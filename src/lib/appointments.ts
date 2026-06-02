@@ -1,7 +1,37 @@
 import { addMinutes, format, parse, isBefore, isAfter, startOfDay } from "date-fns";
 import { prisma } from "./prisma";
 
-export async function getAvailableSlots(dateStr: string, durationMin: number) {
+export function timeToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + (m ?? 0);
+}
+
+export function minutesToTime(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** Verifica se o intervalo [start, start+duration) sobrepõe algum agendamento existente */
+export function overlapsExisting(
+  startMin: number,
+  durationMin: number,
+  bookings: { startTime: string; endTime: string }[]
+): boolean {
+  const endMin = startMin + durationMin;
+  for (const b of bookings) {
+    const bStart = timeToMinutes(b.startTime);
+    const bEnd = timeToMinutes(b.endTime);
+    if (startMin < bEnd && bStart < endMin) return true;
+  }
+  return false;
+}
+
+export async function getAvailableSlots(
+  dateStr: string,
+  durationMin: number,
+  excludeAppointmentId?: string
+) {
   const settings = await prisma.settings.findUnique({ where: { id: "default" } });
   if (!settings) return [];
 
@@ -14,11 +44,8 @@ export async function getAvailableSlots(dateStr: string, durationMin: number) {
   const [startH, startM] = settings.businessHoursStart.split(":").map(Number);
   const [endH, endM] = settings.businessHoursEnd.split(":").map(Number);
 
-  const dayStart = new Date(date);
-  dayStart.setHours(startH, startM, 0, 0);
-
-  const dayEnd = new Date(date);
-  dayEnd.setHours(endH, endM, 0, 0);
+  const dayStartMin = startH * 60 + startM;
+  const dayEndMin = endH * 60 + endM;
 
   const existing = await prisma.appointment.findMany({
     where: {
@@ -27,35 +54,59 @@ export async function getAvailableSlots(dateStr: string, durationMin: number) {
         lt: addMinutes(startOfDay(date), 24 * 60),
       },
       status: { notIn: ["CANCELLED", "NO_SHOW"] },
+      ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
     },
+    select: { startTime: true, endTime: true },
   });
 
-  const booked = new Set(existing.map((a) => a.startTime));
   const slots: string[] = [];
-  let current = dayStart;
-
+  const step = settings.slotDurationMin;
   const isToday = format(date, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
-  const now = new Date();
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
 
-  while (isBefore(addMinutes(current, durationMin), dayEnd)) {
-    const slotStart = format(current, "HH:mm");
-    const slotEndTime = addMinutes(current, durationMin);
-
-    if (!booked.has(slotStart)) {
-      const isFutureSlot = !isToday || isAfter(current, now);
-      if (isFutureSlot && !isAfter(slotEndTime, dayEnd)) {
-        slots.push(slotStart);
-      }
+  for (let cursor = dayStartMin; cursor + durationMin <= dayEndMin; cursor += step) {
+    if (isToday && cursor < nowMin) continue;
+    if (!overlapsExisting(cursor, durationMin, existing)) {
+      slots.push(minutesToTime(cursor));
     }
-
-    current = addMinutes(current, settings.slotDurationMin);
-    if (!isBefore(current, dayEnd)) break;
   }
 
-  return slots.filter((s) => !booked.has(s));
+  return slots;
 }
 
 export function calculateEndTime(startTime: string, durationMin: number): string {
   const base = parse(startTime, "HH:mm", new Date());
   return format(addMinutes(base, durationMin), "HH:mm");
+}
+
+/** Normaliza entrada do cliente para HH:mm ou null */
+export function parseTimeInput(text: string): string | null {
+  const t = text.trim().toLowerCase();
+  const match =
+    t.match(/^(\d{1,2})[:h](\d{2})$/) ||
+    t.match(/^(\d{1,2})[:h](\d{1})$/) ||
+    t.match(/^(\d{1,2})$/);
+  if (!match) return null;
+  const h = parseInt(match[1], 10);
+  const m = match[2] ? parseInt(match[2].padEnd(2, "0"), 10) : 0;
+  if (h > 23 || m > 59) return null;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+export async function isSlotAvailable(
+  dateStr: string,
+  startTime: string,
+  durationMin: number,
+  excludeAppointmentId?: string
+): Promise<boolean> {
+  const slots = await getAvailableSlots(dateStr, durationMin, excludeAppointmentId);
+  return slots.includes(startTime);
+}
+
+export function formatDurationLabel(durationMin: number): string {
+  const h = Math.floor(durationMin / 60);
+  const m = durationMin % 60;
+  if (h > 0 && m > 0) return `${h}h${String(m).padStart(2, "0")}`;
+  if (h > 0) return `${h}h`;
+  return `${m} min`;
 }

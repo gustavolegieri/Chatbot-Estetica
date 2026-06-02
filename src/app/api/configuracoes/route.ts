@@ -16,6 +16,9 @@ const updateSchema = z.object({
   evolutionApiUrl: z.string().optional().nullable(),
   evolutionApiKey: z.string().optional().nullable(),
   evolutionInstanceName: z.string().optional().nullable(),
+  pixKey: z.string().optional().nullable(),
+  pixHolderName: z.string().optional().nullable(),
+  pixBank: z.string().optional().nullable(),
 });
 
 export async function GET() {

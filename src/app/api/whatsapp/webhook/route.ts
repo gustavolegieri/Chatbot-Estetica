@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processWhatsAppMessage } from "@/lib/whatsapp-bot";
-import { normalizePhone } from "@/lib/utils";
+import {
+  isGroupWebhookPayload,
+  isPrivateUserChat,
+  phoneFromPrivateJid,
+} from "@/lib/whatsapp-jid";
 
 interface EvolutionWebhookPayload {
   event?: string;
   instance?: string;
   data?: {
-    key?: { remoteJid?: string; fromMe?: boolean };
+    key?: {
+      remoteJid?: string;
+      fromMe?: boolean;
+      participant?: string;
+    };
+    isGroup?: boolean;
     pushName?: string;
     message?: {
       conversation?: string;
@@ -19,21 +28,17 @@ interface EvolutionWebhookPayload {
   };
 }
 
-/** Apenas chat privado (DM). Ignora grupos, listas de transmissão e status. */
-function isPrivateUserChat(remoteJid: string) {
-  const jid = remoteJid.toLowerCase();
-  if (jid.endsWith("@g.us")) return false;
-  if (jid.endsWith("@broadcast")) return false;
-  if (jid.includes("@newsletter")) return false;
-  return jid.endsWith("@s.whatsapp.net") || jid.endsWith("@c.us");
-}
-
 function extractMessage(payload: EvolutionWebhookPayload) {
   const data = payload.data;
   if (!data?.key?.remoteJid || data.key.fromMe) return null;
+
+  // Grupos, comunidades e listas: ignorar totalmente
+  if (isGroupWebhookPayload(data)) return null;
   if (!isPrivateUserChat(data.key.remoteJid)) return null;
 
-  const phone = normalizePhone(data.key.remoteJid.replace("@s.whatsapp.net", ""));
+  const phone = phoneFromPrivateJid(data.key.remoteJid);
+  if (!phone) return null;
+
   const msg = data.message;
 
   let text = "";
@@ -79,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     const message = extractMessage(payload);
     if (!message) {
-      return NextResponse.json({ success: true, ignored: true });
+      return NextResponse.json({ success: true, ignored: true, reason: "not_private_chat" });
     }
 
     await processWhatsAppMessage(message);
@@ -87,7 +92,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[WhatsApp Webhook]", error);
-    // 200 evita retentativas em loop pela Evolution API
     return NextResponse.json({ success: true, error: "Erro no processamento (ver logs)" });
   }
 }
@@ -95,7 +99,7 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     success: true,
-    message: "Webhook Evolution API ativo",
+    message: "Webhook Evolution API ativo (somente conversas privadas)",
     endpoint: "/api/whatsapp/webhook",
   });
 }

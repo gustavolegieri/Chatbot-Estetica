@@ -1,82 +1,98 @@
-import { addHours, format, parse, subHours } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { addMinutes, subMinutes } from "date-fns";
 import { AppointmentStatus } from "@prisma/client";
 import { prisma } from "./prisma";
-import { sendText } from "./evolution-api";
+import {
+  appointmentStartsAt,
+  sendAppointmentCancelledNotice,
+  sendConfirmWarning,
+  sendReminder4h,
+} from "./appointment-whatsapp";
 
-function appointmentStartsAt(date: Date, startTime: string): Date {
-  const day = format(date, "yyyy-MM-dd");
-  return parse(`${day} ${startTime}`, "yyyy-MM-dd HH:mm", new Date());
-}
+const ACTIVE = [AppointmentStatus.CONFIRMED, AppointmentStatus.PENDING];
 
-/** Envia lembrete WhatsApp ~24h antes do horário do agendamento. */
-export async function sendDueAppointmentReminders(): Promise<{
-  sent: number;
-  skipped: number;
+/** Cron: lembretes 4h, aviso 30min antes, cancelamento após +10min sem confirmação */
+export async function processAppointmentRemindersAndAutoCancel(): Promise<{
+  reminder4h: number;
+  warnings: number;
+  autoCancelled: number;
 }> {
   const settings = await prisma.settings.findUnique({ where: { id: "default" } });
   if (!settings?.whatsappEnabled) {
-    return { sent: 0, skipped: 0 };
+    return { reminder4h: 0, warnings: 0, autoCancelled: 0 };
   }
 
   const now = new Date();
-  const windowStart = addHours(now, 23);
-  const windowEnd = addHours(now, 25);
-
   const appointments = await prisma.appointment.findMany({
     where: {
-      status: { in: [AppointmentStatus.CONFIRMED, AppointmentStatus.PENDING] },
-      reminderSentAt: null,
-      date: { gte: subHours(now, 1) },
+      status: { in: ACTIVE },
+      date: { gte: subMinutes(now, 60) },
     },
-    include: {
-      client: true,
-      service: true,
-    },
+    include: { client: true, service: true },
   });
 
-  let sent = 0;
-  let skipped = 0;
+  let reminder4h = 0;
+  let warnings = 0;
+  let autoCancelled = 0;
 
   for (const apt of appointments) {
     const startsAt = appointmentStartsAt(apt.date, apt.startTime);
-    if (startsAt < windowStart || startsAt > windowEnd) {
-      skipped++;
-      continue;
+    if (startsAt <= now) continue;
+
+    const minsUntil = (startsAt.getTime() - now.getTime()) / 60000;
+
+    // ~4 horas antes: lembrete + pedir confirmação
+    if (!apt.reminder4hSentAt && minsUntil <= 245 && minsUntil >= 215) {
+      await sendReminder4h(apt);
+      await prisma.appointment.update({
+        where: { id: apt.id },
+        data: { reminder4hSentAt: now },
+      });
+      reminder4h++;
     }
 
-    if (!apt.client.phone) {
-      skipped++;
-      continue;
+    // 30 min antes: aviso de cancelamento se não confirmou
+    if (
+      !apt.clientConfirmedAt &&
+      !apt.confirmWarningSentAt &&
+      minsUntil <= 32 &&
+      minsUntil >= 28
+    ) {
+      await sendConfirmWarning(apt);
+      await prisma.appointment.update({
+        where: { id: apt.id },
+        data: { confirmWarningSentAt: now },
+      });
+      warnings++;
     }
 
-    const dateLabel = format(apt.date, "EEEE, dd/MM", { locale: ptBR });
-    const businessName = settings.businessName ?? "Estética Automotiva";
+    // 10 min após aviso (≈20 min antes do horário): cancela automaticamente
+    const shouldAutoCancel =
+      !apt.clientConfirmedAt &&
+      apt.confirmWarningSentAt &&
+      now >= addMinutes(apt.confirmWarningSentAt, 10);
 
-    await sendText({
-      number: apt.client.phone,
-      text: [
-        `⏰ *Lembrete — ${businessName}*`,
-        "",
-        `Olá, ${apt.client.name}!`,
-        "",
-        `Seu agendamento é *amanhã*:`,
-        `🔧 ${apt.service.name}`,
-        `📅 ${dateLabel} às ${apt.startTime}`,
-        settings.businessAddress ? `📍 ${settings.businessAddress}` : "",
-        "",
-        `Qualquer dúvida, responda *menu*.`,
-      ]
-        .filter(Boolean)
-        .join("\n"),
-    });
-
-    await prisma.appointment.update({
-      where: { id: apt.id },
-      data: { reminderSentAt: now },
-    });
-    sent++;
+    if (shouldAutoCancel) {
+      await prisma.appointment.update({
+        where: { id: apt.id },
+        data: { status: AppointmentStatus.CANCELLED },
+      });
+      await sendAppointmentCancelledNotice(
+        apt,
+        "O horário foi liberado por falta de confirmação no prazo combinado."
+      );
+      autoCancelled++;
+    }
   }
 
-  return { sent, skipped };
+  return { reminder4h, warnings, autoCancelled };
+}
+
+/** Mantido para compatibilidade — delega ao fluxo novo */
+export async function sendDueAppointmentReminders() {
+  const result = await processAppointmentRemindersAndAutoCancel();
+  return {
+    sent: result.reminder4h + result.warnings,
+    skipped: 0,
+    ...result,
+  };
 }

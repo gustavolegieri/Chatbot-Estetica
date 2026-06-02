@@ -22,11 +22,11 @@ async function main() {
     update: {},
     create: {
       id: "default",
-      businessName: "Estética Automotiva Premium",
+      businessName: "Garagem do Ka",
       businessPhone: "(11) 99999-9999",
       businessAddress: "Rua das Oficinas, 100 - São Paulo, SP",
       whatsappWelcomeMsg:
-        "Olá! 👋 Bem-vindo à *Estética Automotiva Premium*.\n\nEscolha uma opção abaixo para agendar seu serviço:",
+        "Olá! Bem-vindo à Garagem do Ka 🚗 Estética automotiva premium.",
     },
   });
 
@@ -60,6 +60,30 @@ async function main() {
       description: "Pacote completo: lavagem, polimento e proteção",
       price: 1299.9,
       durationMin: 360,
+    },
+    {
+      name: "Cristalização",
+      description: "Selagem com brilho intenso e proteção da pintura",
+      price: 449.9,
+      durationMin: 150,
+    },
+    {
+      name: "Enceramento Premium",
+      description: "Cera de alta performance e acabamento de vitrine",
+      price: 179.9,
+      durationMin: 60,
+    },
+    {
+      name: "Revitalização de Plásticos",
+      description: "Recuperação de plásticos externos e internos",
+      price: 149.9,
+      durationMin: 90,
+    },
+    {
+      name: "Limpeza de Motor",
+      description: "Limpeza técnica e segura do compartimento do motor",
+      price: 199.9,
+      durationMin: 90,
     },
   ];
 

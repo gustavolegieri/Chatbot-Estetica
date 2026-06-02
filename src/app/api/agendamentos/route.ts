@@ -3,7 +3,7 @@ import { z } from "zod";
 import { parse } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { calculateEndTime } from "@/lib/appointments";
+import { calculateEndTime, isSlotAvailable } from "@/lib/appointments";
 
 const createSchema = z.object({
   clientId: z.string(),
@@ -53,6 +53,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Serviço não encontrado" }, { status: 404 });
     }
 
+    const available = await isSlotAvailable(data.date, data.startTime, service.durationMin);
+    if (!available) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Horário ${data.startTime} indisponível para "${service.name}" (${service.durationMin} min). Escolha outro horário.`,
+        },
+        { status: 409 }
+      );
+    }
+
     const appointment = await prisma.appointment.create({
       data: {
         clientId: data.clientId,
@@ -63,6 +74,7 @@ export async function POST(request: NextRequest) {
         status: data.status ?? "CONFIRMED",
         notes: data.notes,
         source: "admin",
+        clientConfirmedAt: new Date(),
       },
       include: { client: true, service: true },
     });

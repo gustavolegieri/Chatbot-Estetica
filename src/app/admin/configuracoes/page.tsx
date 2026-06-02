@@ -17,6 +17,9 @@ interface Settings {
   evolutionApiUrl: string | null;
   evolutionApiKey: string | null;
   evolutionInstanceName: string | null;
+  pixKey: string | null;
+  pixHolderName: string | null;
+  pixBank: string | null;
 }
 
 const dayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -136,6 +139,24 @@ export default function ConfiguracoesPage() {
                   {label}
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <h2 className="mb-4 text-lg font-semibold">Pagamento PIX (bot WhatsApp)</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label className="label">Chave PIX</label>
+              <input className="input" placeholder="CPF, CNPJ, e-mail ou telefone" value={settings.pixKey ?? ""} onChange={(e) => setSettings({ ...settings, pixKey: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">Nome do titular</label>
+              <input className="input" value={settings.pixHolderName ?? ""} onChange={(e) => setSettings({ ...settings, pixHolderName: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">Banco</label>
+              <input className="input" value={settings.pixBank ?? ""} onChange={(e) => setSettings({ ...settings, pixBank: e.target.value })} />
             </div>
           </div>
         </div>

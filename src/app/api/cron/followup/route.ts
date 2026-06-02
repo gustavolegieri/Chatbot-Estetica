@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processAppointmentRemindersAndAutoCancel } from "@/lib/appointment-reminders";
+import { sendIdleSessionRecoveries } from "@/lib/whatsapp-followup";
+import { resetAllExpiredSessions } from "@/lib/whatsapp-session-reset";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
-  const result = await processAppointmentRemindersAndAutoCancel();
-  return NextResponse.json({ ok: true, ...result });
+  const reset = await resetAllExpiredSessions();
+  const followup = await sendIdleSessionRecoveries();
+  const reminders = await processAppointmentRemindersAndAutoCancel();
+  return NextResponse.json({ ok: true, ...reset, ...followup, reminders });
 }

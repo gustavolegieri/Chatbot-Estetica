@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { parse } from "date-fns";
+import { format, parse } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { calculateEndTime } from "@/lib/appointments";
+import { calculateEndTime, isSlotAvailable } from "@/lib/appointments";
+import { onAppointmentStatusChange } from "@/lib/appointment-lifecycle";
 
 const updateSchema = z.object({
   clientId: z.string().optional(),
@@ -28,19 +29,42 @@ export async function PUT(
 
     const existing = await prisma.appointment.findUnique({
       where: { id },
-      include: { service: true },
+      include: { service: true, client: true },
     });
     if (!existing) {
       return NextResponse.json({ success: false, error: "Não encontrado" }, { status: 404 });
     }
 
+    const previousStatus = existing.status;
+    const serviceId = data.serviceId ?? existing.serviceId;
+    const service = await prisma.service.findUnique({ where: { id: serviceId } });
+    if (!service) {
+      return NextResponse.json({ success: false, error: "Serviço não encontrado" }, { status: 404 });
+    }
+
+    const dateStr = data.date ?? format(existing.date, "yyyy-MM-dd");
+    const startTime = data.startTime ?? existing.startTime;
+
+    const newStatus = data.status ?? previousStatus;
+    if (
+      (data.date || data.startTime || data.serviceId) &&
+      newStatus !== "CANCELLED"
+    ) {
+      const available = await isSlotAvailable(dateStr, startTime, service.durationMin, id);
+      if (!available) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Horário ${startTime} indisponível. "${service.name}" ocupa ${service.durationMin} min — o próximo horário livre depende da duração do serviço.`,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     let endTime = existing.endTime;
     if (data.startTime || data.serviceId) {
-      const serviceId = data.serviceId ?? existing.serviceId;
-      const service = await prisma.service.findUnique({ where: { id: serviceId } });
-      if (service) {
-        endTime = calculateEndTime(data.startTime ?? existing.startTime, service.durationMin);
-      }
+      endTime = calculateEndTime(startTime, service.durationMin);
     }
 
     const appointment = await prisma.appointment.update({
@@ -54,10 +78,10 @@ export async function PUT(
     });
 
     if (data.status === "COMPLETED") {
-      const existing = await prisma.financialRecord.findFirst({
+      const income = await prisma.financialRecord.findFirst({
         where: { appointmentId: id, type: "INCOME" },
       });
-      if (!existing) {
+      if (!income) {
         await prisma.financialRecord.create({
           data: {
             type: "INCOME",
@@ -72,8 +96,13 @@ export async function PUT(
       }
     }
 
+    if (data.status) {
+      await onAppointmentStatusChange(previousStatus, appointment);
+    }
+
     return NextResponse.json({ success: true, data: appointment });
-  } catch {
+  } catch (e) {
+    console.error("[agendamentos PUT]", e);
     return NextResponse.json({ success: false, error: "Erro ao atualizar" }, { status: 500 });
   }
 }
@@ -86,9 +115,21 @@ export async function DELETE(
   if (!session) return NextResponse.json({ success: false, error: "Não autenticado" }, { status: 401 });
 
   const { id } = await params;
-  await prisma.appointment.update({
+  const existing = await prisma.appointment.findUnique({
+    where: { id },
+    include: { client: true, service: true },
+  });
+  if (!existing) {
+    return NextResponse.json({ success: false, error: "Não encontrado" }, { status: 404 });
+  }
+
+  const appointment = await prisma.appointment.update({
     where: { id },
     data: { status: "CANCELLED" },
+    include: { client: true, service: true },
   });
+
+  await onAppointmentStatusChange(existing.status, appointment);
+
   return NextResponse.json({ success: true });
 }

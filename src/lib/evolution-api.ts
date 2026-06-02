@@ -1,4 +1,5 @@
 import { phoneToWhatsApp } from "./utils";
+import { isValidPrivateRecipient } from "./whatsapp-jid";
 
 interface SendTextParams {
   number: string;
@@ -58,6 +59,10 @@ async function evolutionFetch(endpoint: string, body: object) {
 }
 
 export async function sendText({ number, text }: SendTextParams) {
+  if (!isValidPrivateRecipient(number)) {
+    console.warn("[Evolution API] Envio bloqueado (não é chat privado):", number);
+    return { blocked: true, reason: "not_private_recipient" };
+  }
   return evolutionFetch("Text", {
     number: phoneToWhatsApp(number),
     text,

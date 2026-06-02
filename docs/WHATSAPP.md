@@ -4,36 +4,26 @@
 
 O bot de WhatsApp guia o cliente por um fluxo conversacional para agendar, consultar, cancelar ou reagendar serviços.
 
-## Fluxo do Bot
+## Fluxo do Bot (Garagem do Ka)
+
+Atendente virtual premium com etapas numeradas, anti-flood (debounce ~2,8s) e apenas chats privados.
 
 ```
-Mensagem recebida
-       │
-       ▼
-┌──────────────┐
-│ Menu inicial │ ◄── "menu", "oi", "olá"
-└──────┬───────┘
-       │
-   ┌───┴───┬──────────┬──────────┐
-   ▼       ▼          ▼          ▼
-Agendar  Meus     Cancelar   Reagendar
-         agend.
-   │
-   ▼
-Escolher serviço (lista)
-   │
-   ▼
-Escolher data (lista)
-   │
-   ▼
-Escolher horário (lista)
-   │
-   ▼
-Confirmar (botões)
-   │
-   ▼
-Agendamento criado + registro financeiro
+Primeira mensagem → Boas-vindas + pedir nome
+Nome → Menu (8 categorias de serviço)
+Categoria → Submenu ou serviço direto
+Serviço → Agendar / Outros / Dúvida
+Veículo (modelo • ano • cor • estado) → Orçamento
+Upsell (1x) → Período → Dia → Pagamento → Confirmação
 ```
+
+**Comandos:** `menu` volta ao menu principal (se o nome já foi informado).
+
+**Interpretação livre:** o cliente pode enviar veículo e serviço na mesma mensagem (ex.: *Hilux preta 2021 com riscos, quero vitrificação*). SUVs/pickups e condição severa ajustam a faixa de preço.
+
+**Sessão:** após 45 min sem resposta, oferece continuar ou recomeçar.
+
+Arquivos principais: `src/lib/whatsapp-bot.ts`, `whatsapp-flow.ts`, `whatsapp-catalog.ts`, `whatsapp-flow-messages.ts`.
 
 ## Configuração da Evolution API
 

@@ -79,21 +79,31 @@ export default function AgendamentosPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    await fetch("/api/agendamentos", {
+    const res = await fetch("/api/agendamentos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
+    const data = await res.json();
+    if (!data.success) {
+      alert(data.error ?? "Erro ao agendar");
+      return;
+    }
     setModalOpen(false);
     load();
   }
 
   async function updateStatus(id: string, status: string) {
-    await fetch(`/api/agendamentos/${id}`, {
+    const res = await fetch(`/api/agendamentos/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
+    const data = await res.json();
+    if (!data.success) {
+      alert(data.error ?? "Erro ao atualizar status");
+      return;
+    }
     load();
   }
 
@@ -143,7 +153,10 @@ export default function AgendamentosPage() {
                     {apt.startTime} - {apt.endTime}
                   </td>
                   <td className="py-3">{apt.client.name}</td>
-                  <td className="py-3">{apt.service.name}</td>
+                  <td className="py-3">
+                    {apt.service.name}
+                    <span className="ml-1 text-xs text-slate-400">({apt.service.durationMin} min)</span>
+                  </td>
                   <td className="py-3">
                     <StatusBadge status={apt.status} />
                   </td>
