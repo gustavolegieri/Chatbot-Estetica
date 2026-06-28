@@ -1,38 +1,24 @@
 # Supabase + Vercel (Prisma)
 
-## URL que funciona neste projeto
+## Por que `db.*.supabase.co` falha na Vercel
 
-Na **Vercel**, use o **PgBouncer** no host `db.*` (porta **6543**), não a conexão direta na 5432:
+O host `db.rifvdutsxappnlroennh.supabase.co` costuma ser **só IPv6**. No seu PC funciona; na **Vercel (IPv4)** o `/api/health` fica com `db: false`.
+
+Use o **Supavisor (pooler)** com usuário `postgres.PROJECT_REF`:
 
 ```env
-DATABASE_URL=postgresql://postgres:SUA_SENHA_URL_ENCODED@db.rifvdutsxappnlroennh.supabase.co:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
+DATABASE_URL=postgresql://postgres.rifvdutsxappnlroennh:SUA_SENHA%23@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
 ```
 
-- Usuário: `postgres` (não `postgres.rifvdutsxappnlroennh` neste formato)
-- Senha com `#` → `%23` na URL
-- Caminho: `/postgres` + `?` + parâmetros (não cole `sslmode` colado em `postgres`)
+- `#` na senha → `%23`
+- Copie a região exata em **Supabase → Connect → Transaction pooler** (este projeto: `aws-1-us-east-1`)
 
-## Erros comuns
-
-| Sintoma | Causa |
-|--------|--------|
-| `db: false` na Vercel | URL com `:5432` no host `db.*` (IPv6; serverless não alcança) |
-| `db: false` com env OK | URL malformada, ex.: `...6543/postgressslmode=require` (falta `?`) |
-| Pooler `aws-0-...` falha | Região errada — prefira a URL acima (porta 6543 no `db.*`) |
-
-## No PC (migrations / seed)
-
-Mantenha no `.env` local:
+## No PC
 
 ```env
-# Runtime (igual Vercel)
-DATABASE_URL=postgresql://postgres:...@db.rifvdutsxappnlroennh.supabase.co:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
-
-# Opcional: migrations Prisma (5432 direto, só no PC)
+DATABASE_URL=...pooler...6543...?pgbouncer=true...
 DIRECT_URL=postgresql://postgres:...@db.rifvdutsxappnlroennh.supabase.co:5432/postgres?sslmode=require
 ```
-
-Depois de conectar:
 
 ```bash
 npx prisma db push
@@ -43,13 +29,14 @@ Admin: `admin@estetica.com` / `admin123`
 
 ## Vercel
 
-1. **Settings → Environment Variables** → `DATABASE_URL` (Production, Preview, Development)
-2. **Deployments → Redeploy** (obrigatório após mudar env)
-3. Abra `https://SEU-DOMINIO.vercel.app/api/health` → deve retornar `"db":true,"adminUser":true`
+1. `DATABASE_URL` = pooler (acima), **sem aspas**
+2. `JWT_SECRET` e `NEXT_PUBLIC_APP_URL` = `https://chatbot-estetica-ten.vercel.app`
+3. **Redeploy** após mudar env
 
-## Testar URL localmente
+Teste: `https://chatbot-estetica-ten.vercel.app/api/health` → `"ok":true`
+
+## Achar a região do pooler
 
 ```bash
-node scripts/check-db-url.mjs
-node scripts/test-pooler.mjs
+node scripts/find-pooler-region.mjs
 ```

@@ -1,105 +1,129 @@
+/**
+ * Webhook WasenderAPI → Next.js
+ * Arquivo: src/app/api/webhook/whatsapp/route.ts
+ *
+ * Substitui o webhook da Evolution API.
+ *
+ * Variável de ambiente necessária:
+ *   WASENDER_WEBHOOK_SECRET  → segredo gerado no painel WasenderAPI
+ *                              (sessão → configurações → webhook secret)
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { processWhatsAppMessage } from "@/lib/whatsapp-bot";
-import {
-  isGroupWebhookPayload,
-  isPrivateUserChat,
-  phoneFromPrivateJid,
-} from "@/lib/whatsapp-jid";
+import { isGroupWebhookPayload, phoneFromPrivateJid } from "@/lib/whatsapp-jid";
 
-interface EvolutionWebhookPayload {
-  event?: string;
-  instance?: string;
-  data?: {
-    key?: {
-      remoteJid?: string;
-      fromMe?: boolean;
-      participant?: string;
-    };
-    isGroup?: boolean;
-    pushName?: string;
-    message?: {
-      conversation?: string;
-      extendedTextMessage?: { text?: string };
-      buttonsResponseMessage?: { selectedButtonId?: string };
-      listResponseMessage?: {
-        singleSelectReply?: { selectedRowId?: string };
-      };
-    };
-  };
+/** Verifica assinatura enviada pela WasenderAPI no header X-Webhook-Signature */
+function verifySignature(req: NextRequest, rawBody: string): boolean {
+  const secret = process.env.WASENDER_WEBHOOK_SECRET;
+  // Se não configurou o secret, passa (útil em dev)
+  if (!secret) return true;
+
+  const signature = req.headers.get("x-webhook-signature");
+  if (!signature) return false;
+
+  return signature === secret;
 }
 
-function extractMessage(payload: EvolutionWebhookPayload) {
-  const data = payload.data;
-  if (!data?.key?.remoteJid || data.key.fromMe) return null;
+/**
+ * Extrai o texto da mensagem do payload WasenderAPI.
+ * O campo unificado é `messageBody`; fallback para campos legados.
+ */
+function extractText(data: Record<string, unknown>): string {
+  if (typeof data.messageBody === "string") return data.messageBody;
 
-  // Grupos, comunidades e listas: ignorar totalmente
-  if (isGroupWebhookPayload(data)) return null;
-  if (!isPrivateUserChat(data.key.remoteJid)) return null;
+  const msg = data.message as Record<string, unknown> | undefined;
+  if (!msg) return "";
 
-  const phone = phoneFromPrivateJid(data.key.remoteJid);
-  if (!phone) return null;
+  return (
+    (msg.conversation as string) ||
+    (msg.extendedTextMessage as Record<string, unknown>)?.text as string ||
+    ""
+  );
+}
 
-  const msg = data.message;
+/** Extrai buttonId / listId de respostas interativas (se suportado no futuro) */
+function extractInteractive(data: Record<string, unknown>) {
+  const msg = data.message as Record<string, unknown> | undefined;
+  if (!msg) return {};
 
-  let text = "";
-  let buttonId: string | undefined;
-  let listId: string | undefined;
-
-  if (msg?.conversation) {
-    text = msg.conversation;
-  } else if (msg?.extendedTextMessage?.text) {
-    text = msg.extendedTextMessage.text;
-  } else if (msg?.buttonsResponseMessage?.selectedButtonId) {
-    buttonId = msg.buttonsResponseMessage.selectedButtonId;
-    text = buttonId;
-  } else if (msg?.listResponseMessage?.singleSelectReply?.selectedRowId) {
-    listId = msg.listResponseMessage.singleSelectReply.selectedRowId;
-    text = listId;
+  // botão de resposta rápida
+  const btnReply = msg.buttonsResponseMessage as Record<string, unknown> | undefined;
+  if (btnReply) {
+    return { buttonId: btnReply.selectedButtonId as string };
   }
 
-  if (!text && !buttonId && !listId) return null;
+  // item de lista
+  const listReply = msg.listResponseMessage as Record<string, unknown> | undefined;
+  if (listReply) {
+    return { listId: listReply.singleSelectReply?.selectedRowId as string };
+  }
 
-  return {
+  return {};
+}
+
+export async function POST(req: NextRequest) {
+  let rawBody: string;
+  try {
+    rawBody = await req.text();
+  } catch {
+    return NextResponse.json({ error: "invalid body" }, { status: 400 });
+  }
+
+  if (!verifySignature(req, rawBody)) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return NextResponse.json({ error: "invalid json" }, { status: 400 });
+  }
+
+  const event = payload.event as string | undefined;
+
+  // Só processa mensagens recebidas (não as enviadas pelo bot)
+  if (event !== "messages.received" && event !== "messages.upsert") {
+    return NextResponse.json({ ok: true });
+  }
+
+  const data = (payload.data ?? payload) as Record<string, unknown>;
+
+  // Ignora mensagens enviadas pelo próprio bot
+  const key = data.key as Record<string, unknown> | undefined;
+  if (key?.fromMe === true) {
+    return NextResponse.json({ ok: true });
+  }
+
+  // Ignora grupos
+  if (isGroupWebhookPayload({ key, isGroup: data.isGroup as boolean })) {
+    return NextResponse.json({ ok: true });
+  }
+
+  const remoteJid = (key?.remoteJid ?? data.from ?? "") as string;
+  const phone = phoneFromPrivateJid(remoteJid);
+  if (!phone) {
+    return NextResponse.json({ ok: true });
+  }
+
+  const text = extractText(data);
+  const { buttonId, listId } = extractInteractive(data);
+  const pushName = (data.pushName ?? data.notifyName ?? "") as string;
+
+  // Responde 200 imediatamente antes de processar (boa prática)
+  const processingPromise = processWhatsAppMessage({
     phone,
-    text,
+    text: text || buttonId || listId || "",
     buttonId,
     listId,
-    pushName: data.pushName,
-  };
-}
-
-function isMessageUpsertEvent(event?: string) {
-  if (!event) return false;
-  const normalized = event.toLowerCase().replace(/_/g, ".");
-  return normalized === "messages.upsert";
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const payload: EvolutionWebhookPayload = await request.json();
-
-    if (!isMessageUpsertEvent(payload.event)) {
-      return NextResponse.json({ success: true, ignored: true, event: payload.event });
-    }
-
-    const message = extractMessage(payload);
-    if (!message) {
-      return NextResponse.json({ success: true, ignored: true, reason: "not_private_chat" });
-    }
-
-    await processWhatsAppMessage(message);
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("[WhatsApp Webhook]", error);
-    return NextResponse.json({ success: true, error: "Erro no processamento (ver logs)" });
-  }
-}
-
-export async function GET() {
-  return NextResponse.json({
-    success: true,
-    message: "Webhook Evolution API ativo (somente conversas privadas)",
-    endpoint: "/api/whatsapp/webhook",
+    pushName: pushName || undefined,
   });
+
+  // Fire-and-forget com log de erro
+  processingPromise.catch((err) => {
+    console.error("[Webhook] Erro ao processar mensagem:", err);
+  });
+
+  return NextResponse.json({ ok: true });
 }

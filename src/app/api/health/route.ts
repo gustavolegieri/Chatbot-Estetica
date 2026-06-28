@@ -16,6 +16,7 @@ export async function GET() {
     hint: "" as string,
     urlHost: urlAnalysis.host || undefined,
     urlPort: urlAnalysis.port || undefined,
+    urlHasPgbouncer: process.env.DATABASE_URL?.includes("pgbouncer=true") ?? false,
   };
 
   if (urlAnalysis.hints.length > 0) {
@@ -36,7 +37,7 @@ export async function GET() {
     if (/Can't reach database|P1001|ENOTFOUND|ETIMEDOUT/i.test(msg)) {
       checks.hint =
         checks.hint ||
-        "Banco inacessível. Na Vercel use: db.rifvdutsxappnlroennh.supabase.co:6543 com ?pgbouncer=true (veja docs/SUPABASE-VERCEL.md).";
+        "Banco inacessível na Vercel. Use o pooler aws-*-us-east-1.pooler.supabase.com:6543 (não db.*:6543). Veja docs/SUPABASE-VERCEL.md.";
     } else if (!checks.hint) {
       checks.hint = "Erro ao conectar ao banco. Confira DATABASE_URL na Vercel.";
     }

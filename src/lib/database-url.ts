@@ -68,6 +68,11 @@ export function analyzeDatabaseUrl(raw?: string): {
       "Na Vercel use porta 6543 no mesmo host db.*.supabase.co (PgBouncer), não 5432."
     );
   }
+  if (process.env.VERCEL === "1" && host === `db.${PROJECT_REF}.supabase.co`) {
+    hints.push(
+      "db.*.supabase.co costuma falhar na Vercel (IPv6). Use aws-*-REGION.pooler.supabase.com:6543."
+    );
+  }
   if (wrongUserForPooler) {
     hints.push(`No pooler aws-*, o usuário deve ser postgres.${PROJECT_REF}, não só postgres.`);
   }
@@ -91,6 +96,32 @@ export function analyzeDatabaseUrl(raw?: string): {
   };
 }
 
+/** Corrige typos comuns e completa parâmetros que a Vercel às vezes corta */
+export function repairDatabaseUrl(raw?: string): string | undefined {
+  let url = sanitizeDatabaseUrl(raw);
+  if (!url) return undefined;
+
+  url = url.replace(/\/postgress+sslmode=require/gi, "/postgres?sslmode=require");
+  url = url.replace(/\/postgressslmode=require/gi, "/postgres?sslmode=require");
+
+  const dbHost = `db.${PROJECT_REF}.supabase.co`;
+  const onVercel = process.env.VERCEL === "1";
+
+  if (url.includes(dbHost)) {
+    if (onVercel && url.includes(`@${dbHost}:5432/`)) {
+      url = url.replace(`@${dbHost}:5432/`, `@${dbHost}:6543/`);
+    }
+    if (url.includes(`@${dbHost}:6543/`) && !url.includes("pgbouncer=true")) {
+      url += url.includes("?") ? "&pgbouncer=true" : "?pgbouncer=true";
+    }
+    if (!url.includes("sslmode=")) {
+      url += url.includes("?") ? "&sslmode=require" : "?sslmode=require";
+    }
+  }
+
+  return url;
+}
+
 export function getRuntimeDatabaseUrl(): string | undefined {
-  return sanitizeDatabaseUrl(process.env.DATABASE_URL);
+  return repairDatabaseUrl(process.env.DATABASE_URL);
 }
