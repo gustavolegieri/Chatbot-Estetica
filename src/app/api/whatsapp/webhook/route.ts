@@ -56,7 +56,8 @@ function extractInteractive(data: Record<string, unknown>) {
   // item de lista
   const listReply = msg.listResponseMessage as Record<string, unknown> | undefined;
   if (listReply) {
-    return { listId: listReply.singleSelectReply?.selectedRowId as string };
+    const singleSelect = listReply.singleSelectReply as Record<string, unknown> | undefined;
+    return { listId: singleSelect?.selectedRowId as string | undefined };
   }
 
   return {};
