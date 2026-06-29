@@ -63,6 +63,11 @@ import {
   vehicleDisplayFromFlow,
 } from "./whatsapp-vehicle-parse";
 import { FlowState } from "./whatsapp-flow-types";
+import {
+  analyzeWhatsAppMessage,
+  answerCustomerDoubt,
+  looksLikeQuestion,
+} from "./whatsapp-ai";
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -499,6 +504,23 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
 
   if (
     !isShortMenuPick &&
+    !num &&
+    looksLikeQuestion(input) &&
+    flow.stage !== "ETAPA10_FAQ" &&
+    flow.stage !== "ETAPA1_AWAITING_NAME"
+  ) {
+    const aiAnswer = await answerCustomerDoubt({ question: input, flow, ctx, wctx });
+    if (aiAnswer) {
+      await sendText({
+        number: msg.phone,
+        text: `${aiAnswer}\n\n${menuForStage(flow, wctx)}`,
+      });
+      return;
+    }
+  }
+
+  if (
+    !isShortMenuPick &&
     flow.customerName &&
     flow.stage !== "ETAPA1_AWAITING_NAME" &&
     flow.stage !== "STALE_RETURN"
@@ -534,9 +556,45 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
 
     case "ETAPA1_AWAITING_NAME": {
       const serviceKey = detectServiceKey(input);
+      const analysis = await analyzeWhatsAppMessage({
+        text: input,
+        stage: flow.stage,
+        pushName: msg.pushName,
+        ctx,
+      });
 
-      if (!looksLikePersonName(input)) {
-        const hint = msg.pushName && looksLikePersonName(msg.pushName) ? msg.pushName.split(/\s+/)[0] : null;
+      if (analysis?.intent === "greeting" || analysis?.intent === "small_talk") {
+        const hint =
+          msg.pushName && looksLikePersonName(msg.pushName) ? msg.pushName.split(/\s+/)[0] : null;
+        await sendText({
+          number: msg.phone,
+          text:
+            analysis.reply ??
+            (hint
+              ? `Olá! 😊 Para começar, me confirma seu *nome*?\n_(Se for *${hint}*, pode mandar só o nome)_`
+              : `Olá! 😊 Para começar, qual é o seu *nome*?\n_(Só o primeiro nome)_`),
+        });
+        return;
+      }
+
+      if (analysis?.intent === "doubt" && analysis.reply) {
+        await sendText({
+          number: msg.phone,
+          text: `${analysis.reply}\n\nPara seguir, qual é o seu *nome*? 😊\n_(Só o primeiro nome)_`,
+        });
+        return;
+      }
+
+      const nameFromAi =
+        analysis?.intent === "name" && analysis.extractedName
+          ? analysis.extractedName.split(/\s+/)[0]
+          : null;
+      const nameFromInput = looksLikePersonName(input) ? input.split(/\s+/)[0] : null;
+      const name = nameFromAi ?? nameFromInput;
+
+      if (!name) {
+        const hint =
+          msg.pushName && looksLikePersonName(msg.pushName) ? msg.pushName.split(/\s+/)[0] : null;
         await sendText({
           number: msg.phone,
           text: hint
@@ -546,7 +604,6 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         return;
       }
 
-      const name = input.split(/\s+/)[0];
       await ensureClient(msg.phone, name);
       const next: FlowState = {
         stage: "ETAPA2_MAIN_MENU",
@@ -580,6 +637,16 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
             text: msgH.mainMenu(flow.customerName ?? "Cliente"),
           });
           return;
+        }
+        if (looksLikeQuestion(input)) {
+          const aiAnswer = await answerCustomerDoubt({ question: input, flow, ctx, wctx });
+          if (aiAnswer) {
+            await sendText({
+              number: msg.phone,
+              text: `${aiAnswer}\n\n${msgH.mainMenu(flow.customerName ?? "Cliente")}`,
+            });
+            return;
+          }
         }
         await sendText({
           number: msg.phone,
@@ -950,7 +1017,8 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         }
         return;
       }
-      const ans = faqAnswer(input, flow);
+      const ans =
+        (await answerCustomerDoubt({ question: input, flow, ctx, wctx })) ?? faqAnswer(input, flow);
       await sendText({
         number: msg.phone,
         text: ans

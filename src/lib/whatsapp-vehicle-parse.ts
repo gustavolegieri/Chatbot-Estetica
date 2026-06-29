@@ -35,6 +35,8 @@ const CAR_MODELS =
 const NOT_VEHICLE_TEXT =
   /agendamento|agendar|marcar|reservar|menu|dúvida|duvida|lavagem|polimento|vitrifica|higieniza|obrigad|valeu|bom dia|boa tarde|boa noite|oi|olá|ola|quero|preciso|serviço|servico|horário|horario|pagamento|pix/i;
 
+import { isGreetingOrSmallTalk } from "./whatsapp-intent";
+
 const NOT_A_NAME =
   /agendamento|agendar|marcar|reservar|menu|lavagem|polimento|vitrifica|higieniza|cristaliza|pacote|serviço|servico|obrigad|valeu|bom dia|boa tarde|quero|preciso|horário|horario|pagamento|pix|^\d+$/i;
 
@@ -134,6 +136,7 @@ export function looksLikePersonName(text: string): boolean {
   const t = text.trim();
   if (t.length < 2 || t.length > 35) return false;
   if (/^\d{1,2}$/.test(t)) return false;
+  if (isGreetingOrSmallTalk(t)) return false;
   if (NOT_A_NAME.test(t)) return false;
   if (isValidVehicle(t)) return false;
   if (looksLikeVehicleOnly(t)) return false;
