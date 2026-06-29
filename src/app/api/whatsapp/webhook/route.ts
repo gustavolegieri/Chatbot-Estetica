@@ -1,6 +1,3 @@
-* Webhook WasenderAPI → Next.js
- * Arquivo: src/app/api/whatsapp/webhook/route.ts
- */
 
 import { NextRequest, NextResponse } from "next/server";
 import { processWhatsAppMessage } from "@/lib/whatsapp-bot";
