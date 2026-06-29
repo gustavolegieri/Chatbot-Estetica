@@ -8,13 +8,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isLogin = pathname === "/admin/login";
 
   if (isLogin) {
-    return <>{children}</>;
+    return <div className="admin-shell">{children}</div>;
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="admin-shell flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 overflow-auto p-8">{children}</main>
+      <main className="flex-1 overflow-auto p-6 lg:p-8">{children}</main>
     </div>
   );
 }

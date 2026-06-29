@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Car, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { BrandLogo } from "@/components/layout/BrandLogo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -40,19 +41,26 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-brand-900 via-brand-800 to-slate-900 p-4">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 backdrop-blur">
-            <Car className="h-8 w-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-white">Estética Automotiva</h1>
-          <p className="mt-1 text-brand-200">Acesse o painel administrativo</p>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden p-4">
+      {/* Background */}
+      <div className="absolute inset-0 bg-surface-950" />
+      <div className="absolute inset-0 bg-dark-radial opacity-80" />
+      <div className="absolute left-1/2 top-0 h-px w-3/4 -translate-x-1/2 bg-gold-shine opacity-30" />
+
+      <div className="relative w-full max-w-md">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <BrandLogo size="lg" />
+          <p className="mt-4 font-serif text-xs uppercase tracking-[0.35em] text-brand-400/80">
+            Estética Automotiva Premium
+          </p>
+          <p className="mt-2 text-sm text-slate-500">Acesse o painel administrativo</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="card">
+        <form onSubmit={handleSubmit} className="card border-brand-700/30">
           {error && (
-            <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+            <div className="mb-4 rounded-lg bg-red-950/50 px-4 py-3 text-sm text-red-300 ring-1 ring-red-800/50">
+              {error}
+            </div>
           )}
 
           <div className="space-y-4">
@@ -94,11 +102,11 @@ export default function LoginPage() {
                 Entrando...
               </>
             ) : (
-              "Entrar"
+              "Entrar no painel"
             )}
           </button>
 
-          <p className="mt-4 text-center text-xs text-slate-500">
+          <p className="mt-4 text-center text-xs text-slate-600">
             Demo: admin@estetica.com / admin123
           </p>
         </form>

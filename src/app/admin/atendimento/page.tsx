@@ -181,7 +181,7 @@ export default function AtendimentoPage() {
 
   return (
     <div className="-m-8 flex h-[calc(100vh)] flex-col">
-      <div className="shrink-0 border-b border-slate-200 bg-white px-6 py-4">
+      <div className="shrink-0 border-b border-brand-900/40 bg-surface-850 px-6 py-4">
         <AdminHeader
           title="Central de Atendimento"
           description="Conversas WhatsApp, solicitações ao dono e analytics do bot"
@@ -228,7 +228,7 @@ export default function AtendimentoPage() {
 
         {showAnalytics && overview && (
           <div className="mt-3 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div className="rounded-lg border border-brand-900/40 bg-surface-800 p-4">
               <h3 className="mb-3 text-sm font-semibold text-slate-700">
                 Serviços mais agendados (WhatsApp)
               </h3>
@@ -242,7 +242,7 @@ export default function AtendimentoPage() {
                         <span className="font-medium text-slate-700">{s.name}</span>
                         <span className="text-slate-500">{s.count}</span>
                       </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                      <div className="h-2 overflow-hidden rounded-full bg-surface-700">
                         <div
                           className="h-full rounded-full bg-brand-500 transition-all"
                           style={{ width: `${(s.count / maxServiceCount) * 100}%` }}
@@ -253,7 +253,7 @@ export default function AtendimentoPage() {
                 </div>
               )}
             </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div className="rounded-lg border border-brand-900/40 bg-surface-800 p-4">
               <h3 className="mb-3 text-sm font-semibold text-slate-700">
                 Funil do bot (7 dias)
               </h3>
@@ -261,7 +261,7 @@ export default function AtendimentoPage() {
                 {overview.funnel.slice(0, 10).map((f) => (
                   <span
                     key={f.stage}
-                    className="rounded-full bg-white px-2.5 py-1 text-xs text-slate-600 ring-1 ring-slate-200"
+                    className="rounded-full bg-surface-750 ring-brand-800/30"
                   >
                     {f.label}: <strong>{f.count}</strong>
                   </span>
@@ -274,8 +274,8 @@ export default function AtendimentoPage() {
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-12">
         {/* Lista de conversas */}
-        <div className="flex flex-col border-r border-slate-200 bg-white lg:col-span-3">
-          <div className="space-y-2 border-b border-slate-200 p-3">
+        <div className="flex flex-col border-r border-brand-900/40 bg-surface-850 lg:col-span-3">
+          <div className="space-y-2 border-b border-surface-700 p-3">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
@@ -299,7 +299,7 @@ export default function AtendimentoPage() {
                   onClick={() => setFilter(f.id)}
                   className={cn(
                     "rounded-full px-2 py-0.5 text-xs font-medium",
-                    filter === f.id ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600"
+                    filter === f.id ? "bg-brand-600 text-surface-950" : "bg-surface-750 text-slate-400"
                   )}
                 >
                   {f.label}
@@ -320,14 +320,14 @@ export default function AtendimentoPage() {
                     type="button"
                     onClick={() => selectConversation(c.phone)}
                     className={cn(
-                      "w-full border-b border-slate-100 px-3 py-3 text-left transition hover:bg-slate-50",
+                      "w-full border-b border-surface-700 px-3 py-3 text-left transition hover:bg-surface-750",
                       selectedPhone === c.phone && "bg-brand-50"
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="truncate font-medium text-slate-900">{c.clientName}</p>
+                          <p className="truncate font-medium text-slate-100">{c.clientName}</p>
                           {c.handoffStatus === "PENDING" && (
                             <span className="shrink-0 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
                               DONO
@@ -358,7 +358,7 @@ export default function AtendimentoPage() {
         </div>
 
         {/* Chat */}
-        <div className="flex min-h-0 flex-col bg-slate-50 lg:col-span-6">
+        <div className="flex min-h-0 flex-col bg-surface-800 lg:col-span-6">
           {!selectedPhone || !detail ? (
             <div className="flex flex-1 flex-col items-center justify-center text-slate-500">
               <MessageCircle className="mb-3 h-12 w-12 text-slate-300" />
@@ -366,9 +366,9 @@ export default function AtendimentoPage() {
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
+              <div className="flex items-center justify-between border-b border-brand-900/40 bg-surface-850 px-4 py-3">
                 <div>
-                  <p className="font-semibold text-slate-900">
+                  <p className="font-semibold text-slate-100">
                     {detail.flow.customerName ?? detail.session.client?.name ?? "Cliente"}
                   </p>
                   <p className="text-xs text-slate-500">{formatPhone(detail.session.phone)}</p>
@@ -403,7 +403,7 @@ export default function AtendimentoPage() {
                 <div ref={chatEndRef} />
               </div>
 
-              <form onSubmit={sendReply} className="border-t border-slate-200 bg-white p-3">
+              <form onSubmit={sendReply} className="border-t border-brand-900/40 bg-surface-850 p-3">
                 <div className="flex gap-2">
                   <input
                     className="input flex-1"
@@ -421,14 +421,14 @@ export default function AtendimentoPage() {
         </div>
 
         {/* Painel lateral */}
-        <div className="overflow-y-auto border-l border-slate-200 bg-white p-4 lg:col-span-3">
+        <div className="overflow-y-auto border-l border-brand-900/40 bg-surface-850 p-4 lg:col-span-3">
           {!detail ? (
             <p className="text-sm text-slate-500">Detalhes do cliente aparecem aqui</p>
           ) : (
             <div className="space-y-5">
               <section>
                 <h3 className="mb-2 text-sm font-semibold text-slate-800">Fluxo atual</h3>
-                <div className="rounded-lg bg-slate-50 p-3 text-sm">
+                <div className="rounded-lg bg-surface-800 p-3 text-sm">
                   <p>
                     <span className="text-slate-500">Etapa:</span> {detail.flow.stageLabel}
                   </p>
@@ -528,7 +528,7 @@ export default function AtendimentoPage() {
                 ) : (
                   <ul className="space-y-2">
                     {detail.appointments.map((a) => (
-                      <li key={a.id} className="rounded-lg border border-slate-200 p-2 text-xs">
+                      <li key={a.id} className="rounded-lg border border-surface-700 p-2 text-xs">
                         <p className="font-medium">{a.service.name}</p>
                         <p className="text-slate-500">
                           {formatDate(a.date)} · {a.startTime} · {a.status}

@@ -4,32 +4,79 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply bg-surface-950 text-slate-100 antialiased;
   }
 }
 
 @layer components {
+  .admin-shell {
+    @apply min-h-screen bg-surface-950 text-slate-100;
+    background-image: radial-gradient(ellipse at 20% 0%, rgba(212, 175, 55, 0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 100%, rgba(212, 175, 55, 0.03) 0%, transparent 50%);
+  }
+
   .card {
-    @apply rounded-xl border border-slate-200 bg-white p-6 shadow-sm;
+    @apply rounded-xl border border-brand-800/30 bg-surface-800 p-6 shadow-gold;
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-700 disabled:opacity-50;
+    @apply inline-flex items-center justify-center rounded-lg bg-gold-gradient px-4 py-2 text-sm font-semibold text-surface-950 shadow-gold transition hover:brightness-110 disabled:opacity-50;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50;
+    @apply inline-flex items-center justify-center rounded-lg border border-brand-700/40 bg-surface-750 px-4 py-2 text-sm font-medium text-brand-200 transition hover:border-brand-500/50 hover:bg-surface-700 hover:text-brand-100 disabled:opacity-50;
   }
 
   .btn-danger {
-    @apply inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-50;
+    @apply inline-flex items-center justify-center rounded-lg bg-red-900/80 px-4 py-2 text-sm font-medium text-red-200 ring-1 ring-red-700/50 transition hover:bg-red-800 disabled:opacity-50;
   }
 
   .input {
-    @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20;
+    @apply w-full rounded-lg border border-surface-600 bg-surface-850 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20;
   }
 
   .label {
-    @apply mb-1 block text-sm font-medium text-slate-700;
+    @apply mb-1 block text-sm font-medium text-slate-300;
+  }
+
+  .heading-brand {
+    @apply font-serif tracking-wide text-brand-300;
+  }
+
+  .text-muted {
+    @apply text-slate-400;
+  }
+
+  .border-gold {
+    @apply border-brand-800/30;
+  }
+
+  .table-admin thead {
+    @apply text-slate-400;
+  }
+
+  .table-admin tbody tr {
+    @apply border-surface-700;
+  }
+
+  .table-admin tbody tr:hover {
+    @apply bg-surface-750/50;
+  }
+
+  .admin-shell table thead tr {
+    @apply border-b border-brand-900/40 text-left text-slate-400;
+  }
+
+  .admin-shell table tbody tr {
+    @apply border-b border-surface-700/80;
+  }
+
+  .admin-shell table tbody tr:hover {
+    @apply bg-surface-750/40;
+  }
+
+  .admin-shell table th,
+  .admin-shell table td {
+    @apply text-slate-300;
   }
 }

@@ -10,13 +10,13 @@ import {
   Calendar,
   DollarSign,
   Settings,
-  Car,
   LogOut,
   MessageSquare,
   CalendarOff,
   Headphones,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BrandLogo } from "./BrandLogo";
 
 const navItems = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -54,18 +54,12 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-slate-200 bg-white">
-      <div className="flex items-center gap-3 border-b border-slate-200 px-6 py-5">
-        <div className="rounded-lg bg-brand-600 p-2">
-          <Car className="h-6 w-6 text-white" />
-        </div>
-        <div>
-          <h1 className="text-sm font-bold text-slate-900">Estética Auto</h1>
-          <p className="text-xs text-slate-500">Painel Admin</p>
-        </div>
+    <aside className="flex h-screen w-64 flex-col border-r border-brand-900/40 bg-surface-900">
+      <div className="border-b border-brand-900/40 px-4 py-5">
+        <BrandLogo size="md" showText />
       </div>
 
-      <nav className="flex-1 space-y-1 p-4">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = pathname.startsWith(item.href);
@@ -76,14 +70,14 @@ export function Sidebar() {
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition",
                 active
-                  ? "bg-brand-50 text-brand-700"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  ? "bg-brand-900/40 text-brand-300 shadow-gold ring-1 ring-brand-700/30"
+                  : "text-slate-400 hover:bg-surface-800 hover:text-brand-200"
               )}
             >
-              <Icon className="h-5 w-5" />
+              <Icon className={cn("h-5 w-5", active ? "text-brand-400" : "")} />
               {item.label}
               {"badge" in item && item.badge && handoffCount > 0 && (
-                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+                <span className="ml-auto flex h-5 min-w-5 animate-pulse items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white shadow-lg shadow-red-900/50">
                   {handoffCount}
                 </span>
               )}
@@ -92,10 +86,10 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="border-t border-slate-200 p-4">
+      <div className="border-t border-brand-900/40 p-3">
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-red-50 hover:text-red-600"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 transition hover:bg-red-950/40 hover:text-red-400"
         >
           <LogOut className="h-5 w-5" />
           Sair
