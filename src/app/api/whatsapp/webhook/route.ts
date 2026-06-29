@@ -5,53 +5,73 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { processWhatsAppMessage } from "@/lib/whatsapp-bot";
-import { isGroupWebhookPayload, phoneFromPrivateJid } from "@/lib/whatsapp-jid";
 
 /** Verifica assinatura enviada pela WasenderAPI no header X-Webhook-Signature */
 function verifySignature(req: NextRequest, rawBody: string): boolean {
   const secret = process.env.WASENDER_WEBHOOK_SECRET;
   if (!secret) return true;
-
   const signature = req.headers.get("x-webhook-signature");
   if (!signature) return false;
-
   return signature === secret;
 }
 
-/**
- * Extrai o texto da mensagem do payload WasenderAPI.
- * O campo unificado é `messageBody`; fallback para campos legados.
- */
-function extractText(data: Record<string, unknown>): string {
-  if (typeof data.messageBody === "string") return data.messageBody;
+/** Extrai o texto da mensagem */
+function extractText(msg: Record<string, unknown>): string {
+  if (typeof msg.messageBody === "string") return msg.messageBody;
 
-  const msg = data.message as Record<string, unknown> | undefined;
-  if (!msg) return "";
+  const message = msg.message as Record<string, unknown> | undefined;
+  if (!message) return "";
 
   return (
-    (msg.conversation as string) ||
-    ((msg.extendedTextMessage as Record<string, unknown>)?.text as string) ||
+    (message.conversation as string) ||
+    ((message.extendedTextMessage as Record<string, unknown>)?.text as string) ||
     ""
   );
 }
 
 /** Extrai buttonId / listId de respostas interativas */
-function extractInteractive(data: Record<string, unknown>) {
-  const msg = data.message as Record<string, unknown> | undefined;
-  if (!msg) return {};
+function extractInteractive(msg: Record<string, unknown>) {
+  const message = msg.message as Record<string, unknown> | undefined;
+  if (!message) return {};
 
-  const btnReply = msg.buttonsResponseMessage as Record<string, unknown> | undefined;
+  const btnReply = message.buttonsResponseMessage as Record<string, unknown> | undefined;
   if (btnReply) {
     return { buttonId: btnReply.selectedButtonId as string };
   }
 
-  const listReply = msg.listResponseMessage as Record<string, unknown> | undefined;
+  const listReply = message.listResponseMessage as Record<string, unknown> | undefined;
   if (listReply) {
     const singleSelect = listReply.singleSelectReply as Record<string, unknown> | undefined;
     return { listId: singleSelect?.selectedRowId as string | undefined };
   }
 
   return {};
+}
+
+/** Extrai número de telefone limpo de qualquer formato WasenderAPI */
+function extractPhone(msgKey: Record<string, unknown>): string | null {
+  // Preferir senderPn ou cleanedSenderPn (formato @s.whatsapp.net ou número limpo)
+  const candidates = [
+    msgKey.cleanedSenderPn,
+    msgKey.senderPn,
+    msgKey.remoteJid,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string" || !candidate) continue;
+
+    // Ignora JIDs de grupo e lid
+    if (candidate.includes("@g.us")) continue;
+    if (candidate.includes("@broadcast")) continue;
+    if (candidate.includes("@newsletter")) continue;
+    if (candidate.includes("@lid") && !msgKey.cleanedSenderPn && !msgKey.senderPn) continue;
+
+    // Extrai só os dígitos
+    const digits = candidate.replace(/\D/g, "");
+    if (digits.length >= 10 && digits.length <= 15) return digits;
+  }
+
+  return null;
 }
 
 export async function POST(req: NextRequest) {
@@ -61,9 +81,6 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
-
-  // LOG TEMPORÁRIO — remove depois de funcionar
-  console.log("[Webhook] payload recebido:", rawBody.slice(0, 600));
 
   if (!verifySignature(req, rawBody)) {
     console.warn("[Webhook] assinatura inválida");
@@ -78,9 +95,8 @@ export async function POST(req: NextRequest) {
   }
 
   const event = payload.event as string | undefined;
-  console.log("[Webhook] event:", event);
 
-  // Aceita todos os eventos de mensagem recebida
+  // Aceita eventos de mensagem recebida
   const isMessageEvent =
     event === "messages.received" ||
     event === "messages.upsert" ||
@@ -88,37 +104,38 @@ export async function POST(req: NextRequest) {
     !event;
 
   if (!isMessageEvent) {
-    console.log("[Webhook] evento ignorado:", event);
     return NextResponse.json({ ok: true });
   }
 
-  const data = (payload.data ?? payload) as Record<string, unknown>;
+  const data = payload.data as Record<string, unknown> | undefined;
+  if (!data) return NextResponse.json({ ok: true });
+
+  // WasenderAPI envia as mensagens dentro de data.messages (objeto, não array)
+  const msgRaw = data.messages ?? data;
+  const msg = msgRaw as Record<string, unknown>;
+
+  const msgKey = (msg.key ?? {}) as Record<string, unknown>;
 
   // Ignora mensagens enviadas pelo próprio bot
-  const key = data.key as Record<string, unknown> | undefined;
-  if (key?.fromMe === true) {
-    console.log("[Webhook] ignorado: fromMe");
+  if (msgKey.fromMe === true) {
     return NextResponse.json({ ok: true });
   }
 
   // Ignora grupos
-  if (isGroupWebhookPayload({ key, isGroup: data.isGroup as boolean })) {
-    console.log("[Webhook] ignorado: grupo");
+  const remoteJid = (msgKey.remoteJid ?? "") as string;
+  if (remoteJid.includes("@g.us") || remoteJid.includes("@broadcast")) {
     return NextResponse.json({ ok: true });
   }
 
-  const remoteJid = (key?.remoteJid ?? data.from ?? "") as string;
-  console.log("[Webhook] remoteJid:", remoteJid);
-
-  const phone = phoneFromPrivateJid(remoteJid);
+  const phone = extractPhone(msgKey);
   if (!phone) {
-    console.warn("[Webhook] phone inválido para jid:", remoteJid);
+    console.warn("[Webhook] phone inválido, key:", JSON.stringify(msgKey));
     return NextResponse.json({ ok: true });
   }
 
-  const text = extractText(data);
-  const { buttonId, listId } = extractInteractive(data);
-  const pushName = (data.pushName ?? data.notifyName ?? "") as string;
+  const text = extractText(msg);
+  const { buttonId, listId } = extractInteractive(msg);
+  const pushName = (msg.pushName ?? msg.notifyName ?? "") as string;
 
   console.log("[Webhook] processando — phone:", phone, "text:", text);
 
