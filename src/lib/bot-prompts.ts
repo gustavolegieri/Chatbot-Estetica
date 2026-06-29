@@ -1,7 +1,9 @@
 import { prisma } from "./prisma";
 import { BOT_PROMPT_DEFAULTS } from "./bot-prompt-defaults";
+import { applyPrompt } from "./prompt-utils";
 
 export type PromptMap = Record<string, string>;
+export { applyPrompt };
 
 let cache: { map: PromptMap; loadedAt: number } | null = null;
 const CACHE_TTL_MS = 30_000;
@@ -25,22 +27,6 @@ export async function loadPromptMap(force = false): Promise<PromptMap> {
   return map;
 }
 
-export function applyPrompt(template: string, vars: Record<string, string | undefined | null>): string {
-  let out = template;
-  for (const [key, value] of Object.entries(vars)) {
-    out = out.split(`{${key}}`).join(value ?? "");
-  }
-  return out
-    .split("\n")
-    .filter((line, i, arr) => {
-      if (line.trim() !== "") return true;
-      const prev = arr[i - 1];
-      return prev !== undefined && prev.trim() !== "";
-    })
-    .join("\n")
-    .trim();
-}
-
 export function renderPrompt(
   prompts: PromptMap,
   key: string,
@@ -50,11 +36,22 @@ export function renderPrompt(
   return applyPrompt(template, vars);
 }
 
-export async function seedBotPrompts() {
+export function getDefaultPromptContent(key: string): string | null {
+  return BOT_PROMPT_DEFAULTS.find((p) => p.key === key)?.content ?? null;
+}
+
+export async function seedBotPrompts(options?: { force?: boolean }) {
   for (const p of BOT_PROMPT_DEFAULTS) {
     await prisma.botPrompt.upsert({
       where: { key: p.key },
-      update: {},
+      update: options?.force
+        ? {
+            label: p.label,
+            category: p.category,
+            content: p.content,
+            hint: p.hint ?? null,
+          }
+        : {},
       create: {
         key: p.key,
         label: p.label,
