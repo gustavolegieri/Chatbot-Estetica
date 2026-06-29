@@ -1,6 +1,5 @@
 import { prisma } from "./prisma";
 import { normalizePhone } from "./utils";
-import { enqueueWhatsAppMessage } from "./whatsapp-debounce";
 import { isValidPrivateRecipient } from "./whatsapp-jid";
 import { goToMainMenu, processNumberedFlow, startFlow } from "./whatsapp-flow";
 import { tryHandleAppointmentConfirmation } from "./appointment-confirmation";
@@ -93,5 +92,5 @@ async function handleMessage(msg: IncomingMessage) {
 }
 
 export async function processWhatsAppMessage(msg: IncomingMessage) {
-  enqueueWhatsAppMessage(msg, handleMessage);
+  await handleMessage(msg);
 }
