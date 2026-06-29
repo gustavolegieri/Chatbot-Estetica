@@ -1,84 +1,97 @@
+import { prisma } from "./prisma";
 import { normalizePhone } from "./utils";
+import { enqueueWhatsAppMessage } from "./whatsapp-debounce";
+import { isValidPrivateRecipient } from "./whatsapp-jid";
+import { goToMainMenu, processNumberedFlow, startFlow } from "./whatsapp-flow";
+import { tryHandleAppointmentConfirmation } from "./appointment-confirmation";
+import { applySessionResetIfExpired } from "./whatsapp-session-reset";
+import { FlowState } from "./whatsapp-flow-types";
 
-const DEBOUNCE_MS = 2800;
-
-interface PendingMessage {
-  phone: string;
-  texts: string[];
-  pushName?: string;
-  buttonId?: string;
-  listId?: string;
-  timer: ReturnType<typeof setTimeout>;
-}
-
-interface IncomingPayload {
+interface IncomingMessage {
   phone: string;
   text: string;
-  pushName?: string;
   buttonId?: string;
   listId?: string;
+  pushName?: string;
 }
 
-const pending = new Map<string, PendingMessage>();
-const processing = new Set<string>();
-
-export function isProcessing(phone: string) {
-  return processing.has(normalizePhone(phone));
+function parseFlow(raw: unknown): FlowState {
+  if (!raw || typeof raw !== "object") {
+    return { stage: "ETAPA1_AWAITING_NAME", welcomed: false };
+  }
+  return raw as FlowState;
 }
 
-export function setProcessing(phone: string, value: boolean) {
-  const key = normalizePhone(phone);
-  if (value) processing.add(key);
-  else processing.delete(key);
-}
+async function getOrCreateSession(phone: string, pushName?: string) {
+  const normalized = normalizePhone(phone);
 
-/**
- * Agrupa mensagens rápidas em uma só (anti-flood).
- * Responde uma única vez após ~2,8s sem novas mensagens.
- */
-export function enqueueWhatsAppMessage(
-  msg: IncomingPayload,
-  handler: (merged: IncomingPayload) => Promise<void>
-) {
-  const key = normalizePhone(msg.phone);
-  const existing = pending.get(key);
+  let session = await prisma.whatsAppSession.findUnique({
+    where: { phone: normalized },
+    include: { client: true },
+  });
 
-  if (existing) {
-    clearTimeout(existing.timer);
-    existing.texts.push(msg.text);
-    if (msg.pushName) existing.pushName = msg.pushName;
-    if (msg.buttonId) existing.buttonId = msg.buttonId;
-    if (msg.listId) existing.listId = msg.listId;
-  } else {
-    pending.set(key, {
-      phone: msg.phone,
-      texts: [msg.text],
-      pushName: msg.pushName,
-      buttonId: msg.buttonId,
-      listId: msg.listId,
-      timer: setTimeout(() => {}, 0),
+  if (!session) {
+    let client = await prisma.client.findUnique({ where: { phone: normalized } });
+    if (!client && pushName) {
+      client = await prisma.client.create({
+        data: { name: pushName, phone: normalized },
+      });
+    }
+
+    session = await prisma.whatsAppSession.create({
+      data: {
+        phone: normalized,
+        clientId: client?.id,
+        metadata: { stage: "ETAPA1_AWAITING_NAME", welcomed: false } as object,
+      },
+      include: { client: true },
     });
   }
 
-  const entry = pending.get(key)!;
-  entry.timer = setTimeout(async () => {
-    pending.delete(key);
-    if (processing.has(key)) return;
+  return session;
+}
 
-    const mergedText = entry.texts.join(" ").trim();
-    if (!mergedText && !entry.buttonId && !entry.listId) return;
+async function handleMessage(msg: IncomingMessage) {
+  if (!isValidPrivateRecipient(msg.phone)) {
+    console.warn("[WhatsApp Bot] Ignorado (não é chat privado):", msg.phone);
+    return;
+  }
 
-    processing.add(key);
-    try {
-      await handler({
-        phone: entry.phone,
-        text: mergedText || entry.buttonId || entry.listId || "",
-        pushName: entry.pushName,
-        buttonId: entry.buttonId,
-        listId: entry.listId,
-      });
-    } finally {
-      processing.delete(key);
-    }
-  }, DEBOUNCE_MS);
+  const settings = await prisma.settings.findUnique({ where: { id: "default" } });
+  // Só bloqueia se o campo existir E for explicitamente false
+  if (settings && settings.whatsappEnabled === false) {
+    console.warn("[WhatsApp Bot] whatsappEnabled=false nas configurações, mensagem ignorada");
+    return;
+  }
+
+  const session = await getOrCreateSession(msg.phone, msg.pushName);
+  let flow = parseFlow(session.metadata);
+
+  await applySessionResetIfExpired(msg.phone, session.updatedAt, flow);
+
+  const sessionAfterReset = await prisma.whatsAppSession.findUnique({
+    where: { phone: normalizePhone(msg.phone) },
+    include: { client: true },
+  });
+  flow = parseFlow(sessionAfterReset?.metadata);
+
+  if (await tryHandleAppointmentConfirmation(msg.phone, msg.text)) return;
+
+  if (msg.text.trim().toLowerCase() === "menu") {
+    const name =
+      flow.customerName ?? session.client?.name ?? msg.pushName ?? "Cliente";
+    await goToMainMenu(msg.phone, name);
+    return;
+  }
+
+  if (!flow.welcomed) {
+    await startFlow(msg);
+    return;
+  }
+
+  await processNumberedFlow(msg, flow);
+}
+
+export async function processWhatsAppMessage(msg: IncomingMessage) {
+  enqueueWhatsAppMessage(msg, handleMessage);
 }

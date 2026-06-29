@@ -443,6 +443,23 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
   const lower = input.toLowerCase();
   const isShortMenuPick = num !== null && input.length <= 2;
 
+  // Small talk / confirmações neutras ("pera ai", "ok", "tá", "entendi") em stages intermediárias
+  // → responde com lembrete gentil sem quebrar o estado atual
+  if (
+    !isShortMenuPick &&
+    !num &&
+    isGreetingOrSmallTalk(input) &&
+    flow.stage !== "ETAPA1_AWAITING_NAME" &&
+    flow.stage !== "ETAPA2_MAIN_MENU" &&
+    flow.stage !== "STALE_RETURN"
+  ) {
+    await sendText({
+      number: msg.phone,
+      text: `Claro 😊 ${menuForStage(flow)}`,
+    });
+    return;
+  }
+
   if (
     !isShortMenuPick &&
     flow.customerName &&
@@ -898,8 +915,15 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     }
 
     default: {
-      await saveFlow(msg.phone, { stage: "ETAPA1_AWAITING_NAME" });
-      await sendText({ number: msg.phone, text: etapa1Welcome(ctx) });
+      // Stage desconhecida ou corrompida → redireciona sem perder o nome do cliente
+      console.warn("[Flow] Stage inesperada:", flow.stage, "— redirecionando para menu principal");
+      const name = flow.customerName ?? "Cliente";
+      await saveFlow(msg.phone, {
+        stage: "ETAPA2_MAIN_MENU",
+        welcomed: true,
+        customerName: flow.customerName,
+      });
+      await sendText({ number: msg.phone, text: etapa2MainMenu(name) });
     }
   }
 }

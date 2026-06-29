@@ -58,7 +58,11 @@ async function handleMessage(msg: IncomingMessage) {
   }
 
   const settings = await prisma.settings.findUnique({ where: { id: "default" } });
-  if (settings && !settings.whatsappEnabled) return;
+  // Só bloqueia se o campo existir E for explicitamente false
+  if (settings && settings.whatsappEnabled === false) {
+    console.warn("[WhatsApp Bot] whatsappEnabled=false nas configurações, mensagem ignorada");
+    return;
+  }
 
   const session = await getOrCreateSession(msg.phone, msg.pushName);
   let flow = parseFlow(session.metadata);
