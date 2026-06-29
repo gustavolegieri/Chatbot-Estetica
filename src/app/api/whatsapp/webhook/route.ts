@@ -1,5 +1,4 @@
-/**
- * Webhook WasenderAPI → Next.js
+* Webhook WasenderAPI → Next.js
  * Arquivo: src/app/api/whatsapp/webhook/route.ts
  */
 
@@ -50,7 +49,6 @@ function extractInteractive(msg: Record<string, unknown>) {
 
 /** Extrai número de telefone limpo de qualquer formato WasenderAPI */
 function extractPhone(msgKey: Record<string, unknown>): string | null {
-  // Preferir senderPn ou cleanedSenderPn (formato @s.whatsapp.net ou número limpo)
   const candidates = [
     msgKey.cleanedSenderPn,
     msgKey.senderPn,
@@ -59,14 +57,11 @@ function extractPhone(msgKey: Record<string, unknown>): string | null {
 
   for (const candidate of candidates) {
     if (typeof candidate !== "string" || !candidate) continue;
-
-    // Ignora JIDs de grupo e lid
     if (candidate.includes("@g.us")) continue;
     if (candidate.includes("@broadcast")) continue;
     if (candidate.includes("@newsletter")) continue;
     if (candidate.includes("@lid") && !msgKey.cleanedSenderPn && !msgKey.senderPn) continue;
 
-    // Extrai só os dígitos
     const digits = candidate.replace(/\D/g, "");
     if (digits.length >= 10 && digits.length <= 15) return digits;
   }
@@ -96,7 +91,6 @@ export async function POST(req: NextRequest) {
 
   const event = payload.event as string | undefined;
 
-  // Aceita eventos de mensagem recebida
   const isMessageEvent =
     event === "messages.received" ||
     event === "messages.upsert" ||
@@ -110,18 +104,15 @@ export async function POST(req: NextRequest) {
   const data = payload.data as Record<string, unknown> | undefined;
   if (!data) return NextResponse.json({ ok: true });
 
-  // WasenderAPI envia as mensagens dentro de data.messages (objeto, não array)
   const msgRaw = data.messages ?? data;
   const msg = msgRaw as Record<string, unknown>;
 
   const msgKey = (msg.key ?? {}) as Record<string, unknown>;
 
-  // Ignora mensagens enviadas pelo próprio bot
   if (msgKey.fromMe === true) {
     return NextResponse.json({ ok: true });
   }
 
-  // Ignora grupos
   const remoteJid = (msgKey.remoteJid ?? "") as string;
   if (remoteJid.includes("@g.us") || remoteJid.includes("@broadcast")) {
     return NextResponse.json({ ok: true });
@@ -139,17 +130,18 @@ export async function POST(req: NextRequest) {
 
   console.log("[Webhook] processando — phone:", phone, "text:", text);
 
-  const processingPromise = processWhatsAppMessage({
-    phone,
-    text: text || buttonId || listId || "",
-    buttonId,
-    listId,
-    pushName: pushName || undefined,
-  });
-
-  processingPromise.catch((err) => {
-    console.error("[Webhook] Erro ao processar mensagem:", err);
-  });
+  try {
+    await processWhatsAppMessage({
+      phone,
+      text: text || buttonId || listId || "",
+      buttonId,
+      listId,
+      pushName: pushName || undefined,
+    });
+    console.log("[Webhook] processamento concluído");
+  } catch (err) {
+    console.error("[Webhook] ERRO:", err);
+  }
 
   return NextResponse.json({ ok: true });
 }
