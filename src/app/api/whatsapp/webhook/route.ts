@@ -1,12 +1,6 @@
 /**
  * Webhook WasenderAPI → Next.js
- * Arquivo: src/app/api/webhook/whatsapp/route.ts
- *
- * Substitui o webhook da Evolution API.
- *
- * Variável de ambiente necessária:
- *   WASENDER_WEBHOOK_SECRET  → segredo gerado no painel WasenderAPI
- *                              (sessão → configurações → webhook secret)
+ * Arquivo: src/app/api/whatsapp/webhook/route.ts
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -16,7 +10,6 @@ import { isGroupWebhookPayload, phoneFromPrivateJid } from "@/lib/whatsapp-jid";
 /** Verifica assinatura enviada pela WasenderAPI no header X-Webhook-Signature */
 function verifySignature(req: NextRequest, rawBody: string): boolean {
   const secret = process.env.WASENDER_WEBHOOK_SECRET;
-  // Se não configurou o secret, passa (útil em dev)
   if (!secret) return true;
 
   const signature = req.headers.get("x-webhook-signature");
@@ -37,23 +30,21 @@ function extractText(data: Record<string, unknown>): string {
 
   return (
     (msg.conversation as string) ||
-    (msg.extendedTextMessage as Record<string, unknown>)?.text as string ||
+    ((msg.extendedTextMessage as Record<string, unknown>)?.text as string) ||
     ""
   );
 }
 
-/** Extrai buttonId / listId de respostas interativas (se suportado no futuro) */
+/** Extrai buttonId / listId de respostas interativas */
 function extractInteractive(data: Record<string, unknown>) {
   const msg = data.message as Record<string, unknown> | undefined;
   if (!msg) return {};
 
-  // botão de resposta rápida
   const btnReply = msg.buttonsResponseMessage as Record<string, unknown> | undefined;
   if (btnReply) {
     return { buttonId: btnReply.selectedButtonId as string };
   }
 
-  // item de lista
   const listReply = msg.listResponseMessage as Record<string, unknown> | undefined;
   if (listReply) {
     const singleSelect = listReply.singleSelectReply as Record<string, unknown> | undefined;
@@ -71,7 +62,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
 
+  // LOG TEMPORÁRIO — remove depois de funcionar
+  console.log("[Webhook] payload recebido:", rawBody.slice(0, 600));
+
   if (!verifySignature(req, rawBody)) {
+    console.warn("[Webhook] assinatura inválida");
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -83,9 +78,17 @@ export async function POST(req: NextRequest) {
   }
 
   const event = payload.event as string | undefined;
+  console.log("[Webhook] event:", event);
 
-  // Só processa mensagens recebidas (não as enviadas pelo bot)
-  if (event !== "messages.received" && event !== "messages.upsert") {
+  // Aceita todos os eventos de mensagem recebida
+  const isMessageEvent =
+    event === "messages.received" ||
+    event === "messages.upsert" ||
+    event === "messages-personal.received" ||
+    !event;
+
+  if (!isMessageEvent) {
+    console.log("[Webhook] evento ignorado:", event);
     return NextResponse.json({ ok: true });
   }
 
@@ -94,17 +97,22 @@ export async function POST(req: NextRequest) {
   // Ignora mensagens enviadas pelo próprio bot
   const key = data.key as Record<string, unknown> | undefined;
   if (key?.fromMe === true) {
+    console.log("[Webhook] ignorado: fromMe");
     return NextResponse.json({ ok: true });
   }
 
   // Ignora grupos
   if (isGroupWebhookPayload({ key, isGroup: data.isGroup as boolean })) {
+    console.log("[Webhook] ignorado: grupo");
     return NextResponse.json({ ok: true });
   }
 
   const remoteJid = (key?.remoteJid ?? data.from ?? "") as string;
+  console.log("[Webhook] remoteJid:", remoteJid);
+
   const phone = phoneFromPrivateJid(remoteJid);
   if (!phone) {
+    console.warn("[Webhook] phone inválido para jid:", remoteJid);
     return NextResponse.json({ ok: true });
   }
 
@@ -112,7 +120,8 @@ export async function POST(req: NextRequest) {
   const { buttonId, listId } = extractInteractive(data);
   const pushName = (data.pushName ?? data.notifyName ?? "") as string;
 
-  // Responde 200 imediatamente antes de processar (boa prática)
+  console.log("[Webhook] processando — phone:", phone, "text:", text);
+
   const processingPromise = processWhatsAppMessage({
     phone,
     text: text || buttonId || listId || "",
@@ -121,7 +130,6 @@ export async function POST(req: NextRequest) {
     pushName: pushName || undefined,
   });
 
-  // Fire-and-forget com log de erro
   processingPromise.catch((err) => {
     console.error("[Webhook] Erro ao processar mensagem:", err);
   });
