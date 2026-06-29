@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { invalidateCatalogCache } from "@/lib/whatsapp-service-catalog";
 
 const updateSchema = z.object({
   name: z.string().min(2).optional(),
@@ -9,6 +10,20 @@ const updateSchema = z.object({
   price: z.number().positive().optional(),
   durationMin: z.number().int().positive().optional(),
   active: z.boolean().optional(),
+  catalogKey: z.string().optional().nullable(),
+  categoryNum: z.number().int().min(1).max(8).optional().nullable(),
+  menuOrder: z.number().int().optional(),
+  whatsappPitch: z.string().optional().nullable(),
+  whatsappShort: z.string().optional().nullable(),
+  whatsappDetail: z.string().optional().nullable(),
+  priceHatchMin: z.number().optional().nullable(),
+  priceHatchMax: z.number().optional().nullable(),
+  priceSuvMin: z.number().optional().nullable(),
+  priceSuvMax: z.number().optional().nullable(),
+  timeEstimate: z.string().optional().nullable(),
+  upsellServiceId: z.string().optional().nullable(),
+  upsellBenefit: z.string().optional().nullable(),
+  showInWhatsApp: z.boolean().optional(),
 });
 
 export async function PUT(
@@ -23,6 +38,7 @@ export async function PUT(
     const body = await request.json();
     const data = updateSchema.parse(body);
     const service = await prisma.service.update({ where: { id }, data });
+    invalidateCatalogCache();
     return NextResponse.json({ success: true, data: service });
   } catch {
     return NextResponse.json({ success: false, error: "Erro ao atualizar" }, { status: 500 });
@@ -38,5 +54,6 @@ export async function DELETE(
 
   const { id } = await params;
   await prisma.service.update({ where: { id }, data: { active: false } });
+  invalidateCatalogCache();
   return NextResponse.json({ success: true });
 }

@@ -76,15 +76,31 @@ model Client {
 }
 
 model Service {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  price       Decimal  @db.Decimal(10, 2)
-  durationMin Int      @default(60)
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  price           Decimal  @db.Decimal(10, 2)
+  durationMin     Int      @default(60)
+  active          Boolean  @default(true)
+  catalogKey      String?  @unique
+  categoryNum     Int?
+  menuOrder       Int      @default(0)
+  whatsappPitch   String?
+  whatsappShort   String?
+  whatsappDetail  String?  @db.Text
+  priceHatchMin   Decimal? @db.Decimal(10, 2)
+  priceHatchMax   Decimal? @db.Decimal(10, 2)
+  priceSuvMin     Decimal? @db.Decimal(10, 2)
+  priceSuvMax     Decimal? @db.Decimal(10, 2)
+  timeEstimate    String?
+  upsellServiceId String?
+  upsellBenefit   String?
+  showInWhatsApp  Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
+  upsellService    Service?  @relation("ServiceUpsell", fields: [upsellServiceId], references: [id], onDelete: SetNull)
+  upsellFor        Service[] @relation("ServiceUpsell")
   appointments     Appointment[]
   financialRecords FinancialRecord[]
 }
@@ -143,6 +159,8 @@ model Settings {
   businessAddress       String?
   businessHoursStart    String  @default("08:00")
   businessHoursEnd      String  @default("18:00")
+  lunchBreakStart       String?
+  lunchBreakEnd         String?
   slotDurationMin       Int     @default(60)
   workingDays           String  @default("1,2,3,4,5,6")
   whatsappEnabled       Boolean @default(true)
@@ -153,7 +171,33 @@ model Settings {
   pixKey                String?
   pixHolderName         String?
   pixBank               String?
+  sessionResetMin       Int     @default(60)
+  followupIdleMin       Int     @default(10)
+  reminder4hMin         Int     @default(240)
+  reminder30minMin      Int     @default(30)
+  autoCancelMin         Int     @default(10)
   updatedAt             DateTime @updatedAt
+}
+
+model BotPrompt {
+  key       String   @id
+  label     String
+  category  String   @default("geral")
+  content   String   @db.Text
+  hint      String?
+  updatedAt DateTime @updatedAt
+}
+
+model BlockedDate {
+  id         String   @id @default(cuid())
+  date       DateTime @db.Date
+  reason     String
+  isHoliday  Boolean  @default(false)
+  blockStart String?
+  blockEnd   String?
+  createdAt  DateTime @default(now())
+
+  @@unique([date])
 }
 
 model WhatsAppSession {

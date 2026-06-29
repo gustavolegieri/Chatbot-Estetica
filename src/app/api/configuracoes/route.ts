@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { invalidateCatalogCache } from "@/lib/whatsapp-service-catalog";
 
 const updateSchema = z.object({
   businessName: z.string().optional(),
@@ -9,6 +10,8 @@ const updateSchema = z.object({
   businessAddress: z.string().optional().nullable(),
   businessHoursStart: z.string().optional(),
   businessHoursEnd: z.string().optional(),
+  lunchBreakStart: z.string().optional().nullable(),
+  lunchBreakEnd: z.string().optional().nullable(),
   slotDurationMin: z.number().int().positive().optional(),
   workingDays: z.string().optional(),
   whatsappEnabled: z.boolean().optional(),
@@ -19,6 +22,11 @@ const updateSchema = z.object({
   pixKey: z.string().optional().nullable(),
   pixHolderName: z.string().optional().nullable(),
   pixBank: z.string().optional().nullable(),
+  sessionResetMin: z.number().int().positive().optional(),
+  followupIdleMin: z.number().int().positive().optional(),
+  reminder4hMin: z.number().int().positive().optional(),
+  reminder30minMin: z.number().int().positive().optional(),
+  autoCancelMin: z.number().int().positive().optional(),
 });
 
 export async function GET() {
@@ -43,6 +51,7 @@ export async function PUT(request: NextRequest) {
       create: { id: "default", ...data },
     });
 
+    invalidateCatalogCache();
     return NextResponse.json({ success: true, data: settings });
   } catch (error) {
     if (error instanceof z.ZodError) {

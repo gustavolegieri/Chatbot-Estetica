@@ -11,6 +11,8 @@ import {
   Settings,
   Car,
   LogOut,
+  MessageSquare,
+  CalendarOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +22,8 @@ const navItems = [
   { href: "/admin/servicos", label: "Serviços", icon: Wrench },
   { href: "/admin/agendamentos", label: "Agendamentos", icon: Calendar },
   { href: "/admin/financeiro", label: "Financeiro", icon: DollarSign },
+  { href: "/admin/bot/prompts", label: "Prompts Bot", icon: MessageSquare },
+  { href: "/admin/feriados", label: "Feriados", icon: CalendarOff },
   { href: "/admin/configuracoes", label: "Configurações", icon: Settings },
 ];
 

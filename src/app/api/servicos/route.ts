@@ -2,6 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { invalidateCatalogCache } from "@/lib/whatsapp-service-catalog";
+
+const whatsappFields = {
+  catalogKey: z.string().optional().nullable(),
+  categoryNum: z.number().int().min(1).max(8).optional().nullable(),
+  menuOrder: z.number().int().optional(),
+  whatsappPitch: z.string().optional().nullable(),
+  whatsappShort: z.string().optional().nullable(),
+  whatsappDetail: z.string().optional().nullable(),
+  priceHatchMin: z.number().optional().nullable(),
+  priceHatchMax: z.number().optional().nullable(),
+  priceSuvMin: z.number().optional().nullable(),
+  priceSuvMax: z.number().optional().nullable(),
+  timeEstimate: z.string().optional().nullable(),
+  upsellServiceId: z.string().optional().nullable(),
+  upsellBenefit: z.string().optional().nullable(),
+  showInWhatsApp: z.boolean().optional(),
+};
 
 const createSchema = z.object({
   name: z.string().min(2),
@@ -9,6 +27,7 @@ const createSchema = z.object({
   price: z.number().positive(),
   durationMin: z.number().int().positive().default(60),
   active: z.boolean().default(true),
+  ...whatsappFields,
 });
 
 export async function GET(request: NextRequest) {
@@ -19,7 +38,8 @@ export async function GET(request: NextRequest) {
 
   const services = await prisma.service.findMany({
     where: activeOnly ? { active: true } : undefined,
-    orderBy: { name: "asc" },
+    include: { upsellService: { select: { id: true, name: true } } },
+    orderBy: [{ categoryNum: "asc" }, { menuOrder: "asc" }, { name: "asc" }],
   });
 
   return NextResponse.json({ success: true, data: services });
@@ -34,6 +54,7 @@ export async function POST(request: NextRequest) {
     const data = createSchema.parse(body);
 
     const service = await prisma.service.create({ data });
+    invalidateCatalogCache();
     return NextResponse.json({ success: true, data: service }, { status: 201 });
   } catch {
     return NextResponse.json({ success: false, error: "Erro ao criar serviço" }, { status: 500 });

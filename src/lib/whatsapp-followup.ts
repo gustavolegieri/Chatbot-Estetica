@@ -1,30 +1,31 @@
 import { WhatsAppSessionStep } from "@prisma/client";
 import { prisma } from "./prisma";
 import { sendText } from "./evolution-api";
-import { FlowState, SESSION_RESET_MS } from "./whatsapp-flow-types";
-
-const RECOVERY_IDLE_MS = 10 * 60 * 1000;
+import { loadPromptMap, renderPrompt } from "./bot-prompts";
+import { getFollowupIdleMs, getSessionResetMs } from "./settings-runtime";
+import { FlowState } from "./whatsapp-flow-types";
 
 function parseFlow(raw: unknown): FlowState {
   if (!raw || typeof raw !== "object") return { stage: "ETAPA2_MAIN_MENU" };
   return raw as FlowState;
 }
 
-/** Lembrete leve só para quem parou há 10–60 min (nunca “estava em atendimento” no dia seguinte). */
-function buildRecoveryMessage(meta: FlowState): string {
-  const name = meta.customerName ? ` *${meta.customerName}*` : ``;
-  return [
-    `Oi${name}! 😊`,
-    ``,
-    `Ainda posso te ajudar com nossos serviços. É só responder aqui 🚗✨`,
-  ].join("\n");
+/** Lembrete leve só para quem parou há X min (configurável no admin). */
+async function buildRecoveryMessage(meta: FlowState): Promise<string> {
+  const prompts = await loadPromptMap();
+  const name = meta.customerName ? `, *${meta.customerName}*` : ``;
+  return renderPrompt(prompts, "followup_recovery", { name });
 }
 
 /** Recuperação de clientes que pararam de responder (chamar via cron a cada 5–10 min) */
 export async function sendIdleSessionRecoveries() {
+  const [sessionResetMs, recoveryIdleMs] = await Promise.all([
+    getSessionResetMs(),
+    getFollowupIdleMs(),
+  ]);
   const now = Date.now();
-  const minIdle = new Date(now - RECOVERY_IDLE_MS);
-  const maxIdle = new Date(now - SESSION_RESET_MS);
+  const minIdle = new Date(now - recoveryIdleMs);
+  const maxIdle = new Date(now - sessionResetMs);
 
   const sessions = await prisma.whatsAppSession.findMany({
     where: {
@@ -40,7 +41,7 @@ export async function sendIdleSessionRecoveries() {
 
     await sendText({
       number: session.phone,
-      text: buildRecoveryMessage(meta),
+      text: await buildRecoveryMessage(meta),
     });
     await prisma.whatsAppSession.update({
       where: { id: session.id },

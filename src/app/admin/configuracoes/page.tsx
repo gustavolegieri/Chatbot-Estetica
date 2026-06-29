@@ -10,6 +10,8 @@ interface Settings {
   businessAddress: string | null;
   businessHoursStart: string;
   businessHoursEnd: string;
+  lunchBreakStart: string | null;
+  lunchBreakEnd: string | null;
   slotDurationMin: number;
   workingDays: string;
   whatsappEnabled: boolean;
@@ -20,6 +22,11 @@ interface Settings {
   pixKey: string | null;
   pixHolderName: string | null;
   pixBank: string | null;
+  sessionResetMin: number;
+  followupIdleMin: number;
+  reminder4hMin: number;
+  reminder30minMin: number;
+  autoCancelMin: number;
 }
 
 const dayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -141,6 +148,99 @@ export default function ConfiguracoesPage() {
               ))}
             </div>
           </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label">Intervalo de almoço — início</label>
+              <input
+                type="time"
+                className="input"
+                value={settings.lunchBreakStart ?? ""}
+                onChange={(e) => setSettings({ ...settings, lunchBreakStart: e.target.value || null })}
+              />
+            </div>
+            <div>
+              <label className="label">Intervalo de almoço — fim</label>
+              <input
+                type="time"
+                className="input"
+                value={settings.lunchBreakEnd ?? ""}
+                onChange={(e) => setSettings({ ...settings, lunchBreakEnd: e.target.value || null })}
+              />
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            Feriados e bloqueios de dia inteiro ficam em{" "}
+            <a href="/admin/feriados" className="text-brand-600 underline">
+              Feriados
+            </a>
+            .
+          </p>
+        </div>
+
+        <div className="card">
+          <h2 className="mb-4 text-lg font-semibold">Automações do bot</h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <label className="label">Reset de sessão (min)</label>
+              <input
+                type="number"
+                min={15}
+                className="input"
+                value={settings.sessionResetMin ?? 60}
+                onChange={(e) =>
+                  setSettings({ ...settings, sessionResetMin: parseInt(e.target.value, 10) || 60 })
+                }
+              />
+            </div>
+            <div>
+              <label className="label">Follow-up inatividade (min)</label>
+              <input
+                type="number"
+                min={5}
+                className="input"
+                value={settings.followupIdleMin ?? 10}
+                onChange={(e) =>
+                  setSettings({ ...settings, followupIdleMin: parseInt(e.target.value, 10) || 10 })
+                }
+              />
+            </div>
+            <div>
+              <label className="label">Lembrete antes (min)</label>
+              <input
+                type="number"
+                min={60}
+                className="input"
+                value={settings.reminder4hMin ?? 240}
+                onChange={(e) =>
+                  setSettings({ ...settings, reminder4hMin: parseInt(e.target.value, 10) || 240 })
+                }
+              />
+            </div>
+            <div>
+              <label className="label">Aviso urgente (min antes)</label>
+              <input
+                type="number"
+                min={10}
+                className="input"
+                value={settings.reminder30minMin ?? 30}
+                onChange={(e) =>
+                  setSettings({ ...settings, reminder30minMin: parseInt(e.target.value, 10) || 30 })
+                }
+              />
+            </div>
+            <div>
+              <label className="label">Auto-cancelamento (min após aviso)</label>
+              <input
+                type="number"
+                min={5}
+                className="input"
+                value={settings.autoCancelMin ?? 10}
+                onChange={(e) =>
+                  setSettings({ ...settings, autoCancelMin: parseInt(e.target.value, 10) || 10 })
+                }
+              />
+            </div>
+          </div>
         </div>
 
         <div className="card">
@@ -174,8 +274,11 @@ export default function ConfiguracoesPage() {
 
           <div className="space-y-4">
             <div>
-              <label className="label">Mensagem de boas-vindas</label>
-              <textarea className="input" rows={4} value={settings.whatsappWelcomeMsg} onChange={(e) => setSettings({ ...settings, whatsappWelcomeMsg: e.target.value })} />
+              <label className="label">Mensagem de boas-vindas (legado)</label>
+              <textarea className="input" rows={2} value={settings.whatsappWelcomeMsg} onChange={(e) => setSettings({ ...settings, whatsappWelcomeMsg: e.target.value })} />
+              <p className="mt-1 text-xs text-slate-500">
+                O bot usa os prompts em <a href="/admin/bot/prompts" className="text-brand-600 underline">Prompts Bot</a>.
+              </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>

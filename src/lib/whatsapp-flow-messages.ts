@@ -1,4 +1,5 @@
 import { BRAND_DEFAULT, CATALOG, type CatalogItem } from "./whatsapp-catalog";
+import { getDefaultPromptMap, renderPrompt, type PromptMap } from "./bot-prompts";
 
 export interface FlowContext {
   businessName: string;
@@ -7,6 +8,10 @@ export interface FlowContext {
   pixKey: string | null;
   pixHolder: string | null;
   pixBank: string | null;
+}
+
+function p(prompts: PromptMap | undefined) {
+  return prompts ?? getDefaultPromptMap();
 }
 
 export function formatHours(start: string, end: string, workingDays: string) {
@@ -23,53 +28,34 @@ export function formatHours(start: string, end: string, workingDays: string) {
 // ETAPA 1 — BOAS-VINDAS
 // ─────────────────────────────────────────────────────────────
 
-export function etapa1Welcome(ctx: FlowContext) {
+export function etapa1Welcome(ctx: FlowContext, prompts?: PromptMap) {
   const name = ctx.businessName || BRAND_DEFAULT;
-  return [
-    `Olá! Seja muito bem-vindo(a) à *${name}* 🚗✨`,
-    ``,
-    `Aqui não fazemos lavagem comum — somos especialistas em *estética automotiva premium*: serviços que cuidam, protegem e valorizam o seu veículo de verdade.`,
-    ``,
-    `O que fazemos por você:`,
-    `🔹 *Lavagem detalhada* — muito além de água e sabão`,
-    `🔹 *Polimento técnico* — riscos e opacidade eliminados`,
-    `🔹 *Proteção de pintura* — vitrificação e cristalização`,
-    `🔹 *Higienização interior* — renovação completa por dentro`,
-    `🔹 *Detalhamentos completos* — carro como saído da concessionária`,
-    ``,
-    `📍 ${ctx.address || "Consulte nosso endereço"}`,
-    `🕐 ${ctx.hours}`,
-    ``,
-    `Para começarmos, qual é o seu *nome*? 😊`,
-  ].join("\n");
+  return renderPrompt(p(prompts), "etapa1_welcome", {
+    businessName: name,
+    address: ctx.address || "Consulte nosso endereço",
+    hours: ctx.hours,
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
 // ETAPA 2 — MENU PRINCIPAL
 // ─────────────────────────────────────────────────────────────
 
-export function etapa2MainMenu(clientName: string) {
-  return [
-    `Que bom te ter aqui, *${clientName}*! 😊`,
-    ``,
-    `O que seu carro precisa hoje?`,
-    ``,
-    `*1* 💧 Lavagem`,
-    `*2* ✨ Polimento`,
-    `*3* 🛡️ Proteção & Brilho`,
-    `*4* 🪑 Interior`,
-    `*5* 🔄 Revitalização`,
-    `*6* 🔬 Detalhes especiais`,
-    `*7* 📦 Pacotes premium`,
-    `*8* 🤔 Não sei qual preciso`,
-  ].join("\n");
+export function etapa2MainMenu(clientName: string, menu: string, prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa2_main_menu", {
+    clientName,
+    menu,
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
 // ETAPA 3 — DETALHE DO SERVIÇO
 // ─────────────────────────────────────────────────────────────
 
-export function serviceDetail(item: CatalogItem) {
+export function serviceDetail(item: CatalogItem, prompts?: PromptMap, detailOverride?: string | null) {
+  if (detailOverride?.trim()) {
+    return [detailOverride.trim(), ``, serviceActionMenu(prompts)].join("\n");
+  }
   if (item.key === "pacotes") {
     return [
       `📦 *Pacotes Premium — Garagem do Ka*`,
@@ -94,7 +80,7 @@ export function serviceDetail(item: CatalogItem) {
       ``,
       `💬 Qual se encaixa melhor no que você precisa?`,
       ``,
-      packageActionMenu(),
+      packageActionMenu(prompts),
     ].join("\n");
   }
 
@@ -473,83 +459,42 @@ export function serviceDetail(item: CatalogItem) {
     `💰 Valor confirmado na avaliação presencial`,
   ];
 
-  return [...lines.filter((l) => l !== undefined), ``, serviceActionMenu()].join("\n");
+  return [...lines.filter((l) => l !== undefined), ``, serviceActionMenu(prompts)].join("\n");
 }
 
-export function serviceActionMenu() {
-  return [
-    `O que você quer fazer?`,
-    ``,
-    `*1* 📅 Quero agendar`,
-    `*2* 🔄 Ver outros serviços`,
-    `*3* 💬 Tenho uma dúvida`,
-  ].join("\n");
+export function serviceActionMenu(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "service_action_menu", {});
 }
 
-export function packageActionMenu() {
-  return [
-    `*1* 📅 Agendar um pacote`,
-    `*2* 🔍 Comparar pacotes`,
-    `*3* 🔧 Ver serviços avulsos`,
-  ].join("\n");
+export function packageActionMenu(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "package_action_menu", {});
 }
 
 // ─────────────────────────────────────────────────────────────
 // ETAPA 4 — VEÍCULO
 // ─────────────────────────────────────────────────────────────
 
-export function etapa4Vehicle(hasVehicle: boolean) {
+export function etapa4Vehicle(hasVehicle: boolean, prompts?: PromptMap) {
   if (hasVehicle) {
-    return [
-      `Perfeito — já tenho seu veículo anotado 🚗`,
-      `Vamos para o orçamento!`,
-    ].join("\n");
+    return renderPrompt(p(prompts), "etapa4_vehicle_has", {});
   }
-  return [
-    `Qual é o *modelo* do seu veículo? 🚗`,
-    ``,
-    `_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_`,
-    ``,
-    `_Ou envie modelo e ano juntos: *Civic 2021*_`,
-  ].join("\n");
+  return renderPrompt(p(prompts), "etapa4_vehicle", {});
 }
 
-export function etapa4AskYear(model: string) {
-  return [
-    `Anotado: *${model}* 👍`,
-    ``,
-    `Qual o *ano* do veículo?`,
-    ``,
-    `_Exemplo: 2021, 2019, 2018_`,
-  ].join("\n");
+export function etapa4AskYear(model: string, prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa4_ask_year", { model });
 }
 
-export function vehicleModelNotUnderstood() {
-  return [
-    `Não identifiquei o modelo 😅`,
-    ``,
-    `Envie só o *modelo* do carro (marca/modelo):`,
-    `_Ex: Civic, Fiat Argo, Hilux SW4_`,
-  ].join("\n");
+export function vehicleModelNotUnderstood(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "vehicle_model_not_understood", {});
 }
 
-export function vehicleYearNotUnderstood() {
-  return [
-    `Preciso do *ano* com 4 dígitos 😊`,
-    ``,
-    `_Exemplo: 2021, 2019, 2015_`,
-  ].join("\n");
+export function vehicleYearNotUnderstood(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "vehicle_year_not_understood", {});
 }
 
-export function vehicleNotUnderstood() {
-  return [
-    `Não consegui validar o veículo 😅`,
-    ``,
-    `Envie *modelo e ano*, por exemplo:`,
-    `_Civic 2021_`,
-    `_Hilux 2019_`,
-    `_Onix 2020_`,
-  ].join("\n");
+export function vehicleNotUnderstood(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "vehicle_not_understood", {});
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -563,207 +508,124 @@ export function etapa5Quote(
   min: number,
   max: number,
   time: string,
-  pitch?: string
+  pitch?: string,
+  prompts?: PromptMap
 ) {
   const hasValue = min > 0 && max > 0;
   const valueLine = hasValue
     ? `💰 *R$ ${min} a R$ ${max}*`
     : `💰 *Valor sob consulta — confirmado na avaliação*`;
 
-  return [
-    `Aqui está o orçamento para você, *${name}*:`,
-    ``,
-    `━━━━━━━━━━━━━━━━━━━━`,
-    `🚗 *Veículo:* ${vehicle}`,
-    `🔧 *Serviço:* ${service}`,
-    `━━━━━━━━━━━━━━━━━━━━`,
-    pitch ? `✨ ${pitch}` : ``,
-    ``,
+  return renderPrompt(p(prompts), "etapa5_quote", {
+    name,
+    vehicle,
+    service,
     valueLine,
-    `⏱️ *Tempo estimado:* ${time}`,
-    ``,
-    `_O valor exato confirmamos na avaliação presencial — às vezes o carro surpreende para melhor ou para pior 😊_`,
-    ``,
-    `O que você quer fazer?`,
-    ``,
-    `*1* 📅 Agendar agora`,
-    `*2* 🔄 Ver outro serviço`,
-    `*3* 💬 Tenho dúvidas antes`,
-  ]
-    .filter((line) => line !== "")
-    .join("\n");
+    time,
+    pitch: pitch ? `✨ ${pitch}` : "",
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
 // ETAPA 6 — UPSELL
 // ─────────────────────────────────────────────────────────────
 
-export function etapa6Upsell(service: string, complement: string, benefit: string) {
-  return [
-    `Uma sugestão rápida antes de agendar 💡`,
-    ``,
-    `Muitos clientes que fazem *${service}* aproveitam a visita e incluem *${complement}* no mesmo dia.`,
-    ``,
-    `Por quê faz sentido: ${benefit}`,
-    ``,
-    `Sai mais em conta junto e você aproveita melhor a ida 😊`,
-    ``,
-    `*1* ✅ Boa ideia, incluir ${complement}`,
-    `*2* ➡️ Não, seguir só com ${service}`,
-  ].join("\n");
+export function etapa6Upsell(service: string, complement: string, benefit: string, prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa6_upsell", { service, complement, benefit });
 }
 
 // ─────────────────────────────────────────────────────────────
 // ETAPA 7 — AGENDAMENTO
 // ─────────────────────────────────────────────────────────────
 
-export function etapa7Day() {
-  return [
-    `Ótimo, vamos agendar! 📅`,
-    ``,
-    `Qual dia você prefere?`,
-    ``,
-    `*1* Segunda-feira`,
-    `*2* Terça-feira`,
-    `*3* Quarta-feira`,
-    `*4* Quinta-feira`,
-    `*5* Sexta-feira`,
-    `*6* Sábado`,
-    ``,
-    `_Ou escreva: *amanhã*, *sexta*, *15/06*_ 📆`,
-  ].join("\n");
+export function etapa7Day(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa7_day", {});
 }
 
-export function etapa7Time(dayLabel: string, slots: string[], durationLabel: string) {
+export function etapa7Time(dayLabel: string, slots: string[], durationLabel: string, prompts?: PromptMap) {
   if (slots.length === 0) {
-    return etapa7NoSlots(dayLabel);
+    return etapa7NoSlots(dayLabel, prompts);
   }
-  const lines = slots.slice(0, 14).map((s, i) => `*${i + 1}* — ${s}`);
-  return [
-    `Horários disponíveis em *${dayLabel}*:`,
-    ``,
-    `_Seu serviço leva ~*${durationLabel}* — esse intervalo fica bloqueado na agenda._`,
-    ``,
-    ...lines,
-    ``,
-    `_Ou digite o horário, ex: *09:00*_`,
-  ].join("\n");
+  const slotLines = slots.slice(0, 14).map((s, i) => `*${i + 1}* — ${s}`).join("\n");
+  return renderPrompt(p(prompts), "etapa7_time", {
+    dayLabel,
+    slots: slotLines,
+    durationLabel,
+  });
 }
 
-export function etapa7NoSlots(dayLabel: string) {
-  return [
-    `Não há horários livres em *${dayLabel}* para a duração do seu serviço 😔`,
-    ``,
-    `Escolha outro dia:`,
-    ``,
-    etapa7Day(),
-  ].join("\n");
+export function etapa7NoSlots(dayLabel: string, prompts?: PromptMap) {
+  const base = renderPrompt(p(prompts), "etapa7_no_slots", { dayLabel });
+  return [base, ``, etapa7Day(prompts)].join("\n");
 }
 
 // ─────────────────────────────────────────────────────────────
 // ETAPA 8 — PAGAMENTO
 // ─────────────────────────────────────────────────────────────
 
-export function etapa8Payment(hasPix: boolean) {
+export function etapa8Payment(hasPix: boolean, prompts?: PromptMap) {
   const options = hasPix
     ? [`*1* PIX`, `*2* Débito`, `*3* Crédito`, `*4* Dinheiro`]
     : [`*1* Débito`, `*2* Crédito`, `*3* Dinheiro`];
 
-  return [
-    `Quase lá! Só mais uma coisa 🎉`,
-    ``,
-    `Como você prefere pagar?`,
-    ``,
-    ...options,
-    ``,
-    `_Pagamento realizado no dia do serviço._`,
-  ].join("\n");
+  return renderPrompt(p(prompts), "etapa8_payment", {
+    options: options.join("\n"),
+  });
 }
 
-export function etapa8PixBlock(ctx: FlowContext) {
-  return [
-    `━━━━━━━━━━━━━━━━━━━━`,
-    `💸 *Dados para PIX*`,
-    `━━━━━━━━━━━━━━━━━━━━`,
-    `🔑 *Chave:* ${ctx.pixKey}`,
-    `👤 *Titular:* ${ctx.pixHolder ?? ctx.businessName}`,
-    ctx.pixBank ? `🏦 *Banco:* ${ctx.pixBank}` : ``,
-    `━━━━━━━━━━━━━━━━━━━━`,
-    `_Envie o comprovante no dia do serviço 😊_`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+export function etapa8PixBlock(ctx: FlowContext, prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa8_pix_block", {
+    pixKey: ctx.pixKey ?? "",
+    pixHolder: ctx.pixHolder ?? ctx.businessName,
+    bankLine: ctx.pixBank ? `🏦 *Banco:* ${ctx.pixBank}` : "",
+    businessName: ctx.businessName,
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
 // ETAPA 9 — CONFIRMAÇÃO FINAL DO AGENDAMENTO
 // ─────────────────────────────────────────────────────────────
 
-export function etapa9Confirm(data: {
-  name: string;
-  vehicle: string;
-  services: string;
-  day: string;
-  time: string;
-  payment: string;
-  value: string;
-  address: string;
-  pixBlock?: string;
-}) {
-  const lines = [
-    `🎉 *Agendamento Confirmado!*`,
-    ``,
-    `Tudo certo, *${data.name}*! Seu agendamento está registrado. Aqui está o resumo completo:`,
-    ``,
-    `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬`,
-    `👤 *Cliente:* ${data.name}`,
-    `🚗 *Veículo:* ${data.vehicle}`,
-    `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬`,
-    `🔧 *Serviço(s):* ${data.services}`,
-    `📅 *Data:* ${data.day}`,
-    `🕐 *Horário:* ${data.time}`,
-    `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬`,
-    `💳 *Pagamento:* ${data.payment}`,
-    `💰 *Valor estimado:* ${data.value}`,
-    `_↳ Valor exato confirmado na avaliação presencial_`,
-    `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬`,
-    `📍 *Onde nos encontrar:*`,
-    data.address,
-  ];
-
-  if (data.pixBlock) {
-    lines.push(``, data.pixBlock);
-  }
-
-  lines.push(
-    ``,
-    `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬`,
-    `📌 *O que acontece agora:*`,
-    ``,
-    `1️⃣ Você receberá uma confirmação no dia anterior`,
-    `2️⃣ No dia, é só chegar no horário combinado`,
-    `3️⃣ A gente cuida do resto — promessa 💎`,
-    ``,
-    `Dúvida de última hora? Manda mensagem aqui mesmo 😊`,
-    ``,
-    `⏰ *4h antes* enviamos lembrete — responda *CONFIRME* para garantir o horário.`,
-    ``,
-    `Te esperamos, *${data.name}*! Vai sair incrível 🚗✨`,
-  );
-
-  return lines.join("\n");
+export function etapa9Confirm(
+  data: {
+    name: string;
+    vehicle: string;
+    services: string;
+    day: string;
+    time: string;
+    payment: string;
+    value: string;
+    address: string;
+    pixBlock?: string;
+  },
+  prompts?: PromptMap
+) {
+  return renderPrompt(p(prompts), "etapa9_confirm", {
+    name: data.name,
+    vehicle: data.vehicle,
+    services: data.services,
+    day: data.day,
+    time: data.time,
+    payment: data.payment,
+    value: data.value,
+    address: data.address,
+    pixBlock: data.pixBlock ? `\n${data.pixBlock}` : "",
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
 // STALE RETURN — RETORNO APÓS INATIVIDADE
 // ─────────────────────────────────────────────────────────────
 
-export function staleReturnPrompt(flow?: {
-  customerName?: string;
-  vehicleRaw?: string;
-  serviceLabel?: string;
-  stage?: string;
-}) {
+export function staleReturnPrompt(
+  flow?: {
+    customerName?: string;
+    vehicleRaw?: string;
+    serviceLabel?: string;
+    stage?: string;
+  },
+  prompts?: PromptMap
+) {
   const name = flow?.customerName ? `, *${flow.customerName}*` : ``;
   const hasContext = flow?.vehicleRaw || flow?.serviceLabel;
 
@@ -776,61 +638,35 @@ export function staleReturnPrompt(flow?: {
           ? `Você estava com seu *${flow.vehicleRaw}* em mãos 🚗`
           : `Você estava no meio de um agendamento.`;
 
-  return [
-    `Oi${name}! 😊`,
-    ``,
+  return renderPrompt(p(prompts), "stale_return", {
+    name,
     contextLine,
-    ``,
-    hasContext ? `Bora continuar de onde paramos?` : `Posso te ajudar com alguma coisa?`,
-    ``,
-    `*1* ✅ Sim, continua!`,
-    `*2* 🔄 Quero começar do zero`,
-  ].join("\n");
+    continueLine: hasContext ? `Bora continuar de onde paramos?` : `Posso te ajudar com alguma coisa?`,
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
 // CLIENTE INDECISO
 // ─────────────────────────────────────────────────────────────
 
-export function indecisiveVehiclePrompt() {
-  return [
-    `Sem problema — vou te ajudar a descobrir o melhor! 😊`,
-    ``,
-    `Qual o *modelo* do seu veículo?`,
-    `_Ex: Civic, Hilux, Onix — ou *Civic 2021*_`,
-  ].join("\n");
+export function indecisiveVehiclePrompt(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "indecisive_vehicle", {});
 }
 
-export function indecisiveProblemPrompt() {
-  return [
-    `Perfeito 🚗`,
-    ``,
-    `O que está acontecendo?`,
-    ``,
-    `*1* 🎨 Pintura opaca, riscada ou sem brilho`,
-    `*2* 🪑 Interior com cheiro ruim ou muito sujo`,
-    `*3* 🛡️ Quero proteger um carro novo ou recém-comprado`,
-    `*4* ✨ Quero um cuidado geral completo`,
-    `*5* 🔧 Outro problema`,
-  ].join("\n");
+export function indecisiveProblemPrompt(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "indecisive_problem", {});
 }
 
 // ─────────────────────────────────────────────────────────────
 // UTILITÁRIOS
 // ─────────────────────────────────────────────────────────────
 
-export function invalidMenu(menu: string) {
-  return [
-    `Ops, essa opção não existe 😅`,
-    ``,
-    `Escolhe uma dessas:`,
-    ``,
-    menu,
-  ].join("\n");
+export function invalidMenu(menu: string, prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "invalid_menu", { menu });
 }
 
-export function quotePitchForService(key: string): string {
-  const item = CATALOG[key];
+export function quotePitchForService(key: string, catalog: Record<string, CatalogItem> = CATALOG): string {
+  const item = catalog[key];
   if (!item) return "";
   return item.pitch ?? "";
 }

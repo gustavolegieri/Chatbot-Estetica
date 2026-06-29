@@ -12,6 +12,7 @@ export async function GET() {
   const today = new Date();
   const monthStart = startOfMonth(today);
   const monthEnd = endOfMonth(today);
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   const [
     totalClients,
@@ -22,6 +23,10 @@ export async function GET() {
     monthExpenses,
     recentAppointments,
     revenueByService,
+    whatsappSessions,
+    whatsappAppointments,
+    blockedDatesCount,
+    activeServices,
   ] = await Promise.all([
     prisma.client.count(),
     prisma.appointment.count(),
@@ -51,6 +56,10 @@ export async function GET() {
       where: { type: "INCOME", date: { gte: monthStart, lte: monthEnd }, serviceId: { not: null } },
       _sum: { amount: true },
     }),
+    prisma.whatsAppSession.count({ where: { updatedAt: { gte: weekAgo } } }),
+    prisma.appointment.count({ where: { source: "whatsapp", createdAt: { gte: monthStart } } }),
+    prisma.blockedDate.count({ where: { date: { gte: startOfDay(today) } } }),
+    prisma.service.count({ where: { active: true, showInWhatsApp: true } }),
   ]);
 
   return NextResponse.json({
@@ -64,6 +73,10 @@ export async function GET() {
       monthExpenses: Number(monthExpenses._sum.amount ?? 0),
       recentAppointments,
       revenueByService,
+      whatsappSessions,
+      whatsappAppointments,
+      blockedDatesCount,
+      activeServices,
     },
   });
 }

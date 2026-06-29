@@ -1,10 +1,12 @@
 import { WhatsAppSessionStep } from "@prisma/client";
 import { prisma } from "./prisma";
 import { normalizePhone } from "./utils";
-import { FlowState, SESSION_RESET_MS } from "./whatsapp-flow-types";
+import { getSessionResetMs } from "./settings-runtime";
+import { FlowState } from "./whatsapp-flow-types";
 
-export function isSessionExpired(updatedAt: Date): boolean {
-  return Date.now() - updatedAt.getTime() >= SESSION_RESET_MS;
+export async function isSessionExpired(updatedAt: Date): Promise<boolean> {
+  const ms = await getSessionResetMs();
+  return Date.now() - updatedAt.getTime() >= ms;
 }
 
 /** Estado limpo — sem veículo, serviço ou etapa anterior */
@@ -35,11 +37,12 @@ export async function saveFreshFlow(phone: string, customerName?: string) {
 }
 
 /**
- * Reinicia atendimentos parados há mais de 1h (sem enviar mensagem).
+ * Reinicia atendimentos parados há mais de X min (sem enviar mensagem).
  * Chamar no cron a cada hora e ao receber mensagem.
  */
 export async function resetAllExpiredSessions(): Promise<{ reset: number; checked: number }> {
-  const cutoff = new Date(Date.now() - SESSION_RESET_MS);
+  const sessionResetMs = await getSessionResetMs();
+  const cutoff = new Date(Date.now() - sessionResetMs);
   const sessions = await prisma.whatsAppSession.findMany({
     where: { updatedAt: { lt: cutoff } },
     include: { client: true },
@@ -72,13 +75,13 @@ export async function resetAllExpiredSessions(): Promise<{ reset: number; checke
   return { reset, checked: sessions.length };
 }
 
-/** Ao receber mensagem após 1h+ sem resposta: reinicia silenciosamente (sem “você estava em atendimento”). */
+/** Ao receber mensagem após inatividade: reinicia silenciosamente. */
 export async function applySessionResetIfExpired(
   phone: string,
   updatedAt: Date,
   current: FlowState
 ): Promise<boolean> {
-  if (!isSessionExpired(updatedAt)) return false;
+  if (!(await isSessionExpired(updatedAt))) return false;
 
   const client = await prisma.client.findUnique({
     where: { phone: normalizePhone(phone) },

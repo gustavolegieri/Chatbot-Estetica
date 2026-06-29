@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users, Calendar, DollarSign, Clock } from "lucide-react";
+import { Users, Calendar, DollarSign, Clock, MessageCircle, Wrench } from "lucide-react";
 import { AdminHeader } from "@/components/layout/AdminHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -14,6 +14,10 @@ interface DashboardData {
   pendingAppointments: number;
   monthRevenue: number;
   monthExpenses: number;
+  whatsappSessions: number;
+  whatsappAppointments: number;
+  blockedDatesCount: number;
+  activeServices: number;
   recentAppointments: Array<{
     id: string;
     date: string;
@@ -45,7 +49,7 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <AdminHeader title="Dashboard" description="Visão geral do seu negócio" />
+      <AdminHeader title="Dashboard" description="Visão geral do seu negócio e do bot WhatsApp" />
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Clientes" value={data?.totalClients ?? 0} icon={Users} />
@@ -57,6 +61,13 @@ export default function DashboardPage() {
           icon={DollarSign}
           trend={`Lucro: ${formatCurrency(profit)}`}
         />
+      </div>
+
+      <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard title="Sessões WhatsApp (7d)" value={data?.whatsappSessions ?? 0} icon={MessageCircle} />
+        <StatCard title="Agendamentos via bot" value={data?.whatsappAppointments ?? 0} icon={MessageCircle} />
+        <StatCard title="Serviços no bot" value={data?.activeServices ?? 0} icon={Wrench} />
+        <StatCard title="Bloqueios futuros" value={data?.blockedDatesCount ?? 0} icon={Calendar} />
       </div>
 
       <div className="mt-8 card">

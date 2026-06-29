@@ -12,11 +12,13 @@ import {
 import { normalizePhone } from "./utils";
 import {
   BRAND_DEFAULT,
-  CATALOG,
-  CATEGORIES,
-  UPSELL_BY_KEY,
   UNDECIDED_TO_KEY,
-} from "./whatsapp-catalog";
+  loadWhatsAppCatalog,
+  buildMainMenu,
+  subMenuForCategoryCtx,
+  getUpsellForKey,
+  type WhatsAppCatalogContext,
+} from "./whatsapp-service-catalog";
 import {
   etapa1Welcome,
   etapa2MainMenu,
@@ -48,12 +50,10 @@ import {
   detectServiceKey,
   isGreetingOrSmallTalk,
   onlyMenuNumber,
-  subMenuForCategory,
   wantsDoubt,
   wantsOtherServices,
   wantsToSchedule,
 } from "./whatsapp-intent";
-import { FlowState } from "./whatsapp-flow-types";
 import {
   isValidVehicle,
   looksLikePersonName,
@@ -62,8 +62,23 @@ import {
   parseYearFromText,
   vehicleDisplayFromFlow,
 } from "./whatsapp-vehicle-parse";
+import { FlowState } from "./whatsapp-flow-types";
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+function flowMsg(wctx: WhatsAppCatalogContext) {
+  const { prompts, catalog } = wctx;
+  return {
+    mainMenu: (name: string) =>
+      etapa2MainMenu(name, buildMainMenu(wctx.categories, prompts), prompts),
+    subMenu: (n: number) => subMenuForCategoryCtx(n, wctx),
+    detail: (key: string) => {
+      const item = catalog[key];
+      if (!item) return "";
+      return serviceDetail(item, prompts, wctx.servicesByKey[key]?.whatsappDetail);
+    },
+  };
+}
 
 /** Duração estimada (min) por serviço do catálogo — usada se o DB não tiver o serviço */
 const CATALOG_DURATION_MIN: Record<string, number> = {
@@ -137,14 +152,14 @@ function beginVehicleCollection(flow: FlowState): FlowState {
   };
 }
 
-async function goToVehicleStep(msg: IncomingMessage, flow: FlowState) {
+async function goToVehicleStep(msg: IncomingMessage, flow: FlowState, wctx: WhatsAppCatalogContext) {
   const next = beginVehicleCollection(flow);
   await saveFlow(msg.phone, next);
-  await sendText({ number: msg.phone, text: etapa4Vehicle(false) });
+  await sendText({ number: msg.phone, text: etapa4Vehicle(false, wctx.prompts) });
 }
 
-function quoteForKey(key: string, flow: FlowState) {
-  const item = CATALOG[key];
+function quoteForKey(key: string, flow: FlowState, wctx: WhatsAppCatalogContext) {
+  const item = wctx.catalog[key];
   if (!item || key === "indeciso") {
     return { min: 0, max: 0, time: "—", label: flow.serviceLabel ?? "Serviço" };
   }
@@ -162,24 +177,30 @@ function quoteForKey(key: string, flow: FlowState) {
   return { min, max, time: item.time, label: item.label };
 }
 
-async function activateService(msg: IncomingMessage, flow: FlowState, serviceKey: string) {
-  const item = CATALOG[serviceKey];
+async function activateService(
+  msg: IncomingMessage,
+  flow: FlowState,
+  serviceKey: string,
+  wctx: WhatsAppCatalogContext
+) {
+  const item = wctx.catalog[serviceKey];
   if (!item) return;
-  const db =
-    serviceKey === "pacotes"
-      ? await resolveDbService("Detalhamento")
-      : await resolveDbService(item.dbMatch);
+  const dbId =
+    wctx.dbServiceIdByKey[serviceKey] ??
+    (serviceKey === "pacotes"
+      ? (await resolveDbService("Detalhamento"))?.id
+      : (await resolveDbService(item.dbMatch))?.id);
   const stage =
     serviceKey === "pacotes" ? "ETAPA3_PACKAGE_ACTION" : "ETAPA3_SERVICE_ACTION";
   await saveFlow(msg.phone, {
     ...flow,
     serviceKey,
     serviceLabel: item.label,
-    dbServiceId: db?.id,
+    dbServiceId: dbId,
     stage,
   });
   await delay(500);
-  await sendText({ number: msg.phone, text: serviceDetail(item) });
+  await sendText({ number: msg.phone, text: flowMsg(wctx).detail(serviceKey) });
 }
 
 function parseDayInput(input: string, num: number | null) {
@@ -287,17 +308,23 @@ const WEEKDAYS: Record<number, { label: string; day: number }> = {
   6: { label: "Sábado", day: 6 },
 };
 
-async function getFlowDurationMin(flow: FlowState): Promise<number> {
+async function getFlowDurationMin(flow: FlowState, wctx: WhatsAppCatalogContext): Promise<number> {
   if (flow.dbServiceId) {
     const s = await prisma.service.findUnique({ where: { id: flow.dbServiceId } });
     if (s?.durationMin) return s.durationMin;
   }
   const key = flow.serviceKey ?? "lavagem_detalhada";
+  const svc = wctx.servicesByKey[key];
+  if (svc?.durationMin) return svc.durationMin;
   return CATALOG_DURATION_MIN[key] ?? 120;
 }
 
-async function proceedToTimeSelection(msg: IncomingMessage, flow: FlowState) {
-  let durationMin = await getFlowDurationMin(flow);
+async function proceedToTimeSelection(
+  msg: IncomingMessage,
+  flow: FlowState,
+  wctx: WhatsAppCatalogContext
+) {
+  let durationMin = await getFlowDurationMin(flow, wctx);
   if (flow.upsellAccepted) durationMin += 60;
 
   if (!flow.dayDate) return;
@@ -305,6 +332,7 @@ async function proceedToTimeSelection(msg: IncomingMessage, flow: FlowState) {
   const slots = await getAvailableSlots(flow.dayDate, durationMin);
   flow.serviceDurationMin = durationMin;
   flow.availableSlots = slots;
+  const { prompts } = wctx;
 
   if (slots.length === 0) {
     flow.stage = "ETAPA7_DAY";
@@ -312,7 +340,7 @@ async function proceedToTimeSelection(msg: IncomingMessage, flow: FlowState) {
     await saveFlow(msg.phone, flow);
     await sendText({
       number: msg.phone,
-      text: etapa7NoSlots(flow.dayLabel ?? "este dia"),
+      text: etapa7NoSlots(flow.dayLabel ?? "este dia", prompts),
     });
     return;
   }
@@ -321,7 +349,12 @@ async function proceedToTimeSelection(msg: IncomingMessage, flow: FlowState) {
   await saveFlow(msg.phone, flow);
   await sendText({
     number: msg.phone,
-    text: etapa7Time(flow.dayLabel ?? flow.dayDate, slots, formatDurationLabel(durationMin)),
+    text: etapa7Time(
+      flow.dayLabel ?? flow.dayDate,
+      slots,
+      formatDurationLabel(durationMin),
+      prompts
+    ),
   });
 }
 
@@ -404,7 +437,7 @@ function faqAnswer(text: string, flow: FlowState): string | null {
   return null;
 }
 
-async function sendQuote(msg: IncomingMessage, flow: FlowState) {
+async function sendQuote(msg: IncomingMessage, flow: FlowState, wctx: WhatsAppCatalogContext) {
   const vehicleText = vehicleDisplayFromFlow(flow);
   const key = flow.serviceKey ?? "lavagem_detalhada";
   const quote =
@@ -415,7 +448,7 @@ async function sendQuote(msg: IncomingMessage, flow: FlowState) {
           time: "1 dia",
           label: flow.packageKey ?? "Pacote Premium",
         }
-      : quoteForKey(key, flow);
+      : quoteForKey(key, flow, wctx);
   flow.quoteMin = quote.min;
   flow.quoteMax = quote.max;
   flow.estimatedTime = quote.time;
@@ -431,13 +464,17 @@ async function sendQuote(msg: IncomingMessage, flow: FlowState) {
       quote.min,
       quote.max,
       quote.time,
-      quotePitchForService(key)
+      quotePitchForService(key, wctx.catalog),
+      wctx.prompts
     ),
   });
 }
 
 export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState) {
   const ctx = await loadContext();
+  const wctx = await loadWhatsAppCatalog();
+  const msgH = flowMsg(wctx);
+  const { prompts } = wctx;
   const input = msg.text.trim();
   const num = onlyNumber(input);
   const lower = input.toLowerCase();
@@ -455,7 +492,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
   ) {
     await sendText({
       number: msg.phone,
-      text: `Claro 😊 ${menuForStage(flow)}`,
+      text: `Claro 😊 ${menuForStage(flow, wctx)}`,
     });
     return;
   }
@@ -472,7 +509,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     if (isValidVehicle(input) && serviceKey && serviceKey !== "indeciso") {
       const merged = { ...storeVehicle(flow, input), serviceKey };
       if (flow.stage === "ETAPA2_MAIN_MENU" || flow.stage === "ETAPA2_SUB") {
-        await activateService(msg, merged, serviceKey);
+        await activateService(msg, merged, serviceKey, wctx);
         return;
       }
     }
@@ -487,10 +524,10 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
           welcomed: true,
           customerName: name.split(/\s+/)[0],
         });
-        await sendText({ number: msg.phone, text: etapa2MainMenu(name.split(/\s+/)[0]) });
+        await sendText({ number: msg.phone, text: msgH.mainMenu(name.split(/\s+/)[0]) });
       } else {
         await saveFlow(msg.phone, { stage: "ETAPA1_AWAITING_NAME", welcomed: false });
-        await sendText({ number: msg.phone, text: etapa1Welcome(ctx) });
+        await sendText({ number: msg.phone, text: etapa1Welcome(ctx, prompts) });
       }
       return;
     }
@@ -518,11 +555,11 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       };
       if (serviceKey && serviceKey !== "indeciso") {
         await saveFlow(msg.phone, next);
-        await activateService(msg, next, serviceKey);
+        await activateService(msg, next, serviceKey, wctx);
         return;
       }
       await saveFlow(msg.phone, next);
-      await sendText({ number: msg.phone, text: etapa2MainMenu(name) });
+      await sendText({ number: msg.phone, text: msgH.mainMenu(name) });
       return;
     }
 
@@ -532,7 +569,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       const pick = num && num >= 1 && num <= 8 ? num : catFromText;
 
       if (serviceFromText && serviceFromText !== "indeciso") {
-        await activateService(msg, flow, serviceFromText);
+        await activateService(msg, flow, serviceFromText, wctx);
         return;
       }
 
@@ -540,13 +577,13 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         if (isGreetingOrSmallTalk(input)) {
           await sendText({
             number: msg.phone,
-            text: etapa2MainMenu(flow.customerName ?? "Cliente"),
+            text: msgH.mainMenu(flow.customerName ?? "Cliente"),
           });
           return;
         }
         await sendText({
           number: msg.phone,
-          text: invalidMenu(etapa2MainMenu(flow.customerName ?? "Cliente")),
+          text: invalidMenu(msgH.mainMenu(flow.customerName ?? "Cliente"), prompts),
         });
         return;
       }
@@ -556,23 +593,23 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
           ...beginVehicleCollection({ ...flow, serviceKey: "indeciso" }),
           stage: "ETAPA3_UNDECIDED_VEHICLE",
         });
-        await sendText({ number: msg.phone, text: indecisiveVehiclePrompt() });
+        await sendText({ number: msg.phone, text: indecisiveVehiclePrompt(prompts) });
         return;
       }
 
       if (pick === 7) {
-        await activateService(msg, flow, "pacotes");
+        await activateService(msg, flow, "pacotes", wctx);
         return;
       }
 
-      const cat = CATEGORIES[pick];
+      const cat = wctx.categories[pick];
       if (cat && cat.keys.length === 1) {
-        await activateService(msg, flow, cat.keys[0]);
+        await activateService(msg, flow, cat.keys[0], wctx);
         return;
       }
 
       await saveFlow(msg.phone, { ...flow, stage: "ETAPA2_SUB", categoryNum: pick });
-      await sendText({ number: msg.phone, text: subMenuForCategory(pick) });
+      await sendText({ number: msg.phone, text: msgH.subMenu(pick) });
       return;
     }
 
@@ -581,20 +618,20 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         await saveFlow(msg.phone, { ...flow, stage: "ETAPA2_MAIN_MENU" });
         await sendText({
           number: msg.phone,
-          text: etapa2MainMenu(flow.customerName ?? "Cliente"),
+          text: msgH.mainMenu(flow.customerName ?? "Cliente"),
         });
         return;
       }
-      const cat = flow.categoryNum ? CATEGORIES[flow.categoryNum] : null;
+      const cat = flow.categoryNum ? wctx.categories[flow.categoryNum] : null;
       if (!cat || !num || num < 1 || num > cat.keys.length) {
         await sendText({
           number: msg.phone,
-          text: invalidMenu(flow.categoryNum ? subMenuForCategory(flow.categoryNum) : etapa2MainMenu(flow.customerName ?? "Cliente")),
+          text: invalidMenu(flow.categoryNum ? msgH.subMenu(flow.categoryNum) : msgH.mainMenu(flow.customerName ?? "Cliente"), prompts),
         });
         return;
       }
       const key = cat.keys[num - 1];
-      await activateService(msg, flow, key);
+      await activateService(msg, flow, key, wctx);
       return;
     }
 
@@ -604,14 +641,14 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
           ...storeVehicle(flow, input),
           stage: "ETAPA3_UNDECIDED_PROBLEM",
         });
-        await sendText({ number: msg.phone, text: indecisiveProblemPrompt() });
+        await sendText({ number: msg.phone, text: indecisiveProblemPrompt(prompts) });
         return;
       }
       const step = flow.vehicleCollectStep ?? "model";
       if (step === "model") {
         const model = parseModelFromText(input);
         if (!model) {
-          await sendText({ number: msg.phone, text: vehicleModelNotUnderstood() });
+          await sendText({ number: msg.phone, text: vehicleModelNotUnderstood(prompts) });
           return;
         }
         await saveFlow(msg.phone, {
@@ -639,7 +676,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     case "ETAPA3_UNDECIDED_PROBLEM": {
       const issue = num ?? 5;
       const key = UNDECIDED_TO_KEY[issue] ?? "lavagem_detalhada";
-      const item = CATALOG[key];
+      const item = wctx.catalog[key];
       await saveFlow(msg.phone, {
         ...flow,
         stage: "ETAPA3_SERVICE_ACTION",
@@ -649,7 +686,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       });
       await sendText({
         number: msg.phone,
-        text: `Para seu caso, recomendo *${item.label}* ✨\n\n${serviceDetail(item)}`,
+        text: `Para seu caso, recomendo *${item.label}* ✨\n\n${flowMsg(wctx).detail(key)}`,
       });
       return;
     }
@@ -657,36 +694,36 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     case "ETAPA3_PACKAGE_ACTION": {
       if (wantsOtherServices(input, num, 3)) {
         await saveFlow(msg.phone, { ...flow, stage: "ETAPA2_MAIN_MENU" });
-        await sendText({ number: msg.phone, text: etapa2MainMenu(flow.customerName ?? "Cliente") });
+        await sendText({ number: msg.phone, text: msgH.mainMenu(flow.customerName ?? "Cliente") });
         return;
       }
       if (num === 2) {
         await sendText({
           number: msg.phone,
-          text: `📦 *Pacotes:* Brilho Total (R$550+) | Proteção Completa (R$900+) | Interior Premium (R$380+) | Full Detail (R$1400+)\n\n${packageActionMenu()}`,
+          text: `📦 *Pacotes:* Brilho Total (R$550+) | Proteção Completa (R$900+) | Interior Premium (R$380+) | Full Detail (R$1400+)\n\n${packageActionMenu(prompts)}`,
         });
         return;
       }
       if (!wantsToSchedule(input, num)) {
         await sendText({
           number: msg.phone,
-          text: invalidMenu(packageActionMenu()),
+          text: invalidMenu(packageActionMenu(prompts), prompts),
         });
         return;
       }
       flow.packageKey = "Pacote escolhido";
       if (hasVehicleInFlow(flow)) {
-        await sendQuote(msg, flow);
+        await sendQuote(msg, flow, wctx);
         return;
       }
-      await goToVehicleStep(msg, flow);
+      await goToVehicleStep(msg, flow, wctx);
       return;
     }
 
     case "ETAPA3_SERVICE_ACTION": {
       if (wantsOtherServices(input, num)) {
         await saveFlow(msg.phone, { ...flow, stage: "ETAPA2_MAIN_MENU" });
-        await sendText({ number: msg.phone, text: etapa2MainMenu(flow.customerName ?? "Cliente") });
+        await sendText({ number: msg.phone, text: msgH.mainMenu(flow.customerName ?? "Cliente") });
         return;
       }
       if (wantsDoubt(input, num)) {
@@ -705,16 +742,16 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         return;
       }
       if (hasVehicleInFlow(flow)) {
-        await sendQuote(msg, flow);
+        await sendQuote(msg, flow, wctx);
         return;
       }
-      await goToVehicleStep(msg, flow);
+      await goToVehicleStep(msg, flow, wctx);
       return;
     }
 
     case "ETAPA4_VEHICLE": {
       if (isValidVehicle(input)) {
-        await sendQuote(msg, storeVehicle(flow, input));
+        await sendQuote(msg, storeVehicle(flow, input), wctx);
         return;
       }
 
@@ -723,7 +760,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       if (step === "model") {
         const model = parseModelFromText(input);
         if (!model) {
-          await sendText({ number: msg.phone, text: vehicleModelNotUnderstood() });
+          await sendText({ number: msg.phone, text: vehicleModelNotUnderstood(prompts) });
           return;
         }
         await saveFlow(msg.phone, {
@@ -742,17 +779,17 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       }
       const combined = `${flow.vehicleModel} ${year}`;
       if (!isValidVehicle(combined)) {
-        await sendText({ number: msg.phone, text: vehicleNotUnderstood() });
+        await sendText({ number: msg.phone, text: vehicleNotUnderstood(prompts) });
         return;
       }
-      await sendQuote(msg, storeVehicle(flow, combined));
+      await sendQuote(msg, storeVehicle(flow, combined), wctx);
       return;
     }
 
     case "ETAPA5_QUOTE": {
       if (wantsOtherServices(input, num)) {
         await saveFlow(msg.phone, { ...flow, stage: "ETAPA2_MAIN_MENU" });
-        await sendText({ number: msg.phone, text: etapa2MainMenu(flow.customerName ?? "Cliente") });
+        await sendText({ number: msg.phone, text: msgH.mainMenu(flow.customerName ?? "Cliente") });
         return;
       }
       if (wantsDoubt(input, num)) {
@@ -772,18 +809,24 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       if (flow.upsellOffered) {
         flow.stage = "ETAPA7_DAY";
         await saveFlow(msg.phone, flow);
-        await sendText({ number: msg.phone, text: etapa7Day() });
+        await sendText({ number: msg.phone, text: etapa7Day(prompts) });
         return;
       }
       const key = flow.serviceKey ?? "lavagem_detalhada";
-      const upsell = UPSELL_BY_KEY[key] ?? UPSELL_BY_KEY.lavagem_detalhada;
+      const upsell = getUpsellForKey(key, wctx) ?? getUpsellForKey("lavagem_detalhada", wctx);
+      if (!upsell) {
+        flow.stage = "ETAPA7_DAY";
+        await saveFlow(msg.phone, flow);
+        await sendText({ number: msg.phone, text: etapa7Day(prompts) });
+        return;
+      }
       flow.upsellLabel = upsell.complement;
       flow.upsellOffered = true;
       flow.stage = "ETAPA6_UPSELL";
       await saveFlow(msg.phone, flow);
       await sendText({
         number: msg.phone,
-        text: etapa6Upsell(flow.serviceLabel ?? "serviço", upsell.complement, upsell.benefit),
+        text: etapa6Upsell(flow.serviceLabel ?? "serviço", upsell.complement, upsell.benefit, prompts),
       });
       return;
     }
@@ -799,14 +842,14 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       flow.upsellAccepted = num === 1;
       flow.stage = "ETAPA7_DAY";
       await saveFlow(msg.phone, flow);
-      await sendText({ number: msg.phone, text: etapa7Day() });
+      await sendText({ number: msg.phone, text: etapa7Day(prompts) });
       return;
     }
 
     case "ETAPA7_PERIOD": {
       flow.stage = "ETAPA7_DAY";
       await saveFlow(msg.phone, flow);
-      await sendText({ number: msg.phone, text: etapa7Day() });
+      await sendText({ number: msg.phone, text: etapa7Day(prompts) });
       return;
     }
 
@@ -816,19 +859,19 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       if (!dayParsed) {
         await sendText({
           number: msg.phone,
-          text: invalidMenu(etapa7Day()),
+          text: invalidMenu(etapa7Day(prompts), prompts),
         });
         return;
       }
       flow.dayLabel = dayParsed.dayLabel;
       flow.dayDate = dayParsed.dayDate;
-      await proceedToTimeSelection(msg, flow);
+      await proceedToTimeSelection(msg, flow, wctx);
       return;
     }
 
     case "ETAPA7_TIME": {
       const slots = flow.availableSlots ?? [];
-      const durationMin = flow.serviceDurationMin ?? (await getFlowDurationMin(flow));
+      const durationMin = flow.serviceDurationMin ?? (await getFlowDurationMin(flow, wctx));
       let chosen: string | null = null;
 
       if (num && num >= 1 && num <= slots.length) {
@@ -842,7 +885,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         await sendText({
           number: msg.phone,
           text: invalidMenu(
-            etapa7Time(flow.dayLabel ?? flow.dayDate ?? "o dia", slots, formatDurationLabel(durationMin))
+            etapa7Time(flow.dayLabel ?? flow.dayDate ?? "o dia", slots, formatDurationLabel(durationMin), prompts)
           ),
         });
         return;
@@ -858,7 +901,8 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
             text: `Esse horário acabou de ser reservado 😔\n\n${etapa7Time(
               flow.dayLabel ?? flow.dayDate,
               fresh,
-              formatDurationLabel(durationMin)
+              formatDurationLabel(durationMin),
+              prompts
             )}`,
           });
           return;
@@ -869,13 +913,13 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       flow.periodLabel = chosen;
       flow.stage = "ETAPA8_PAYMENT";
       await saveFlow(msg.phone, flow);
-      await sendText({ number: msg.phone, text: etapa8Payment(!!ctx.pixKey) });
+      await sendText({ number: msg.phone, text: etapa8Payment(!!ctx.pixKey, prompts) });
       return;
     }
 
     case "ETAPA8_PAYMENT":
     case "ETAPA8_PAYMENT_NO_PIX": {
-      await handlePayment(msg, flow, ctx, num, lower);
+      await handlePayment(msg, flow, ctx, num, lower, wctx);
       return;
     }
 
@@ -887,7 +931,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         if (restored.stage === "ETAPA3_SERVICE_ACTION" && restored.serviceKey) {
           await sendText({
             number: msg.phone,
-            text: serviceDetail(CATALOG[restored.serviceKey]),
+            text: flowMsg(wctx).detail(restored.serviceKey),
           });
         } else {
           await sendText({
@@ -898,7 +942,9 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
               restored.serviceLabel ?? "serviço",
               restored.quoteMin ?? 0,
               restored.quoteMax ?? 0,
-              restored.estimatedTime ?? "—"
+              restored.estimatedTime ?? "—",
+              undefined,
+              prompts
             ),
           });
         }
@@ -923,19 +969,20 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         welcomed: true,
         customerName: flow.customerName,
       });
-      await sendText({ number: msg.phone, text: etapa2MainMenu(name) });
+      await sendText({ number: msg.phone, text: msgH.mainMenu(name) });
     }
   }
 }
 
-function menuForStage(flow: FlowState): string {
+function menuForStage(flow: FlowState, wctx: WhatsAppCatalogContext): string {
+  const msgH = flowMsg(wctx);
   switch (flow.stage) {
     case "ETAPA2_MAIN_MENU":
-      return etapa2MainMenu(flow.customerName ?? "Cliente");
+      return msgH.mainMenu(flow.customerName ?? "Cliente");
     case "ETAPA5_QUOTE":
       return `*1* Agendar | *2* Outro serviço | *3* Dúvida`;
     case "ETAPA3_SERVICE_ACTION":
-      return serviceActionMenu();
+      return serviceActionMenu(wctx.prompts);
     default:
       return `Digite *menu* para ver opções.`;
   }
@@ -946,8 +993,10 @@ async function handlePayment(
   flow: FlowState,
   ctx: FlowContext,
   num: number | null,
-  lower: string
+  lower: string,
+  wctx: WhatsAppCatalogContext
 ) {
+  const { prompts } = wctx;
   const isNoPix = flow.stage === "ETAPA8_PAYMENT_NO_PIX";
   const max = isNoPix ? 3 : 4;
   const min = isNoPix ? 1 : 1;
@@ -955,7 +1004,7 @@ async function handlePayment(
   if (!num || num < min || num > max) {
     await sendText({
       number: msg.phone,
-      text: invalidMenu(etapa8Payment(!!ctx.pixKey && !isNoPix)),
+      text: invalidMenu(etapa8Payment(!!ctx.pixKey && !isNoPix, prompts), prompts),
     });
     return;
   }
@@ -968,17 +1017,18 @@ async function handlePayment(
   if (!isNoPix && num === 1 && !ctx.pixKey) {
     flow.stage = "ETAPA8_PAYMENT_NO_PIX";
     await saveFlow(msg.phone, flow);
-    await sendText({ number: msg.phone, text: etapa8Payment(false) });
+    await sendText({ number: msg.phone, text: etapa8Payment(false, prompts) });
     return;
   }
 
-  await confirmFinal(msg, flow, ctx, !isNoPix && num === 1 && !!ctx.pixKey);
+  await confirmFinal(msg, flow, ctx, wctx, !isNoPix && num === 1 && !!ctx.pixKey);
 }
 
 async function confirmFinal(
   msg: IncomingMessage,
   flow: FlowState,
   ctx: FlowContext,
+  wctx: WhatsAppCatalogContext,
   includePix = false
 ) {
   await createAppointment(flow, msg.phone);
@@ -997,22 +1047,26 @@ async function confirmFinal(
       : "sob consulta";
 
   const name = flow.customerName ?? "Cliente";
-  const confirmBody = etapa9Confirm({
-    name,
-    vehicle: vehicleDisplayFromFlow(flow),
-    services: services || "Serviço premium",
-    day: flow.dayLabel ?? flow.dayDate ?? "—",
-    time: flow.startTime ?? flow.periodLabel ?? "—",
-    payment: flow.paymentMethod ?? "—",
-    value,
-    address: ctx.address || "nosso endereço",
-    pixBlock: includePix ? etapa8PixBlock(ctx) : undefined,
-  });
+  const { prompts } = wctx;
+  const confirmBody = etapa9Confirm(
+    {
+      name,
+      vehicle: vehicleDisplayFromFlow(flow),
+      services: services || "Serviço premium",
+      day: flow.dayLabel ?? flow.dayDate ?? "—",
+      time: flow.startTime ?? flow.periodLabel ?? "—",
+      payment: flow.paymentMethod ?? "—",
+      value,
+      address: ctx.address || "nosso endereço",
+      pixBlock: includePix ? etapa8PixBlock(ctx, prompts) : undefined,
+    },
+    prompts
+  );
 
   await delay(600);
   await sendText({
     number: msg.phone,
-    text: `${confirmBody}\n\n━━━━━━━━━━━━━━━━━━━━\n\n${etapa2MainMenu(name)}`,
+    text: `${confirmBody}\n\n━━━━━━━━━━━━━━━━━━━━\n\n${flowMsg(wctx).mainMenu(name)}`,
   });
 
   await saveFlow(msg.phone, {
@@ -1025,16 +1079,17 @@ async function confirmFinal(
 /** Primeira interação: sempre etapa 1 */
 export async function startFlow(msg: IncomingMessage) {
   const ctx = await loadContext();
+  const wctx = await loadWhatsAppCatalog();
   await saveFlow(msg.phone, { stage: "ETAPA1_AWAITING_NAME", welcomed: true });
-  await sendText({ number: msg.phone, text: etapa1Welcome(ctx) });
+  await sendText({ number: msg.phone, text: etapa1Welcome(ctx, wctx.prompts) });
 }
 
 export async function goToMainMenu(phone: string, customerName: string) {
-  const ctx = await loadContext();
+  const wctx = await loadWhatsAppCatalog();
   await saveFlow(phone, {
     stage: "ETAPA2_MAIN_MENU",
     welcomed: true,
     customerName,
   });
-  await sendText({ number: phone, text: etapa2MainMenu(customerName) });
+  await sendText({ number: phone, text: flowMsg(wctx).mainMenu(customerName) });
 }

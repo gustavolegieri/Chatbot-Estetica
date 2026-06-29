@@ -1,7 +1,16 @@
 import { PrismaClient, UserRole } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { CATALOG, CATEGORIES, UPSELL_BY_KEY } from "../src/lib/whatsapp-catalog";
+import { seedBotPrompts } from "../src/lib/bot-prompts";
 
 const prisma = new PrismaClient();
+
+function categoryForKey(key: string): number {
+  for (const [num, cat] of Object.entries(CATEGORIES)) {
+    if (cat.keys.includes(key)) return Number(num);
+  }
+  return 1;
+}
 
 async function main() {
   const passwordHash = await bcrypt.hash("admin123", 12);
@@ -25,75 +34,60 @@ async function main() {
       businessName: "Garagem do Ka",
       businessPhone: "(11) 99999-9999",
       businessAddress: "Rua das Oficinas, 100 - São Paulo, SP",
-      whatsappWelcomeMsg:
-        "Olá! Bem-vindo à Garagem do Ka 🚗 Estética automotiva premium.",
+      lunchBreakStart: "12:00",
+      lunchBreakEnd: "13:00",
+      whatsappWelcomeMsg: "Olá! Bem-vindo à Garagem do Ka 🚗 Estética automotiva premium.",
     },
   });
 
-  const services = [
-    {
-      name: "Lavagem Completa",
-      description: "Lavagem externa e interna com enceramento básico",
-      price: 89.9,
-      durationMin: 90,
-    },
-    {
-      name: "Polimento",
-      description: "Polimento profissional com remoção de riscos leves",
-      price: 299.9,
-      durationMin: 180,
-    },
-    {
-      name: "Vitrificação",
-      description: "Proteção cerâmica de alta durabilidade",
-      price: 899.9,
-      durationMin: 240,
-    },
-    {
-      name: "Higienização Interna",
-      description: "Limpeza profunda de estofados e carpetes",
-      price: 199.9,
-      durationMin: 120,
-    },
-    {
-      name: "Detalhamento Completo",
-      description: "Pacote completo: lavagem, polimento e proteção",
-      price: 1299.9,
-      durationMin: 360,
-    },
-    {
-      name: "Cristalização",
-      description: "Selagem com brilho intenso e proteção da pintura",
-      price: 449.9,
-      durationMin: 150,
-    },
-    {
-      name: "Enceramento Premium",
-      description: "Cera de alta performance e acabamento de vitrine",
-      price: 179.9,
-      durationMin: 60,
-    },
-    {
-      name: "Revitalização de Plásticos",
-      description: "Recuperação de plásticos externos e internos",
-      price: 149.9,
-      durationMin: 90,
-    },
-    {
-      name: "Limpeza de Motor",
-      description: "Limpeza técnica e segura do compartimento do motor",
-      price: 199.9,
-      durationMin: 90,
-    },
-  ];
+  await seedBotPrompts();
 
-  for (const service of services) {
-    const existing = await prisma.service.findFirst({
-      where: { name: service.name },
-    });
-    if (!existing) {
-      await prisma.service.create({ data: service });
+  const serviceIds: Record<string, string> = {};
+
+  for (const [key, item] of Object.entries(CATALOG)) {
+    if (key === "indeciso") continue;
+
+    const existing = await prisma.service.findFirst({ where: { catalogKey: key } });
+    const basePrice = item.hatchMin > 0 ? item.hatchMin : 99.9;
+
+    const data = {
+      name: item.label,
+      description: item.short,
+      price: basePrice,
+      durationMin: 120,
+      active: true,
+      catalogKey: key,
+      categoryNum: categoryForKey(key),
+      menuOrder: 0,
+      whatsappPitch: item.pitch,
+      whatsappShort: item.short,
+      priceHatchMin: item.hatchMin,
+      priceHatchMax: item.hatchMax,
+      priceSuvMin: item.suvMin,
+      priceSuvMax: item.suvMax,
+      timeEstimate: item.time,
+      showInWhatsApp: true,
+    };
+
+    if (existing) {
+      const updated = await prisma.service.update({ where: { id: existing.id }, data });
+      serviceIds[key] = updated.id;
+    } else {
+      const created = await prisma.service.create({ data });
+      serviceIds[key] = created.id;
     }
+  }
+
+  for (const [key, upsell] of Object.entries(UPSELL_BY_KEY)) {
+    const serviceId = serviceIds[key];
+    if (!serviceId) continue;
+    const complement = Object.entries(CATALOG).find(([, v]) => v.label === upsell.complement);
+    const upsellId = complement ? serviceIds[complement[0]] : undefined;
+    if (!upsellId) continue;
+    await prisma.service.update({
+      where: { id: serviceId },
+      data: { upsellServiceId: upsellId, upsellBenefit: upsell.benefit },
+    });
   }
 
   console.log("Seed concluído!");

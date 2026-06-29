@@ -27,6 +27,22 @@ export function overlapsExisting(
   return false;
 }
 
+function isInLunchBreak(cursor: number, durationMin: number, lunchStart?: string | null, lunchEnd?: string | null): boolean {
+  if (!lunchStart || !lunchEnd) return false;
+  const lunchStartMin = timeToMinutes(lunchStart);
+  const lunchEndMin = timeToMinutes(lunchEnd);
+  const slotEnd = cursor + durationMin;
+  return cursor < lunchEndMin && slotEnd > lunchStartMin;
+}
+
+function isInBlockedWindow(cursor: number, durationMin: number, blockStart?: string | null, blockEnd?: string | null): boolean {
+  if (!blockStart || !blockEnd) return false;
+  const bStart = timeToMinutes(blockStart);
+  const bEnd = timeToMinutes(blockEnd);
+  const slotEnd = cursor + durationMin;
+  return cursor < bEnd && bStart < slotEnd;
+}
+
 export async function getAvailableSlots(
   dateStr: string,
   durationMin: number,
@@ -40,6 +56,12 @@ export async function getAvailableSlots(
   const dayOfWeek = date.getDay();
 
   if (!workingDays.includes(dayOfWeek)) return [];
+
+  const blocked = await prisma.blockedDate.findUnique({
+    where: { date: startOfDay(date) },
+  });
+
+  if (blocked && !blocked.blockStart && !blocked.blockEnd) return [];
 
   const [startH, startM] = settings.businessHoursStart.split(":").map(Number);
   const [endH, endM] = settings.businessHoursEnd.split(":").map(Number);
@@ -66,6 +88,8 @@ export async function getAvailableSlots(
 
   for (let cursor = dayStartMin; cursor + durationMin <= dayEndMin; cursor += step) {
     if (isToday && cursor < nowMin) continue;
+    if (isInLunchBreak(cursor, durationMin, settings.lunchBreakStart, settings.lunchBreakEnd)) continue;
+    if (isInBlockedWindow(cursor, durationMin, blocked?.blockStart, blocked?.blockEnd)) continue;
     if (!overlapsExisting(cursor, durationMin, existing)) {
       slots.push(minutesToTime(cursor));
     }

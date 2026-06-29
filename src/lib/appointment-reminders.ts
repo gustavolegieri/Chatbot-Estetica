@@ -10,7 +10,7 @@ import {
 
 const ACTIVE = [AppointmentStatus.CONFIRMED, AppointmentStatus.PENDING];
 
-/** Cron: lembretes 4h, aviso 30min antes, cancelamento após +10min sem confirmação */
+/** Cron: lembretes, aviso antes do horário, cancelamento automático (tempos configuráveis no admin) */
 export async function processAppointmentRemindersAndAutoCancel(): Promise<{
   reminder4h: number;
   warnings: number;
@@ -20,6 +20,10 @@ export async function processAppointmentRemindersAndAutoCancel(): Promise<{
   if (!settings?.whatsappEnabled) {
     return { reminder4h: 0, warnings: 0, autoCancelled: 0 };
   }
+
+  const reminder4hMin = settings.reminder4hMin ?? 240;
+  const reminder30minMin = settings.reminder30minMin ?? 30;
+  const autoCancelMin = settings.autoCancelMin ?? 10;
 
   const now = new Date();
   const appointments = await prisma.appointment.findMany({
@@ -40,8 +44,7 @@ export async function processAppointmentRemindersAndAutoCancel(): Promise<{
 
     const minsUntil = (startsAt.getTime() - now.getTime()) / 60000;
 
-    // ~4 horas antes: lembrete + pedir confirmação
-    if (!apt.reminder4hSentAt && minsUntil <= 245 && minsUntil >= 215) {
+    if (!apt.reminder4hSentAt && minsUntil <= reminder4hMin + 5 && minsUntil >= reminder4hMin - 25) {
       await sendReminder4h(apt);
       await prisma.appointment.update({
         where: { id: apt.id },
@@ -50,12 +53,11 @@ export async function processAppointmentRemindersAndAutoCancel(): Promise<{
       reminder4h++;
     }
 
-    // 30 min antes: aviso de cancelamento se não confirmou
     if (
       !apt.clientConfirmedAt &&
       !apt.confirmWarningSentAt &&
-      minsUntil <= 32 &&
-      minsUntil >= 28
+      minsUntil <= reminder30minMin + 2 &&
+      minsUntil >= reminder30minMin - 2
     ) {
       await sendConfirmWarning(apt);
       await prisma.appointment.update({
@@ -65,11 +67,10 @@ export async function processAppointmentRemindersAndAutoCancel(): Promise<{
       warnings++;
     }
 
-    // 10 min após aviso (≈20 min antes do horário): cancela automaticamente
     const shouldAutoCancel =
       !apt.clientConfirmedAt &&
       apt.confirmWarningSentAt &&
-      now >= addMinutes(apt.confirmWarningSentAt, 10);
+      now >= addMinutes(apt.confirmWarningSentAt, autoCancelMin);
 
     if (shouldAutoCancel) {
       await prisma.appointment.update({
