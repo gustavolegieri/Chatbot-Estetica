@@ -30,6 +30,16 @@ export function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, "");
 }
 
+export function formatPhone(phone: string): string {
+  const d = normalizePhone(phone);
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  if (d.length === 13 && d.startsWith("55")) {
+    return `+${d.slice(0, 2)} (${d.slice(2, 4)}) ${d.slice(4, 9)}-${d.slice(9)}`;
+  }
+  return phone;
+}
+
 export function phoneToWhatsApp(phone: string): string {
   let digits = normalizePhone(phone);
   if (digits.length <= 11 && !digits.startsWith("55")) {

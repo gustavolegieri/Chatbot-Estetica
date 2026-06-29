@@ -47,6 +47,24 @@ enum WhatsAppSessionStep {
   CANCELLING
 }
 
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageSender {
+  CLIENT
+  BOT
+  ADMIN
+}
+
+enum HandoffStatus {
+  NONE
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -73,6 +91,7 @@ model Client {
 
   appointments     Appointment[]
   whatsappSessions WhatsAppSession[]
+  whatsappMessages WhatsAppMessage[]
 }
 
 model Service {
@@ -201,17 +220,51 @@ model BlockedDate {
 }
 
 model WhatsAppSession {
-  id               String              @id @default(cuid())
-  clientId         String?
-  phone            String              @unique
-  step             WhatsAppSessionStep @default(IDLE)
-  selectedServiceId String?
-  selectedDate     String?
-  selectedTime     String?
+  id                   String              @id @default(cuid())
+  clientId             String?
+  phone                String              @unique
+  step                 WhatsAppSessionStep @default(IDLE)
+  selectedServiceId    String?
+  selectedDate         String?
+  selectedTime         String?
   pendingAppointmentId String?
-  metadata         Json?
-  updatedAt        DateTime            @updatedAt
-  createdAt        DateTime            @default(now())
+  metadata             Json?
+  handoffStatus        HandoffStatus       @default(NONE)
+  handoffAt            DateTime?
+  handoffReason        String?
+  handoffNote          String?
+  handoffResolvedAt    DateTime?
+  botPaused            Boolean             @default(false)
+  lastMessageAt        DateTime?
+  lastMessagePreview   String?
+  unreadCount          Int                 @default(0)
+  updatedAt            DateTime            @updatedAt
+  createdAt            DateTime            @default(now())
 
-  client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  client   Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  messages WhatsAppMessage[]
+
+  @@index([handoffStatus])
+  @@index([lastMessageAt])
+  @@index([updatedAt])
+}
+
+model WhatsAppMessage {
+  id        String           @id @default(cuid())
+  sessionId String?
+  phone     String
+  clientId  String?
+  direction MessageDirection
+  sender    MessageSender
+  body      String           @db.Text
+  flowStage String?
+  createdAt DateTime         @default(now())
+
+  session WhatsAppSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  client  Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([phone])
+  @@index([sessionId])
+  @@index([createdAt])
+  @@index([clientId])
 }

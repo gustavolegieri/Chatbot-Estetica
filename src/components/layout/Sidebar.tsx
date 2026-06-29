@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -13,11 +14,13 @@ import {
   LogOut,
   MessageSquare,
   CalendarOff,
+  Headphones,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/atendimento", label: "Atendimento", icon: Headphones, badge: true },
   { href: "/admin/clientes", label: "Clientes", icon: Users },
   { href: "/admin/servicos", label: "Serviços", icon: Wrench },
   { href: "/admin/agendamentos", label: "Agendamentos", icon: Calendar },
@@ -29,6 +32,21 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [handoffCount, setHandoffCount] = useState(0);
+
+  useEffect(() => {
+    function loadBadge() {
+      fetch("/api/atendimento/badge")
+        .then((r) => r.json())
+        .then((res) => {
+          if (res.success) setHandoffCount(res.data.pendingHandoffs);
+        })
+        .catch(() => {});
+    }
+    loadBadge();
+    const interval = setInterval(loadBadge, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -64,6 +82,11 @@ export function Sidebar() {
             >
               <Icon className="h-5 w-5" />
               {item.label}
+              {"badge" in item && item.badge && handoffCount > 0 && (
+                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+                  {handoffCount}
+                </span>
+              )}
             </Link>
           );
         })}

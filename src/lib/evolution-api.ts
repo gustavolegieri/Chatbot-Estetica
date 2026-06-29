@@ -9,14 +9,21 @@
  *   EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE_NAME
  */
 
+import { MessageDirection, MessageSender } from "@prisma/client";
 import { phoneToWhatsApp } from "./utils";
 import { isValidPrivateRecipient } from "./whatsapp-jid";
+import { getMessageLogContext } from "./whatsapp-message-context";
+import { logWhatsAppMessage } from "./whatsapp-message-log";
 
 const WASENDER_BASE = "https://wasenderapi.com/api";
 
 interface SendTextParams {
   number: string;
   text: string;
+  /** Evita loop de log quando a mensagem já foi registrada manualmente */
+  skipBotLog?: boolean;
+  sender?: "BOT" | "ADMIN";
+  flowStage?: string;
 }
 
 interface ButtonOption {
@@ -74,16 +81,38 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
 }
 
 /** Envia mensagem de texto simples */
-export async function sendText({ number, text }: SendTextParams) {
+export async function sendText({
+  number,
+  text,
+  skipBotLog,
+  sender = "BOT",
+  flowStage,
+}: SendTextParams) {
   if (!isValidPrivateRecipient(number)) {
     console.warn("[WasenderAPI] Envio bloqueado (não é chat privado):", number);
     return { blocked: true, reason: "not_private_recipient" };
   }
 
-  return wasenderFetch({
+  const result = await wasenderFetch({
     to: phoneToWhatsApp(number),
     text,
   });
+
+  if (!skipBotLog) {
+    const ctx = getMessageLogContext();
+    const msgSender: MessageSender = sender === "ADMIN" ? MessageSender.ADMIN : MessageSender.BOT;
+    await logWhatsAppMessage({
+      phone: number,
+      sessionId: ctx?.sessionId,
+      clientId: ctx?.clientId,
+      direction: MessageDirection.OUTBOUND,
+      sender: msgSender,
+      body: text,
+      flowStage: flowStage ?? ctx?.getStage(),
+    }).catch((err) => console.error("[WhatsApp Log] outbound:", err));
+  }
+
+  return result;
 }
 
 /**

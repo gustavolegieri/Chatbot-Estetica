@@ -1,3 +1,4 @@
+import { MessageDirection, MessageSender } from "@prisma/client";
 import { prisma } from "./prisma";
 import { normalizePhone } from "./utils";
 import { isValidPrivateRecipient } from "./whatsapp-jid";
@@ -5,6 +6,13 @@ import { goToMainMenu, processNumberedFlow, startFlow } from "./whatsapp-flow";
 import { tryHandleAppointmentConfirmation } from "./appointment-confirmation";
 import { applySessionResetIfExpired } from "./whatsapp-session-reset";
 import { FlowState } from "./whatsapp-flow-types";
+import { runWithMessageLogContext } from "./whatsapp-message-context";
+import { logWhatsAppMessage } from "./whatsapp-message-log";
+import {
+  isBotPausedForPhone,
+  requestHumanHandoff,
+  wantsHumanHandoff,
+} from "./whatsapp-handoff";
 
 interface IncomingMessage {
   phone: string;
@@ -57,7 +65,6 @@ async function handleMessage(msg: IncomingMessage) {
   }
 
   const settings = await prisma.settings.findUnique({ where: { id: "default" } });
-  // Só bloqueia se o campo existir E for explicitamente false
   if (settings && settings.whatsappEnabled === false) {
     console.warn("[WhatsApp Bot] whatsappEnabled=false nas configurações, mensagem ignorada");
     return;
@@ -65,30 +72,72 @@ async function handleMessage(msg: IncomingMessage) {
 
   const session = await getOrCreateSession(msg.phone, msg.pushName);
   let flow = parseFlow(session.metadata);
+  const flowRef = { current: flow };
 
-  await applySessionResetIfExpired(msg.phone, session.updatedAt, flow);
+  await runWithMessageLogContext(
+    {
+      phone: msg.phone,
+      sessionId: session.id,
+      clientId: session.clientId,
+      getStage: () => flowRef.current.stage,
+    },
+    async () => {
+      const inboundText = msg.text.trim() || msg.buttonId || msg.listId || "";
 
-  const sessionAfterReset = await prisma.whatsAppSession.findUnique({
-    where: { phone: normalizePhone(msg.phone) },
-    include: { client: true },
-  });
-  flow = parseFlow(sessionAfterReset?.metadata);
+      if (inboundText) {
+        await logWhatsAppMessage({
+          phone: msg.phone,
+          sessionId: session.id,
+          clientId: session.clientId,
+          direction: MessageDirection.INBOUND,
+          sender: MessageSender.CLIENT,
+          body: inboundText,
+          flowStage: flowRef.current.stage,
+        });
+      }
 
-  if (await tryHandleAppointmentConfirmation(msg.phone, msg.text)) return;
+      if (wantsHumanHandoff(inboundText)) {
+        const name =
+          flowRef.current.customerName ?? session.client?.name ?? msg.pushName;
+        await requestHumanHandoff({
+          phone: msg.phone,
+          sessionId: session.id,
+          reason: inboundText,
+          clientName: name,
+        });
+        return;
+      }
 
-  if (msg.text.trim().toLowerCase() === "menu") {
-    const name =
-      flow.customerName ?? session.client?.name ?? msg.pushName ?? "Cliente";
-    await goToMainMenu(msg.phone, name);
-    return;
-  }
+      if (await isBotPausedForPhone(msg.phone)) {
+        return;
+      }
 
-  if (!flow.welcomed) {
-    await startFlow(msg);
-    return;
-  }
+      await applySessionResetIfExpired(msg.phone, session.updatedAt, flowRef.current);
 
-  await processNumberedFlow(msg, flow);
+      const sessionAfterReset = await prisma.whatsAppSession.findUnique({
+        where: { phone: normalizePhone(msg.phone) },
+        include: { client: true },
+      });
+      flowRef.current = parseFlow(sessionAfterReset?.metadata);
+      flow = flowRef.current;
+
+      if (await tryHandleAppointmentConfirmation(msg.phone, msg.text)) return;
+
+      if (msg.text.trim().toLowerCase() === "menu") {
+        const name =
+          flowRef.current.customerName ?? session.client?.name ?? msg.pushName ?? "Cliente";
+        await goToMainMenu(msg.phone, name);
+        return;
+      }
+
+      if (!flowRef.current.welcomed) {
+        await startFlow(msg);
+        return;
+      }
+
+      await processNumberedFlow(msg, flowRef.current);
+    }
+  );
 }
 
 export async function processWhatsAppMessage(msg: IncomingMessage) {
