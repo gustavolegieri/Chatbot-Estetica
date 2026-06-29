@@ -1,5 +1,6 @@
-import { addMinutes, format, parse, isBefore, isAfter, startOfDay } from "date-fns";
+import { addMinutes, format, parse, isBefore, isAfter } from "date-fns";
 import { prisma } from "./prisma";
+import { localDayRange, parseIsoDateLocal } from "./date-br";
 
 export function timeToMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(":").map(Number);
@@ -52,13 +53,15 @@ export async function getAvailableSlots(
   if (!settings) return [];
 
   const workingDays = settings.workingDays.split(",").map(Number);
-  const date = parse(dateStr, "yyyy-MM-dd", new Date());
+  const date = parseIsoDateLocal(dateStr);
   const dayOfWeek = date.getDay();
 
   if (!workingDays.includes(dayOfWeek)) return [];
 
+  const { gte: dayStart, lt: dayEnd } = localDayRange(dateStr);
+
   const blocked = await prisma.blockedDate.findUnique({
-    where: { date: startOfDay(date) },
+    where: { date: dayStart },
   });
 
   if (blocked && !blocked.blockStart && !blocked.blockEnd) return [];
@@ -72,8 +75,8 @@ export async function getAvailableSlots(
   const existing = await prisma.appointment.findMany({
     where: {
       date: {
-        gte: startOfDay(date),
-        lt: addMinutes(startOfDay(date), 24 * 60),
+        gte: dayStart,
+        lt: dayEnd,
       },
       status: { notIn: ["CANCELLED", "NO_SHOW"] },
       ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),

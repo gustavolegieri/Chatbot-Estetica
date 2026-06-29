@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { Plus, Calendar } from "lucide-react";
-import { format } from "date-fns";
 import { AdminHeader } from "@/components/layout/AdminHeader";
 import { Modal } from "@/components/ui/Modal";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { formatDate } from "@/lib/utils";
+import { brDateToIso, isoToBrDate, maskBrDateInput, todayIsoLocal } from "@/lib/date-br";
 
 interface Appointment {
   id: string;
@@ -40,11 +39,13 @@ export default function AgendamentosPage() {
   const [slots, setSlots] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [filterDate, setFilterDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [filterDate, setFilterDate] = useState(todayIsoLocal());
+  const [filterDateBr, setFilterDateBr] = useState(isoToBrDate(todayIsoLocal()));
   const [form, setForm] = useState({
     clientId: "",
     serviceId: "",
-    date: format(new Date(), "yyyy-MM-dd"),
+    date: todayIsoLocal(),
+    dateBr: isoToBrDate(todayIsoLocal()),
     startTime: "",
     status: "CONFIRMED",
     notes: "",
@@ -79,10 +80,15 @@ export default function AgendamentosPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const dateIso = brDateToIso(form.dateBr);
+    if (!dateIso) {
+      alert("Data inválida. Use o formato dd/mm/aaaa");
+      return;
+    }
     const res = await fetch("/api/agendamentos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, date: dateIso }),
     });
     const data = await res.json();
     if (!data.success) {
@@ -123,10 +129,23 @@ export default function AgendamentosPage() {
       <div className="mb-4">
         <label className="label">Filtrar por data</label>
         <input
-          type="date"
+          type="text"
+          inputMode="numeric"
           className="input max-w-xs"
-          value={filterDate}
-          onChange={(e) => setFilterDate(e.target.value)}
+          placeholder="dd/mm/aaaa"
+          value={filterDateBr}
+          onChange={(e) => {
+            const masked = maskBrDateInput(e.target.value);
+            setFilterDateBr(masked);
+            const iso = brDateToIso(masked);
+            if (iso) setFilterDate(iso);
+          }}
+          onBlur={() => {
+            const iso = brDateToIso(filterDateBr);
+            if (!iso) {
+              setFilterDateBr(isoToBrDate(filterDate));
+            }
+          }}
         />
       </div>
 
@@ -206,7 +225,19 @@ export default function AgendamentosPage() {
           </div>
           <div>
             <label className="label">Data *</label>
-            <input type="date" className="input" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+            <input
+              type="text"
+              inputMode="numeric"
+              className="input"
+              placeholder="dd/mm/aaaa"
+              value={form.dateBr}
+              onChange={(e) => {
+                const dateBr = maskBrDateInput(e.target.value);
+                const date = brDateToIso(dateBr) ?? form.date;
+                setForm({ ...form, dateBr, date });
+              }}
+              required
+            />
           </div>
           <div>
             <label className="label">Horário *</label>

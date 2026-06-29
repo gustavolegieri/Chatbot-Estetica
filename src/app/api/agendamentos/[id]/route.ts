@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { calculateEndTime, isSlotAvailable } from "@/lib/appointments";
 import { onAppointmentStatusChange } from "@/lib/appointment-lifecycle";
+import { parseIsoDateLocal } from "@/lib/date-br";
 
 const updateSchema = z.object({
   clientId: z.string().optional(),
@@ -71,7 +72,7 @@ export async function PUT(
       where: { id },
       data: {
         ...data,
-        date: data.date ? parse(data.date, "yyyy-MM-dd", new Date()) : undefined,
+        date: data.date ? parseIsoDateLocal(data.date) : undefined,
         endTime,
       },
       include: { client: true, service: true },

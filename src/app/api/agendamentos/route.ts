@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { parse } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { calculateEndTime, isSlotAvailable } from "@/lib/appointments";
+import { localDayRange, parseIsoDateLocal } from "@/lib/date-br";
 
 const createSchema = z.object({
   clientId: z.string(),
@@ -25,12 +25,10 @@ export async function GET(request: NextRequest) {
     where: {
       ...(status ? { status: status as never } : {}),
       ...(date
-        ? {
-            date: {
-              gte: parse(date, "yyyy-MM-dd", new Date()),
-              lt: new Date(parse(date, "yyyy-MM-dd", new Date()).getTime() + 86400000),
-            },
-          }
+        ? (() => {
+            const range = localDayRange(date);
+            return { date: { gte: range.gte, lt: range.lt } };
+          })()
         : {}),
     },
     include: { client: true, service: true },
@@ -68,7 +66,7 @@ export async function POST(request: NextRequest) {
       data: {
         clientId: data.clientId,
         serviceId: data.serviceId,
-        date: parse(data.date, "yyyy-MM-dd", new Date()),
+        date: parseIsoDateLocal(data.date),
         startTime: data.startTime,
         endTime: calculateEndTime(data.startTime, service.durationMin),
         status: data.status ?? "CONFIRMED",
