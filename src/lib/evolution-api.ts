@@ -36,7 +36,7 @@ function getApiKey(): string | null {
   return process.env.WASENDER_API_KEY ?? null;
 }
 
-async function wasenderFetch(body: object): Promise<unknown> {
+async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
   const apiKey = getApiKey();
 
   if (!apiKey) {
@@ -52,6 +52,18 @@ async function wasenderFetch(body: object): Promise<unknown> {
     },
     body: JSON.stringify(body),
   });
+
+  if (response.status === 429 && attempt <= 3) {
+    let waitMs = 62_000; // fallback: 62s
+    try {
+      const json = await response.clone().json() as { retry_after?: number };
+      if (json.retry_after) waitMs = (json.retry_after + 2) * 1000;
+    } catch { /* ignora erro de parse */ }
+
+    console.warn(`[WasenderAPI] Rate limit — aguardando ${waitMs / 1000}s (tentativa ${attempt}/3)`);
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+    return wasenderFetch(body, attempt + 1);
+  }
 
   if (!response.ok) {
     const text = await response.text();
