@@ -6,6 +6,8 @@ import { parseFlowMetadata } from "@/lib/atendimento-analytics";
 import { flowStageLabel } from "@/lib/flow-stage-labels";
 import { markConversationRead } from "@/lib/whatsapp-message-log";
 import { normalizePhone } from "@/lib/utils";
+import { sendWelcomeFlow } from "@/lib/whatsapp-welcome";
+import { resolveValidCustomerName } from "@/lib/customer-name";
 
 export async function GET(
   _request: NextRequest,
@@ -81,7 +83,10 @@ export async function PUT(
   const body = await request.json();
   const action = body.action as string;
 
-  const waSession = await prisma.whatsAppSession.findUnique({ where: { phone } });
+  const waSession = await prisma.whatsAppSession.findUnique({
+    where: { phone },
+    include: { client: true },
+  });
   if (!waSession) {
     return NextResponse.json({ success: false, error: "Conversa não encontrada" }, { status: 404 });
   }
@@ -95,6 +100,11 @@ export async function PUT(
   }
 
   if (action === "resolve") {
+    const flow = parseFlowMetadata(waSession.metadata);
+    const clientName =
+      resolveValidCustomerName(waSession.client?.name) ??
+      resolveValidCustomerName(flow.customerName);
+
     const updated = await prisma.whatsAppSession.update({
       where: { id: waSession.id },
       data: {
@@ -104,6 +114,9 @@ export async function PUT(
         handoffNote: body.note ?? waSession.handoffNote,
       },
     });
+
+    await sendWelcomeFlow(phone, clientName);
+
     return NextResponse.json({ success: true, data: updated });
   }
 

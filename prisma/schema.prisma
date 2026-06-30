@@ -190,7 +190,7 @@ model Settings {
   pixKey                String?
   pixHolderName         String?
   pixBank               String?
-  sessionResetMin       Int     @default(60)
+  sessionResetMin       Int     @default(30)
   followupIdleMin       Int     @default(10)
   reminder4hMin         Int     @default(240)
   reminder30minMin      Int     @default(30)

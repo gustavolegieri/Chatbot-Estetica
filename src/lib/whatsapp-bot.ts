@@ -5,6 +5,8 @@ import { isValidPrivateRecipient } from "./whatsapp-jid";
 import { goToMainMenu, processNumberedFlow, startFlow } from "./whatsapp-flow";
 import { tryHandleAppointmentConfirmation } from "./appointment-confirmation";
 import { applySessionResetIfExpired } from "./whatsapp-session-reset";
+import { sendWelcomeFlow } from "./whatsapp-welcome";
+import { resolveValidCustomerName } from "./customer-name";
 import { FlowState } from "./whatsapp-flow-types";
 import { runWithMessageLogContext } from "./whatsapp-message-context";
 import { logWhatsAppMessage } from "./whatsapp-message-log";
@@ -40,9 +42,12 @@ async function getOrCreateSession(phone: string, pushName?: string) {
   if (!session) {
     let client = await prisma.client.findUnique({ where: { phone: normalized } });
     if (!client && pushName) {
-      client = await prisma.client.create({
-        data: { name: pushName, phone: normalized },
-      });
+      const validName = resolveValidCustomerName(pushName);
+      if (validName) {
+        client = await prisma.client.create({
+          data: { name: validName, phone: normalized },
+        });
+      }
     }
 
     session = await prisma.whatsAppSession.create({
@@ -112,7 +117,22 @@ async function handleMessage(msg: IncomingMessage) {
         return;
       }
 
-      await applySessionResetIfExpired(msg.phone, session.updatedAt, flowRef.current);
+      const wasReset = await applySessionResetIfExpired(
+        msg.phone,
+        session.updatedAt,
+        flowRef.current
+      );
+      if (wasReset) {
+        const refreshed = await prisma.whatsAppSession.findUnique({
+          where: { phone: normalizePhone(msg.phone) },
+          include: { client: true },
+        });
+        const name =
+          resolveValidCustomerName(refreshed?.client?.name) ??
+          resolveValidCustomerName(msg.pushName);
+        await sendWelcomeFlow(msg.phone, name);
+        return;
+      }
 
       const sessionAfterReset = await prisma.whatsAppSession.findUnique({
         where: { phone: normalizePhone(msg.phone) },
@@ -121,7 +141,7 @@ async function handleMessage(msg: IncomingMessage) {
       flowRef.current = parseFlow(sessionAfterReset?.metadata);
       flow = flowRef.current;
 
-      if (await tryHandleAppointmentConfirmation(msg.phone, msg.text)) return;
+      if (await tryHandleAppointmentConfirmation(msg.phone, msg.text, flowRef.current.stage)) return;
 
       if (msg.text.trim().toLowerCase() === "menu") {
         const name =

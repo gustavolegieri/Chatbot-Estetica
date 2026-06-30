@@ -12,6 +12,14 @@ function categoryForKey(key: string): number {
   return 1;
 }
 
+function menuOrderForKey(key: string): number {
+  for (const cat of Object.values(CATEGORIES)) {
+    const idx = cat.keys.indexOf(key);
+    if (idx >= 0) return idx + 1;
+  }
+  return 0;
+}
+
 async function main() {
   const passwordHash = await bcrypt.hash("admin123", 12);
 
@@ -28,7 +36,7 @@ async function main() {
 
   await prisma.settings.upsert({
     where: { id: "default" },
-    update: {},
+    update: { sessionResetMin: 30 },
     create: {
       id: "default",
       businessName: "Garagem do Ka",
@@ -36,11 +44,21 @@ async function main() {
       businessAddress: "Rua das Oficinas, 100 - São Paulo, SP",
       lunchBreakStart: "12:00",
       lunchBreakEnd: "13:00",
+      sessionResetMin: 30,
       whatsappWelcomeMsg: "Olá! Bem-vindo à Garagem do Ka 🚗 Estética automotiva premium.",
     },
   });
 
   await seedBotPrompts();
+
+  const validKeys = new Set(Object.keys(CATALOG).filter((k) => k !== "indeciso"));
+  await prisma.service.updateMany({
+    where: {
+      catalogKey: { not: null },
+      NOT: { catalogKey: { in: [...validKeys] } },
+    },
+    data: { active: false, showInWhatsApp: false },
+  });
 
   const serviceIds: Record<string, string> = {};
 
@@ -48,17 +66,31 @@ async function main() {
     if (key === "indeciso") continue;
 
     const existing = await prisma.service.findFirst({ where: { catalogKey: key } });
-    const basePrice = item.hatchMin > 0 ? item.hatchMin : 99.9;
+    const basePrice = item.hatchMin > 0 ? item.hatchMin : 0;
+    const durationMap: Record<string, number> = {
+      lavagem_simples: 75,
+      lavagem_completa: 105,
+      lavagem_detalhada: 150,
+      limpeza_motor: 120,
+      cristalizacao_farois: 90,
+      descontaminacao_pintura: 150,
+      higienizacao_tecido: 150,
+      higienizacao_tecido_completa: 210,
+      higienizacao_couro: 120,
+      higienizacao_couro_completa: 210,
+      descontaminacao_vidro: 90,
+      polimento_cotacao: 240,
+    };
 
     const data = {
       name: item.label,
       description: item.short,
-      price: basePrice,
-      durationMin: 120,
+      price: basePrice > 0 ? basePrice : 0,
+      durationMin: durationMap[key] ?? 120,
       active: true,
       catalogKey: key,
       categoryNum: categoryForKey(key),
-      menuOrder: 0,
+      menuOrder: menuOrderForKey(key),
       whatsappPitch: item.pitch,
       whatsappShort: item.short,
       priceHatchMin: item.hatchMin,

@@ -4,6 +4,7 @@ import {
   BRAND_DEFAULT,
   CATALOG,
   CATEGORIES,
+  MAIN_MENU_CATEGORIES,
   UNDECIDED_TO_KEY,
   type CatalogItem,
 } from "./whatsapp-catalog";
@@ -71,9 +72,9 @@ function buildCategoriesFromServices(
     }
   }
 
-  if (!result[8]?.keys.includes("indeciso")) {
-    result[8] = result[8] ?? { title: "Ajuda na escolha", keys: [] };
-    if (!result[8].keys.includes("indeciso")) result[8].keys.push("indeciso");
+  if (!result[6]?.keys.includes("indeciso")) {
+    result[6] = result[6] ?? { title: "Ajuda na escolha", keys: [] };
+    if (!result[6].keys.includes("indeciso")) result[6].keys.push("indeciso");
   }
 
   return result;
@@ -120,10 +121,10 @@ export function invalidateCatalogCache() {
 
 export function buildMainMenu(categories: WhatsAppCatalogContext["categories"], prompts: PromptMap): string {
   const lines: string[] = [];
-  for (let i = 1; i <= 8; i++) {
+  const icons = ["💧", "🔧", "🪑", "✨", "🪟", "🤔"];
+  for (let i = 1; i <= MAIN_MENU_CATEGORIES; i++) {
     const cat = categories[i];
     if (!cat) continue;
-    const icons = ["💧", "✨", "🛡️", "🪑", "🔄", "🔬", "📦", "🤔"];
     lines.push(`*${i}* ${icons[i - 1] ?? "•"} ${cat.title}`);
   }
   return lines.join("\n");
@@ -136,7 +137,7 @@ export function subMenuForCategoryCtx(
   const cat = ctx.categories[categoryNum];
   if (!cat) return "";
   const lines = cat.keys
-    .filter((k) => k !== "indeciso" && k !== "pacotes")
+    .filter((k) => k !== "indeciso")
     .map((key, i) => {
       const item = ctx.catalog[key];
       return item ? `*${i + 1}* — ${item.label}` : null;
@@ -159,4 +160,4 @@ export function getUpsellForKey(
   return null;
 }
 
-export { BRAND_DEFAULT, UNDECIDED_TO_KEY };
+export { BRAND_DEFAULT, MAIN_MENU_CATEGORIES, UNDECIDED_TO_KEY };

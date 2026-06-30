@@ -10,7 +10,7 @@ Atendente virtual premium com etapas numeradas, anti-flood (debounce ~2,8s) e ap
 
 ```
 Primeira mensagem → Boas-vindas + pedir nome
-Nome → Menu (8 categorias de serviço)
+Nome → Menu (6 categorias de serviço)
 Categoria → Submenu ou serviço direto
 Serviço → Agendar / Outros / Dúvida
 Veículo (modelo • ano • cor • estado) → Orçamento
@@ -19,9 +19,13 @@ Upsell (1x) → Período → Dia → Pagamento → Confirmação
 
 **Comandos:** `menu` volta ao menu principal (se o nome já foi informado).
 
-**Interpretação livre:** o cliente pode enviar veículo e serviço na mesma mensagem (ex.: *Hilux preta 2021 com riscos, quero vitrificação*). SUVs/pickups e condição severa ajustam a faixa de preço.
+**Interpretação livre:** o cliente pode enviar veículo e serviço na mesma mensagem (ex.: *Hilux preta 2021 com riscos, quero vitrificação*).
 
-**Sessão:** após 45 min sem resposta, oferece continuar ou recomeçar.
+**Sessão:** após **30 min** sem resposta (configurável em Configurações → `sessionResetMin`), o bot reinicia e reenvia as boas-vindas.
+
+**Handoff:** ao encerrar atendimento humano no painel, o bot reenvia boas-vindas automaticamente.
+
+**Confirmação de presença:** responda *CONFIRME* (não use o número `1` do menu). Lembrete 4h e aviso 30min antes do horário.
 
 Arquivos principais: `src/lib/whatsapp-bot.ts`, `whatsapp-flow.ts`, `whatsapp-catalog.ts`, `whatsapp-flow-messages.ts`.
 
@@ -113,7 +117,32 @@ O estado da conversa é armazenado em `WhatsAppSession`:
 
 Se as variáveis `EVOLUTION_API_*` não estiverem configuradas, as mensagens são logadas no console sem envio real. Útil para desenvolvimento sem WhatsApp conectado.
 
-## Lembrete 24h antes
+## Automações (cron)
+
+Configure `CRON_SECRET` no `.env` e chame **a cada 5–10 minutos**:
+
+```http
+GET https://seu-dominio/api/cron/followup?secret=SUA_CRON_SECRET
+```
+
+Ou: `Authorization: Bearer SUA_CRON_SECRET`
+
+Esse endpoint executa:
+- **Reset de sessão** (30 min) + reenvio de boas-vindas
+- **Follow-up** por inatividade (10 min, configurável)
+- **Lembrete 4h** antes do agendamento (`reminder_4h`)
+- **Aviso 30 min** antes pedindo *CONFIRME* (`reminder_30min`)
+- **Auto-cancelamento** se não confirmar no prazo
+
+Alternativa só lembretes:
+
+```http
+GET https://seu-dominio/api/cron/reminders?secret=SUA_CRON_SECRET
+```
+
+**Pós-atendimento:** ao marcar agendamento como *Concluído* no painel, envia WhatsApp de agradecimento (`appointment_thankyou`).
+
+## Lembrete 24h antes (legado)
 
 O sistema envia um WhatsApp automático cerca de **24 horas antes** do horário do agendamento (status Confirmado ou Pendente).
 
