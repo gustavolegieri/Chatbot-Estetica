@@ -10,7 +10,7 @@ Atendente virtual premium com etapas numeradas, anti-flood (debounce ~2,8s) e ap
 
 ```
 Primeira mensagem → Boas-vindas + pedir nome
-Nome → Menu (6 categorias de serviço)
+Nome → Menu (8 categorias de serviço)
 Categoria → Submenu ou serviço direto
 Serviço → Agendar / Outros / Dúvida
 Veículo (modelo • ano • cor • estado) → Orçamento
@@ -23,9 +23,11 @@ Upsell (1x) → Período → Dia → Pagamento → Confirmação
 
 **Sessão:** após **30 min** sem resposta (configurável em Configurações → `sessionResetMin`), o bot reinicia e reenvia as boas-vindas.
 
-**Handoff:** ao encerrar atendimento humano no painel, o bot reenvia boas-vindas automaticamente.
+**Handoff:** ao encerrar atendimento humano no painel, a *próxima mensagem* do cliente recebe boas-vindas + menu principal.
 
-**Confirmação de presença:** responda *CONFIRME* (não use o número `1` do menu). Lembrete 4h e aviso 30min antes do horário.
+**Confirmação de presença:** responda *CONFIRME* (não use o número `1` do menu). Lembrete 4h e aviso 30min antes do horário — enviados automaticamente pelo bot a cada mensagem recebida (sem depender de cron externo).
+
+**Fora do horário:** mensagens recebidas após o fechamento (ou fora dos dias de funcionamento) recebem aviso automático com horário de retorno.
 
 Arquivos principais: `src/lib/whatsapp-bot.ts`, `whatsapp-flow.ts`, `whatsapp-catalog.ts`, `whatsapp-flow-messages.ts`.
 
@@ -127,7 +129,7 @@ GET https://seu-dominio/api/cron/followup?secret=SUA_CRON_SECRET
 
 Ou: `Authorization: Bearer SUA_CRON_SECRET`
 
-Esse endpoint executa:
+Esse endpoint executa (opcional — o bot também processa lembretes a cada mensagem recebida):
 - **Reset de sessão** (30 min) + reenvio de boas-vindas
 - **Follow-up** por inatividade (10 min, configurável)
 - **Lembrete 4h** antes do agendamento (`reminder_4h`)

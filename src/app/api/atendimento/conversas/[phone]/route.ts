@@ -6,7 +6,7 @@ import { parseFlowMetadata } from "@/lib/atendimento-analytics";
 import { flowStageLabel } from "@/lib/flow-stage-labels";
 import { markConversationRead } from "@/lib/whatsapp-message-log";
 import { normalizePhone } from "@/lib/utils";
-import { sendWelcomeFlow } from "@/lib/whatsapp-welcome";
+import { markPendingWelcomeRestart } from "@/lib/whatsapp-session-reset";
 import { resolveValidCustomerName } from "@/lib/customer-name";
 
 export async function GET(
@@ -115,7 +115,7 @@ export async function PUT(
       },
     });
 
-    await sendWelcomeFlow(phone, clientName);
+    await markPendingWelcomeRestart(phone, clientName);
 
     return NextResponse.json({ success: true, data: updated });
   }

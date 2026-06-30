@@ -6,7 +6,7 @@ export async function getRuntimeSettings() {
 
 export async function getSessionResetMs(): Promise<number> {
   const s = await getRuntimeSettings();
-  return (s?.sessionResetMin ?? 60) * 60 * 1000;
+  return (s?.sessionResetMin ?? 30) * 60 * 1000;
 }
 
 export async function getFollowupIdleMs(): Promise<number> {

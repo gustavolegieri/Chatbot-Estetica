@@ -2,7 +2,7 @@
 
 export const BRAND_DEFAULT = "Garagem do Ka";
 
-export const MAIN_MENU_CATEGORIES = 6;
+export const MAIN_MENU_CATEGORIES = 8;
 
 export interface CatalogItem {
   key: string;
@@ -22,10 +22,14 @@ function price(p: number) {
 }
 
 export const CATEGORIES: Record<number, { title: string; keys: string[] }> = {
-  1: { title: "Lavagens", keys: ["lavagem_simples", "lavagem_completa", "lavagem_detalhada"] },
-  2: { title: "Motor & Faróis", keys: ["limpeza_motor", "cristalizacao_farois"] },
+  1: { title: "Lavagem", keys: ["lavagem_simples", "lavagem_completa", "lavagem_detalhada"] },
+  2: { title: "Polimento", keys: ["polimento_cotacao"] },
   3: {
-    title: "Higienização Interna",
+    title: "Proteção & Brilho",
+    keys: ["descontaminacao_pintura", "cristalizacao_farois"],
+  },
+  4: {
+    title: "Interior",
     keys: [
       "higienizacao_tecido",
       "higienizacao_tecido_completa",
@@ -33,9 +37,13 @@ export const CATEGORIES: Record<number, { title: string; keys: string[] }> = {
       "higienizacao_couro_completa",
     ],
   },
-  4: { title: "Pintura & Proteção", keys: ["descontaminacao_pintura", "polimento_cotacao"] },
-  5: { title: "Vidros", keys: ["descontaminacao_vidro"] },
-  6: { title: "Ajuda na escolha", keys: ["indeciso"] },
+  5: { title: "Detalhes Especiais", keys: ["limpeza_motor", "descontaminacao_vidro"] },
+  6: {
+    title: "Revitalização",
+    keys: ["revitalizacao_pintura", "descontaminacao", "limpeza_premium"],
+  },
+  7: { title: "Pacotes Premium", keys: ["pacotes"] },
+  8: { title: "Ajuda na escolha", keys: ["indeciso"] },
 };
 
 export const CATALOG: Record<string, CatalogItem> = {
@@ -149,6 +157,54 @@ export const CATALOG: Record<string, CatalogItem> = {
     hatchMax: 0,
     suvMin: 0,
     suvMax: 0,
+  },
+  revitalizacao_pintura: {
+    key: "revitalizacao_pintura",
+    label: "Revitalização de Pintura",
+    short: "Recuperação estética completa da pintura.",
+    pitch: "Para pinturas opacas, sem vida ou muito desgastadas.",
+    dbMatch: "Polimento",
+    time: "4h a 8h",
+    hatchMin: 500,
+    hatchMax: 800,
+    suvMin: 750,
+    suvMax: 1100,
+  },
+  descontaminacao: {
+    key: "descontaminacao",
+    label: "Descontaminação de Pintura",
+    short: "Remove contaminantes antes de polir ou proteger.",
+    pitch: "Prepara a pintura para resultado perfeito.",
+    dbMatch: "Polimento",
+    time: "1h30 a 3h",
+    hatchMin: 200,
+    hatchMax: 320,
+    suvMin: 280,
+    suvMax: 420,
+  },
+  limpeza_premium: {
+    key: "limpeza_premium",
+    label: "Limpeza Premium",
+    short: "Detalhamento completo de acabamento externo.",
+    pitch: "Acabamento impecável em cada detalhe.",
+    dbMatch: "Lavagem",
+    time: "2h a 4h",
+    hatchMin: 150,
+    hatchMax: 250,
+    suvMin: 220,
+    suvMax: 340,
+  },
+  pacotes: {
+    key: "pacotes",
+    label: "Pacotes Premium",
+    short: "Combos com melhor custo-benefício.",
+    pitch: "Proteção, brilho e detalhamento combinados.",
+    dbMatch: "Detalhamento",
+    time: "1 dia",
+    hatchMin: 550,
+    hatchMax: 900,
+    suvMin: 900,
+    suvMax: 1500,
   },
   indeciso: {
     key: "indeciso",

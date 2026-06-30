@@ -72,9 +72,9 @@ function buildCategoriesFromServices(
     }
   }
 
-  if (!result[6]?.keys.includes("indeciso")) {
-    result[6] = result[6] ?? { title: "Ajuda na escolha", keys: [] };
-    if (!result[6].keys.includes("indeciso")) result[6].keys.push("indeciso");
+  if (!result[8]?.keys.includes("indeciso")) {
+    result[8] = result[8] ?? { title: "Ajuda na escolha", keys: [] };
+    if (!result[8].keys.includes("indeciso")) result[8].keys.push("indeciso");
   }
 
   return result;
@@ -121,7 +121,7 @@ export function invalidateCatalogCache() {
 
 export function buildMainMenu(categories: WhatsAppCatalogContext["categories"], prompts: PromptMap): string {
   const lines: string[] = [];
-  const icons = ["💧", "🔧", "🪑", "✨", "🪟", "🤔"];
+  const icons = ["💧", "✨", "🛡️", "🪑", "🔬", "🔄", "📦", "🤔"];
   for (let i = 1; i <= MAIN_MENU_CATEGORIES; i++) {
     const cat = categories[i];
     if (!cat) continue;

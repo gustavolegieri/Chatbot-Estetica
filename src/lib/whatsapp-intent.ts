@@ -1,6 +1,6 @@
 import { CATALOG, CATEGORIES, MAIN_MENU_CATEGORIES } from "./whatsapp-catalog";
 
-/** Número do menu principal (1–6 categorias) */
+/** Número do menu principal (1–8 categorias) */
 export function detectCategoryNum(text: string): number | null {
   const t = text.toLowerCase();
   if (/não sei|nao sei|qual serviço|qual servico|me indica|me ajuda|indeciso/.test(t)) return 6;

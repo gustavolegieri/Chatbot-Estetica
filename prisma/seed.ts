@@ -80,6 +80,10 @@ async function main() {
       higienizacao_couro_completa: 210,
       descontaminacao_vidro: 90,
       polimento_cotacao: 240,
+      revitalizacao_pintura: 360,
+      descontaminacao: 150,
+      limpeza_premium: 180,
+      pacotes: 480,
     };
 
     const data = {

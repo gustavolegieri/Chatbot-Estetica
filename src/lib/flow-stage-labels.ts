@@ -20,6 +20,7 @@ export const FLOW_STAGE_LABELS: Record<string, string> = {
   ETAPA10_FAQ: "Dúvidas (FAQ)",
   STALE_RETURN: "Retorno após pausa",
   HANDOFF: "Atendimento humano",
+  AFTER_HOURS: "Fora do horário",
 };
 
 export function flowStageLabel(stage?: string | FlowStage | null): string {

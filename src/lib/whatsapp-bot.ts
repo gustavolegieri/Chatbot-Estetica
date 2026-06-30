@@ -4,9 +4,12 @@ import { normalizePhone } from "./utils";
 import { isValidPrivateRecipient } from "./whatsapp-jid";
 import { goToMainMenu, processNumberedFlow, startFlow } from "./whatsapp-flow";
 import { tryHandleAppointmentConfirmation } from "./appointment-confirmation";
-import { applySessionResetIfExpired } from "./whatsapp-session-reset";
+import { applyWelcomeRestartIfNeeded } from "./whatsapp-session-reset";
 import { sendWelcomeFlow } from "./whatsapp-welcome";
 import { resolveValidCustomerName } from "./customer-name";
+import { getBusinessHoursStatus, afterHoursMessage } from "./business-hours";
+import { runAppointmentRemindersFromBot } from "./appointment-reminders-runner";
+import { sendText } from "./evolution-api";
 import { FlowState } from "./whatsapp-flow-types";
 import { runWithMessageLogContext } from "./whatsapp-message-context";
 import { logWhatsAppMessage } from "./whatsapp-message-log";
@@ -75,9 +78,12 @@ async function handleMessage(msg: IncomingMessage) {
     return;
   }
 
+  runAppointmentRemindersFromBot();
+
   const session = await getOrCreateSession(msg.phone, msg.pushName);
   let flow = parseFlow(session.metadata);
   const flowRef = { current: flow };
+  const lastInteractionAt = session.lastMessageAt ?? session.updatedAt;
 
   await runWithMessageLogContext(
     {
@@ -117,9 +123,25 @@ async function handleMessage(msg: IncomingMessage) {
         return;
       }
 
-      const wasReset = await applySessionResetIfExpired(
+      if (await tryHandleAppointmentConfirmation(msg.phone, msg.text, flowRef.current.stage)) return;
+
+      if (settings && !getBusinessHoursStatus(settings).isOpen) {
+        const name =
+          resolveValidCustomerName(flowRef.current.customerName) ??
+          resolveValidCustomerName(session.client?.name) ??
+          resolveValidCustomerName(msg.pushName);
+        const status = getBusinessHoursStatus(settings);
+        await sendText({
+          number: msg.phone,
+          text: afterHoursMessage(settings, name, status),
+          flowStage: "AFTER_HOURS",
+        });
+        return;
+      }
+
+      const wasReset = await applyWelcomeRestartIfNeeded(
         msg.phone,
-        session.updatedAt,
+        lastInteractionAt,
         flowRef.current
       );
       if (wasReset) {
@@ -140,8 +162,6 @@ async function handleMessage(msg: IncomingMessage) {
       });
       flowRef.current = parseFlow(sessionAfterReset?.metadata);
       flow = flowRef.current;
-
-      if (await tryHandleAppointmentConfirmation(msg.phone, msg.text, flowRef.current.stage)) return;
 
       if (msg.text.trim().toLowerCase() === "menu") {
         const name =

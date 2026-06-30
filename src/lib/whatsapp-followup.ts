@@ -24,7 +24,10 @@ export async function sendIdleSessionRecoveries() {
     where: {
       step: WhatsAppSessionStep.IDLE,
       botPaused: false,
-      updatedAt: { gte: maxIdle, lte: minIdle },
+      OR: [
+        { lastMessageAt: { gte: maxIdle, lte: minIdle } },
+        { lastMessageAt: null, updatedAt: { gte: maxIdle, lte: minIdle } },
+      ],
     },
     include: { client: true },
   });

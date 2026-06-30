@@ -15,31 +15,31 @@ function p(prompts: PromptMap | undefined) {
 }
 
 export function formatHours(start: string, end: string, workingDays: string) {
-  const labels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "SÃ¡b"];
+  const labels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
   const days = workingDays.split(",").map(Number);
   const range =
     days.length === 6 && !days.includes(0)
-      ? "Segunda a sÃ¡bado"
+      ? "Segunda a sábado"
       : days.map((d) => labels[d]).join(", ");
-  return `${range}, ${start} Ã s ${end}`;
+  return `${range}, ${start} às ${end}`;
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ETAPA 1 â€” BOAS-VINDAS
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────
+// ETAPA 1 — BOAS-VINDAS
+// ─────────────────────────────────────────────────────────────
 
 export function etapa1Welcome(ctx: FlowContext, prompts?: PromptMap) {
   const name = ctx.businessName || BRAND_DEFAULT;
   return renderPrompt(p(prompts), "etapa1_welcome", {
     businessName: name,
-    address: ctx.address || "Consulte nosso endereÃ§o",
+    address: ctx.address || "Consulte nosso endereço",
     hours: ctx.hours,
   });
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ETAPA 2 â€” MENU PRINCIPAL
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────
+// ETAPA 2 — MENU PRINCIPAL
+// ─────────────────────────────────────────────────────────────
 
 export function etapa2MainMenu(clientName: string, menu: string, prompts?: PromptMap) {
   return renderPrompt(p(prompts), "etapa2_main_menu", {
@@ -48,15 +48,15 @@ export function etapa2MainMenu(clientName: string, menu: string, prompts?: Promp
   });
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ETAPA 3 â€” DETALHE DO SERVIÃ‡O
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────
+// ETAPA 3 — DETALHE DO SERVIÇO
+// ─────────────────────────────────────────────────────────────
 
 function formatServicePrice(item: CatalogItem): string {
   if (item.key === "polimento_cotacao" || item.hatchMin <= 0) {
-    return "ðŸ’° *Valor mediante avaliaÃ§Ã£o presencial* â€” agende para cotaÃ§Ã£o";
+    return "💰 *Valor mediante avaliação presencial* — agende para cotação";
   }
-  return `ðŸ’° *R$ ${item.hatchMin}*`;
+  return `💰 *R$ ${item.hatchMin}*`;
 }
 
 export function serviceDetail(item: CatalogItem, prompts?: PromptMap, detailOverride?: string | null) {
@@ -64,129 +64,263 @@ export function serviceDetail(item: CatalogItem, prompts?: PromptMap, detailOver
     return [detailOverride.trim(), ``, serviceActionMenu(prompts)].join("\n");
   }
 
+  if (item.key === "pacotes") {
+    return [
+      `📦 *Pacotes Premium — Garagem do Ka*`,
+      ``,
+      `Transformação completa em um único atendimento. Combos pensados para entregar o máximo de resultado com o melhor custo-benefício:`,
+      ``,
+      `✦ *Detail Essencial* — a partir de R$ 550`,
+      `   Lavagem detalhada + polimento leve + proteção básica`,
+      `   _Perfeito para manter o carro sempre impecável_`,
+      ``,
+      `✦ *Proteção Total* — a partir de R$ 900`,
+      `   Polimento técnico + vitrificação cerâmica de alta performance`,
+      `   _Brilho profundo com proteção que dura_`,
+      ``,
+      `✦ *Interior Premium* — a partir de R$ 380`,
+      `   Higienização completa + tratamento de couro + aromatização`,
+      `   _Sensação de carro zero km por dentro_`,
+      ``,
+      `✦ *Full Detail Ka* — a partir de R$ 1.400`,
+      `   Exterior + interior + proteção cerâmica premium`,
+      `   _O pacote mais completo da Garagem do Ka_`,
+      ``,
+      `💬 Qual combo combina mais com o que você busca?`,
+      ``,
+      packageActionMenu(prompts),
+    ].join("\n");
+  }
+
   const serviceTexts: Record<string, string[]> = {
     lavagem_simples: [
-      `ðŸ’§ *Lavagem Simples*`,
+      `💧 *Lavagem Simples*`,
       ``,
-      `O que inclui:`,
-      `â€¢ Ducha`,
-      `â€¢ Secagem`,
-      `â€¢ AplicaÃ§Ã£o de pretinho`,
-      `â€¢ Limpeza interna bÃ¡sica`,
+      `_Manutenção regular com cuidado e acabamento que faz diferença._`,
       ``,
-      `â±ï¸ ${item.time}`,
+      `✨ *O que inclui:*`,
+      `• Pré-lavagem com espuma ativa que solta a sujeira`,
+      `• Lavagem externa manual, segura para a pintura`,
+      `• Secagem completa com microfibra premium`,
+      `• Finalização dos pneus com pretinho`,
+      `• Aspiração e limpeza interna básica`,
+      ``,
+      `⏱️ ${item.time}`,
       formatServicePrice(item),
     ],
     lavagem_completa: [
-      `ðŸ’§ *Lavagem Completa*`,
+      `💧 *Lavagem Completa*`,
       ``,
-      `O que inclui:`,
-      `â€¢ Ducha e secagem`,
-      `â€¢ Limpeza interna bÃ¡sica`,
-      `â€¢ AplicaÃ§Ã£o de pretinho`,
-      `â€¢ RevitalizaÃ§Ã£o de plÃ¡sticos`,
-      `â€¢ AplicaÃ§Ã£o de cera lÃ­quida`,
-      `â€¢ Limpeza dos vidros`,
+      `_Muito além da lavagem comum — brilho, proteção e interior renovado._`,
       ``,
-      `â±ï¸ ${item.time}`,
+      `✨ *O que inclui:*`,
+      `• Pré-lavagem com espuma ativa + lavagem externa manual`,
+      `• Secagem cuidadosa com microfibra`,
+      `• Limpeza interna básica com aspiração`,
+      `• Pretinho nos pneus e acabamento impecável`,
+      `• Revitalização de plásticos externos`,
+      `• Aplicação de cera líquida para brilho intenso`,
+      `• Limpeza e cristalização dos vidros`,
+      ``,
+      `⏱️ ${item.time}`,
       formatServicePrice(item),
     ],
     lavagem_detalhada: [
-      `ðŸ’§ *Lavagem Detalhada*`,
+      `💧 *Lavagem Detalhada*`,
       ``,
-      `O que inclui:`,
-      `â€¢ Ducha e secagem`,
-      `â€¢ Limpeza interna detalhada`,
-      `â€¢ Ducha nos cantos de portas/mala`,
-      `â€¢ Limpeza de pedais e trilhos`,
-      `â€¢ Cera em pasta, pretinho e plÃ¡sticos`,
-      `â€¢ Caixas de roda, vidros, tapetes e cheirinho`,
+      `_Cada centímetro tratado com atenção — resultado de estúdio._`,
       ``,
-      `â±ï¸ ${item.time}`,
+      `✨ *O que inclui:*`,
+      `• Pré-lavagem com espuma + lavagem externa completa`,
+      `• Secagem total com microfibra em toda a lataria`,
+      `• Limpeza interna detalhada (painel, console e detalhes)`,
+      `• Ducha nos vãos de portas, mala e soleiras`,
+      `• Limpeza profunda de pedais e trilhos dos bancos`,
+      `• Cera em pasta para brilho profundo e proteção`,
+      `• Pretinho, revitalização de plásticos e caixas de roda`,
+      `• Vidros cristalinos, tapetes, saquinho de lixo e aromatização`,
+      ``,
+      `⏱️ ${item.time}`,
       formatServicePrice(item),
     ],
     limpeza_motor: [
-      `ðŸ”§ *Lavagem TÃ©cnica do Motor*`,
+      `🔬 *Lavagem Técnica do Motor*`,
       ``,
-      `Limpeza tÃ©cnica e segura do compartimento do motor.`,
+      `_Compartimento limpo, seguro e com visual de vitrine — sem riscos._`,
       ``,
-      `â±ï¸ ${item.time}`,
+      `✨ *O que inclui:*`,
+      `• Proteção de módulos e componentes elétricos`,
+      `• Desengorduramento técnico com produtos específicos`,
+      `• Lavagem controlada do bloco e bacias`,
+      `• Acabamento e secagem segura do compartimento`,
+      ``,
+      `⏱️ ${item.time}`,
       formatServicePrice(item),
     ],
     cristalizacao_farois: [
-      `ðŸ’¡ *CristalizaÃ§Ã£o de FarÃ³is*`,
+      `🛡️ *Cristalização de Faróis*`,
       ``,
-      `Recupera transparÃªncia e aparÃªncia dos farÃ³is.`,
+      `_Faróis opacos voltam a brilhar — mais segurança e estética na direção noturna._`,
       ``,
-      `â±ï¸ ${item.time}`,
+      `✨ *O que inclui:*`,
+      `• Lixamento e polimento para remover amarelamento`,
+      `• Recuperação da transparência original`,
+      `• Cristalização com selante UV de longa duração`,
+      `• Proteção contra reoxidação e ressecamento`,
+      ``,
+      `⏱️ ${item.time}`,
       formatServicePrice(item),
     ],
     descontaminacao_pintura: [
-      `âœ¨ *DescontaminaÃ§Ã£o + Cera Nobre*`,
+      `🛡️ *Descontaminação + Cera Nobre*`,
       ``,
-      `Remove contaminantes da pintura e aplica cera nobre.`,
+      `_Remove impurezas da pintura e sela com brilho premium e proteção._`,
       ``,
-      `â±ï¸ ${item.time}`,
+      `✨ *O que inclui:*`,
+      `• Lavagem técnica de preparo da lataria`,
+      `• Clay bar para eliminar contaminantes metálicos`,
+      `• Remoção de resíduos industriais e poluição`,
+      `• Aplicação de cera nobre com acabamento espelhado`,
+      ``,
+      `⏱️ ${item.time}`,
       formatServicePrice(item),
     ],
     higienizacao_tecido: [
-      `ðŸª‘ *HigienizaÃ§Ã£o Bancos (Tecido)*`,
+      `🪑 *Higienização Bancos (Tecido)*`,
       ``,
-      `HigienizaÃ§Ã£o profunda dos bancos de tecido.`,
+      `_Bancos renovados — sem odores, manchas impregnadas ou ácaros._`,
       ``,
-      `â±ï¸ ${item.time}`,
+      `✨ *O que inclui:*`,
+      `• Aspiração profunda dos estofados`,
+      `• Extração com shampoo automotivo de alta performance`,
+      `• Tratamento de manchas e odores impregnados`,
+      `• Secagem e acabamento com toque macio`,
+      ``,
+      `⏱️ ${item.time}`,
       formatServicePrice(item),
     ],
     higienizacao_tecido_completa: [
-      `ðŸª‘ *HigienizaÃ§Ã£o Completa (Tecido)*`,
+      `🪑 *Higienização Completa (Tecido)*`,
       ``,
-      `Bancos, teto e carpete em tecido.`,
+      `_Interior zerado — bancos, teto e carpete como novos._`,
       ``,
-      `â±ï¸ ${item.time}`,
+      `✨ *O que inclui:*`,
+      `• Higienização profunda de todos os bancos`,
+      `• Limpeza e extração do teto em tecido`,
+      `• Tratamento completo do carpete e tapetes`,
+      `• Eliminação de odores e acabamento aromatizado`,
+      ``,
+      `⏱️ ${item.time}`,
       formatServicePrice(item),
     ],
     higienizacao_couro: [
-      `ðŸª‘ *HigienizaÃ§Ã£o Bancos (Couro)*`,
+      `🪑 *Higienização Bancos (Couro)*`,
       ``,
-      `Limpeza e tratamento dos bancos de couro.`,
+      `_Couro limpo, hidratado e protegido — maciez e aparência premium._`,
       ``,
-      `â±ï¸ ${item.time}`,
+      `✨ *O que inclui:*`,
+      `• Limpeza profunda com produtos específicos para couro`,
+      `• Remoção de oleosidade, sujeira e manchas superficiais`,
+      `• Hidratação para evitar ressecamento e rachaduras`,
+      `• Proteção que preserva cor e textura original`,
+      ``,
+      `⏱️ ${item.time}`,
       formatServicePrice(item),
     ],
     higienizacao_couro_completa: [
-      `ðŸª‘ *HigienizaÃ§Ã£o Completa (Couro)*`,
+      `🪑 *Higienização Completa (Couro)*`,
       ``,
-      `Bancos, teto e carpete em couro.`,
+      `_Todo o interior em couro tratado com padrão de luxo._`,
       ``,
-      `â±ï¸ ${item.time}`,
+      `✨ *O que inclui:*`,
+      `• Higienização e hidratação de todos os bancos`,
+      `• Limpeza e tratamento do forro do teto`,
+      `• Cuidado completo com carpetes e detalhes internos`,
+      `• Acabamento premium com proteção duradoura`,
+      ``,
+      `⏱️ ${item.time}`,
       formatServicePrice(item),
     ],
     descontaminacao_vidro: [
-      `ðŸªŸ *DescontaminaÃ§Ã£o de Vidro*`,
+      `🔬 *Descontaminação de Vidro*`,
       ``,
-      `Remove resÃ­duos e melhora a clareza dos vidros.`,
+      `_Vidros cristalinos, sem manchas — visibilidade perfeita em qualquer clima._`,
       ``,
-      `â±ï¸ ${item.time}`,
+      `✨ *O que inclui:*`,
+      `• Remoção de resíduos de chuva ácida e poluição`,
+      `• Descontaminação interna e externa dos vidros`,
+      `• Eliminação de marcas de água e oleosidade`,
+      `• Acabamento antirreflexo e alta clareza`,
+      ``,
+      `⏱️ ${item.time}`,
       formatServicePrice(item),
     ],
     polimento_cotacao: [
-      `âœ¨ *Polimento*`,
+      `✨ *Polimento*`,
       ``,
-      `CorreÃ§Ã£o de riscos e brilho profundo â€” valor personalizado conforme estado da pintura.`,
+      `_Correção de riscos, swirls e opacidade — pintura com brilho de showroom._`,
       ``,
-      `â±ï¸ ${item.time}`,
+      `✨ *O que inclui:*`,
+      `• Avaliação presencial da profundidade dos riscos`,
+      `• Polimento técnico com compostos profissionais`,
+      `• Correção de hologramas, marcas e perda de brilho`,
+      `• Lustro final e proteção conforme estado da pintura`,
+      ``,
+      `⏱️ ${item.time}`,
+      formatServicePrice(item),
+    ],
+    revitalizacao_pintura: [
+      `🔄 *Revitalização de Pintura*`,
+      ``,
+      `_Para pinturas opacas e sem vida — cor e brilho originais de volta._`,
+      ``,
+      `✨ *O que inclui:*`,
+      `• Diagnóstico completo do estado da lataria`,
+      `• Descontaminação e preparo profissional`,
+      `• Polimento técnico para restaurar cor e brilho`,
+      `• Proteção final personalizada ao resultado`,
+      ``,
+      `⏱️ ${item.time}`,
+      formatServicePrice(item),
+    ],
+    descontaminacao: [
+      `🔬 *Descontaminação de Pintura*`,
+      ``,
+      `_Base perfeita antes de polir ou proteger — pintura lisa como vidro._`,
+      ``,
+      `✨ *O que inclui:*`,
+      `• Lavagem técnica de preparo`,
+      `• Clay bar e produtos químicos específicos`,
+      `• Remoção de ferro, resina e poluentes industriais`,
+      `• Superfície pronta para o próximo tratamento`,
+      ``,
+      `⏱️ ${item.time}`,
+      formatServicePrice(item),
+    ],
+    limpeza_premium: [
+      `✨ *Limpeza Premium*`,
+      ``,
+      `_Detalhamento externo completo — acabamento impecável em cada friso._`,
+      ``,
+      `✨ *O que inclui:*`,
+      `• Lavagem técnica com produtos premium`,
+      `• Limpeza de rodas, pneus, soleiras e frisos`,
+      `• Aplicação de finalizadores e protegentes`,
+      `• Secagem e acabamento de vitrine`,
+      ``,
+      `⏱️ ${item.time}`,
       formatServicePrice(item),
     ],
   };
 
   const lines = serviceTexts[item.key] ?? [
-    `ðŸ”§ *${item.label}*`,
+    `🔧 *${item.label}*`,
     ``,
     item.short,
     ``,
     item.pitch ? `_${item.pitch}_` : ``,
     ``,
-    `â±ï¸ ${item.time}`,
+    `⏱️ ${item.time}`,
     formatServicePrice(item),
   ];
 
@@ -201,9 +335,9 @@ export function packageActionMenu(prompts?: PromptMap) {
   return renderPrompt(p(prompts), "package_action_menu", {});
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ETAPA 4 â€” VEÃCULO
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────
+// ETAPA 4 — VEÍCULO
+// ─────────────────────────────────────────────────────────────
 
 export function etapa4Vehicle(hasVehicle: boolean, prompts?: PromptMap) {
   if (hasVehicle) {
@@ -228,9 +362,9 @@ export function vehicleNotUnderstood(prompts?: PromptMap) {
   return renderPrompt(p(prompts), "vehicle_not_understood", {});
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ETAPA 5 â€” ORÃ‡AMENTO
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────
+// ETAPA 5 — ORÇAMENTO
+// ─────────────────────────────────────────────────────────────
 
 export function etapa5Quote(
   name: string,
@@ -244,8 +378,8 @@ export function etapa5Quote(
 ) {
   const hasValue = min > 0 && max > 0;
   const valueLine = hasValue
-    ? `ðŸ’° *R$ ${min} a R$ ${max}*`
-    : `ðŸ’° *Valor sob consulta â€” confirmado na avaliaÃ§Ã£o*`;
+    ? `💰 *R$ ${min} a R$ ${max}*`
+    : `💰 *Valor sob consulta — confirmado na avaliação*`;
 
   return renderPrompt(p(prompts), "etapa5_quote", {
     name,
@@ -253,21 +387,21 @@ export function etapa5Quote(
     service,
     valueLine,
     time,
-    pitch: pitch ? `âœ¨ ${pitch}` : "",
+    pitch: pitch ? `✨ ${pitch}` : "",
   });
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ETAPA 6 â€” UPSELL
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────
+// ETAPA 6 — UPSELL
+// ─────────────────────────────────────────────────────────────
 
 export function etapa6Upsell(service: string, complement: string, benefit: string, prompts?: PromptMap) {
   return renderPrompt(p(prompts), "etapa6_upsell", { service, complement, benefit });
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ETAPA 7 â€” AGENDAMENTO
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────
+// ETAPA 7 — AGENDAMENTO
+// ─────────────────────────────────────────────────────────────
 
 export function etapa7Day(prompts?: PromptMap) {
   return renderPrompt(p(prompts), "etapa7_day", {});
@@ -277,7 +411,7 @@ export function etapa7Time(dayLabel: string, slots: string[], durationLabel: str
   if (slots.length === 0) {
     return etapa7NoSlots(dayLabel, prompts);
   }
-  const slotLines = slots.slice(0, 14).map((s, i) => `*${i + 1}* â€” ${s}`).join("\n");
+  const slotLines = slots.slice(0, 14).map((s, i) => `*${i + 1}* — ${s}`).join("\n");
   return renderPrompt(p(prompts), "etapa7_time", {
     dayLabel,
     slots: slotLines,
@@ -290,14 +424,14 @@ export function etapa7NoSlots(dayLabel: string, prompts?: PromptMap) {
   return [base, ``, etapa7Day(prompts)].join("\n");
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ETAPA 8 â€” PAGAMENTO
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────
+// ETAPA 8 — PAGAMENTO
+// ─────────────────────────────────────────────────────────────
 
 export function etapa8Payment(hasPix: boolean, prompts?: PromptMap) {
   const options = hasPix
-    ? [`*1* PIX`, `*2* DÃ©bito`, `*3* CrÃ©dito`, `*4* Dinheiro`]
-    : [`*1* DÃ©bito`, `*2* CrÃ©dito`, `*3* Dinheiro`];
+    ? [`*1* PIX`, `*2* Débito`, `*3* Crédito`, `*4* Dinheiro`]
+    : [`*1* Débito`, `*2* Crédito`, `*3* Dinheiro`];
 
   return renderPrompt(p(prompts), "etapa8_payment", {
     options: options.join("\n"),
@@ -308,14 +442,14 @@ export function etapa8PixBlock(ctx: FlowContext, prompts?: PromptMap) {
   return renderPrompt(p(prompts), "etapa8_pix_block", {
     pixKey: ctx.pixKey ?? "",
     pixHolder: ctx.pixHolder ?? ctx.businessName,
-    bankLine: ctx.pixBank ? `ðŸ¦ *Banco:* ${ctx.pixBank}` : "",
+    bankLine: ctx.pixBank ? `🏦 *Banco:* ${ctx.pixBank}` : "",
     businessName: ctx.businessName,
   });
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ETAPA 9 â€” CONFIRMAÃ‡ÃƒO FINAL DO AGENDAMENTO
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────
+// ETAPA 9 — CONFIRMAÇÃO FINAL DO AGENDAMENTO
+// ─────────────────────────────────────────────────────────────
 
 export function etapa9Confirm(
   data: {
@@ -344,9 +478,9 @@ export function etapa9Confirm(
   });
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// STALE RETURN â€” RETORNO APÃ“S INATIVIDADE
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────
+// STALE RETURN — RETORNO APÓS INATIVIDADE
+// ─────────────────────────────────────────────────────────────
 
 export function staleReturnPrompt(
   flow?: {
@@ -362,12 +496,12 @@ export function staleReturnPrompt(
 
   const contextLine =
     flow?.serviceLabel && flow?.vehicleRaw
-      ? `VocÃª estava vendo *${flow.serviceLabel}* para o seu *${flow.vehicleRaw}* ðŸš—`
+      ? `Você estava vendo *${flow.serviceLabel}* para o seu *${flow.vehicleRaw}* 🚗`
       : flow?.serviceLabel
-        ? `VocÃª estava vendo *${flow.serviceLabel}* ðŸ”§`
+        ? `Você estava vendo *${flow.serviceLabel}* 🔧`
         : flow?.vehicleRaw
-          ? `VocÃª estava com seu *${flow.vehicleRaw}* em mÃ£os ðŸš—`
-          : `VocÃª estava no meio de um agendamento.`;
+          ? `Você estava com seu *${flow.vehicleRaw}* em mãos 🚗`
+          : `Você estava no meio de um agendamento.`;
 
   return renderPrompt(p(prompts), "stale_return", {
     name,
@@ -376,9 +510,9 @@ export function staleReturnPrompt(
   });
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────
 // CLIENTE INDECISO
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────
 
 export function indecisiveVehiclePrompt(prompts?: PromptMap) {
   return renderPrompt(p(prompts), "indecisive_vehicle", {});
@@ -388,9 +522,9 @@ export function indecisiveProblemPrompt(prompts?: PromptMap) {
   return renderPrompt(p(prompts), "indecisive_problem", {});
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// UTILITÃRIOS
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────
+// UTILITÁRIOS
+// ─────────────────────────────────────────────────────────────
 
 export function invalidMenu(menu: string, prompts?: PromptMap) {
   return renderPrompt(p(prompts), "invalid_menu", { menu });

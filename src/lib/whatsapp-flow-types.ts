@@ -1,5 +1,5 @@
-/** Sem interação por 1h → atendimento reinicia (cron + próxima mensagem) */
-export const SESSION_RESET_MS = 60 * 60 * 1000;
+/** Sem interação por 30 min → atendimento reinicia (cron + próxima mensagem) */
+export const SESSION_RESET_MS = 30 * 60 * 1000;
 
 export type FlowStage =
   | "ETAPA1_AWAITING_NAME"
@@ -55,7 +55,9 @@ export interface FlowState {
   paymentMethod?: string;
   undecidedIssue?: number;
   returnStage?: FlowStage;
-  /** Snapshot para retomar após 45min */
+  /** Snapshot para retomar após inatividade */
   resumeStage?: FlowStage;
+  /** Próxima mensagem do cliente deve receber boas-vindas (ex.: após handoff encerrado) */
+  pendingWelcomeRestart?: boolean;
 }
 

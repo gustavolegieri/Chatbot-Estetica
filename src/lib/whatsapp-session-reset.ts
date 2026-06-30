@@ -6,9 +6,9 @@ import { FlowState } from "./whatsapp-flow-types";
 import { sendWelcomeFlow } from "./whatsapp-welcome";
 import { resolveValidCustomerName } from "./customer-name";
 
-export async function isSessionExpired(updatedAt: Date): Promise<boolean> {
+export async function isSessionExpired(lastInteractionAt: Date): Promise<boolean> {
   const ms = await getSessionResetMs();
-  return Date.now() - updatedAt.getTime() >= ms;
+  return Date.now() - lastInteractionAt.getTime() >= ms;
 }
 
 /** Estado limpo — sem veículo, serviço ou etapa anterior */
@@ -39,6 +39,26 @@ export async function saveFreshFlow(phone: string, customerName?: string) {
   return fresh;
 }
 
+/** Marca que a próxima mensagem do cliente deve receber boas-vindas (ex.: após encerrar handoff). */
+export async function markPendingWelcomeRestart(phone: string, customerName?: string | null) {
+  const fresh = buildFreshFlowState(customerName ?? undefined);
+  await prisma.whatsAppSession.update({
+    where: { phone: normalizePhone(phone) },
+    data: {
+      metadata: { ...fresh, pendingWelcomeRestart: true } as object,
+      step: WhatsAppSessionStep.IDLE,
+    },
+  });
+}
+
+export function shouldRestartWithWelcome(
+  lastInteractionAt: Date,
+  flow: FlowState,
+  expired: boolean
+): boolean {
+  return flow.pendingWelcomeRestart === true || expired;
+}
+
 /**
  * Reinicia atendimentos parados há mais de X min e envia boas-vindas.
  * Chamar no cron a cada 5–10 min.
@@ -47,7 +67,10 @@ export async function resetAllExpiredSessions(): Promise<{ reset: number; checke
   const sessionResetMs = await getSessionResetMs();
   const cutoff = new Date(Date.now() - sessionResetMs);
   const sessions = await prisma.whatsAppSession.findMany({
-    where: { updatedAt: { lt: cutoff }, botPaused: false },
+    where: {
+      botPaused: false,
+      OR: [{ lastMessageAt: { lt: cutoff } }, { lastMessageAt: null, updatedAt: { lt: cutoff } }],
+    },
     include: { client: true },
   });
 
@@ -59,6 +82,7 @@ export async function resetAllExpiredSessions(): Promise<{ reset: number; checke
     const alreadyFresh =
       meta.stage === fresh.stage &&
       meta.welcomed === fresh.welcomed &&
+      !meta.pendingWelcomeRestart &&
       !meta.serviceKey &&
       !meta.vehicleRaw &&
       !meta.resumeStage;
@@ -72,13 +96,17 @@ export async function resetAllExpiredSessions(): Promise<{ reset: number; checke
   return { reset, checked: sessions.length };
 }
 
-/** Ao receber mensagem após inatividade: reinicia e indica que boas-vindas serão enviadas. */
-export async function applySessionResetIfExpired(
+/**
+ * Ao receber mensagem: reinicia se atendimento foi encerrado ou sessão expirou.
+ * Usa lastInteractionAt *antes* de registrar a mensagem atual.
+ */
+export async function applyWelcomeRestartIfNeeded(
   phone: string,
-  updatedAt: Date,
+  lastInteractionAt: Date,
   current: FlowState
 ): Promise<boolean> {
-  if (!(await isSessionExpired(updatedAt))) return false;
+  const expired = await isSessionExpired(lastInteractionAt);
+  if (!shouldRestartWithWelcome(lastInteractionAt, current, expired)) return false;
 
   const client = await prisma.client.findUnique({
     where: { phone: normalizePhone(phone) },
@@ -87,4 +115,13 @@ export async function applySessionResetIfExpired(
     resolveValidCustomerName(current.customerName) ?? resolveValidCustomerName(client?.name);
   await saveFreshFlow(phone, name ?? undefined);
   return true;
+}
+
+/** @deprecated Use applyWelcomeRestartIfNeeded */
+export async function applySessionResetIfExpired(
+  phone: string,
+  lastInteractionAt: Date,
+  current: FlowState
+): Promise<boolean> {
+  return applyWelcomeRestartIfNeeded(phone, lastInteractionAt, current);
 }
