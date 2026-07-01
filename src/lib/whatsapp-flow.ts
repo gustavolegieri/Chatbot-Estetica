@@ -2,7 +2,7 @@ import { AppointmentStatus } from "@prisma/client";
 import { addDays, format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { prisma } from "./prisma";
-import { sendText } from "./evolution-api";
+import { sendText, sendMedia } from "./evolution-api";
 import {
   calculateEndTime,
   formatDurationLabel,
@@ -212,6 +212,28 @@ async function activateService(
     dbServiceId: dbId,
     stage: "ETAPA3_SERVICE_ACTION",
   });
+
+  // Enviar imagem do serviço (se existir)
+  if (dbId) {
+    try {
+      const media = await prisma.serviceMedia.findFirst({
+        where: { serviceId: dbId, mimeType: { startsWith: "image/" } },
+        orderBy: { createdAt: "asc" },
+      });
+      if (media?.path) {
+        await sendMedia({
+          number: msg.phone,
+          mediaUrl: media.path,
+          caption: item.label,
+          mediaType: "image",
+        });
+        await delay(800);
+      }
+    } catch (err) {
+      console.error("[Midia] Erro ao enviar imagem do serviço:", err);
+    }
+  }
+
   await delay(500);
   await sendText({ number: msg.phone, text: flowMsg(wctx).detail(serviceKey) });
 }
@@ -440,7 +462,7 @@ function faqAnswer(text: string, flow: FlowState): string | null {
     return `Sim 😊 Muitos clientes deixam o veículo e retiram após o serviço.`;
   }
   if (/garantia/.test(t)) {
-    return `🛡️ Sim! Se algo não ficar como esperado, ajustamos para você.`;
+    return `🛡️ Sim! Se algo não ficou como esperado, ajustamos para você.`;
   }
   if (/suv|pickup|van|grande|hilux|toro/.test(t)) {
     return `Sim! Trabalhamos com veículos de todos os portes 🚗`;

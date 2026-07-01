@@ -157,6 +157,7 @@ export default function NotificacoesPage() {
           {settings.notifyByEmail && (
             <div className="ml-16 mt-3">
               <label className="label">Seu e-mail</label>
+              <p className="mb-2 text-xs text-slate-500">Informe o endereço que deve receber essas mensagens.</p>
               <div className="flex items-center gap-2">
                 <Mail className="h-5 w-5 text-slate-500" />
                 <input className="input max-w-md" type="email" placeholder="seu@email.com" value={settings.notifyEmailAddress ?? ""} onChange={(e) => setSettings({ ...settings, notifyEmailAddress: e.target.value })} />

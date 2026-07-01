@@ -20,10 +20,17 @@ const WASENDER_BASE = "https://wasenderapi.com/api";
 interface SendTextParams {
   number: string;
   text: string;
-  /** Evita loop de log quando a mensagem já foi registrada manualmente */
   skipBotLog?: boolean;
   sender?: "BOT" | "ADMIN";
   flowStage?: string;
+}
+
+interface SendMediaParams {
+  number: string;
+  mediaUrl: string;
+  caption?: string;
+  filename?: string;
+  mediaType?: "image" | "video" | "document";
 }
 
 interface ButtonOption {
@@ -61,12 +68,11 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
   });
 
   if (response.status === 429 && attempt <= 3) {
-    let waitMs = 62_000; // fallback: 62s
+    let waitMs = 62_000;
     try {
       const json = await response.clone().json() as { retry_after?: number };
       if (json.retry_after) waitMs = (json.retry_after + 2) * 1000;
-    } catch { /* ignora erro de parse */ }
-
+    } catch { /* ignora */ }
     console.warn(`[WasenderAPI] Rate limit — aguardando ${waitMs / 1000}s (tentativa ${attempt}/3)`);
     await new Promise((resolve) => setTimeout(resolve, waitMs));
     return wasenderFetch(body, attempt + 1);
@@ -116,14 +122,34 @@ export async function sendText({
 }
 
 /**
- * Envia botões interativos.
- *
- * ATENÇÃO: A WasenderAPI não possui endpoint nativo de botões igual à
- * Evolution API. Como fallback, os botões são enviados como lista
- * numerada em texto simples — funciona em qualquer versão do WhatsApp.
- *
- * Se no futuro a WasenderAPI suportar botões nativos, basta trocar o
- * corpo do wasenderFetch abaixo.
+ * Envia mídia (imagem/vídeo/documento) via WhatsApp usando WasenderAPI.
+ * A API aceita URLs públicas de mídia.
+ */
+export async function sendMedia({
+  number,
+  mediaUrl,
+  caption,
+  filename,
+  mediaType = "image",
+}: SendMediaParams) {
+  if (!isValidPrivateRecipient(number)) {
+    console.warn("[WasenderAPI] Envio de mídia bloqueado (não é chat privado):", number);
+    return { blocked: true, reason: "not_private_recipient" };
+  }
+
+  const payload: Record<string, any> = {
+    to: phoneToWhatsApp(number),
+    media: mediaUrl,
+    mediatype: mediaType,
+  };
+  if (caption) payload.caption = caption;
+  if (filename) payload.filename = filename;
+
+  return wasenderFetch(payload);
+}
+
+/**
+ * Envia botões interativos como texto numerado (fallback).
  */
 export async function sendButtons({
   number,

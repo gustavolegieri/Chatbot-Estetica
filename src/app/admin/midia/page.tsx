@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AdminHeader } from "@/components/layout/AdminHeader";
-import { Upload, Trash2, Image as ImageIcon, Film, Loader2 } from "lucide-react";
+import { Upload, Trash2, Image as ImageIcon, Film, Loader2, Info } from "lucide-react";
 
 export default function MidiaPage() {
   const [files, setFiles] = useState<any[]>([]);
@@ -48,16 +48,34 @@ export default function MidiaPage() {
 
   return (
     <div className="space-y-6">
-      <AdminHeader title="Galeria / Mídia" description="Gerencie imagens e arquivos usados no bot" />
+      <AdminHeader title="Galeria / Mídia" description="Imagens que o robô pode enviar no WhatsApp" />
 
+      {/* Explicação */}
+      <div className="rounded-xl border border-brand-700/40 bg-brand-950/30 p-5 shadow-gold">
+        <div className="flex items-start gap-3">
+          <Info className="h-5 w-5 mt-0.5 text-brand-400 flex-shrink-0" />
+          <div className="text-sm text-slate-300">
+            <p className="font-semibold text-brand-200 mb-1">📸 Para que serve esta aba?</p>
+            <p>Aqui você envia <strong>imagens</strong> (fotos de serviços, antes/depois, logotipos) que ficam salvas no sistema.</p>
+            <p className="mt-2">
+              <strong>Com o WASender API conectado + configuração no bot:</strong> o robô do WhatsApp pode enviar essas imagens automaticamente para os clientes quando eles perguntarem sobre serviços.
+            </p>
+            <p className="mt-1 text-slate-500 text-xs">
+              ⚡ Dica: associe a imagem a um serviço pelo &quot;ID do serviço&quot; para o bot saber qual imagem enviar.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Upload */}
       <div className="card">
         <div className="mb-5 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-900/40 ring-1 ring-brand-700/30">
             <Upload className="h-5 w-5 text-brand-300" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-brand-200">Enviar arquivo</h2>
-            <p className="text-sm text-slate-400">Imagens que o bot pode enviar no WhatsApp</p>
+            <h2 className="text-lg font-bold text-brand-200">Enviar nova imagem</h2>
+            <p className="text-sm text-slate-400">Faça upload de fotos para usar no WhatsApp</p>
           </div>
         </div>
 
@@ -79,22 +97,23 @@ export default function MidiaPage() {
         </div>
       </div>
 
+      {/* Galeria */}
       <div className="card">
         <div className="mb-5 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-900/40 ring-1 ring-amber-700/30">
             <ImageIcon className="h-5 w-5 text-amber-400" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-brand-200">Arquivos</h2>
-            <p className="text-sm text-slate-400">{files.length} arquivo(s) cadastrado(s)</p>
+            <h2 className="text-lg font-bold text-brand-200">Suas imagens</h2>
+            <p className="text-sm text-slate-400">{files.length} arquivo(s) salvos</p>
           </div>
         </div>
 
         {files.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-slate-500">
             <ImageIcon className="mb-3 h-12 w-12 text-slate-600" />
-            <p className="text-sm font-medium">Nenhum arquivo ainda</p>
-            <p className="text-xs">Envie imagens para usar no bot do WhatsApp</p>
+            <p className="text-sm font-medium">Nenhuma imagem ainda</p>
+            <p className="text-xs">Envie fotos dos seus serviços para o robô usar</p>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
@@ -110,7 +129,7 @@ export default function MidiaPage() {
                 <div className="flex items-center justify-between gap-2 p-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-medium text-slate-300">{f.filename}</p>
-                    <p className="text-[10px] text-slate-500">{(f.size / 1024).toFixed(1)} KB</p>
+                    <p className="text-[10px] text-slate-500">{(f.size / 1024).toFixed(1)} KB{f.serviceId ? ` · ID: ${f.serviceId?.slice(0, 8)}` : ""}</p>
                   </div>
                   <button onClick={() => removeFile(f.id)} className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-red-400 transition hover:bg-red-950/40 hover:text-red-300">
                     <Trash2 className="h-4 w-4" />
