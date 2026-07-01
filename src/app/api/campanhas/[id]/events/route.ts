@@ -20,12 +20,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
       emitter.on('progress', send);
       emitter.once('done', onDone);
-
-      // no-op; the emitter will push events
     },
     cancel() {
       // nothing
-    }
+    },
   });
 
   return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } });

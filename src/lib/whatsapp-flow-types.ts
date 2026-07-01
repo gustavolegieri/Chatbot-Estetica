@@ -59,5 +59,12 @@ export interface FlowState {
   resumeStage?: FlowStage;
   /** Próxima mensagem do cliente deve receber boas-vindas (ex.: após handoff encerrado) */
   pendingWelcomeRestart?: boolean;
+
+  // Cupom
+  couponCode?: string;
+  couponId?: string;
+  couponDiscountApplied?: number; // valor descontado (R$)
+  couponError?: string;
 }
+
 

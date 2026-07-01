@@ -20,7 +20,7 @@ import {
   Download,
   BarChart2,
   Send,
-  Gift,
+  GiftIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "./BrandLogo";
@@ -33,7 +33,7 @@ const navItems = [
   { href: "/admin/notificacoes", label: "Notificações", icon: Bell },
   { href: "/admin/campanhas", label: "Campanhas", icon: Send },
   { href: "/admin/midia", label: "Galeria/Mídia", icon: ImageIcon },
-  { href: "/admin/fidelidade", label: "Fidelidade / Cupons", icon: Gift },
+  { href: "/admin/fidelidade", label: "Fidelidade / Cupons", icon: GiftIcon },
   { href: "/admin/auditoria", label: "Log de Auditoria", icon: LogOut },
   { href: "/admin/backup", label: "Backup", icon: Download },
   { href: "/admin/relatorios", label: "Relatórios", icon: BarChart2 },

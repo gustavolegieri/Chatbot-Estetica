@@ -71,6 +71,8 @@ import {
   answerCustomerDoubt,
   looksLikeQuestion,
 } from "./whatsapp-ai";
+import { canRedeem, findCouponByCode, redeemCoupon } from "./coupons";
+
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -216,10 +218,12 @@ async function activateService(
   // Enviar imagem do serviço (se existir)
   if (dbId) {
     try {
-      const media = await prisma.serviceMedia.findFirst({
+      // Nem todo schema possui serviceMedia; tratar de forma compatível.
+      const media = await (prisma as any).serviceMedia?.findFirst({
         where: { serviceId: dbId, mimeType: { startsWith: "image/" } },
         orderBy: { createdAt: "asc" },
       });
+
       if (media?.path) {
         await sendMedia({
           number: msg.phone,
@@ -409,9 +413,71 @@ async function ensureClient(phone: string, name: string) {
   return client;
 }
 
+function clampMoney(v: number) {
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.round(v * 100) / 100);
+}
+
+function parseCouponCodeFromText(text: string): string | null {
+  const t = text.trim();
+  if (!t) return null;
+
+  // Exemplos: "cupom AA", "código AA", "tenho o AA", "usar AA", "AA"
+  const m = t.match(/(?:cupom|c[oó]digo|c[oó]digo do|usar|tenho o|tenho um)\s*:?\s*([a-z0-9_-]{2,30})/i);
+  if (m?.[1]) return m[1].toLowerCase();
+
+  // Se o usuário mandar algo que parece só o código (ex: "aa")
+  if (/^[a-z0-9_-]{2,30}$/i.test(t)) return t.toLowerCase();
+
+  return null;
+}
+
+async function applyCouponToFlowValue(params: {
+  coupon: any;
+  flow: FlowState;
+}): Promise<{ flow: FlowState; discountApplied: number }> {
+  const { coupon, flow } = params;
+  const baseMin = flow.quoteMin ?? 0;
+  const baseMax = flow.quoteMax ?? 0;
+  if (baseMin <= 0 && baseMax <= 0) {
+    return { flow, discountApplied: 0 };
+  }
+
+  let newMin = baseMin;
+  let newMax = baseMax;
+
+  if (coupon.type === 'percent') {
+    const pct = coupon.amount ?? 0;
+    newMin = baseMin * (1 - pct / 100);
+    newMax = baseMax * (1 - pct / 100);
+  } else {
+    const fixed = coupon.amount ?? 0;
+    newMin = baseMin - fixed;
+    newMax = baseMax - fixed;
+  }
+
+  newMin = clampMoney(newMin);
+  newMax = clampMoney(newMax);
+
+  const discountApplied = clampMoney((baseMin + baseMax) / 2 - (newMin + newMax) / 2);
+
+  return {
+    flow: {
+      ...flow,
+      quoteMin: newMin,
+      quoteMax: newMax,
+      couponDiscountApplied: discountApplied,
+    },
+    discountApplied,
+  };
+}
+
 async function createAppointment(flow: FlowState, phone: string) {
   const client = await prisma.client.findUnique({ where: { phone: normalizePhone(phone) } });
   if (!client || !flow.dbServiceId || !flow.dayDate || !flow.startTime) return null;
+
+
+
 
   const service = await prisma.service.findUnique({ where: { id: flow.dbServiceId } });
   if (!service) return null;
@@ -978,7 +1044,11 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     }
 
     case "ETAPA7_TIME": {
+      
+      
+
       const slots = flow.availableSlots ?? [];
+
       const durationMin = flow.serviceDurationMin ?? (await getFlowDurationMin(flow, wctx));
       let chosen: string | null = null;
 
@@ -1025,11 +1095,20 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       return;
     }
 
-    case "ETAPA8_PAYMENT":
-    case "ETAPA8_PAYMENT_NO_PIX": {
+    case "ETAPA8_PAYMENT": {
+      // Antes de escolher a forma de pagamento, permitir aplicar cupom
+      if (await applyCouponPhase(msg, flow, lower, ctx, wctx, num, input)) return;
       await handlePayment(msg, flow, ctx, num, lower, wctx);
       return;
     }
+
+    case "ETAPA8_PAYMENT_NO_PIX": {
+      // Antes de escolher a forma de pagamento, permitir aplicar cupom
+      if (await applyCouponPhase(msg, flow, lower, ctx, wctx, num, input)) return;
+      await handlePayment(msg, flow, ctx, num, lower, wctx);
+      return;
+    }
+
 
     case "ETAPA10_FAQ": {
       if (lower === "voltar" && flow.returnStage) {
@@ -1096,7 +1175,83 @@ function menuForStage(flow: FlowState, wctx: WhatsAppCatalogContext, pushName?: 
   }
 }
 
+async function applyCouponPhase(
+  msg: IncomingMessage,
+  flow: FlowState,
+  lower: string,
+  ctx: FlowContext,
+  wctx: WhatsAppCatalogContext,
+  num: number | null,
+  input: string
+): Promise<boolean> {
+  // Aceitar cupom apenas antes de escolher pagamento
+  // Não interromper quando o usuário digita número do menu (1..4)
+  const isPaymentMenuPick = num !== null;
+  if (isPaymentMenuPick) return false;
+
+  const code = parseCouponCodeFromText(input) ?? null;
+  if (!code) {
+    // Se usuário só perguntar “tenho cupom?”, não tem código ainda
+    if (/\b(cupom|c[oó]digo|desconto)\b/i.test(input) && !flow.couponCode) {
+      await sendText({
+        number: msg.phone,
+        text: `Perfeito 😊 Me envie o *código do cupom* (ex: *AA*).`,
+      });
+    }
+    return false;
+  }
+
+  // Cliente precisa existir para validação de limite por cliente
+  const clientId = await prisma.client.findUnique({ where: { phone: normalizePhone(msg.phone) } }).then((c) => c?.id);
+  if (!clientId) {
+    await sendText({ number: msg.phone, text: `Antes de usar cupom, confirme seu *nome* 😊` });
+    return true;
+  }
+
+  const coupon = await findCouponByCode(code);
+  if (!coupon || !coupon.active) {
+    flow.couponError = 'invalid_or_inactive';
+    flow.couponCode = code;
+    await saveFlow(msg.phone, flow);
+    await sendText({ number: msg.phone, text: `Cupom inválido ou inativo 😔` });
+    return true;
+  }
+
+  // Validar regras (datas/limites/por cliente)
+  const check = await canRedeem(coupon.id, clientId);
+  if (!check.ok) {
+    flow.couponError = check.reason;
+    flow.couponCode = code;
+    await saveFlow(msg.phone, flow);
+    await sendText({ number: msg.phone, text: `Não foi possível aplicar o cupom: ${check.reason}.` });
+    return true;
+  }
+
+  const applied = await applyCouponToFlowValue({ coupon, flow });
+  flow.couponId = coupon.id;
+  flow.couponCode = code;
+  flow.couponDiscountApplied = applied.discountApplied;
+  flow.couponError = undefined;
+
+  flow.quoteMin = applied.flow.quoteMin;
+  flow.quoteMax = applied.flow.quoteMax;
+  await saveFlow(msg.phone, flow);
+
+  const discountText = applied.discountApplied > 0 ? `Desconto: *R$ ${applied.discountApplied}*` : `Cupom aplicado!`;
+  await sendText({
+    number: msg.phone,
+    text: `✅ Cupom *${code.toUpperCase()}* aplicado!
+
+${discountText}
+
+Agora escolha a forma de pagamento.`,
+  });
+
+  return true;
+}
+
 async function handlePayment(
+
   msg: IncomingMessage,
   flow: FlowState,
   ctx: FlowContext,
@@ -1139,9 +1294,27 @@ async function confirmFinal(
   wctx: WhatsAppCatalogContext,
   includePix = false
 ) {
-  await createAppointment(flow, msg.phone);
+  const appointment = await createAppointment(flow, msg.phone);
+
+  // Se houver cupom aplicado, registrar redemption vinculado ao agendamento
+  if (appointment?.id && flow.couponCode) {
+    try {
+      // redeemCoupon exige clientId; buscar via phone é seguro
+      const client = await prisma.client.findUnique({
+        where: { phone: normalizePhone(msg.phone) },
+      });
+
+      if (client?.id) {
+        await redeemCoupon(flow.couponCode, client.id, appointment.id);
+      }
+    } catch (err) {
+      console.error('[Cupon] Falha ao registrar redemption:', err);
+    }
+  }
+
 
   const services = [
+
     flow.serviceLabel,
     flow.upsellAccepted ? flow.upsellLabel : null,
     flow.packageKey,
