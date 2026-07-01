@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 
 export async function GET() {
-  // export backup
   try {
     const [clients, appointments, services, botPrompts, settings, brand, notificationSetting, users, coupons] = await Promise.all([
       prisma.client.findMany(),
@@ -30,7 +29,20 @@ export async function GET() {
       exportedAt: new Date().toISOString(),
     };
 
-    return NextResponse.json({ success: true, data: payload });
+    return NextResponse.json({
+      success: true,
+      data: payload,
+      meta: {
+        counts: {
+          clients: clients.length,
+          appointments: appointments.length,
+          services: services.length,
+          botPrompts: botPrompts.length,
+          users: users.length,
+          coupons: coupons.length,
+        },
+      },
+    });
   } catch (error) {
     console.error("[backup GET]", error);
     return NextResponse.json({ success: false, error: "Erro ao gerar backup." }, { status: 500 });
@@ -53,56 +65,59 @@ export async function POST(request: NextRequest) {
 
     if (!data) return NextResponse.json({ success: false, error: "Dados de backup ausentes." }, { status: 400 });
 
-    // careful restore: wipe and recreate in safe order
-    // delete dependent records first
-    await prisma.$transaction([
-      prisma.appointment.deleteMany(),
-      prisma.financialRecord.deleteMany(),
-      prisma.whatsAppMessage.deleteMany(),
-      prisma.whatsAppSession.deleteMany(),
-      prisma.client.deleteMany(),
-      prisma.service.deleteMany(),
-      prisma.botPrompt.deleteMany(),
-      prisma.user.deleteMany(),
-      prisma.coupon.deleteMany(),
-    ]);
+    const counts = {
+      clients: Array.isArray(data.clients) ? data.clients.length : 0,
+      appointments: Array.isArray(data.appointments) ? data.appointments.length : 0,
+      services: Array.isArray(data.services) ? data.services.length : 0,
+      botPrompts: Array.isArray(data.botPrompts) ? data.botPrompts.length : 0,
+      users: Array.isArray(data.users) ? data.users.length : 0,
+      coupons: Array.isArray(data.coupons) ? data.coupons.length : 0,
+    };
 
-    // recreate
-    if (Array.isArray(data.clients) && data.clients.length) {
-      await prisma.client.createMany({ data: data.clients });
-    }
-    if (Array.isArray(data.services) && data.services.length) {
-      await prisma.service.createMany({ data: data.services });
-    }
-    if (Array.isArray(data.users) && data.users.length) {
-      await prisma.user.createMany({ data: data.users });
-    }
-    if (Array.isArray(data.botPrompts) && data.botPrompts.length) {
-      // BotPrompt uses key as id
-      for (const p of data.botPrompts) {
-        await prisma.botPrompt.create({ data: p });
+    await prisma.$transaction(async (tx) => {
+      await tx.appointment.deleteMany();
+      await tx.financialRecord.deleteMany();
+      await tx.whatsAppMessage.deleteMany();
+      await tx.whatsAppSession.deleteMany();
+      await tx.client.deleteMany();
+      await tx.service.deleteMany();
+      await tx.botPrompt.deleteMany();
+      await tx.user.deleteMany();
+      await tx.coupon.deleteMany();
+
+      if (Array.isArray(data.clients) && data.clients.length) {
+        await tx.client.createMany({ data: data.clients });
       }
-    }
-    if (Array.isArray(data.appointments) && data.appointments.length) {
-      await prisma.appointment.createMany({ data: data.appointments });
-    }
-    if (Array.isArray(data.coupons) && data.coupons.length) {
-      await prisma.coupon.createMany({ data: data.coupons });
-    }
+      if (Array.isArray(data.services) && data.services.length) {
+        await tx.service.createMany({ data: data.services });
+      }
+      if (Array.isArray(data.users) && data.users.length) {
+        await tx.user.createMany({ data: data.users });
+      }
+      if (Array.isArray(data.botPrompts) && data.botPrompts.length) {
+        for (const p of data.botPrompts) {
+          await tx.botPrompt.create({ data: p });
+        }
+      }
+      if (Array.isArray(data.appointments) && data.appointments.length) {
+        await tx.appointment.createMany({ data: data.appointments });
+      }
+      if (Array.isArray(data.coupons) && data.coupons.length) {
+        await tx.coupon.createMany({ data: data.coupons });
+      }
 
-    if (data.settings) {
-      await prisma.settings.upsert({ where: { id: "default" }, create: { id: "default", ...data.settings }, update: data.settings });
-    }
+      if (data.settings) {
+        await tx.settings.upsert({ where: { id: "default" }, create: { id: "default", ...data.settings }, update: data.settings });
+      }
+      if (data.brand) {
+        await tx.brand.upsert({ where: { id: "default" }, create: { id: "default", ...data.brand }, update: data.brand });
+      }
+      if (data.notificationSetting) {
+        await tx.notificationSetting.upsert({ where: { id: "default" }, create: { id: "default", ...data.notificationSetting }, update: data.notificationSetting });
+      }
+    });
 
-    if (data.brand) {
-      await prisma.brand.upsert({ where: { id: "default" }, create: { id: "default", ...data.brand }, update: data.brand });
-    }
-
-    if (data.notificationSetting) {
-      await prisma.notificationSetting.upsert({ where: { id: "default" }, create: { id: "default", ...data.notificationSetting }, update: data.notificationSetting });
-    }
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, data: { restored: counts } });
   } catch (error) {
     console.error("[backup POST]", error);
     return NextResponse.json({ success: false, error: "Erro ao restaurar backup." }, { status: 500 });

@@ -8,9 +8,9 @@ const schema = z.object({
   notifyClientHandoff: z.boolean().optional(),
   notifyCancelledAppointment: z.boolean().optional(),
   notifyMonthlyGoal: z.boolean().optional(),
-  monthlyGoalAmount: z.number().optional(),
+  monthlyGoalAmount: z.union([z.number(), z.string(), z.null()]).optional(),
   notifyByEmail: z.boolean().optional(),
-  notifyEmailAddress: z.string().email().optional().nullable(),
+  notifyEmailAddress: z.union([z.string().email(), z.string().max(255), z.null()]).optional(),
 });
 
 export async function GET() {
@@ -29,6 +29,12 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const data = schema.parse(body);
 
+    const monthlyGoalAmount = data.monthlyGoalAmount == null || data.monthlyGoalAmount === ""
+      ? null
+      : Number(data.monthlyGoalAmount);
+
+    const notifyEmailAddress = data.notifyByEmail ? (data.notifyEmailAddress?.trim() || null) : null;
+
     const upsert = await prisma.notificationSetting.upsert({
       where: { id: "default" },
       create: {
@@ -37,18 +43,18 @@ export async function PUT(request: NextRequest) {
         notifyClientHandoff: data.notifyClientHandoff ?? true,
         notifyCancelledAppointment: data.notifyCancelledAppointment ?? true,
         notifyMonthlyGoal: data.notifyMonthlyGoal ?? false,
-        monthlyGoalAmount: data.monthlyGoalAmount ? Number(data.monthlyGoalAmount) : undefined,
+        monthlyGoalAmount: monthlyGoalAmount ? monthlyGoalAmount : null,
         notifyByEmail: data.notifyByEmail ?? false,
-        notifyEmailAddress: data.notifyEmailAddress ?? null,
+        notifyEmailAddress,
       },
       update: {
         notifyNewAppointment: data.notifyNewAppointment ?? undefined,
         notifyClientHandoff: data.notifyClientHandoff ?? undefined,
         notifyCancelledAppointment: data.notifyCancelledAppointment ?? undefined,
         notifyMonthlyGoal: data.notifyMonthlyGoal ?? undefined,
-        monthlyGoalAmount: data.monthlyGoalAmount ? Number(data.monthlyGoalAmount) : undefined,
+        monthlyGoalAmount: monthlyGoalAmount ? monthlyGoalAmount : null,
         notifyByEmail: data.notifyByEmail ?? undefined,
-        notifyEmailAddress: data.notifyEmailAddress ?? undefined,
+        notifyEmailAddress,
       },
     });
 

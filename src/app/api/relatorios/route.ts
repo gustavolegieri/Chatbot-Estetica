@@ -13,26 +13,37 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { from, to, type } = body;
-    const fromDate = from ? new Date(from) : new Date(0);
-    const toDate = to ? new Date(to) : new Date();
+    const fromDate = from ? startOfDay(new Date(from)) : new Date(0);
+    const toDate = to ? endOfDay(new Date(to)) : new Date();
 
     if (type === "clientes") {
-      const clients = await prisma.client.findMany({ where: { createdAt: { gte: startOfDay(fromDate), lte: endOfDay(toDate) } } });
-      return NextResponse.json({ success: true, data: clients });
+      const clients = await prisma.client.findMany({
+        where: { createdAt: { gte: fromDate, lte: toDate } },
+        orderBy: { createdAt: "desc" },
+      });
+      return NextResponse.json({ success: true, data: { items: clients, summary: { count: clients.length } } });
     }
 
     if (type === "agendamentos") {
-      const appts = await prisma.appointment.findMany({ where: { date: { gte: startOfDay(fromDate), lte: endOfDay(toDate) } }, include: { client: true, service: true } });
-      return NextResponse.json({ success: true, data: appts });
+      const appts = await prisma.appointment.findMany({
+        where: { date: { gte: fromDate, lte: toDate } },
+        include: { client: true, service: true },
+        orderBy: { date: "desc" },
+      });
+      return NextResponse.json({ success: true, data: { items: appts, summary: { count: appts.length } } });
     }
 
     if (type === "financeiro") {
-      const records = await prisma.financialRecord.findMany({ where: { date: { gte: startOfDay(fromDate), lte: endOfDay(toDate) } } });
-      return NextResponse.json({ success: true, data: records });
+      const records = await prisma.financialRecord.findMany({
+        where: { date: { gte: fromDate, lte: toDate } },
+        orderBy: { date: "desc" },
+      });
+      const totalIncome = records.filter((record) => record.type === "INCOME").reduce((acc, record) => acc + Number(record.amount), 0);
+      const totalExpense = records.filter((record) => record.type === "EXPENSE").reduce((acc, record) => acc + Number(record.amount), 0);
+      return NextResponse.json({ success: true, data: { items: records, summary: { count: records.length, totalIncome, totalExpense, balance: totalIncome - totalExpense } } });
     }
 
     if (type === "summary") {
-      // month comparison
       const now = new Date();
       const startThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const startLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -48,10 +59,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         data: {
-          thisMonthRevenue: Number(thisRevenueAgg._sum.amount ?? 0),
-          lastMonthRevenue: Number(lastRevenueAgg._sum.amount ?? 0),
-          thisMonthAppointments: thisAppointments,
-          lastMonthAppointments: lastAppointments,
+          items: [],
+          summary: {
+            thisMonthRevenue: Number(thisRevenueAgg._sum.amount ?? 0),
+            lastMonthRevenue: Number(lastRevenueAgg._sum.amount ?? 0),
+            thisMonthAppointments: thisAppointments,
+            lastMonthAppointments: lastAppointments,
+          },
         },
       });
     }
