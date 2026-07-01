@@ -2,8 +2,9 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { getCampaignEmitter } from '@/lib/campaign-processor';
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
-  const emitter = getCampaignEmitter(params.id);
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const emitter = getCampaignEmitter(id);
 
   const stream = new ReadableStream({
     start(controller) {
@@ -19,9 +20,6 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
       emitter.on('progress', send);
       emitter.once('done', onDone);
-
-      // cleanup when closed
-      controller.byobRequest?.respondWithNewView?.();
 
       // no-op; the emitter will push events
     },

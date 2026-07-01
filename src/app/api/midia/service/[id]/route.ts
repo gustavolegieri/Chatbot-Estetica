@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: serviceId } = await params;
   try {
-    const serviceId = params.id;
     const list = await prisma.serviceMedia.findMany({ where: { serviceId }, orderBy: { createdAt: 'desc' } });
     return NextResponse.json({ data: list });
   } catch (err) {

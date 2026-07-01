@@ -3,9 +3,9 @@ import { prisma } from '@/lib/prisma';
 import fs from 'fs';
 import path from 'path';
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   try {
-    const id = params.id;
     const item = await prisma.serviceMedia.findUnique({ where: { id } });
     if (!item) return NextResponse.json({ error: 'not_found' }, { status: 404 });
 
@@ -25,9 +25,9 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   }
 }
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   try {
-    const id = params.id;
     const item = await prisma.serviceMedia.findUnique({ where: { id } });
     if (!item) return NextResponse.json({ error: 'not_found' }, { status: 404 });
     return NextResponse.json({ data: item });

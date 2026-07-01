@@ -20,6 +20,7 @@ import {
   Download,
   BarChart2,
   Send,
+  Gift,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "./BrandLogo";

@@ -12,7 +12,8 @@ const updateUserSchema = z.object({
   active: z.boolean().optional(),
 });
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   try {
     await requireAdmin();
   } catch (error) {
@@ -26,7 +27,6 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 
   try {
-    const { id } = params;
     const body = await request.json();
     const data = updateUserSchema.parse(body);
 
@@ -74,7 +74,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   try {
     await requireAdmin();
   } catch (error) {
@@ -88,7 +89,6 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
   }
 
   try {
-    const { id } = params;
     await prisma.user.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {
