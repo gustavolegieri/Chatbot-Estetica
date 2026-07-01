@@ -14,12 +14,14 @@ import {
   MessageSquare,
   CalendarOff,
   Headphones,
+  Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "./BrandLogo";
 
 const navItems = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/sistema", label: "Sistema", icon: Layers },
   { href: "/admin/atendimento", label: "Atendimento", icon: Headphones, badge: true },
   { href: "/admin/clientes", label: "Clientes", icon: Users },
   { href: "/admin/servicos", label: "Serviços", icon: Wrench },
