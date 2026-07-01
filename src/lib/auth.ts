@@ -76,3 +76,11 @@ export async function requireAuth(): Promise<SessionPayload> {
   }
   return session;
 }
+
+export async function requireAdmin(): Promise<SessionPayload> {
+  const session = await requireAuth();
+  if (session.role !== "ADMIN") {
+    throw new Error("FORBIDDEN");
+  }
+  return session;
+}

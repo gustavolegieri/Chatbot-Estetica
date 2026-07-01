@@ -92,6 +92,7 @@ model Client {
   appointments     Appointment[]
   whatsappSessions WhatsAppSession[]
   whatsappMessages WhatsAppMessage[]
+  couponRedemptions CouponRedemption[]
 }
 
 model Service {
@@ -122,6 +123,7 @@ model Service {
   upsellFor        Service[] @relation("ServiceUpsell")
   appointments     Appointment[]
   financialRecords FinancialRecord[]
+  media            ServiceMedia[]
 }
 
 model Appointment {
@@ -198,6 +200,83 @@ model Settings {
   updatedAt             DateTime @updatedAt
 }
 
+model Brand {
+  id         String   @id @default("default")
+  displayName String? 
+  themeColor  String? 
+  logoPath    String? 
+  updatedAt  DateTime @updatedAt
+}
+
+model NotificationSetting {
+  id                          String  @id @default("default")
+  notifyNewAppointment        Boolean @default(true)
+  notifyClientHandoff         Boolean @default(true)
+  notifyCancelledAppointment  Boolean @default(true)
+  notifyMonthlyGoal           Boolean @default(false)
+  monthlyGoalAmount           Decimal? @db.Decimal(10, 2)
+  notifyByEmail               Boolean @default(false)
+  notifyEmailAddress          String? 
+  updatedAt                   DateTime @updatedAt
+}
+
+model Coupon {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  type       String   @default("percent")
+  amount     Decimal  @db.Decimal(10, 2)
+  validFrom  DateTime?
+  validTo    DateTime?
+  usageLimit Int?
+  usagePerCustomer Int? @default(1)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  redemptions CouponRedemption[]
+}
+
+model CouponRedemption {
+  id         String   @id @default(cuid())
+  couponId   String
+  clientId   String
+  appointmentId String?
+  amountApplied Decimal? @db.Decimal(10,2)
+  createdAt  DateTime @default(now())
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([couponId])
+  @@index([clientId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String
+  data      Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model ServiceMedia {
+  id         String   @id @default(cuid())
+  serviceId  String?
+  filename   String
+  path       String
+  mimeType   String
+  size       Int
+  createdAt  DateTime @default(now())
+
+  service Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  @@index([serviceId])
+}
+
 model BotPrompt {
   key       String   @id
   label     String
@@ -267,4 +346,52 @@ model WhatsAppMessage {
   @@index([sessionId])
   @@index([createdAt])
   @@index([clientId])
+}
+
+enum CampaignStatus {
+  DRAFT
+  RUNNING
+  PAUSED
+  COMPLETED
+}
+
+enum QueueStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+}
+
+model Campaign {
+  id              String         @id @default(cuid())
+  name            String
+  message         String         @db.Text
+  selectorType    String         // all | inactive | service
+  selectorMeta    Json?
+  status          CampaignStatus @default(DRAFT)
+  totalRecipients Int? 
+  successCount    Int     @default(0)
+  failCount       Int     @default(0)
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  queue CampaignQueue[]
+}
+
+model CampaignQueue {
+  id         String    @id @default(cuid())
+  campaignId String
+  phone      String
+  name       String?
+  status     QueueStatus @default(PENDING)
+  attempts   Int       @default(0)
+  lastError  String?
+  queuedAt   DateTime  @default(now())
+  sentAt     DateTime?
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([status])
 }

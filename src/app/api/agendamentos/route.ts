@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { calculateEndTime, isSlotAvailable } from "@/lib/appointments";
 import { localDayRange, parseIsoDateLocal } from "@/lib/date-br";
+import { findCouponByCode } from '@/lib/coupons';
+import { logAudit } from '@/lib/audit';
 
 const createSchema = z.object({
   clientId: z.string(),
@@ -45,6 +47,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const data = createSchema.parse(body);
+    // optional coupon code
+    const couponCode: string | undefined = (body as any).couponCode;
 
     const service = await prisma.service.findUnique({ where: { id: data.serviceId } });
     if (!service) {
@@ -76,6 +80,31 @@ export async function POST(request: NextRequest) {
       },
       include: { client: true, service: true },
     });
+
+    // if coupon provided, attempt to create redemption record linking to this appointment
+    if (couponCode) {
+      try {
+        const coupon = await findCouponByCode(couponCode);
+        if (coupon) {
+          // compute applied amount for percent type
+          let appliedAmount: number | null = null;
+          if (coupon.type === 'percent') {
+            appliedAmount = Number((Number(service.price) * Number(coupon.amount) / 100).toFixed(2));
+          } else {
+            appliedAmount = Number(coupon.amount);
+          }
+          await prisma.couponRedemption.create({ data: { couponId: coupon.id, clientId: data.clientId, appointmentId: appointment.id, amountApplied: appliedAmount } });
+          // create financial record to reflect discount (negative income)
+          if (appliedAmount) {
+            await prisma.financialRecord.create({ data: { type: 'EXPENSE', category: 'OTHER', amount: appliedAmount, description: `Desconto via cupom ${coupon.code}`, date: new Date(), appointmentId: appointment.id, serviceId: service.id } });
+          }
+          await logAudit({ action: 'redeem_coupon_via_appointment', resource: coupon.id, data: { appointmentId: appointment.id, clientId: data.clientId, appliedAmount } });
+        }
+      } catch (e) {
+        // do not block appointment creation if coupon redeem fails here; log error
+        console.warn('coupon redemption failed during appointment creation', e);
+      }
+    }
 
     return NextResponse.json({ success: true, data: appointment }, { status: 201 });
   } catch {
