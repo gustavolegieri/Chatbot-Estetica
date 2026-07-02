@@ -166,9 +166,43 @@ export default function NotificacoesPage() {
           )}
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={async () => {
+              setSaving(true);
+              setMessage(null);
+              try {
+                const res = await fetch("/api/notificacoes/test-email", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ to: settings.notifyEmailAddress ?? undefined }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) setMessage({ text: data.error || "Erro ao testar e-mail", type: "error" });
+                else setMessage({ text: "Teste disparado! Verifique o e-mail e o WhatsApp.", type: "success" });
+              } catch {
+                setMessage({ text: "Erro de conexão ao testar e-mail.", type: "error" });
+              } finally {
+                setSaving(false);
+              }
+            }}
+            className="btn-secondary gap-2 px-6 py-3"
+          >
+            <Mail className="h-4 w-4" />
+            Testar e-mail
+          </button>
+
           <button type="submit" disabled={saving} className="btn-primary gap-2 px-8 py-3">
-            {saving ? <><RefreshCw className="h-4 w-4 animate-spin" /> Salvando...</> : <><Save className="h-4 w-4" /> Salvar configurações</>}
+            {saving ? (
+              <>
+                <RefreshCw className="h-4 w-4 animate-spin" /> Salvando...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" /> Salvar configurações
+              </>
+            )}
           </button>
         </div>
       </form>

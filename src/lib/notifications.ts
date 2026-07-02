@@ -41,27 +41,10 @@ async function sendEmailOrSkip(opts: {
     return { skipped: true };
   }
 
-  try {
-    const nodemailer = await import("nodemailer");
-    const transporter = nodemailer.createTransport({
-      host,
-      port: Number(port),
-      secure: Number(port) === 465,
-      auth: { user, pass },
-    });
-
-    await transporter.sendMail({
-      from,
-      to: opts.to,
-      subject: opts.subject,
-      text: opts.text,
-    });
-
-    return { skipped: false };
-  } catch (err) {
-    console.error("[notifications] erro enviando email", err);
-    return { skipped: true, error: String(err) };
-  }
+  // Este projeto não inclui `nodemailer` nas dependências.
+  // Mantemos o envio de e-mail como no-op por enquanto (não quebra o WhatsApp).
+  console.warn("[notifications] envio de email desativado: instale nodemailer e configure SMTP.");
+  return { skipped: true };
 }
 
 export async function notifyNewAppointment(apt: AptFull) {
@@ -186,9 +169,10 @@ export async function notifyMonthlyGoalIfNeeded() {
   ].join("\n");
 
   // Qual número/quem recebe? Sem tabela de destinatários, enviamos para businessPhone se existir.
+  // Não reutilizamos o `settings` de notificationSettings (que não tem whatsappEnabled)
   const s = await prisma.settings.findUnique({ where: { id: "default" } });
   const businessPhone = s?.businessPhone;
-  if (businessPhone && settings.whatsappEnabled !== false) {
+  if (businessPhone) {
     await sendText({ number: businessPhone, text, sender: "ADMIN", flowStage: "NOTIFY_MONTHLY_GOAL" }).catch(() => {});
   }
 
