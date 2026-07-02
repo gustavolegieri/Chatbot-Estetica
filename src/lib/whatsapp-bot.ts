@@ -119,9 +119,17 @@ async function handleMessage(msg: IncomingMessage) {
         return;
       }
 
+      // Bloqueio administrativo de números: evita respostas automáticas do bot
+      const blocked = await prisma.blockedPhone.findUnique({
+        where: { phone: normalizePhone(msg.phone) },
+        select: { id: true },
+      });
+      if (blocked) return;
+
       if (await isBotPausedForPhone(msg.phone)) {
         return;
       }
+
 
       if (await tryHandleAppointmentConfirmation(msg.phone, msg.text, flowRef.current.stage)) return;
 

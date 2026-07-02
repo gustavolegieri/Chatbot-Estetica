@@ -43,6 +43,7 @@ const navItems = [
   { href: "/admin/agendamentos", label: "Agendamentos", icon: Calendar },
   { href: "/admin/financeiro", label: "Financeiro", icon: DollarSign },
   { href: "/admin/bot/prompts", label: "Prompts Bot", icon: MessageSquare },
+  { href: "/admin/bloqueio", label: "Bloqueio", icon: MessageSquare },
   { href: "/admin/feriados", label: "Feriados", icon: CalendarOff },
   { href: "/admin/configuracoes", label: "Configurações", icon: Settings },
 ];

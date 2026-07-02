@@ -298,6 +298,14 @@ model BlockedDate {
   @@unique([date])
 }
 
+model BlockedPhone {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  reason    String   @default("Bloqueado pelo administrador")
+  createdAt DateTime @default(now())
+}
+
+
 model WhatsAppSession {
   id                   String              @id @default(cuid())
   clientId             String?

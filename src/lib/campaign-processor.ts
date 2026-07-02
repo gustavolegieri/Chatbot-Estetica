@@ -46,6 +46,24 @@ export async function startCampaignProcessing(campaignId: string, opts: Processo
         if (claimed.count === 0) continue; // lost race
 
         try {
+          // Bloqueio: números que não devem receber mensagens automáticas
+          const blocked = await prisma.blockedPhone.findUnique({
+            where: { phone: next.phone },
+            select: { id: true },
+          });
+
+          if (blocked) {
+            await prisma.campaignQueue.update({
+              where: { id: next.id },
+              data: {
+                status: "FAILED",
+                lastError: "blocked_phone",
+              },
+            });
+            emitter.emit("progress", { campaignId, id: next.id, status: "FAILED", error: "blocked_phone" });
+            continue;
+          }
+
           const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
           const messageTemplate = campaign?.message ?? "";
           const message = messageTemplate.replace(/\{name\}/g, next.name ?? "Cliente");

@@ -7,6 +7,7 @@ import {
   sendConfirmWarning,
   sendReminder4h,
 } from "./appointment-whatsapp";
+import { isPhoneBlocked } from "./blocked-phones";
 
 const ACTIVE = [AppointmentStatus.CONFIRMED, AppointmentStatus.PENDING];
 
@@ -42,7 +43,13 @@ export async function processAppointmentRemindersAndAutoCancel(): Promise<{
     const startsAt = appointmentStartsAt(apt.date, apt.startTime);
     if (startsAt <= now) continue;
 
+    // Bloqueio: evita respostas automáticas do bot (reminders/confirm warnings/etc.)
+    if (apt.client?.phone && (await isPhoneBlocked(apt.client.phone))) {
+      continue;
+    }
+
     const minsUntil = (startsAt.getTime() - now.getTime()) / 60000;
+
 
     if (!apt.reminder4hSentAt && minsUntil <= reminder4hMin + 5 && minsUntil >= reminder4hMin - 25) {
       await sendReminder4h(apt);

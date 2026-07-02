@@ -1,12 +1,14 @@
-# TODO - Fidelidade e Cupons (Chatbot-Estetica)
+# TODO - Bloqueio de números (Chatbot-Estetica)
 
-- [ ] Entender como o fluxo de agendamento calcula e registra o valor (quoteMin/quoteMax e financeiroRecord).
-- [ ] Definir como o chat vai detectar um cupom no texto do cliente (ex: "cupom ABC", "tenho o AA").
-- [ ] Adicionar um novo estágio/snapshot no `FlowState` para capturar cupom antes do pagamento.
-- [ ] Integrar com a API existente de resgate (`/api/coupons/redeem`) ou chamar `redeemCoupon` diretamente via lib.
-- [ ] Calcular o desconto no valor exibido e registrado no financeiro: atualizar `flow.quoteMin/flow.quoteMax` ao aplicar cupom.
-- [ ] Registrar no banco a relação do cupom com o agendamento (couponRedemption com appointmentId).
-- [ ] Ajustar a confirmação final (ETAPA9) para informar o cupom e valor com desconto.
-- [ ] Validar cenários: cupom inválido/expirado/limites/uso por cliente e resposta no chat.
-- [ ] Rodar testes locais/compilação do projeto (build) para garantir que TypeScript passa.
+- [x] Criar model/table `BlockedPhone` no Prisma.
+- [x] Adicionar migration SQL para `BlockedPhone`.
+- [x] Criar helpers `src/lib/blocked-phones.ts`.
+- [x] Implementar checagem de bloqueio no bot: `src/lib/whatsapp-bot.ts`.
+- [x] Implementar checagem de bloqueio em reminders: `src/lib/appointment-reminders.ts`.
+- [x] Implementar checagem de bloqueio em campanhas: `src/lib/campaign-processor.ts`.
+- [x] Criar endpoints admin: `src/app/api/blocked-phones/route.ts` e `[id]/route.ts`.
+- [x] Criar página admin: `src/app/admin/bloqueio/page.tsx`.
+- [x] Atualizar sidebar com a nova aba: `src/components/layout/Sidebar.tsx`.
+- [ ] Rodar `prisma generate` + migrar banco no ambiente (ex.: `prisma migrate dev`).
+- [ ] Rodar `npm run build` para validar TypeScript e Next.
 
