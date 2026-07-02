@@ -41,10 +41,27 @@ async function sendEmailOrSkip(opts: {
     return { skipped: true };
   }
 
-  // Este projeto não inclui `nodemailer` nas dependências.
-  // Mantemos o envio de e-mail como no-op por enquanto (não quebra o WhatsApp).
-  console.warn("[notifications] envio de email desativado: instale nodemailer e configure SMTP.");
-  return { skipped: true };
+  try {
+    const nodemailer = await import("nodemailer");
+    const transporter = nodemailer.createTransport({
+      host,
+      port: Number(port),
+      secure: Number(port) === 465,
+      auth: { user, pass },
+    });
+
+    await transporter.sendMail({
+      from,
+      to: opts.to,
+      subject: opts.subject,
+      text: opts.text,
+    });
+
+    return { skipped: false };
+  } catch (err) {
+    console.error("[notifications] erro enviando email", err);
+    return { skipped: true, error: String(err) };
+  }
 }
 
 export async function notifyNewAppointment(apt: AptFull) {
