@@ -28,4 +28,14 @@ export async function onAppointmentStatusChange(
       );
     }
   }
+
+  // Notificações (painel admin)
+  try {
+    if (updated.status === AppointmentStatus.CANCELLED && previous !== AppointmentStatus.CANCELLED) {
+      const { notifyCancelledAppointment } = await import("./notifications");
+      await notifyCancelledAppointment(updated, "Cancelamento registrado pela equipe. O horário voltou a ficar disponível.");
+    }
+  } catch {
+    // noop
+  }
 }

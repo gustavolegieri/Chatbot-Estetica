@@ -18,8 +18,12 @@ export async function POST(req: Request) {
 
     // Prisma espera Date | null. O <input type="date"> manda string 'YYYY-MM-DD'.
     // Se a string vier inválida, new Date(...) vira "Invalid Date" e explode no Prisma.
-    const validFromDate = validFrom ? new Date(validFrom) : null;
-    const validToDate = validTo ? new Date(validTo) : null;
+    // Normaliza campos vazios do form (<input type="date"> manda string "" quando em branco)
+    const validFromNorm = validFrom === "" || validFrom === undefined ? null : validFrom;
+    const validToNorm = validTo === "" || validTo === undefined ? null : validTo;
+
+    const validFromDate = validFromNorm ? new Date(validFromNorm) : null;
+    const validToDate = validToNorm ? new Date(validToNorm) : null;
 
     if (validFromDate && Number.isNaN(validFromDate.getTime())) {
       return NextResponse.json({ success: false, error: 'invalid_validFrom' }, { status: 400 });
@@ -28,8 +32,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'invalid_validTo' }, { status: 400 });
     }
 
-    const usageLimitNum = usageLimit === '' || usageLimit === null || usageLimit === undefined ? null : Number(usageLimit);
-    const usagePerCustomerNum = usagePerCustomer === '' || usagePerCustomer === null || usagePerCustomer === undefined ? 1 : Number(usagePerCustomer);
+    const usageLimitNum =
+      usageLimit === '' || usageLimit === null || usageLimit === undefined ? null : Number(usageLimit);
+    const usagePerCustomerNum =
+      usagePerCustomer === '' || usagePerCustomer === null || usagePerCustomer === undefined ? 1 : Number(usagePerCustomer);
+
 
     if (usageLimitNum !== null && Number.isNaN(usageLimitNum)) {
       return NextResponse.json({ success: false, error: 'invalid_usageLimit' }, { status: 400 });
