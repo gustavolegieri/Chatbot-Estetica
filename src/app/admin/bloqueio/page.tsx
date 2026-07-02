@@ -159,7 +159,13 @@ export default function BloqueioPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="label">Telefone *</label>
-            <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required />
+            <input
+              className="input"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              placeholder="+55 (11) 940594405"
+              required
+            />
           </div>
           <div>
             <label className="label">Motivo</label>

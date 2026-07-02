@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { normalizePhone } from "@/lib/utils";
 
 const createSchema = z.object({
   phone: z.string().min(5),
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     const created = await prisma.blockedPhone.create({
       data: {
-        phone: data.phone,
+        phone: normalizePhone(data.phone),
         reason: data.reason,
       },
     });
