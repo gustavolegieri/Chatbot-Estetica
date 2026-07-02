@@ -19,7 +19,22 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = schema.parse(await request.json().catch(() => ({})));
+    // Evita erro "Unexpected end of JSON input" quando body vier vazio/inválido
+    let raw: unknown = {};
+    try {
+      raw = await request.json();
+    } catch {
+      const txt = await request.text().catch(() => "");
+      if (txt && txt.trim()) {
+        try {
+          raw = JSON.parse(txt);
+        } catch {
+          raw = {};
+        }
+      }
+    }
+
+    const body = schema.parse(raw);
 
     const settings = await prisma.notificationSetting.findUnique({ where: { id: "default" } });
     const notifyEmailAddress = body.to ?? settings?.notifyEmailAddress ?? null;

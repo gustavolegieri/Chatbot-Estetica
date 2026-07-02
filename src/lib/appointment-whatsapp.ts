@@ -19,12 +19,12 @@ async function loadSettings() {
 
 export async function sendAppointmentThankYou(apt: AptWithRelations) {
   const settings = await loadSettings();
-  if (!settings?.whatsappEnabled || !apt.client.phone) return false;
+  if (!settings?.whatsappEnabled || !settings.businessPhone) return false;
 
   const prompts = await loadPromptMap();
   const brand = settings.businessName ?? "Garagem do Ka";
   await sendText({
-    number: apt.client.phone,
+    number: settings.businessPhone,
     text: renderPrompt(prompts, "appointment_thankyou", {
       name: apt.client.name,
       brand,
@@ -36,12 +36,12 @@ export async function sendAppointmentThankYou(apt: AptWithRelations) {
 
 export async function sendAppointmentCancelledNotice(apt: AptWithRelations, reason: string) {
   const settings = await loadSettings();
-  if (!settings?.whatsappEnabled || !apt.client.phone) return false;
+  if (!settings?.whatsappEnabled || !settings.businessPhone) return false;
 
   const prompts = await loadPromptMap();
   const dateLabel = format(apt.date, "dd/MM (EEEE)", { locale: ptBR });
   await sendText({
-    number: apt.client.phone,
+    number: settings.businessPhone,
     text: renderPrompt(prompts, "appointment_cancelled", {
       name: apt.client.name,
       dateLabel,
@@ -55,7 +55,7 @@ export async function sendAppointmentCancelledNotice(apt: AptWithRelations, reas
 
 export async function sendReminder4h(apt: AptWithRelations) {
   const settings = await loadSettings();
-  if (!settings?.whatsappEnabled || !apt.client.phone) return false;
+  if (!settings?.whatsappEnabled || !settings.businessPhone) return false;
 
   const prompts = await loadPromptMap();
   const dateLabel = format(apt.date, "EEEE, dd/MM", { locale: ptBR });
@@ -63,7 +63,7 @@ export async function sendReminder4h(apt: AptWithRelations) {
   const duration = formatDurationLabel(apt.service.durationMin);
 
   await sendText({
-    number: apt.client.phone,
+    number: settings.businessPhone,
     text: renderPrompt(prompts, "reminder_4h", {
       brand,
       name: apt.client.name,
@@ -79,11 +79,11 @@ export async function sendReminder4h(apt: AptWithRelations) {
 
 export async function sendConfirmWarning(apt: AptWithRelations) {
   const settings = await loadSettings();
-  if (!settings?.whatsappEnabled || !apt.client.phone) return false;
+  if (!settings?.whatsappEnabled || !settings.businessPhone) return false;
 
   const prompts = await loadPromptMap();
   await sendText({
-    number: apt.client.phone,
+    number: settings.businessPhone,
     text: renderPrompt(prompts, "reminder_30min", {
       name: apt.client.name,
       service: apt.service.name,
@@ -95,12 +95,12 @@ export async function sendConfirmWarning(apt: AptWithRelations) {
 
 export async function sendConfirmationReceived(apt: AptWithRelations) {
   const settings = await loadSettings();
-  if (!settings?.whatsappEnabled || !apt.client.phone) return false;
+  if (!settings?.whatsappEnabled || !settings.businessPhone) return false;
 
   const dateLabel = format(apt.date, "dd/MM (EEEE)", { locale: ptBR });
 
   await sendText({
-    number: apt.client.phone,
+    number: settings.businessPhone,
     text: [
       `✅ *Presença confirmada!*`,
       ``,
@@ -115,3 +115,4 @@ export async function sendConfirmationReceived(apt: AptWithRelations) {
   });
   return true;
 }
+

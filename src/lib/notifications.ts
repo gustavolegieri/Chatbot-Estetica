@@ -5,7 +5,6 @@ import type { Appointment, Client, Service } from "@prisma/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { logAudit } from "./audit";
-import { normalizePhone } from "./utils";
 
 type AptFull = Appointment & { client: Client; service: Service };
 
@@ -17,8 +16,12 @@ async function getSettings(): Promise<Settings> {
 
 function shouldSend(settings: Settings, key: keyof NotificationSetting): boolean {
   if (!settings) return false;
-  // id is always present; keys exist in the model. This keeps logic simple.
   return Boolean((settings as any)[key]);
+}
+
+async function getBusinessPhone(): Promise<string | null> {
+  const runtime = await prisma.settings.findUnique({ where: { id: "default" } });
+  return runtime?.businessPhone ?? null;
 }
 
 async function sendEmailOrSkip(opts: {
@@ -26,9 +29,6 @@ async function sendEmailOrSkip(opts: {
   subject: string;
   text: string;
 }) {
-  // Implementação SMTP minimalista (opcional)
-  // Env esperadas (não garantidas):
-  //   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
   const host = process.env.SMTP_HOST;
   const port = process.env.SMTP_PORT;
   const user = process.env.SMTP_USER;
@@ -36,7 +36,6 @@ async function sendEmailOrSkip(opts: {
   const from = process.env.SMTP_FROM;
 
   if (!host || !port || !user || !pass || !from) {
-    // sem email não quebra o WhatsApp
     console.warn("[notifications] SMTP não configurado, email skip");
     return { skipped: true };
   }
@@ -66,10 +65,10 @@ async function sendEmailOrSkip(opts: {
 
 export async function notifyNewAppointment(apt: AptFull) {
   const settings = await getSettings();
-  if (!apt.client?.phone) return;
-
-  const phone = normalizePhone(apt.client.phone);
   if (!shouldSend(settings, "notifyNewAppointment")) return;
+
+  const businessPhone = await getBusinessPhone();
+  if (!businessPhone) return;
 
   const dateLabel = format(apt.date, "dd/MM (EEEE)", { locale: ptBR });
 
@@ -80,7 +79,12 @@ export async function notifyNewAppointment(apt: AptFull) {
     `Quando: *${dateLabel}* às *${apt.startTime}*`,
   ].join("\n");
 
-  await sendText({ number: phone, text, sender: "ADMIN", flowStage: "NOTIFY_NEW_APPOINTMENT" }).catch(() => {});
+  await sendText({
+    number: businessPhone,
+    text,
+    sender: "ADMIN",
+    flowStage: "NOTIFY_NEW_APPOINTMENT",
+  }).catch(() => {});
 
   if (settings?.notifyByEmail && apt.client.email) {
     await sendEmailOrSkip({
@@ -93,16 +97,20 @@ export async function notifyNewAppointment(apt: AptFull) {
   await logAudit({
     action: "notify_new_appointment",
     resource: apt.id,
-    data: { phone, appointmentId: apt.id },
+    data: { phone: businessPhone, appointmentId: apt.id },
   }).catch(() => {});
 }
 
-export async function notifyClientHandoff(params: { phone: string; reason: string; clientName?: string }) {
+export async function notifyClientHandoff(params: {
+  phone: string;
+  reason: string;
+  clientName?: string;
+}) {
   const settings = await getSettings();
-  if (!params.phone) return;
-  const phone = normalizePhone(params.phone);
-
   if (!shouldSend(settings, "notifyClientHandoff")) return;
+
+  const businessPhone = await getBusinessPhone();
+  if (!businessPhone) return;
 
   const text = [
     `💬 *Cliente pediu atendimento humano*`,
@@ -110,25 +118,37 @@ export async function notifyClientHandoff(params: { phone: string; reason: strin
     `Motivo: ${params.reason}`,
   ].filter(Boolean).join("\n");
 
-  await sendText({ number: phone, text, sender: "ADMIN", flowStage: "NOTIFY_HANDOFF" }).catch(() => {});
+  await sendText({
+    number: businessPhone,
+    text,
+    sender: "ADMIN",
+    flowStage: "NOTIFY_HANDOFF",
+  }).catch(() => {});
 
-  // email: cliente
   if (settings?.notifyByEmail) {
-    const client = await prisma.client.findUnique({ where: { phone } });
+    const client = await prisma.client.findUnique({ where: { phone: params.phone } });
     if (client?.email) {
-      await sendEmailOrSkip({ to: client.email, subject: "Atendimento humano solicitado", text });
+      await sendEmailOrSkip({
+        to: client.email,
+        subject: "Atendimento humano solicitado",
+        text,
+      });
     }
   }
 
-  await logAudit({ action: "notify_client_handoff", resource: phone, data: params }).catch(() => {});
+  await logAudit({
+    action: "notify_client_handoff",
+    resource: params.phone,
+    data: params,
+  }).catch(() => {});
 }
 
 export async function notifyCancelledAppointment(apt: AptFull, reason: string) {
   const settings = await getSettings();
-  if (!apt.client?.phone) return;
-  const phone = normalizePhone(apt.client.phone);
-
   if (!shouldSend(settings, "notifyCancelledAppointment")) return;
+
+  const businessPhone = await getBusinessPhone();
+  if (!businessPhone) return;
 
   const dateLabel = format(apt.date, "dd/MM (EEEE)", { locale: ptBR });
 
@@ -140,13 +160,26 @@ export async function notifyCancelledAppointment(apt: AptFull, reason: string) {
     `Motivo: ${reason}`,
   ].join("\n");
 
-  await sendText({ number: phone, text, sender: "ADMIN", flowStage: "NOTIFY_CANCELLED" }).catch(() => {});
+  await sendText({
+    number: businessPhone,
+    text,
+    sender: "ADMIN",
+    flowStage: "NOTIFY_CANCELLED",
+  }).catch(() => {});
 
   if (settings?.notifyByEmail && apt.client.email) {
-    await sendEmailOrSkip({ to: apt.client.email, subject: "Agendamento cancelado", text });
+    await sendEmailOrSkip({
+      to: apt.client.email,
+      subject: "Agendamento cancelado",
+      text,
+    });
   }
 
-  await logAudit({ action: "notify_cancelled_appointment", resource: apt.id, data: { phone, reason } }).catch(() => {});
+  await logAudit({
+    action: "notify_cancelled_appointment",
+    resource: apt.id,
+    data: { phone: businessPhone, reason },
+  }).catch(() => {});
 }
 
 export async function notifyMonthlyGoalIfNeeded() {
@@ -154,7 +187,6 @@ export async function notifyMonthlyGoalIfNeeded() {
   if (!settings?.notifyMonthlyGoal) return;
   if (!settings.monthlyGoalAmount || Number(settings.monthlyGoalAmount) <= 0) return;
 
-  // Soma de receitas (INCOME) do mês atual.
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -169,7 +201,6 @@ export async function notifyMonthlyGoalIfNeeded() {
 
   if (revenue < goal) return;
 
-  // Para não notificar repetido: marca em AuditLog (mínima invasão)
   const already = await prisma.auditLog.count({
     where: {
       action: "notify_monthly_goal_reached",
@@ -185,14 +216,20 @@ export async function notifyMonthlyGoalIfNeeded() {
     `Receita no mês: *R$ ${revenue}*`,
   ].join("\n");
 
-  // Qual número/quem recebe? Sem tabela de destinatários, enviamos para businessPhone se existir.
-  // Não reutilizamos o `settings` de notificationSettings (que não tem whatsappEnabled)
-  const s = await prisma.settings.findUnique({ where: { id: "default" } });
-  const businessPhone = s?.businessPhone;
+  const businessPhone = await getBusinessPhone();
   if (businessPhone) {
-    await sendText({ number: businessPhone, text, sender: "ADMIN", flowStage: "NOTIFY_MONTHLY_GOAL" }).catch(() => {});
+    await sendText({
+      number: businessPhone,
+      text,
+      sender: "ADMIN",
+      flowStage: "NOTIFY_MONTHLY_GOAL",
+    }).catch(() => {});
   }
 
-  await logAudit({ action: "notify_monthly_goal_reached", resource: "default", data: { goal, revenue } }).catch(() => {});
+  await logAudit({
+    action: "notify_monthly_goal_reached",
+    resource: "default",
+    data: { goal, revenue },
+  }).catch(() => {});
 }
 
