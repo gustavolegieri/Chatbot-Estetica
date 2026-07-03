@@ -71,16 +71,22 @@ export default function MidiaPage() {
   }
 
   async function upload() {
-    if (!fileDataUrl || !filename) return;
+    if (!selectedFile || !filename) return;
     setUploading(true);
     try {
-      const res = await fetch("/api/midia", {
+      const form = new FormData();
+      form.append("file", selectedFile);
+      form.append("filename", filename);
+
+      const res = await fetch("/api/midia/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataUrl: fileDataUrl, filename }),
+        body: form,
       });
       const json = await res.json();
-      if (json.error) return;
+      if (json.error) {
+        alert(`Erro ao enviar mídia: ${json.error}`);
+        return;
+      }
 
       setFileDataUrl(null);
       setFilename("");
