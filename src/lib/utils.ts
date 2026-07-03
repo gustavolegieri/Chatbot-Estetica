@@ -47,3 +47,4 @@ export function phoneToWhatsApp(phone: string): string {
   }
   return digits;
 }
+
