@@ -34,11 +34,14 @@ function getMimeType(filename: string) {
   }
 }
 
-export async function GET(
-  req: Request,
-  { params }: { params: { filename: string } }
-) {
-  const { filename } = params;
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const pathname = url.pathname;
+  const filename = pathname.split('/').pop() || '';
+  if (!filename) {
+    return NextResponse.json({ error: 'invalid_filename' }, { status: 400 });
+  }
+
   const uploadsDir = getUploadsDir();
   const filePath = path.join(uploadsDir, filename);
 
