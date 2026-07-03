@@ -177,7 +177,7 @@ export default function MidiaPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
         <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/40 p-4 shadow-sm shadow-emerald-900/20">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-600 text-white">
@@ -239,8 +239,8 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
           </div>
         </div>
 
-        <div className="flex flex-col items-center gap-4 sm:flex-row">
-          <label className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-surface-600 bg-surface-850 px-6 py-8 transition hover:border-brand-700/50 hover:bg-brand-950/30 sm:w-auto sm:px-10">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <label className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-surface-600 bg-surface-850 px-6 py-8 transition hover:border-brand-700/50 hover:bg-brand-950/30 sm:w-80 sm:px-10">
             <Upload className="h-8 w-8 text-slate-500" />
             <span className="text-sm font-medium text-slate-400">{selectedFile ? selectedFile.name : "Clique para escolher"}</span>
             <span className="text-xs text-slate-600">PNG, JPG ou MP4</span>
@@ -258,7 +258,7 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
             <button
               onClick={upload}
               disabled={uploading || !fileDataUrl}
-              className="btn-primary gap-2 justify-center py-3"
+              className="btn-primary gap-2 justify-center py-3 w-full sm:w-auto"
             >
               {uploading ? (
                 <>
@@ -337,8 +337,8 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                      <div className="flex-1 min-w-0">
                         <select
                           className="input w-full"
                           value={selectedServiceIdForRow}
@@ -366,26 +366,28 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
                         ) : null}
                       </div>
 
-                      <button
-                        className="btn-primary h-10 px-3"
-                        onClick={() => void validateAndSend(f)}
-                        disabled={!!busyByMedia[f.id] || !testPhone || !selectedServiceIdForRow}
-                        title="Validar no fluxo"
-                      >
-                        {busyByMedia[f.id] ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <span className="flex items-center gap-2"><Play className="h-4 w-4" /> Validar no fluxo</span>
-                        )}
-                      </button>
+                      <div className="flex flex-col gap-2 sm:w-auto sm:min-w-[200px]">
+                        <button
+                          className="btn-primary h-10 w-full px-3"
+                          onClick={() => void validateAndSend(f)}
+                          disabled={!!busyByMedia[f.id] || !testPhone || !selectedServiceIdForRow}
+                          title="Validar no fluxo"
+                        >
+                          {busyByMedia[f.id] ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <span className="flex items-center justify-center gap-2"><Play className="h-4 w-4" /> Validar no fluxo</span>
+                          )}
+                        </button>
 
-                      <button
-                        onClick={() => removeFile(f.id)}
-                        className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-red-400 transition hover:bg-red-950/40 hover:text-red-300"
-                        title="Remover"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                        <button
+                          onClick={() => removeFile(f.id)}
+                          className="flex h-10 w-full items-center justify-center rounded-lg text-red-400 transition hover:bg-red-950/40 hover:text-red-300 sm:w-10"
+                          title="Remover"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -394,7 +396,6 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
           </div>
         )}
       </div>
-
       {/* Telefone de teste */}
       <div className="card">
         <div className="mb-5 flex items-center gap-3">
