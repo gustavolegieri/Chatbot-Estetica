@@ -141,7 +141,7 @@ export default function MidiaPage() {
     <div className="space-y-6">
       <AdminHeader
         title="Galeria / Mídia"
-        description="Imagens que o robô pode enviar no WhatsApp"
+        description="Imagens e vídeos que o robô pode enviar no WhatsApp"
       />
 
       <div className="rounded-xl border border-brand-700/40 bg-brand-950/30 p-5 shadow-gold">
@@ -151,14 +151,19 @@ export default function MidiaPage() {
             <p className="font-semibold text-brand-200 mb-1">📸 Para que serve esta aba?</p>
             <p>
               Aqui você envia <strong>imagens e vídeos</strong> (fotos de serviços, antes/depois, logotipos)
-              que ficam salvos no sistema.
+              que ficam salvos no sistema e podem ser enviados pelo WhatsApp.
             </p>
-            <p className="mt-2">
-              <strong>Validação no fluxo:</strong> ao clicar em <em>Validar no fluxo</em>,
-              você escolhe um serviço, envia a mídia primeiro e depois recebe a mensagem do fluxo.
-            </p>
-            <p className="mt-1 text-slate-500 text-xs">
-              ⚡ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um serviço na galeria e clique em ‘Validar no fluxo’.
+            <div className="mt-4 space-y-3">
+              <p className="font-semibold text-brand-200">Como usar</p>
+              <ol className="list-decimal space-y-1 pl-5 text-slate-300">
+                <li>Faça upload da mídia aqui em cima.</li>
+                <li>Na galeria, selecione o serviço que deve receber essa mídia.</li>
+                <li>Informe um telefone de teste e clique em <strong>Validar no fluxo</strong>.</li>
+                <li>O sistema envia a mídia primeiro e depois exibe a mensagem do fluxo.</li>
+              </ol>
+            </div>
+            <p className="mt-3 text-slate-500 text-xs">
+              ⚡ Upload salva a mídia sem vínculo. A associação é feita ao validar no fluxo.
             </p>
           </div>
         </div>
@@ -222,7 +227,7 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
           </div>
           <div>
             <h2 className="text-lg font-bold text-brand-200">Teste no WhatsApp</h2>
-            <p className="text-sm text-slate-400">Informe um telefone para validar as imagens</p>
+            <p className="text-sm text-slate-400">Informe um telefone para validar as mídias</p>
           </div>
         </div>
 
@@ -241,7 +246,7 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
             <ImageIcon className="h-5 w-5 text-amber-400" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-brand-200">Suas imagens</h2>
+            <h2 className="text-lg font-bold text-brand-200">Suas mídias</h2>
             <p className="text-sm text-slate-400">{files.length} arquivo(s) salvos</p>
           </div>
         </div>
@@ -249,8 +254,8 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
         {files.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-slate-500">
             <ImageIcon className="mb-3 h-12 w-12 text-slate-600" />
-            <p className="text-sm font-medium">Nenhuma imagem ainda</p>
-            <p className="text-xs">Envie fotos dos seus serviços para o robô usar</p>
+            <p className="text-sm font-medium">Nenhuma mídia ainda</p>
+            <p className="text-xs">Envie fotos ou vídeos dos seus serviços para o robô usar</p>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
@@ -294,34 +299,41 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <select
-                        className="input"
-                        value={selectedServiceIdForRow}
-                        onChange={(e) =>
-                          setSelectedServiceByMedia((prev) => ({
-                            ...prev,
-                            [f.id]: e.target.value,
-                          }))
-                        }
-                      >
-                        <option value="">Selecione um serviço</option>
-                        {services.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex-1">
+                        <select
+                          className="input w-full"
+                          value={selectedServiceIdForRow}
+                          onChange={(e) =>
+                            setSelectedServiceByMedia((prev) => ({
+                              ...prev,
+                              [f.id]: e.target.value,
+                            }))
+                          }
+                        >
+                          <option value="">Selecione um serviço</option>
+                          {services.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </select>
+                        {f.serviceId ? (
+                          <p className="mt-1 text-[10px] text-slate-400">
+                            Serviço associado: {servicesById[f.serviceId]?.name ?? f.serviceId}
+                          </p>
+                        ) : null}
+                      </div>
 
                       <button
                         className="btn-secondary h-10 px-3"
                         onClick={() => void validateAndSend(f)}
-                        disabled={!!busyByMedia[f.id] || !testPhone}
-                        title="Associar e enviar teste"
+                        disabled={!!busyByMedia[f.id] || !testPhone || !selectedServiceIdForRow}
+                        title="Validar no fluxo"
                       >
                         {busyByMedia[f.id] ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          <Play className="h-4 w-4" />
+                          <span className="flex items-center gap-2"><Play className="h-4 w-4" /> Validar no fluxo</span>
                         )}
                       </button>
 
