@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Plus, DollarSign } from "lucide-react";
 import { format } from "date-fns";
 import { AdminHeader } from "@/components/layout/AdminHeader";
@@ -34,7 +34,7 @@ export default function FinanceiroPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
 
-  async function load() {
+  const load = useCallback(async () => {
     const res = await fetch(`/api/financeiro?month=${month}`);
     const data = await res.json();
     if (data.success) {
@@ -42,12 +42,12 @@ export default function FinanceiroPage() {
       setSummary(data.data.summary);
     }
     setLoading(false);
-  }
+  }, [month]);
 
   useEffect(() => {
     setLoading(true);
-    load();
-  }, [month]);
+    void load();
+  }, [load]);
 
   const income = Number(summary.find((s) => s.type === "INCOME")?._sum.amount ?? 0);
   const expenses = Number(summary.find((s) => s.type === "EXPENSE")?._sum.amount ?? 0);

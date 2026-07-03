@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AdminHeader } from "@/components/layout/AdminHeader";
 import { Download, BarChart3, TrendingUp, DollarSign, CalendarDays, Users, FileText, RefreshCw, AlertCircle } from "lucide-react";
 
@@ -21,7 +21,7 @@ export default function RelatoriosPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [activeType, setActiveType] = useState<string>("summary");
 
-  async function fetchReport(type: string) {
+  const fetchReport = useCallback(async (type: string) => {
     setLoading(true); setMessage(null); setActiveType(type);
     try {
       const res = await fetch("/api/relatorios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ from, to, type }) });
@@ -30,7 +30,7 @@ export default function RelatoriosPage() {
       const payload = json.data as ReportData; setData(payload); return payload;
     } catch { setMessage("Erro de conexão"); setData(null); return null; }
     finally { setLoading(false); }
-  }
+  }, [from, to]);
 
   async function exportCSV(type: string) {
     const result = await fetchReport(type);
@@ -44,7 +44,7 @@ export default function RelatoriosPage() {
     a.click(); URL.revokeObjectURL(url);
   }
 
-  useEffect(() => { void fetchReport("summary"); }, []);
+  useEffect(() => { void fetchReport("summary"); }, [fetchReport]);
 
   const summary = data?.summary ?? {};
   const isListReport = activeType === "clientes" || activeType === "agendamentos" || activeType === "financeiro";

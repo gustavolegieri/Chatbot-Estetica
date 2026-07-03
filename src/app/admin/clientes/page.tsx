@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Plus, Search, Pencil, Trash2, Users } from "lucide-react";
 import { AdminHeader } from "@/components/layout/AdminHeader";
 import { Modal } from "@/components/ui/Modal";
@@ -27,16 +27,16 @@ export default function ClientesPage() {
   const [editing, setEditing] = useState<Client | null>(null);
   const [form, setForm] = useState(emptyForm);
 
-  async function load() {
+  const load = useCallback(async () => {
     const res = await fetch(`/api/clientes?search=${encodeURIComponent(search)}`);
     const data = await res.json();
     if (data.success) setClients(data.data);
     setLoading(false);
-  }
+  }, [search]);
 
   useEffect(() => {
-    load();
-  }, [search]);
+    void load();
+  }, [load]);
 
   function openCreate() {
     setEditing(null);

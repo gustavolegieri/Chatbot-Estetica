@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { AdminHeader } from "@/components/layout/AdminHeader";
 import { Save, Upload, Image as ImageIcon, Palette, Store, CheckCircle2, AlertCircle } from "lucide-react";
@@ -129,7 +130,7 @@ export default function MarcaPage() {
           <div className="flex flex-col items-center gap-6 sm:flex-row">
             <div className="flex h-32 w-32 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-surface-600 bg-surface-850">
               {preview ? (
-                <img src={preview} alt="Logo" className="h-full w-full object-contain p-2" />
+                <Image src={preview} alt="Logo" width={128} height={128} unoptimized className="h-full w-full object-contain p-2" />
               ) : (
                 <div className="flex flex-col items-center gap-2 text-slate-500">
                   <ImageIcon className="h-8 w-8" />

@@ -86,7 +86,7 @@ export default function BotPromptsPage() {
       initial[v] = SAMPLE_PREVIEW_VARS[v] ?? `[${v}]`;
     }
     setPreviewVars(initial);
-  }, [selected?.key, selected?.hint]);
+  }, [selected]);
 
   function selectPrompt(p: BotPrompt) {
     if (isDirty && !confirm("Você tem alterações não salvas. Descartar?")) return;

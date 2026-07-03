@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Plus, Calendar } from "lucide-react";
 import { AdminHeader } from "@/components/layout/AdminHeader";
 import { Modal } from "@/components/ui/Modal";
@@ -51,7 +51,7 @@ export default function AgendamentosPage() {
     notes: "",
   });
 
-  async function load() {
+  const load = useCallback(async () => {
     const [aptRes, cliRes, svcRes] = await Promise.all([
       fetch(`/api/agendamentos?date=${filterDate}`),
       fetch("/api/clientes"),
@@ -62,11 +62,11 @@ export default function AgendamentosPage() {
     if (cli.success) setClients(cli.data);
     if (svc.success) setServices(svc.data);
     setLoading(false);
-  }
+  }, [filterDate]);
 
   useEffect(() => {
-    load();
-  }, [filterDate]);
+    void load();
+  }, [load]);
 
   useEffect(() => {
     if (form.serviceId && form.date) {

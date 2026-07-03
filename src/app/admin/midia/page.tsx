@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { AdminHeader } from "@/components/layout/AdminHeader";
 import { Upload, Trash2, Image as ImageIcon, Film, Loader2, Info, Play } from "lucide-react";
@@ -303,9 +304,12 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
                 >
                   <div className="flex h-40 items-center justify-center overflow-hidden bg-surface-800">
                     {f.mimeType?.startsWith("image/") ? (
-                      <img
+                      <Image
                         src={f.path}
                         alt={f.filename}
+                        width={400}
+                        height={240}
+                        unoptimized
                         className="h-full w-full object-cover transition group-hover:scale-105"
                       />
                     ) : f.mimeType?.startsWith("video/") ? (

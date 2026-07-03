@@ -54,8 +54,8 @@ export async function GET(req: Request) {
   });
 
   const contentType = media?.mimeType || getMimeType(filename);
-  const stream = fs.createReadStream(filePath);
-  return new NextResponse(stream, {
+  const buffer = fs.readFileSync(filePath);
+  return new NextResponse(buffer, {
     headers: {
       'Content-Type': contentType,
     },
