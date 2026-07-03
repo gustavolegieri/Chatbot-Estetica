@@ -8,15 +8,29 @@ export async function POST(req: Request) {
     const form = await req.formData();
     const file = form.get('file') as any;
     const serviceId = form.get('serviceId')?.toString();
+    const filenameFromBody = form.get('filename');
 
-    if (!file || typeof file.arrayBuffer !== 'function') {
+    if (!file) {
       return NextResponse.json({ error: 'no_file' }, { status: 400 });
     }
 
-    const arrayBuffer = await file.arrayBuffer();
+    const arrayBuffer =
+      typeof file.arrayBuffer === 'function'
+        ? await file.arrayBuffer()
+        : typeof file.stream === 'function'
+        ? await new Response(file).arrayBuffer()
+        : null;
+
+    if (!arrayBuffer) {
+      return NextResponse.json({ error: 'invalid_file' }, { status: 400 });
+    }
+
     const buffer = Buffer.from(arrayBuffer);
     const mime = file.type || 'application/octet-stream';
-    const filename = file.name || `upload-${Date.now()}`;
+    const filename =
+      (typeof filenameFromBody === 'string' && filenameFromBody) ||
+      file.name ||
+      `upload-${Date.now()}`;
 
     const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
     if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -27,11 +41,26 @@ export async function POST(req: Request) {
 
     const relPath = `/uploads/${safeName}`;
 
-    const media = await prisma.serviceMedia.create({ data: { filename, path: relPath, mimeType: mime, size: buffer.length, serviceId } });
+    const media = await prisma.serviceMedia.create({
+      data: {
+        filename,
+        path: relPath,
+        mimeType: mime,
+        size: buffer.length,
+        serviceId,
+      },
+    });
 
     return NextResponse.json({ data: media });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: 'server_error' }, { status: 500 });
+  } catch (err: unknown) {
+    console.error('[Midia Upload]', err);
+    const message =
+      err instanceof Error ? err.message : typeof err === 'string' ? err : 'server_error';
+    return NextResponse.json(
+      {
+        error: process.env.NODE_ENV === 'development' ? message : 'server_error',
+      },
+      { status: 500 }
+    );
   }
 }
