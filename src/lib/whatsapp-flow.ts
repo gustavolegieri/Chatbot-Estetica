@@ -220,26 +220,35 @@ async function activateService(
     try {
       // Nem todo schema possui serviceMedia; tratar de forma compatível.
       const media = await (prisma as any).serviceMedia?.findFirst({
-        where: { serviceId: dbId, mimeType: { startsWith: "image/" } },
+        where: { serviceId: dbId },
         orderBy: { createdAt: "asc" },
       });
 
       if (media?.path) {
+        const mediaType = media.mimeType?.startsWith("video/")
+          ? "video"
+          : media.mimeType?.startsWith("image/")
+          ? "image"
+          : "document";
+
         await sendMedia({
           number: msg.phone,
           mediaUrl: media.path,
           caption: item.label,
-          mediaType: "image",
+          mediaType,
         });
         await delay(800);
       }
-    } catch (err) {
-      console.error("[Midia] Erro ao enviar imagem do serviço:", err);
-    }
-  }
 
-  await delay(500);
-  await sendText({ number: msg.phone, text: flowMsg(wctx).detail(serviceKey) });
+      await delay(500);
+      await sendText({ number: msg.phone, text: flowMsg(wctx).detail(serviceKey) });
+    } catch (err) {
+      console.error("[Midia] Erro ao enviar mídia do serviço:", err);
+    }
+  } else {
+    await delay(500);
+    await sendText({ number: msg.phone, text: flowMsg(wctx).detail(serviceKey) });
+  }
 }
 
 function parseDayInput(input: string, num: number | null) {

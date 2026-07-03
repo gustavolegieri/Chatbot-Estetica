@@ -50,6 +50,30 @@ function getApiKey(): string | null {
   return process.env.WASENDER_API_KEY ?? null;
 }
 
+/**
+ * Converte um caminho relativo (ex: /uploads/foto.jpg) em URL pública absoluta,
+ * já que a WasenderAPI exige uma URL acessível externamente para envio de mídia.
+ */
+function toAbsoluteMediaUrl(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url;
+
+  const base = (process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || "")
+    .trim()
+    .replace(/\/$/, "");
+
+  if (!base) {
+    console.warn(
+      "[WasenderAPI] NEXT_PUBLIC_APP_URL não configurada — envio de mídia relativa pode falhar:",
+      url
+    );
+    return url;
+  }
+
+  const normalizedBase = /^https?:\/\//i.test(base) ? base : `https://${base}`;
+  return `${normalizedBase}${url.startsWith("/") ? url : `/${url}`}`;
+}
+
+
 async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
   const apiKey = getApiKey();
 
@@ -122,8 +146,17 @@ export async function sendText({
 }
 
 /**
+ * Resolve caminho relativo de mídia para URL absoluta pública.
+ * Usa NEXT_PUBLIC_APP_URL ou VERCEL_URL como base.
+ */
+function resolveMediaUrl(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url;
+  return toAbsoluteMediaUrl(url);
+}
+
+/**
  * Envia mídia (imagem/vídeo/documento) via WhatsApp usando WasenderAPI.
- * A API aceita URLs públicas de mídia.
+ * A API aceita URLs públicas de mídia — caminhos relativos são convertidos automaticamente.
  */
 export async function sendMedia({
   number,
@@ -137,9 +170,11 @@ export async function sendMedia({
     return { blocked: true, reason: "not_private_recipient" };
   }
 
+  const absoluteUrl = resolveMediaUrl(mediaUrl);
+
   const payload: Record<string, any> = {
     to: phoneToWhatsApp(number),
-    media: mediaUrl,
+    media: absoluteUrl,
     mediatype: mediaType,
   };
   if (caption) payload.caption = caption;

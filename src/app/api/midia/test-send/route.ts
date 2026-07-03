@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { mediaId, serviceId, phone } = schema.parse(body);
 
-    // A lógica do bot envia a primeira imagem associada ao serviço.
+    // A lógica do bot envia a primeira mídia associada ao serviço.
     // Aqui damos prioridade à mediaId, se fornecida.
     let media = null as any;
     if (mediaId) {
@@ -31,24 +31,29 @@ export async function POST(req: Request) {
 
     if (!media) {
       media = await prisma.serviceMedia.findFirst({
-        where: { serviceId, mimeType: { startsWith: "image/" } },
+        where: { serviceId },
         orderBy: { createdAt: "asc" },
       });
     }
 
     if (!media?.path) {
-      return NextResponse.json({ success: false, error: "Nenhuma imagem encontrada para este serviço" }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Nenhuma mídia encontrada para este serviço" }, { status: 404 });
     }
 
     const service = await prisma.service.findUnique({ where: { id: serviceId } });
     const caption = service?.name ?? media.filename;
+    const mediaType = media.mimeType?.startsWith("video/")
+      ? "video"
+      : media.mimeType?.startsWith("image/")
+      ? "image"
+      : "document";
 
     await sendMedia({
       number: phone,
       mediaUrl: media.path,
       caption,
       filename: media.filename,
-      mediaType: "image",
+      mediaType,
     });
 
     // pequena folga para o WhatsApp processar

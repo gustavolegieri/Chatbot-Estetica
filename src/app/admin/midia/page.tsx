@@ -150,15 +150,15 @@ export default function MidiaPage() {
           <div className="text-sm text-slate-300">
             <p className="font-semibold text-brand-200 mb-1">📸 Para que serve esta aba?</p>
             <p>
-              Aqui você envia <strong>imagens</strong> (fotos de serviços, antes/depois, logotipos)
-              que ficam salvas no sistema.
+              Aqui você envia <strong>imagens e vídeos</strong> (fotos de serviços, antes/depois, logotipos)
+              que ficam salvos no sistema.
             </p>
             <p className="mt-2">
               <strong>Validação no fluxo:</strong> ao clicar em <em>Validar no fluxo</em>,
-              você escolhe um serviço, associa a mídia e envia uma mensagem de teste.
+              você escolhe um serviço, envia a mídia primeiro e depois recebe a mensagem do fluxo.
             </p>
             <p className="mt-1 text-slate-500 text-xs">
-              ⚡ Upload sem vincular por ID. A associação é feita na validação.
+              ⚡ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um serviço na galeria e clique em ‘Validar no fluxo’.
             </p>
           </div>
         </div>
@@ -174,8 +174,8 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
             <Upload className="h-5 w-5 text-brand-300" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-brand-200">Enviar nova imagem</h2>
-            <p className="text-sm text-slate-400">Faça upload de fotos para usar no WhatsApp</p>
+            <h2 className="text-lg font-bold text-brand-200">Enviar nova mídia</h2>
+            <p className="text-sm text-slate-400">Faça upload de fotos ou vídeos para usar no WhatsApp</p>
           </div>
         </div>
 
@@ -268,10 +268,18 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
                         alt={f.filename}
                         className="h-full w-full object-cover transition group-hover:scale-105"
                       />
+                    ) : f.mimeType?.startsWith("video/") ? (
+                      <video
+                        src={f.path}
+                        className="h-full w-full object-cover transition group-hover:scale-105"
+                        muted
+                        playsInline
+                        loop
+                      />
                     ) : (
                       <div className="flex flex-col items-center gap-2 text-slate-500">
                         <Film className="h-8 w-8" />
-                        <span className="text-xs">Vídeo</span>
+                        <span className="text-xs">Arquivo</span>
                       </div>
                     )}
                   </div>
@@ -280,8 +288,8 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-medium text-slate-300">{f.filename}</p>
                       <p className="text-[10px] text-slate-500">
-                        {(f.size / 1024).toFixed(1)} KB
-                        {f.serviceId ? ` · ID: ${String(f.serviceId).slice(0, 8)}` : ""}
+                        {(f.size / 1024).toFixed(1)} KB · {f.mimeType?.startsWith("video/") ? "Vídeo" : "Imagem"}
+                        {f.serviceId ? ` · Serviço: ${servicesById[f.serviceId]?.name ?? String(f.serviceId).slice(0, 8)}` : ""}
                       </p>
                     </div>
 
