@@ -42,6 +42,11 @@ export default function MidiaPage() {
     void Promise.all([loadMedia(), loadServices()]);
   }, []);
 
+  useEffect(() => {
+    // garante que o estado do formulário por mídia não fique vazio após reload
+    if (!files?.length) setSelectedServiceByMedia({});
+  }, [files]);
+
   async function loadMedia() {
     const res = await fetch("/api/midia");
     const json = await res.json();
