@@ -153,19 +153,57 @@ export default function MidiaPage() {
               Aqui você envia <strong>imagens e vídeos</strong> (fotos de serviços, antes/depois, logotipos)
               que ficam salvos no sistema e podem ser enviados pelo WhatsApp.
             </p>
-            <div className="mt-4 space-y-3">
-              <p className="font-semibold text-brand-200">Como usar</p>
-              <ol className="list-decimal space-y-1 pl-5 text-slate-300">
-                <li>Faça upload da mídia aqui em cima.</li>
-                <li>Na galeria, selecione o serviço que deve receber essa mídia.</li>
-                <li>Informe um telefone de teste e clique em <strong>Validar no fluxo</strong>.</li>
-                <li>O sistema envia a mídia primeiro e depois exibe a mensagem do fluxo.</li>
-              </ol>
-            </div>
             <p className="mt-3 text-slate-500 text-xs">
               ⚡ Upload salva a mídia sem vínculo. A associação é feita ao validar no fluxo.
             </p>
           </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/40 p-4 shadow-sm shadow-emerald-900/20">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-600 text-white">
+              <span className="text-sm font-bold">1</span>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-emerald-200">Passo 1</p>
+              <p className="font-semibold text-white">Enviar mídia</p>
+            </div>
+          </div>
+          <p className="mt-4 text-sm text-slate-300">
+            Faça upload de uma foto ou vídeo para salvar no sistema.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-sky-500/20 bg-sky-950/40 p-4 shadow-sm shadow-sky-900/20">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-600 text-white">
+              <span className="text-sm font-bold">2</span>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-sky-200">Passo 2</p>
+              <p className="font-semibold text-white">Selecionar serviço</p>
+            </div>
+          </div>
+          <p className="mt-4 text-sm text-slate-300">
+            Escolha o serviço que deve enviar esta mídia no WhatsApp.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-950/40 p-4 shadow-sm shadow-amber-900/20">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-600 text-white">
+              <span className="text-sm font-bold">3</span>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-amber-200">Passo 3</p>
+              <p className="font-semibold text-white">Validar no fluxo</p>
+            </div>
+          </div>
+          <p className="mt-4 text-sm text-slate-300">
+            Envie a mídia para teste no WhatsApp e confira a mensagem do fluxo.
+          </p>
         </div>
       </div>
 
@@ -179,7 +217,7 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
             <Upload className="h-5 w-5 text-brand-300" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-brand-200">Enviar nova mídia</h2>
+            <h2 className="text-lg font-bold text-brand-200">Passo 1: Enviar mídia</h2>
             <p className="text-sm text-slate-400">Faça upload de fotos ou vídeos para usar no WhatsApp</p>
           </div>
         </div>
@@ -215,28 +253,9 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
                 </>
               )}
             </button>
+            <p className="text-xs text-slate-500">Nome e arquivo são obrigatórios antes de enviar.</p>
           </div>
         </div>
-      </div>
-
-      {/* Telefone de teste */}
-      <div className="card">
-        <div className="mb-5 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-900/40 ring-1 ring-amber-700/30">
-            <Play className="h-5 w-5 text-amber-400" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-brand-200">Teste no WhatsApp</h2>
-            <p className="text-sm text-slate-400">Informe um telefone para validar as mídias</p>
-          </div>
-        </div>
-
-        <input
-          className="input"
-          placeholder="Telefone de teste (ex: +55 11 94059-4405)"
-          value={testPhone}
-          onChange={(e) => setTestPhone(e.target.value)}
-        />
       </div>
 
       {/* Galeria */}
@@ -246,8 +265,8 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
             <ImageIcon className="h-5 w-5 text-amber-400" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-brand-200">Suas mídias</h2>
-            <p className="text-sm text-slate-400">{files.length} arquivo(s) salvos</p>
+            <h2 className="text-lg font-bold text-brand-200">Passo 2: Selecionar serviço</h2>
+            <p className="text-sm text-slate-400">Escolha qual serviço deve enviar esta mídia no WhatsApp</p>
           </div>
         </div>
 
@@ -317,6 +336,9 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
                             </option>
                           ))}
                         </select>
+                        <p className="mt-1 text-[10px] text-slate-400">
+                          Selecione um serviço para ativar o botão de validação.
+                        </p>
                         {f.serviceId ? (
                           <p className="mt-1 text-[10px] text-slate-400">
                             Serviço associado: {servicesById[f.serviceId]?.name ?? f.serviceId}
@@ -325,7 +347,7 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
                       </div>
 
                       <button
-                        className="btn-secondary h-10 px-3"
+                        className="btn-primary h-10 px-3"
                         onClick={() => void validateAndSend(f)}
                         disabled={!!busyByMedia[f.id] || !testPhone || !selectedServiceIdForRow}
                         title="Validar no fluxo"
@@ -351,6 +373,27 @@ Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um servi�
             })}
           </div>
         )}
+      </div>
+
+      {/* Telefone de teste */}
+      <div className="card">
+        <div className="mb-5 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-900/40 ring-1 ring-amber-700/30">
+            <Play className="h-5 w-5 text-amber-400" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-brand-200">Passo 3: Validar no WhatsApp</h2>
+            <p className="text-sm text-slate-400">Informe um telefone para validar as mídias</p>
+          </div>
+        </div>
+
+        <input
+          className="input"
+          placeholder="Telefone de teste (ex: +55 11 94059-4405)"
+          value={testPhone}
+          onChange={(e) => setTestPhone(e.target.value)}
+        />
+        <p className="mt-2 text-xs text-slate-500">Telefone obrigatório para validar a mídia no fluxo.</p>
       </div>
     </div>
   );
