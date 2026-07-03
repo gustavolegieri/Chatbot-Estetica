@@ -166,6 +166,9 @@ export default function MidiaPage() {
 
       {/* Upload */}
       <div className="card">
+        <div className="mb-3 rounded-lg bg-surface-800/60 p-3 text-xs text-slate-400">
+Upload salva a mídia sem vínculo. Para enviar no WhatsApp, selecione um serviço na galeria e clique em ‘Validar no fluxo’.
+        </div>
         <div className="mb-5 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-900/40 ring-1 ring-brand-700/30">
             <Upload className="h-5 w-5 text-brand-300" />
