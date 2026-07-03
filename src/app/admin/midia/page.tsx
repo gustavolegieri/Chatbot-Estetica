@@ -130,7 +130,14 @@ export default function MidiaPage() {
         return;
       }
 
-      alert("Teste enviado! Confira o WhatsApp.");
+      if (json.data?.pending) {
+        alert(
+          "Mídia associada. O WhatsApp não está conectado, então o envio será executado quando estiver disponível."
+        );
+      } else {
+        alert("Teste enviado! Confira o WhatsApp.");
+      }
+
       await loadMedia();
     } finally {
       setBusyByMedia((prev) => ({ ...prev, [media.id]: false }));
@@ -155,6 +162,9 @@ export default function MidiaPage() {
             </p>
             <p className="mt-3 text-slate-500 text-xs">
               ⚡ Upload salva a mídia sem vínculo. A associação é feita ao validar no fluxo.
+            </p>
+            <p className="mt-1 text-slate-400 text-xs">
+              Se o WhatsApp não estiver vinculado, a mídia ainda será salva e associada; o envio ocorrerá assim que o WhatsApp estiver disponível.
             </p>
           </div>
         </div>

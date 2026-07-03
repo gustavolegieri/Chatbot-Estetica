@@ -48,18 +48,51 @@ export async function POST(req: Request) {
       ? "image"
       : "document";
 
-    await sendMedia({
-      number: phone,
-      mediaUrl: media.path,
-      caption,
-      filename: media.filename,
-      mediaType,
-    });
+    let result: any;
+    try {
+      result = await sendMedia({
+        number: phone,
+        mediaUrl: media.path,
+        caption,
+        filename: media.filename,
+        mediaType,
+      });
+    } catch (err: any) {
+      console.error("[Midia] Erro ao enviar mídia de teste:", err);
+      return NextResponse.json({
+        success: true,
+        data: {
+          sent: false,
+          pending: true,
+          warning: "WhatsApp não está conectado. A mídia foi salva e ficará pronta para envio quando o WhatsApp estiver disponível.",
+          mediaId: media.id,
+          serviceId,
+          phone,
+        },
+      });
+    }
 
-    // pequena folga para o WhatsApp processar
+    const isSimulated = result?.simulated === true;
+    const isBlocked = result?.blocked === true;
+    if (isBlocked) {
+      return NextResponse.json({
+        success: false,
+        error: "Envio bloqueado. Verifique o telefone e tente novamente.",
+      }, { status: 400 });
+    }
+
     await delay(400);
 
-    return NextResponse.json({ success: true, data: { sent: true, mediaId: media.id, serviceId, phone } });
+    return NextResponse.json({
+      success: true,
+      data: {
+        sent: !isSimulated,
+        pending: isSimulated,
+        mediaId: media.id,
+        serviceId,
+        phone,
+      },
+    });
   } catch (err: any) {
     console.error(err);
     return NextResponse.json({ success: false, error: "Erro ao enviar" }, { status: 500 });
