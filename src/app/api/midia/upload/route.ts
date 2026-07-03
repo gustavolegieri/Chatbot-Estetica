@@ -1,7 +1,15 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
+
+function getUploadsDir() {
+  if (process.env.NODE_ENV === 'production') {
+    return path.join(os.tmpdir(), 'estetica-uploads');
+  }
+  return path.join(process.cwd(), 'public', 'uploads');
+}
 
 export async function POST(req: Request) {
   try {
@@ -32,14 +40,14 @@ export async function POST(req: Request) {
       file.name ||
       `upload-${Date.now()}`;
 
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+    const uploadsDir = getUploadsDir();
     if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
     const safeName = `${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
     const outPath = path.join(uploadsDir, safeName);
     fs.writeFileSync(outPath, buffer);
 
-    const relPath = `/uploads/${safeName}`;
+    const relPath = `/api/midia/file/${safeName}`;
 
     const media = await prisma.serviceMedia.create({
       data: {
