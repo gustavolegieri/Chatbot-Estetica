@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth";
 import { sendText } from "@/lib/evolution-api";
 import { logWhatsAppMessage } from "@/lib/whatsapp-message-log";
 import { normalizePhone } from "@/lib/utils";
-import { MessageDirection, MessageSender } from "@prisma/client";
+import { MessageDirection, MessageSender } from "@/lib/message-enums";
 
 export async function POST(
   request: NextRequest,

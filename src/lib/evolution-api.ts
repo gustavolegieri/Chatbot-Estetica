@@ -9,7 +9,7 @@
  *   EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE_NAME
  */
 
-import { MessageDirection, MessageSender } from "@prisma/client";
+import { MessageDirection, MessageSender } from "./message-enums";
 import { phoneToWhatsApp } from "./utils";
 import { isValidPrivateRecipient } from "./whatsapp-jid";
 import { getMessageLogContext } from "./whatsapp-message-context";
@@ -174,11 +174,16 @@ export async function sendMedia({
 
   const payload: Record<string, any> = {
     to: phoneToWhatsApp(number),
-    media: absoluteUrl,
-    mediatype: mediaType,
+    text: caption,
   };
-  if (caption) payload.caption = caption;
-  if (filename) payload.filename = filename;
+
+  if (mediaType === "image") {
+    payload.imageUrl = absoluteUrl;
+  } else if (mediaType === "video") {
+    payload.videoUrl = absoluteUrl;
+  } else {
+    payload.documentUrl = absoluteUrl;
+  }
 
   return wasenderFetch(payload);
 }

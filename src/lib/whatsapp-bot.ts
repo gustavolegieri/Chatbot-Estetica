@@ -1,4 +1,4 @@
-import { MessageDirection, MessageSender } from "@prisma/client";
+import { MessageDirection, MessageSender } from "./message-enums";
 import { prisma } from "./prisma";
 import { normalizePhone } from "./utils";
 import { isValidPrivateRecipient } from "./whatsapp-jid";
