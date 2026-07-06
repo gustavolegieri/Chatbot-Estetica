@@ -4,6 +4,15 @@ import { renderPrompt, loadPromptMap, type PromptMap } from "./bot-prompts";
 import { parseVehicleMessage, type ParsedVehicle } from "./whatsapp-vehicle-parse";
 import { prisma } from "./prisma";
 import { buildMainMenu, loadWhatsAppCatalog } from "./whatsapp-service-catalog";
+
+function getCatalogForTest() {
+  return (globalThis as any)?.__BB_WCTX_MOCK__ ?? null;
+}
+
+function getPrismaForTest() {
+  return (globalThis as any)?.__BB_PRISMA_MOCK__ ?? null;
+}
+
 import {
   buildCalendarPrompt,
   buildVehicleCollectionPrompt,
@@ -150,7 +159,8 @@ export async function processTestFlow({
   // Verificar intenção de "menu"
   if (message.toLowerCase() === "menu") {
     session.stage = "ETAPA2_MAIN_MENU";
-    const wctx = await loadWhatsAppCatalog(true);
+    const wctx = getCatalogForTest() ?? (await loadWhatsAppCatalog(true));
+
     const menuText = etapa2MainMenu(
       session.customerName || "Cliente",
       buildMainMenu(wctx.categories, prompts),
@@ -190,7 +200,11 @@ export async function processTestFlow({
       return handleCouponStep(message, session, settings, catalog, prompts, responses);
 
     case "ETAPA10_BUDGET":
-      return handleBudgetAfterCouponAndProceed(message, session, settings, catalog, prompts, responses);
+      // placeholder: mantém fluxo existente do modo teste
+      // (o transcript e o Vercel quebraram por referência a função inexistente)
+      session.stage = "ETAPA7_DAY";
+      return handleDateSelection("4", session, settings, catalog, prompts, responses);
+
 
     case "ETAPA7_DAY":
       return handleDateSelection(message, session, settings, catalog, prompts, responses);
