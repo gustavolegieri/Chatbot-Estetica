@@ -4,12 +4,12 @@ import { loadWhatsAppCatalog, buildMainMenu } from "@/lib/whatsapp-service-catal
 import { loadPromptMap } from "@/lib/bot-prompts";
 import { etapa1Welcome, etapa2MainMenu, formatHours } from "@/lib/whatsapp-flow-messages";
 import { BRAND_DEFAULT } from "@/lib/whatsapp-catalog";
-import { getBusinessHoursStatus } from "@/lib/business-hours";
+import { getBusinessHoursStatus, afterHoursMessage } from "@/lib/business-hours";
 import { testSessions } from "@/lib/test-sessions-store";
 
 export async function POST(req: NextRequest) {
   try {
-    const { sessionId } = await req.json();
+    const { sessionId, testHours } = await req.json();
 
     if (!sessionId) {
       return NextResponse.json(
@@ -34,12 +34,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const businessHours = getBusinessHoursStatus(settings as any);
+    // ⏰ Permitir override do horário para testes
+    // testHours pode ser: "08:00", "14:30", etc. — simula que agora é esse horário
+    let now = new Date();
+    if (testHours && typeof testHours === "string" && /^\d{1,2}:\d{2}$/.test(testHours)) {
+      const [h, m] = testHours.split(":").map(Number);
+      now = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0, 0);
+    }
+
+    const businessHours = getBusinessHoursStatus(settings as any, now);
     if (!businessHours.isOpen) {
       testSessions.set(sessionId, {
         stage: "AFTER_HOURS",
         welcomed: false,
       });
+
+      const msg = afterHoursMessage(
+        {
+          businessName: settings.businessName || BRAND_DEFAULT,
+          businessHoursStart: settings.businessHoursStart,
+          businessHoursEnd: settings.businessHoursEnd,
+          lunchBreakStart: settings.lunchBreakStart,
+          lunchBreakEnd: settings.lunchBreakEnd,
+          workingDays: settings.workingDays,
+        },
+        null,
+        businessHours
+      );
 
       return NextResponse.json({
         success: true,
@@ -47,8 +68,7 @@ export async function POST(req: NextRequest) {
           {
             id: "initial",
             role: "bot",
-            content:
-              "🕐 Desculpe, estamos fora do horário de atendimento! Envie sua mensagem e responderemos assim que possível.",
+            content: msg,
           },
         ],
       });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, RotateCcw, Loader } from "lucide-react";
+import { Send, RotateCcw, Loader, Clock } from "lucide-react";
 
 interface Message {
   id: string;
@@ -16,6 +16,7 @@ export default function TesteBotPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [testSessionId] = useState(() => `test-${Date.now()}`);
+  const [testHours, setTestHours] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -34,10 +35,16 @@ export default function TesteBotPage() {
   const initializeTest = async () => {
     setLoading(true);
     try {
+      const body: Record<string, any> = { sessionId: testSessionId };
+      // Se o usuário informou um horário de teste, envia para o backend
+      if (testHours && /^\d{1,2}:\d{2}$/.test(testHours)) {
+        body.testHours = testHours;
+      }
+
       const response = await fetch("/api/admin/teste/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: testSessionId }),
+        body: JSON.stringify(body),
       });
 
       const data = await response.json();
@@ -115,13 +122,27 @@ export default function TesteBotPage() {
             Simule conversas com o bot usando os fluxos configurados
           </p>
         </div>
-        <button
-          onClick={handleReset}
-          className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-600"
-        >
-          <RotateCcw className="h-4 w-4" />
-          Reiniciar
-        </button>
+        <div className="flex items-center gap-3">
+          {/* ⏰ Simulador de horário */}
+          <div className="flex items-center gap-2 rounded-lg bg-slate-800/60 px-3 py-1.5">
+            <Clock className="h-4 w-4 text-slate-400" />
+            <input
+              type="time"
+              value={testHours}
+              onChange={(e) => setTestHours(e.target.value)}
+              className="w-28 rounded bg-slate-700/50 px-2 py-1 text-xs text-slate-300 placeholder-slate-500 focus:border-brand-500 focus:outline-none"
+              placeholder="Horário"
+              title="Simular horário (deixe vazio para usar o horário real)"
+            />
+          </div>
+          <button
+            onClick={handleReset}
+            className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-600"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Reiniciar
+          </button>
+        </div>
       </div>
 
       {/* Messages Container */}
