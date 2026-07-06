@@ -16,6 +16,7 @@ interface TestSession {
   customerName: string | null;
   selectedService: string | null;
   selectedSubService: string | null;
+  selectedServiceName: string | null;
   vehicle: {
     model: string | null;
     year: number | null;
@@ -30,6 +31,60 @@ interface TestResponse {
   text: string;
   mediaUrl?: string;
   mediaType?: string;
+}
+
+export function buildTestServiceLookupWhere(
+  catalogKey?: string | null,
+  serviceName?: string | null
+) {
+  const where: Record<string, unknown> = { active: true };
+  const ors: Array<Record<string, unknown>> = [];
+
+  if (catalogKey) {
+    ors.push({ catalogKey });
+  }
+
+  if (serviceName) {
+    ors.push({ name: { contains: serviceName, mode: "insensitive" } });
+  }
+
+  if (ors.length > 0) {
+    where.OR = ors;
+  }
+
+  return where;
+}
+
+export function normalizeConditionValue(
+  value: string
+): "excelente" | "bom" | "normal" | "ruim" {
+  const normalized = (value || "").toLowerCase().trim();
+
+  if (!normalized) return "normal";
+  if (/(excelente|novo|zero km|seminovo|otimo|ótimo)/.test(normalized)) return "excelente";
+  if (/(bom|bom estado|pouco uso|bem|limpo)/.test(normalized)) return "bom";
+  if (/(ruim|arranh|feio|sujei|muito sujo|mancha|oxida|opac|precisa de atenção|precisa de atencao|gasto|precisa)/.test(normalized)) {
+    return "ruim";
+  }
+
+  return "normal";
+}
+
+async function resolveTestService(session: TestSession) {
+  const where = buildTestServiceLookupWhere(session.selectedSubService, session.selectedServiceName);
+  const dbService = await prisma.service.findFirst({
+    where,
+    include: { media: true },
+  });
+
+  if (dbService) {
+    return { dbService };
+  }
+
+  const wctx = await loadWhatsAppCatalog(true);
+  const catalogItem = session.selectedSubService ? wctx.catalog[session.selectedSubService] : null;
+
+  return { dbService: null, catalogItem };
 }
 
 export async function processTestFlow({
@@ -220,6 +275,7 @@ async function handleSubMenu(
 
   const selectedService = categoryServices[choice - 1];
   session.selectedSubService = selectedService.key;
+  session.selectedServiceName = selectedService.label;
 
   // Mostrar detalhe do serviço
   const description = serviceDetail(selectedService, prompts);
@@ -310,46 +366,34 @@ async function handleVehicleCollection(
   // Extrair informações do veículo
   const vehicleInfo = parseVehicleMessage(message);
 
-  // Mapear condição para valores permitidos
-  const conditionMap: Record<string, "normal" | "bom" | "excelente" | "ruim"> = {
-    "bom": "bom",
-    "precisa de atenção": "ruim",
-    "normal": "normal",
-    "excelente": "excelente",
-  };
+  const normalizedCondition = normalizeConditionValue(vehicleInfo.condition);
 
   session.vehicle = {
     model: vehicleInfo.model,
     year: vehicleInfo.year ? parseInt(vehicleInfo.year) : null,
     color: vehicleInfo.color,
-    condition: (conditionMap[vehicleInfo.condition] || "normal") as "normal" | "bom" | "excelente" | "ruim",
+    condition: normalizedCondition,
   };
 
-  // Buscar serviço no banco de dados
-  const dbService = await prisma.service.findFirst({
-    where: {
-      catalogKey: session.selectedSubService || undefined,
-    },
-  });
+  const { dbService, catalogItem } = await resolveTestService(session);
 
-  if (!dbService) {
-    responses.push({ text: "❌ Serviço não encontrado" });
-    return responses;
-  }
-
-  // Calcular cotação
+  // Calcular cotação usando o banco quando existir, ou o catálogo como fallback
   const isSUV = vehicleInfo.isSuv || false;
-  const basePrice = (isSUV ? (dbService.priceSuvMin || 0) : (dbService.priceHatchMin || 0)) || 0;
+  const basePrice = dbService
+    ? (isSUV ? Number(dbService.priceSuvMin || 0) : Number(dbService.priceHatchMin || 0))
+    : catalogItem
+      ? (isSUV ? Number(catalogItem.suvMin || 0) : Number(catalogItem.hatchMin || 0))
+      : 0;
 
-  // Ajuste por condição
   const conditionMultiplier: Record<string, number> = {
-    "bom": 0.95,
-    "normal": 1.0,
-    "precisa de atenção": 1.1,
+    excelente: 0.95,
+    bom: 0.95,
+    normal: 1.0,
+    ruim: 1.1,
   };
 
-  const multiplier = (conditionMultiplier[vehicleInfo.condition] ?? 1.0) as number;
-  const quote = (basePrice as number) * multiplier;
+  const multiplier = conditionMultiplier[normalizedCondition] ?? 1.0;
+  const quote = basePrice * multiplier;
 
   session.quote = quote;
   session.stage = "ETAPA5_QUOTE";
@@ -374,11 +418,7 @@ async function handleQuotePresentation(
 
   if (choice === "sim" || choice === "1" || choice === "yes") {
     // Verificar upsell
-    const dbService = await prisma.service.findFirst({
-      where: {
-        catalogKey: session.selectedSubService || undefined,
-      },
-    });
+    const { dbService } = await resolveTestService(session);
 
     if (dbService?.upsellServiceId) {
       const upsellService = await prisma.service.findUnique({
