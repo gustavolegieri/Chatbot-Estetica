@@ -3,7 +3,13 @@ import { renderPrompt, loadPromptMap, type PromptMap } from "./bot-prompts";
 import { parseVehicleMessage, type ParsedVehicle } from "./whatsapp-vehicle-parse";
 import { prisma } from "./prisma";
 import { buildMainMenu, loadWhatsAppCatalog } from "./whatsapp-service-catalog";
-import { buildVehicleCollectionPrompt, isValidCustomerName } from "./flow-validation";
+import {
+  buildCalendarPrompt,
+  buildVehicleCollectionPrompt,
+  buildVehicleConfirmationPrompt,
+  isValidCustomerName,
+  normalizeVehicleConditionValue,
+} from "./flow-validation";
 import {
   etapa1Welcome,
   etapa2MainMenu,
@@ -95,15 +101,10 @@ export function buildTestServiceLookupWhere(
 export function normalizeConditionValue(
   value: string
 ): "excelente" | "bom" | "normal" | "ruim" {
-  const normalized = (value || "").toLowerCase().trim();
-
-  if (!normalized) return "normal";
-  if (/(excelente|novo|zero km|seminovo|otimo|ótimo)/.test(normalized)) return "excelente";
-  if (/(bom|bom estado|pouco uso|bem|limpo)/.test(normalized)) return "bom";
-  if (/(ruim|arranh|feio|sujei|muito sujo|mancha|oxida|opac|precisa de atenção|precisa de atencao|gasto|precisa)/.test(normalized)) {
-    return "ruim";
-  }
-
+  const normalized = normalizeVehicleConditionValue(value);
+  if (normalized === "excelente") return "excelente";
+  if (normalized === "bom") return "bom";
+  if (normalized === "precisa de atenção") return "ruim";
   return "normal";
 }
 
@@ -433,34 +434,15 @@ async function handleVehicleCollection(
     return responses;
   }
 
-  const { dbService, catalogItem } = await resolveTestService(session);
-
-  // Calcular cotação usando o banco quando existir, ou o catálogo como fallback
-  const isSUV = vehicleInfo.isSuv || false;
-  const basePrice = dbService
-    ? (isSUV ? Number(dbService.priceSuvMin || 0) : Number(dbService.priceHatchMin || 0))
-    : catalogItem
-      ? (isSUV ? Number(catalogItem.suvMin || 0) : Number(catalogItem.hatchMin || 0))
-      : 0;
-
-  const conditionMultiplier: Record<string, number> = {
-    excelente: 0.95,
-    bom: 0.95,
-    normal: 1.0,
-    ruim: 1.1,
-  };
-
-  const multiplier = conditionMultiplier[normalizedCondition] ?? 1.0;
-  const quote = basePrice * multiplier;
-
-  session.quote = quote;
-  session.stage = "ETAPA8_PHOTO";
-
-  const vehicleStr = `${vehicleInfo.model || "veículo"} ${vehicleInfo.year || ""}`.trim();
+  session.stage = "ETAPA5_QUOTE";
   responses.push({
-    text: `Ótimo! Para ${vehicleStr} em estado ${vehicleInfo.condition || "normal"}:\n\n💰 *Orçamento: R$ ${quote.toFixed(2).replace(".", ",")}*\n\nVocê quer enviar uma foto do veículo agora? (opcional)\n\n*1* - Sim, enviar foto\n*2* - Não, seguir sem foto`,
+    text: buildVehicleConfirmationPrompt({
+      model: session.vehicle.model,
+      year: session.vehicle.year?.toString() ?? null,
+      color: session.vehicle.color,
+      condition: session.vehicle.condition,
+    }),
   });
-
   return responses;
 }
 
@@ -476,22 +458,15 @@ async function handlePhotoStep(
   const wantsPhoto = /^(1|sim|s|foto|imagem|anexar)$/i.test(input);
 
   session.vehiclePhotoAttached = wantsPhoto;
-  session.stage = "ETAPA5_QUOTE";
+  session.stage = "ETAPA9_COUPON";
 
-  const vehicleStr = `${session.vehicle.model || "veículo"} ${session.vehicle.year || ""}`.trim();
   responses.push({
     text: wantsPhoto
       ? "Foto registrada como opcional. Seguimos com o agendamento."
       : "Sem foto anexada. Seguimos com o agendamento.",
   });
   responses.push({
-    text: `Ótimo! Para ${vehicleStr} em estado ${session.vehicle.condition || "normal"}:\n\n${buildBudgetSummaryText({
-      serviceLabel: session.selectedServiceName || "Serviço premium",
-      serviceValue: session.quote ?? 0,
-      complementValue: 0,
-      couponDiscount: session.couponDiscount ?? 0,
-      totalValue: (session.quote ?? 0) - (session.couponDiscount ?? 0),
-    })}\n\nProsseguir com agendamento?`,
+    text: "Tem um cupom? Se tiver, me envie o código. Se não, diga *não*.",
   });
 
   return responses;
@@ -508,7 +483,6 @@ async function handleQuotePresentation(
   const choice = message.trim().toLowerCase();
 
   if (choice === "sim" || choice === "1" || choice === "yes") {
-    // Verificar upsell
     const { dbService } = await resolveTestService(session);
 
     if (dbService?.upsellServiceId) {
@@ -525,9 +499,9 @@ async function handleQuotePresentation(
       }
     }
 
-    session.stage = "ETAPA9_COUPON";
+    session.stage = "ETAPA8_PHOTO";
     responses.push({
-      text: "Tem um cupom? Se tiver, me envie o código. Se não, diga *não*.",
+      text: "Você quer enviar uma foto do veículo agora? (opcional)\n\n*1* - Sim, enviar foto\n*2* - Não, seguir sem foto",
     });
   } else {
     responses.push({
@@ -559,9 +533,9 @@ async function handleUpsell(
     }
   }
 
-  session.stage = "ETAPA7_DAY";
+  session.stage = "ETAPA8_PHOTO";
   responses.push({
-    text: `Que dia você prefere?\n\n*1* - Hoje\n*2* - Amanhã\n*3* - Em 2 dias\n*4* - Outra data`,
+    text: "Você quer enviar uma foto do veículo agora? (opcional)\n\n*1* - Sim, enviar foto\n*2* - Não, seguir sem foto",
   });
 
   return responses;
@@ -579,10 +553,16 @@ async function handleCouponStep(
   const skip = /^(nao|não|n|sem|pular|ignorar)$/i.test(input);
 
   if (skip) {
-    session.stage = "ETAPA7_DAY";
-    responses.push({ text: "Sem cupom. Seguimos para a data do atendimento." });
+    session.stage = "ETAPA10_BUDGET";
+    responses.push({ text: "Sem cupom. Seguimos para o orçamento consolidado." });
     responses.push({
-      text: `Que dia você prefere?\n\n*1* - Hoje\n*2* - Amanhã\n*3* - Em 2 dias\n*4* - Outra data`,
+      text: buildBudgetSummaryText({
+        serviceLabel: session.selectedServiceName || "Serviço premium",
+        serviceValue: session.quote ?? 0,
+        complementValue: 0,
+        couponDiscount: 0,
+        totalValue: session.quote ?? 0,
+      }),
     });
     return responses;
   }
@@ -612,9 +592,15 @@ async function handleCouponStep(
     })}`,
   });
 
-  session.stage = "ETAPA7_DAY";
+  session.stage = "ETAPA10_BUDGET";
   responses.push({
-    text: `Que dia você prefere?\n\n*1* - Hoje\n*2* - Amanhã\n*3* - Em 2 dias\n*4* - Outra data`,
+    text: buildBudgetSummaryText({
+      serviceLabel: session.selectedServiceName || "Serviço premium",
+      serviceValue: baseQuote,
+      complementValue: 0,
+      couponDiscount: session.couponDiscount ?? 0,
+      totalValue: finalQuote,
+    }),
   });
 
   return responses;
@@ -646,10 +632,10 @@ async function handleDateSelection(
       selectedDate = in2Days.toLocaleDateString("pt-BR");
       break;
     case "4":
-      responses.push({ text: "Digite a data desejada (formato: DD/MM/YYYY)" });
+      responses.push({ text: buildCalendarPrompt(new Date()) });
       return responses;
     default:
-      responses.push({ text: "❌ Opção inválida. Escolha 1, 2, 3 ou 4" });
+      responses.push({ text: buildCalendarPrompt(new Date()) });
       return responses;
   }
 

@@ -5,14 +5,30 @@ export interface VehicleCollectionData {
   condition: string | null;
 }
 
+const NONSENSE_NAME_TOKENS = /^(ffds|asdf|qwerty|zxcv|abcd|1234|test|teste|abc)$/i;
+
 export function isValidCustomerName(input: string | null | undefined): boolean {
   const value = (input ?? "").trim();
   if (!value) return false;
   if (/^\d+$/.test(value)) return false;
-  if (/^(sim|nao|não|não|menu|ok|claro|help|ajuda)$/i.test(value)) return false;
+  if (/^(sim|nao|não|menu|ok|claro|help|ajuda)$/i.test(value)) return false;
+  if (NONSENSE_NAME_TOKENS.test(value)) return false;
   if (value.length < 2 || value.length > 40) return false;
   if (!/[a-zA-ZÀ-ú]/.test(value)) return false;
+  if (!/[aeiouáéíóúàèìòùâêîôûãõ]/i.test(value)) return false;
+  if (/^([A-Za-zÀ-ú])\1+$/.test(value)) return false;
   return true;
+}
+
+export function normalizeVehicleConditionValue(value: string | null | undefined): string {
+  const normalized = (value ?? "").toLowerCase().trim();
+  if (!normalized) return "normal";
+  if (/(excelente|novo|zero km|seminovo|otimo|ótimo)/.test(normalized)) return "excelente";
+  if (/(bom|bom estado|pouco uso|bem|limpo)/.test(normalized)) return "bom";
+  if (/(ruim|arranh|feio|sujei|muito sujo|mancha|oxida|opac|precisa de atenção|precisa de atencao|gasto|precisa)/.test(normalized)) {
+    return "precisa de atenção";
+  }
+  return "normal";
 }
 
 export function buildVehicleCollectionPrompt(data: VehicleCollectionData): string {
@@ -25,8 +41,83 @@ export function buildVehicleCollectionPrompt(data: VehicleCollectionData): strin
     data.condition ? `Estado: ${data.condition}` : "🔧 Estado: (ainda não informado)",
     "",
     "Envie os dados que faltam, por exemplo:",
-    "Honda Civic 2020, preto, bom",
+    "Modelo: Honda Civic",
+    "Ano: 2020",
+    "Cor: Preto",
+    "Estado: Bom estado",
   ];
 
   return lines.join("\n");
+}
+
+export function buildVehicleConfirmationPrompt(data: VehicleCollectionData): string {
+  const model = data.model || "—";
+  const year = data.year || "—";
+  const color = data.color || "—";
+  const condition = data.condition || "—";
+
+  return [
+    "🚘 *Confirmando os dados do veículo*",
+    "",
+    `Modelo: ${model}`,
+    `Ano: ${year}`,
+    `Cor: ${color}`,
+    `Estado: ${condition}`,
+    "",
+    "Confirma esses dados? (sim/não)",
+  ].join("\n");
+}
+
+export function buildCalendarPrompt(date = new Date()): string {
+  const monthNames = [
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
+  ];
+  const weekdayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const today = new Date().getDate();
+  const firstDay = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startDay = firstDay.getDay();
+
+  const weeks: string[][] = [];
+  let day = 1;
+  for (let row = 0; row < 6; row += 1) {
+    const week: string[] = [];
+    for (let col = 0; col < 7; col += 1) {
+      const index = row * 7 + col;
+      if (index < startDay || day > daysInMonth) {
+        week.push("  ");
+      } else {
+        const cell = day === today ? `[${day.toString().padStart(2, "0")}]` : ` ${day.toString().padStart(2, "0")}`;
+        week.push(cell);
+        day += 1;
+      }
+    }
+    weeks.push(week);
+    if (day > daysInMonth) break;
+  }
+
+  return [
+    `📅 ${monthNames[month]} ${year}`,
+    ` ${weekdayNames.join("  ")}`,
+    ...weeks.map((week) => ` ${week.join("  ")}`),
+    "",
+    "✅ Dias disponíveis: destacados sem tarja",
+    "🚫 Domingos: fechado",
+    "📍 Hoje: dia entre colchetes [ ]",
+    "",
+    "Me diga o dia que prefere (ex: 08/07).",
+  ].join("\n");
 }
