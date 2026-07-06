@@ -45,20 +45,15 @@ export function parseYearFromText(text: string): string | null {
   return m ? m[0] : null;
 }
 
-/** Modelo + ano obrigatórios e texto precisa parecer veículo */
 export function isValidVehicle(text: string): boolean {
   const t = text.trim();
   if (t.length < 4 || NOT_VEHICLE_TEXT.test(t)) return false;
-
   const year = parseYearFromText(t);
   if (!year) return false;
-
   const withoutYear = t.replace(year, "").replace(/\s+/g, " ").trim();
   if (withoutYear.length < 2) return false;
   if (!/[a-zA-ZÀ-ú]{2,}/.test(withoutYear)) return false;
-
   if (CAR_BRANDS.test(t) || CAR_MODELS.test(t) || SUV_HINTS.test(t)) return true;
-
   const tokens = withoutYear
     .split(/\s+/)
     .filter((w) => w.length >= 2 && !/^(de|da|do|em|no|na|um|uma)$/i.test(w));
@@ -68,22 +63,28 @@ export function isValidVehicle(text: string): boolean {
 export function parseModelFromText(text: string): string | null {
   const t = text.trim();
   if (!t || NOT_VEHICLE_TEXT.test(t) || /^\d+$/.test(t)) return null;
-
   if (isValidVehicle(t)) {
     const p = parseVehicleMessage(t);
     return p.model || null;
   }
-
   if (parseYearFromText(t)) return null;
-
   if (t.length < 2 || t.length > 50) return null;
   if (!/[a-zA-ZÀ-ú]{2,}/.test(t)) return null;
-
   const cleaned = t.replace(/[^\w\sÀ-ú\-]/gi, "").trim();
   const tokens = cleaned.split(/\s+/).filter((w) => w.length >= 2);
   if (tokens.length === 0) return null;
-
   return tokens.join(" ");
+}
+
+function cleanModelText(text: string): string {
+  let t = text;
+  t = t.replace(/(?:em\s+)?(?:bom|otimo|ótimo|excelente|ruim|regular|normal)\s+estado/gi, "");
+  t = t.replace(/precisa\s+de\s+aten[çcç]ão/g, "");
+  t = t.replace(/pouco\s+uso|bem\s+conservado|bem\s+cuidado|carro\s+novo|zero\s+km|seminovo/gi, "");
+  t = t.replace(/\b(em|de|da|do|no|na|um|uma)\b\s*/gi, "");
+  t = t.replace(/,/g, "");
+  t = t.replace(/\s+/g, " ").trim();
+  return t;
 }
 
 export function parseVehicleMessage(text: string): ParsedVehicle {
@@ -100,8 +101,12 @@ export function parseVehicleMessage(text: string): ParsedVehicle {
     }
   }
 
-  if (/carro novo|zero km|seminovo|estado bom|pouco uso/i.test(lower)) {
+  if (/bom\s+estado|ótimo\s+estado|otimo\s+estado|excelente\s+estado|pouco\s+uso|bem\s+conservado|bem\s+cuidado/i.test(lower)) {
     condition = "bom";
+  } else if (/ruim\s+estado|precisa\s+de\s+atenção|precisa\s+de\s+atencao|muito\s+sujo|gasto/i.test(lower)) {
+    condition = "precisa de atenção";
+  } else if (/regular/i.test(lower)) {
+    condition = "regular";
   } else if (/risco|arranh|oxida|sujo|mancha|opac|ruim|gasto|precisa/i.test(lower)) {
     condition = "precisa de atenção";
   }
@@ -109,7 +114,7 @@ export function parseVehicleMessage(text: string): ParsedVehicle {
   let model = raw;
   if (year) model = model.replace(year, "");
   if (color) model = model.replace(new RegExp(color, "i"), "");
-  model = model.replace(/\s+/g, " ").trim();
+  model = cleanModelText(model);
 
   const isSuv = SUV_HINTS.test(raw);
   const valid = isValidVehicle(raw);
@@ -140,11 +145,9 @@ export function looksLikePersonName(text: string): boolean {
   if (NOT_A_NAME.test(t)) return false;
   if (isValidVehicle(t)) return false;
   if (looksLikeVehicleOnly(t)) return false;
-
   const words = t.split(/\s+/).filter(Boolean);
   if (words.length > 3) return false;
   if (!/^[a-zA-ZÀ-ú'\s]+$/.test(t)) return false;
-
   return words.every((w) => w.length >= 2 && /^[A-Za-zÀ-ú]+$/i.test(w));
 }
 
