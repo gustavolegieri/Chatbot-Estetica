@@ -1,4 +1,5 @@
 import { FlowState } from "./whatsapp-flow-types";
+
 import { renderPrompt, loadPromptMap, type PromptMap } from "./bot-prompts";
 import { parseVehicleMessage, type ParsedVehicle } from "./whatsapp-vehicle-parse";
 import { prisma } from "./prisma";
@@ -176,17 +177,20 @@ export async function processTestFlow({
     case "ETAPA4_VEHICLE":
       return handleVehicleCollection(message, session, settings, catalog, prompts, responses);
 
-    case "ETAPA8_PHOTO":
-      return handlePhotoStep(message, session, settings, catalog, prompts, responses);
-
     case "ETAPA5_QUOTE":
       return handleQuotePresentation(message, session, settings, catalog, prompts, responses);
+
+    case "ETAPA6_UPSELL":
+      return handleUpsell(message, session, settings, catalog, prompts, responses);
+
+    case "ETAPA8_PHOTO":
+      return handlePhotoStep(message, session, settings, catalog, prompts, responses);
 
     case "ETAPA9_COUPON":
       return handleCouponStep(message, session, settings, catalog, prompts, responses);
 
-    case "ETAPA6_UPSELL":
-      return handleUpsell(message, session, settings, catalog, prompts, responses);
+    case "ETAPA10_BUDGET":
+      return handleBudgetAfterCouponAndProceed(message, session, settings, catalog, prompts, responses);
 
     case "ETAPA7_DAY":
       return handleDateSelection(message, session, settings, catalog, prompts, responses);

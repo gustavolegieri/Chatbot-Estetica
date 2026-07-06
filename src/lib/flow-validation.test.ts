@@ -5,7 +5,7 @@ import {
   buildVehicleCollectionPrompt,
   buildVehicleConfirmationPrompt,
   buildCalendarPrompt,
-} from "./flow-validation";
+} from "./flow-validation.ts";
 
 test("isValidCustomerName rejects menu-like, empty and nonsense input", () => {
   assert.equal(isValidCustomerName("1"), false);

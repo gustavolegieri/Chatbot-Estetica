@@ -5,14 +5,15 @@ import {
   buildPaymentOptionsText,
   buildTestServiceLookupWhere,
   normalizeConditionValue,
-} from "./test-bot-processor";
+} from "./test-bot-processor.ts";
 
 test("buildTestServiceLookupWhere includes fallback by visible service name", () => {
   const where = buildTestServiceLookupWhere("lavagem_simples", "Lavagem Simples");
 
   assert.deepEqual(where.active, true);
-  assert.deepEqual(where.OR?.[0], { catalogKey: "lavagem_simples" });
-  assert.deepEqual(where.OR?.[1], {
+  const or = (where as any).OR;
+  assert.deepEqual(or?.[0], { catalogKey: "lavagem_simples" });
+  assert.deepEqual(or?.[1], {
     name: { contains: "Lavagem Simples", mode: "insensitive" },
   });
 });

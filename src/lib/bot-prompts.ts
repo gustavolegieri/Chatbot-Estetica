@@ -19,6 +19,16 @@ export async function loadPromptMap(force = false): Promise<PromptMap> {
     return cache.map;
   }
 
+  // Se o ambiente estiver rodando em modo de teste sem DB (ex.: transcript mocks),
+  // use o mapa padrão local para evitar inicialização do Prisma.
+  const useFallbackPrompts = (globalThis as any)?.__BB_USE_PROMPT_FALLBACK__;
+
+  if (useFallbackPrompts) {
+    const map = defaultMap();
+    cache = { map, loadedAt: Date.now() };
+    return map;
+  }
+
   const rows = await prisma.botPrompt.findMany();
   const map = defaultMap();
   for (const row of rows) map[row.key] = row.content;
