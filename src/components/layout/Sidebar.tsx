@@ -21,6 +21,7 @@ import {
   BarChart2,
   Send,
   GiftIcon,
+  TestTube,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "./BrandLogo";
@@ -30,6 +31,7 @@ const navItems = [
   { href: "/admin/sistema", label: "Sistema", icon: Layers },
   { href: "/admin/marca", label: "Marca", icon: ImageIcon },
   { href: "/admin/usuarios", label: "Usuários", icon: Users, adminOnly: true },
+  { href: "/admin/teste", label: "Teste Bot", icon: TestTube },
   { href: "/admin/notificacoes", label: "Notificações", icon: Bell },
   { href: "/admin/campanhas", label: "Campanhas", icon: Send },
   { href: "/admin/midia", label: "Galeria/Mídia", icon: ImageIcon },
