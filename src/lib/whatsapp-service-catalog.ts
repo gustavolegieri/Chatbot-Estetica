@@ -88,6 +88,11 @@ export async function loadWhatsAppCatalog(force = false): Promise<WhatsAppCatalo
     return catalogCache.ctx;
   }
 
+  const wctxMock = (globalThis as any)?.__BB_WCTX_MOCK__;
+  if (wctxMock) {
+    return wctxMock as WhatsAppCatalogContext;
+  }
+
   const [services, prompts] = await Promise.all([
     prisma.service.findMany({
       where: { active: true, showInWhatsApp: true },
@@ -96,6 +101,7 @@ export async function loadWhatsAppCatalog(force = false): Promise<WhatsAppCatalo
     }),
     loadPromptMap(force),
   ]);
+
 
   const catalog: Record<string, CatalogItem> = { ...CATALOG };
   const servicesByKey: WhatsAppCatalogContext["servicesByKey"] = {};

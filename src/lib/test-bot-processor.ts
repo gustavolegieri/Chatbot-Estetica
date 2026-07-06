@@ -1,4 +1,6 @@
-import { FlowState } from "./whatsapp-flow-types";
+
+import type { FlowState } from "./whatsapp-flow-types";
+
 
 import { renderPrompt, loadPromptMap, type PromptMap } from "./bot-prompts";
 import { parseVehicleMessage, type ParsedVehicle } from "./whatsapp-vehicle-parse";
@@ -120,10 +122,18 @@ export function normalizeConditionValue(
 
 async function resolveTestService(session: TestSession) {
   const where = buildTestServiceLookupWhere(session.selectedSubService, session.selectedServiceName);
-  const dbService = await prisma.service.findFirst({
-    where,
-    include: { media: true },
-  });
+  const prismaMock = getPrismaForTest();
+
+  const dbService = prismaMock?.service?.findFirst
+    ? await prismaMock.service.findFirst({
+        where,
+        include: { media: true },
+      })
+    : await prisma.service.findFirst({
+        where,
+        include: { media: true },
+      });
+
 
   if (dbService) {
     return { dbService };
@@ -349,12 +359,22 @@ async function handleSubMenu(
   responses.push({ text: description });
 
   // Incluir mídia se existir no banco de dados
-  const dbService = await prisma.service.findFirst({
-    where: {
-      catalogKey: selectedService.key,
-    },
-    include: { media: true },
-  });
+  const prismaMock = getPrismaForTest();
+
+  const dbService = prismaMock?.service?.findFirst
+    ? await prismaMock.service.findFirst({
+        where: {
+          catalogKey: selectedService.key,
+        },
+        include: { media: true },
+      })
+    : await prisma.service.findFirst({
+        where: {
+          catalogKey: selectedService.key,
+        },
+        include: { media: true },
+      });
+
 
   if (dbService?.media && dbService.media.length > 0) {
     const media = dbService.media[0];
