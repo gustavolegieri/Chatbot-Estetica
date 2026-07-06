@@ -57,6 +57,7 @@ import {
   wantsRefusal,
   wantsToSchedule,
 } from "./whatsapp-intent";
+import { buildVehicleCollectionPrompt, isValidCustomerName } from "./flow-validation";
 import {
   isValidVehicle,
   looksLikePersonName,
@@ -175,6 +176,17 @@ async function goToVehicleStep(msg: IncomingMessage, flow: FlowState, wctx: What
   await sendText({ number: msg.phone, text: etapa4Vehicle(false, wctx.prompts) });
 }
 
+function normalizeConditionValue(value: string): "excelente" | "bom" | "normal" | "ruim" {
+  const normalized = (value || "").toLowerCase().trim();
+  if (!normalized) return "normal";
+  if (/(excelente|novo|zero km|seminovo|otimo|ótimo)/.test(normalized)) return "excelente";
+  if (/(bom|bom estado|pouco uso|bem|limpo)/.test(normalized)) return "bom";
+  if (/(ruim|arranh|feio|sujei|muito sujo|mancha|oxida|opac|precisa de atenção|precisa de atencao|gasto|precisa)/.test(normalized)) {
+    return "ruim";
+  }
+  return "normal";
+}
+
 function quoteForKey(key: string, flow: FlowState, wctx: WhatsAppCatalogContext) {
   const item = wctx.catalog[key];
   if (!item || key === "indeciso") {
@@ -182,9 +194,7 @@ function quoteForKey(key: string, flow: FlowState, wctx: WhatsAppCatalogContext)
   }
   const vehicleText = vehicleDisplayFromFlow(flow);
   const suv = flow.vehicleIsSuv ?? isSuvLike(vehicleText);
-  const bad =
-    isBadCondition(vehicleText) ||
-    flow.vehicleCondition === "precisa de atenção";
+  const bad = isBadCondition(vehicleText) || normalizeConditionValue(flow.vehicleCondition ?? "") === "ruim";
   let min = suv ? item.suvMin : item.hatchMin;
   let max = suv ? item.suvMax : item.hatchMax;
   if (bad && min > 0) {
@@ -205,8 +215,8 @@ async function activateService(
 ) {
   const item = wctx.catalog[serviceKey];
   if (!item) return;
-  const dbId =
-    wctx.dbServiceIdByKey[serviceKey] ?? (await resolveDbService(item.dbMatch))?.id;
+  const dbService = await resolveDbService(serviceKey, item.dbMatch);
+  const dbId = wctx.dbServiceIdByKey[serviceKey] ?? dbService?.id;
   await saveFlow(msg.phone, {
     ...flow,
     serviceKey,
@@ -305,8 +315,7 @@ function isSuvLike(text: string) {
 }
 
 function isBadCondition(text: string) {
-  const t = text.toLowerCase();
-  return /muito|risco|oxida|sujo|mancha|opac|ruim|arranh/i.test(t);
+  return normalizeConditionValue(text) === "ruim";
 }
 
 async function loadContext(): Promise<FlowContext> {
@@ -332,9 +341,24 @@ async function saveFlow(phone: string, flow: FlowState) {
   });
 }
 
-async function resolveDbService(dbMatch: string) {
+async function resolveDbService(serviceKey?: string, dbMatch?: string) {
+  const ors: Array<Record<string, unknown>> = [];
+
+  if (serviceKey) {
+    ors.push({ catalogKey: serviceKey });
+  }
+
+  if (dbMatch) {
+    ors.push({ name: { contains: dbMatch, mode: "insensitive" } });
+    ors.push({ catalogKey: { contains: dbMatch, mode: "insensitive" } });
+  }
+
+  if (ors.length === 0) {
+    return null;
+  }
+
   return prisma.service.findFirst({
-    where: { active: true, name: { contains: dbMatch, mode: "insensitive" } },
+    where: { active: true, OR: ors } as any,
   });
 }
 
@@ -697,16 +721,16 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
           ? analysis.extractedName.split(/\s+/)[0]
           : null;
       const nameFromInput = looksLikePersonName(input) ? input.split(/\s+/)[0] : null;
-      const name = nameFromAi ?? nameFromInput;
+      const name = (nameFromAi ?? nameFromInput ?? "").trim();
 
-      if (!name) {
+      if (!isValidCustomerName(name)) {
         const hint =
           msg.pushName && looksLikePersonName(msg.pushName) ? msg.pushName.split(/\s+/)[0] : null;
         await sendText({
           number: msg.phone,
           text: hint
-            ? `Para começar, me confirma seu *nome* 😊\n_(Se for *${hint}*, pode mandar só o nome)_`
-            : `Para começar, qual é o seu *nome*? 😊\n_(Só o primeiro nome)_`,
+            ? `Não consegui identificar seu nome 😊 Pode me dizer como posso te chamar?\n_(Se for *${hint}*, pode mandar só o nome)_`
+            : `Não consegui identificar seu nome 😊 Pode me dizer como posso te chamar?`,
         });
         return;
       }
@@ -934,7 +958,17 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
 
     case "ETAPA4_VEHICLE": {
       if (isValidVehicle(input)) {
-        await sendQuote(msg, storeVehicle(flow, input), wctx);
+        const parsed = storeVehicle(flow, input);
+        if (!parsed.vehicleModel || !parsed.vehicleYear || !parsed.vehicleColor || !parsed.vehicleCondition) {
+          await sendText({ number: msg.phone, text: buildVehicleCollectionPrompt({
+            model: parsed.vehicleModel ?? null,
+            year: parsed.vehicleYear ?? null,
+            color: parsed.vehicleColor ?? null,
+            condition: parsed.vehicleCondition ?? null,
+          }) });
+          return;
+        }
+        await sendQuote(msg, parsed, wctx);
         return;
       }
 
@@ -965,7 +999,12 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         await sendText({ number: msg.phone, text: vehicleNotUnderstood(prompts) });
         return;
       }
-      await sendQuote(msg, storeVehicle(flow, combined), wctx);
+      await sendText({ number: msg.phone, text: buildVehicleCollectionPrompt({
+        model: flow.vehicleModel ?? null,
+        year,
+        color: flow.vehicleColor ?? null,
+        condition: flow.vehicleCondition ?? null,
+      }) });
       return;
     }
 

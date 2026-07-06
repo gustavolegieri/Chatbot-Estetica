@@ -3,6 +3,7 @@ import { renderPrompt, loadPromptMap, type PromptMap } from "./bot-prompts";
 import { parseVehicleMessage, type ParsedVehicle } from "./whatsapp-vehicle-parse";
 import { prisma } from "./prisma";
 import { buildMainMenu, loadWhatsAppCatalog } from "./whatsapp-service-catalog";
+import { buildVehicleCollectionPrompt, isValidCustomerName } from "./flow-validation";
 import {
   etapa1Welcome,
   etapa2MainMenu,
@@ -103,6 +104,11 @@ export async function processTestFlow({
   const responses: TestResponse[] = [];
   const prompts = await loadPromptMap();
 
+  if (/falar com (o )?(dono|atendente|humano|pessoa)|atendimento humano|humano por favor|quero um atendente/i.test(message)) {
+    responses.push({ text: "Entendi 😊 Vou encaminhar sua solicitação para a equipe da Garagem do Ka. Enquanto isso, pode continuar descrevendo sua dúvida." });
+    return responses;
+  }
+
   // Verificar intenção de "menu"
   if (message.toLowerCase() === "menu") {
     session.stage = "ETAPA2_MAIN_MENU";
@@ -173,8 +179,8 @@ async function handleNameCollection(
 ): Promise<TestResponse[]> {
   const name = message.trim().slice(0, 50);
 
-  if (name.length < 2) {
-    responses.push({ text: "Por favor, digite um nome válido (mínimo 2 caracteres)" });
+  if (!isValidCustomerName(name)) {
+    responses.push({ text: "Não consegui identificar seu nome 😊 Pode me dizer como posso te chamar?" });
     return responses;
   }
 
@@ -374,6 +380,16 @@ async function handleVehicleCollection(
     color: vehicleInfo.color,
     condition: normalizedCondition,
   };
+
+  if (!session.vehicle.model || !session.vehicle.year || !session.vehicle.color || !session.vehicle.condition) {
+    responses.push({ text: buildVehicleCollectionPrompt({
+      model: session.vehicle.model,
+      year: session.vehicle.year?.toString() ?? null,
+      color: session.vehicle.color,
+      condition: session.vehicle.condition,
+    }) });
+    return responses;
+  }
 
   const { dbService, catalogItem } = await resolveTestService(session);
 
