@@ -403,8 +403,58 @@ export function etapa6Upsell(service: string, complement: string, benefit: strin
 // ETAPA 7 — AGENDAMENTO
 // ─────────────────────────────────────────────────────────────
 
+export function buildCalendarPrompt(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const today = date.getDate();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const monthLabel = date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const weekdayNames = ["D", "S", "T", "Q", "Q", "S", "S"];
+  const weeks: string[][] = [];
+  const startDay = firstDay.getDay();
+  const daysInMonth = lastDay.getDate();
+  let day = 1;
+
+  for (let row = 0; row < 6; row += 1) {
+    const week: string[] = [];
+    for (let col = 0; col < 7; col += 1) {
+      const index = row * 7 + col;
+      if (index < startDay || day > daysInMonth) {
+        week.push("  ");
+      } else {
+        week.push(day < 10 ? ` ${day}` : `${day}`);
+        day += 1;
+      }
+    }
+    weeks.push(week);
+    if (day > daysInMonth) break;
+  }
+
+  const formattedRows = weeks.map((week) => {
+    return week.map((cell) => {
+      const value = cell.trim();
+      if (!value) return "  ";
+      const num = Number(value);
+      return num === today ? `[${num.toString().padStart(2, "0")}]` : ` ${num.toString().padStart(2, "0")}`;
+    }).join(" ");
+  });
+
+  return [
+    `📅 *${monthLabel.replace(/(^\w|\s\w)/g, (m) => m.toUpperCase())}*`,
+    `  ${weekdayNames.join("  ")}`,
+    ...formattedRows.map((row) => ` ${row}`),
+    "",
+    "✅ Dias disponíveis: destacados sem tarja",
+    "🚫 Domingos: fechado",
+    "📍 Hoje: dia entre colchetes [ ]",
+    "",
+    "Me diga o dia que prefere (ex: 08/07).",
+  ].join("\n");
+}
+
 export function etapa7Day(prompts?: PromptMap) {
-  return renderPrompt(p(prompts), "etapa7_day", {});
+  return [buildCalendarPrompt(), "", renderPrompt(p(prompts), "etapa7_day", {})].join("\n");
 }
 
 export function etapa7Time(dayLabel: string, slots: string[], durationLabel: string, prompts?: PromptMap) {

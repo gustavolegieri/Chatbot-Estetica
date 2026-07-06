@@ -297,9 +297,13 @@ function parseDayInput(input: string, num: number | null) {
         : parsed[3]
       : String(new Date().getFullYear());
     const dayDate = `${year}-${month}-${day}`;
+    const parsedDate = parse(dayDate, "yyyy-MM-dd", new Date());
+    const now = new Date();
+    if (parsedDate < new Date(now.getFullYear(), now.getMonth(), now.getDate())) return null;
+    if (parsedDate.getDay() === 0) return null;
     return {
       dayDate,
-      dayLabel: format(parse(dayDate, "yyyy-MM-dd", new Date()), "dd/MM/yyyy (EEEE)", {
+      dayLabel: format(parsedDate, "dd/MM/yyyy (EEEE)", {
         locale: ptBR,
       }),
     };
@@ -316,6 +320,23 @@ function isSuvLike(text: string) {
 
 function isBadCondition(text: string) {
   return normalizeConditionValue(text) === "ruim";
+}
+
+function buildBudgetMessage(flow: FlowState, ctx: FlowContext) {
+  const serviceValue = Number(flow.quoteMin ?? 0);
+  const complementValue = flow.upsellAccepted ? 0 : 0;
+  const couponValue = Number(flow.couponDiscountApplied ?? 0);
+  const totalValue = Math.max(0, serviceValue + complementValue - couponValue);
+
+  return [
+    "━━━━━━━━━━━━━━━",
+    "📋 Seu orçamento",
+    `- Serviço: ${flow.serviceLabel ?? "Serviço premium"} — R$ ${serviceValue.toFixed(2).replace(".", ",")}`,
+    `- Complemento (se houver): R$ ${complementValue.toFixed(2).replace(".", ",")}`,
+    `- Desconto de cupom (se houver): - R$ ${couponValue.toFixed(2).replace(".", ",")}`,
+    `- Total: R$ ${totalValue.toFixed(2).replace(".", ",")}`,
+    "━━━━━━━━━━━━━━━",
+  ].join("\n");
 }
 
 async function loadContext(): Promise<FlowContext> {
@@ -968,7 +989,30 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
           }) });
           return;
         }
-        await sendQuote(msg, parsed, wctx);
+        flow.vehicleConfirmed = false;
+        await saveFlow(msg.phone, { ...flow, ...parsed, vehicleConfirmed: false });
+        await sendText({
+          number: msg.phone,
+          text: `🚘 *Confirmando os dados do veículo*\n\nModelo: *${parsed.vehicleModel ?? "—"}*\nAno: *${parsed.vehicleYear ?? "—"}*\nCor: *${parsed.vehicleColor ?? "—"}*\nEstado: *${parsed.vehicleCondition ?? "—"}*\n\nEstá certo? (sim/não)`,
+        });
+        return;
+      }
+
+      const confirmAnswer = input.toLowerCase();
+      if (confirmAnswer === "sim" || confirmAnswer === "s" || confirmAnswer === "confirmo") {
+        flow.vehicleConfirmed = true;
+        await saveFlow(msg.phone, flow);
+        await sendQuote(msg, flow, wctx);
+        return;
+      }
+
+      if (confirmAnswer === "não" || confirmAnswer === "nao" || confirmAnswer === "n") {
+        await sendText({ number: msg.phone, text: buildVehicleCollectionPrompt({
+          model: flow.vehicleModel ?? null,
+          year: flow.vehicleYear ?? null,
+          color: flow.vehicleColor ?? null,
+          condition: flow.vehicleCondition ?? null,
+        }) });
         return;
       }
 
@@ -1144,19 +1188,52 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     }
 
     case "ETAPA8_PAYMENT": {
-      // Antes de escolher a forma de pagamento, permitir aplicar cupom
       if (await applyCouponPhase(msg, flow, lower, ctx, wctx, num, input)) return;
       await handlePayment(msg, flow, ctx, num, lower, wctx);
       return;
     }
 
     case "ETAPA8_PAYMENT_NO_PIX": {
-      // Antes de escolher a forma de pagamento, permitir aplicar cupom
       if (await applyCouponPhase(msg, flow, lower, ctx, wctx, num, input)) return;
       await handlePayment(msg, flow, ctx, num, lower, wctx);
       return;
     }
 
+    case "ETAPA14_REMINDER": {
+      if (num === 1 || /sim|quero/i.test(lower)) {
+        flow.reminderEnabled = true;
+      } else if (num === 2 || /nao|não|não precisa|não quero/i.test(lower)) {
+        flow.reminderEnabled = false;
+      } else {
+        await sendText({ number: msg.phone, text: `Responda *1* para sim ou *2* para não.` });
+        return;
+      }
+      flow.stage = "ETAPA15_SUMMARY_CONFIRM";
+      await saveFlow(msg.phone, flow);
+      await sendText({
+        number: msg.phone,
+        text: `━━━━━━━━━━━━━━━\n📋 *Resumo do agendamento*\n\n👤 Cliente: *${clientDisplayName(flow, msg.pushName)}*\n🧽 Serviço: *${flow.serviceLabel ?? "—"}*\n🚘 Veículo: *${vehicleDisplayFromFlow(flow)}*\n📅 Data: *${flow.dayLabel ?? flow.dayDate ?? "—"}*\n⏰ Horário: *${flow.startTime ?? "—"}*\n🎟️ Cupom: *${flow.couponCode?.toUpperCase() ?? "nenhum"}*\n💳 Pagamento: *${flow.paymentMethod ?? "—"}*\n🔔 Lembrete: *${flow.reminderEnabled ? "sim" : "não"}*\n💰 Valor total: *R$ ${flow.quoteMin ?? 0}*\n━━━━━━━━━━━━━━━\n\nConfirma o agendamento? (sim/não)`,
+      });
+      return;
+    }
+
+    case "ETAPA15_SUMMARY_CONFIRM": {
+      if (/(sim|s|confirmo)/.test(lower)) {
+        flow.stage = "ETAPA16_CONFIRMATION";
+        await saveFlow(msg.phone, flow);
+        await sendText({
+          number: msg.phone,
+          text: `✅ *Agendamento confirmado!*\n\nSeu atendimento está reservado na Garagem do Ka.\n\n📍 Endereço: *Rua das Oficinas, 100 - São Paulo, SP*\n🕒 Horário: *Segunda a sábado, 08:00 às 18:00*\n\nCancelamentos com até 2h de antecedência sem custo.\n\nPosso te ajudar com mais alguma coisa? 😊`,
+        });
+        return;
+      }
+      if (/(nao|não|n)/.test(lower)) {
+        await sendText({ number: msg.phone, text: `Tudo bem 😊 O que gostaria de alterar?` });
+        return;
+      }
+      await sendText({ number: msg.phone, text: `Responda *sim* ou *não* para confirmar.` });
+      return;
+    }
 
     case "ETAPA10_FAQ": {
       if (lower === "voltar" && flow.returnStage) {
@@ -1332,7 +1409,9 @@ async function handlePayment(
     return;
   }
 
-  await confirmFinal(msg, flow, ctx, wctx, !isNoPix && num === 1 && !!ctx.pixKey);
+  flow.stage = "ETAPA14_REMINDER";
+  await saveFlow(msg.phone, flow);
+  await sendText({ number: msg.phone, text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa` });
 }
 
 async function confirmFinal(

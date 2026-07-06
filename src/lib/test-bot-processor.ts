@@ -18,6 +18,9 @@ interface TestSession {
   selectedService: string | null;
   selectedSubService: string | null;
   selectedServiceName: string | null;
+  couponCode?: string | null;
+  couponDiscount?: number | null;
+  vehiclePhotoAttached?: boolean;
   vehicle: {
     model: string | null;
     year: number | null;
@@ -32,6 +35,39 @@ interface TestResponse {
   text: string;
   mediaUrl?: string;
   mediaType?: string;
+}
+
+export function buildBudgetSummaryText(params: {
+  serviceLabel?: string | null;
+  serviceValue?: number | null;
+  complementValue?: number | null;
+  couponDiscount?: number | null;
+  totalValue?: number | null;
+}) {
+  const serviceValue = Number(params.serviceValue ?? 0);
+  const complementValue = Number(params.complementValue ?? 0);
+  const couponDiscount = Number(params.couponDiscount ?? 0);
+  const totalValue = Number(params.totalValue ?? serviceValue + complementValue - couponDiscount);
+
+  return [
+    "━━━━━━━━━━━━━━━",
+    "📋 Seu orçamento",
+    `- Serviço: ${params.serviceLabel ?? "Serviço premium"} — R$ ${serviceValue.toFixed(2).replace(".", ",")}`,
+    `- Complemento: R$ ${complementValue.toFixed(2).replace(".", ",")}`,
+    `- Cupom: - R$ ${couponDiscount.toFixed(2).replace(".", ",")}`,
+    `- Total: R$ ${totalValue.toFixed(2).replace(".", ",")}`,
+    "━━━━━━━━━━━━━━━",
+  ].join("\n");
+}
+
+export function buildPaymentOptionsText() {
+  return [
+    "Como você gostaria de pagar?",
+    "",
+    "*1* - PIX",
+    "*2* - Cartão",
+    "*3* - Dinheiro",
+  ].join("\n");
 }
 
 export function buildTestServiceLookupWhere(
@@ -139,8 +175,14 @@ export async function processTestFlow({
     case "ETAPA4_VEHICLE":
       return handleVehicleCollection(message, session, settings, catalog, prompts, responses);
 
+    case "ETAPA8_PHOTO":
+      return handlePhotoStep(message, session, settings, catalog, prompts, responses);
+
     case "ETAPA5_QUOTE":
       return handleQuotePresentation(message, session, settings, catalog, prompts, responses);
+
+    case "ETAPA9_COUPON":
+      return handleCouponStep(message, session, settings, catalog, prompts, responses);
 
     case "ETAPA6_UPSELL":
       return handleUpsell(message, session, settings, catalog, prompts, responses);
@@ -412,11 +454,44 @@ async function handleVehicleCollection(
   const quote = basePrice * multiplier;
 
   session.quote = quote;
-  session.stage = "ETAPA5_QUOTE";
+  session.stage = "ETAPA8_PHOTO";
 
   const vehicleStr = `${vehicleInfo.model || "veículo"} ${vehicleInfo.year || ""}`.trim();
   responses.push({
-    text: `Ótimo! Para ${vehicleStr} em estado ${vehicleInfo.condition || "normal"}:\n\n💰 *Orçamento: R$ ${quote.toFixed(2).replace(".", ",")}*\n\nProsseguir com agendamento?`,
+    text: `Ótimo! Para ${vehicleStr} em estado ${vehicleInfo.condition || "normal"}:\n\n💰 *Orçamento: R$ ${quote.toFixed(2).replace(".", ",")}*\n\nVocê quer enviar uma foto do veículo agora? (opcional)\n\n*1* - Sim, enviar foto\n*2* - Não, seguir sem foto`,
+  });
+
+  return responses;
+}
+
+async function handlePhotoStep(
+  message: string,
+  session: TestSession,
+  settings: any,
+  catalog: any[],
+  prompts: PromptMap,
+  responses: TestResponse[]
+): Promise<TestResponse[]> {
+  const input = message.trim().toLowerCase();
+  const wantsPhoto = /^(1|sim|s|foto|imagem|anexar)$/i.test(input);
+
+  session.vehiclePhotoAttached = wantsPhoto;
+  session.stage = "ETAPA5_QUOTE";
+
+  const vehicleStr = `${session.vehicle.model || "veículo"} ${session.vehicle.year || ""}`.trim();
+  responses.push({
+    text: wantsPhoto
+      ? "Foto registrada como opcional. Seguimos com o agendamento."
+      : "Sem foto anexada. Seguimos com o agendamento.",
+  });
+  responses.push({
+    text: `Ótimo! Para ${vehicleStr} em estado ${session.vehicle.condition || "normal"}:\n\n${buildBudgetSummaryText({
+      serviceLabel: session.selectedServiceName || "Serviço premium",
+      serviceValue: session.quote ?? 0,
+      complementValue: 0,
+      couponDiscount: session.couponDiscount ?? 0,
+      totalValue: (session.quote ?? 0) - (session.couponDiscount ?? 0),
+    })}\n\nProsseguir com agendamento?`,
   });
 
   return responses;
@@ -450,10 +525,9 @@ async function handleQuotePresentation(
       }
     }
 
-    // Sem upsell, ir para data
-    session.stage = "ETAPA7_DAY";
+    session.stage = "ETAPA9_COUPON";
     responses.push({
-      text: `Que dia você prefere?\n\n*1* - Hoje\n*2* - Amanhã\n*3* - Em 2 dias\n*4* - Outra data`,
+      text: "Tem um cupom? Se tiver, me envie o código. Se não, diga *não*.",
     });
   } else {
     responses.push({
@@ -484,6 +558,59 @@ async function handleUpsell(
       });
     }
   }
+
+  session.stage = "ETAPA7_DAY";
+  responses.push({
+    text: `Que dia você prefere?\n\n*1* - Hoje\n*2* - Amanhã\n*3* - Em 2 dias\n*4* - Outra data`,
+  });
+
+  return responses;
+}
+
+async function handleCouponStep(
+  message: string,
+  session: TestSession,
+  settings: any,
+  catalog: any[],
+  prompts: PromptMap,
+  responses: TestResponse[]
+): Promise<TestResponse[]> {
+  const input = message.trim();
+  const skip = /^(nao|não|n|sem|pular|ignorar)$/i.test(input);
+
+  if (skip) {
+    session.stage = "ETAPA7_DAY";
+    responses.push({ text: "Sem cupom. Seguimos para a data do atendimento." });
+    responses.push({
+      text: `Que dia você prefere?\n\n*1* - Hoje\n*2* - Amanhã\n*3* - Em 2 dias\n*4* - Outra data`,
+    });
+    return responses;
+  }
+
+  const code = input.toLowerCase();
+  const coupon = await prisma.coupon.findUnique({ where: { code } });
+  if (!coupon || !coupon.active) {
+    responses.push({ text: "Cupom inválido ou inativo. Se preferir, diga *não* e seguimos sem cupom." });
+    return responses;
+  }
+
+  const baseQuote = Number(session.quote ?? 0);
+  const couponAmount = Number(coupon.amount ?? 0);
+  const discount = coupon.type === "percent" ? baseQuote * (couponAmount / 100) : couponAmount;
+  const finalQuote = Math.max(0, baseQuote - discount);
+  session.couponCode = coupon.code;
+  session.couponDiscount = discount;
+  session.quote = finalQuote;
+
+  responses.push({
+    text: `✅ Cupom *${coupon.code.toUpperCase()}* aplicado!\n\n${buildBudgetSummaryText({
+      serviceLabel: session.selectedServiceName || "Serviço premium",
+      serviceValue: baseQuote,
+      complementValue: 0,
+      couponDiscount: session.couponDiscount ?? 0,
+      totalValue: finalQuote,
+    })}`,
+  });
 
   session.stage = "ETAPA7_DAY";
   responses.push({
@@ -557,9 +684,7 @@ async function handleTimeSelection(
   }
 
   session.stage = "ETAPA8_PAYMENT";
-  responses.push({
-    text: `Como você gostaria de pagar?\n\n*1* - PIX (5% desconto) 💳\n*2* - Cartão\n*3* - Dinheiro`,
-  });
+  responses.push({ text: buildPaymentOptionsText() });
 
   return responses;
 }

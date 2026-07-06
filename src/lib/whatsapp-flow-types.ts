@@ -12,12 +12,19 @@ export type FlowStage =
   | "ETAPA4_VEHICLE"
   | "ETAPA5_QUOTE"
   | "ETAPA6_UPSELL"
+  | "ETAPA3_UPSELL"
   | "ETAPA7_PERIOD"
   | "ETAPA7_DAY"
   | "ETAPA7_TIME"
   | "ETAPA7_CUSTOM_DAY"
   | "ETAPA8_PAYMENT"
   | "ETAPA8_PAYMENT_NO_PIX"
+  | "ETAPA8_PHOTO"
+  | "ETAPA9_COUPON"
+  | "ETAPA10_BUDGET"
+  | "ETAPA14_REMINDER"
+  | "ETAPA15_SUMMARY_CONFIRM"
+  | "ETAPA16_CONFIRMATION"
   | "ETAPA10_FAQ"
   | "STALE_RETURN";
 
@@ -38,7 +45,10 @@ export interface FlowState {
   vehicleCondition?: string;
   vehicleIsSuv?: boolean;
   /** Coleta em duas etapas: modelo → ano */
-  vehicleCollectStep?: "model" | "year";
+  vehicleCollectStep?: "model" | "year" | "color" | "condition";
+  vehicleConfirmed?: boolean;
+  vehiclePhotoAttached?: boolean;
+  reminderEnabled?: boolean;
   quoteMin?: number;
   quoteMax?: number;
   estimatedTime?: string;
