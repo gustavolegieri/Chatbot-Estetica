@@ -473,8 +473,8 @@ async function handleVehicleConfirm(
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
   const input = message.trim().toLowerCase();
-  const isYes = /^(sim|s|1|yes|confirmo|confirma)$/i.test(input);
-  const isNo = /^(nao|não|n|2|no|errado|alterar)$/i.test(input);
+  const isYes = /^(sim|s|1|yes|confirmo|confirma|tudo certo)$/i.test(input);
+  const isNo = /^(nao|não|n|2|no|errado|alterar|tudo errado|nada certo)$/i.test(input);
 
   if (isYes) {
     const basePrice = calculateBasePrice(session);
@@ -790,8 +790,8 @@ async function handlePhotoUpload(
   session: TestSession,
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
-  // Detecta URL de imagem na mensagem
-  const photoUrlMatch = message.match(/(https?:\/\/.*\.(jpg|jpeg|png|webp))/i);
+  // Detecta URL de imagem na mensagem (http/https ou file://)
+  const photoUrlMatch = message.match(/(https?:\/\/.*\.(jpg|jpeg|png|webp)|file:\/\/.*?\.(jpg|jpeg|png|webp))/i);
 
   if (!photoUrlMatch) {
     responses.push({ text: "📷 Envie a foto do veículo (URL da imagem)." });
