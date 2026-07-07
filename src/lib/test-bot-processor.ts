@@ -767,12 +767,14 @@ async function handlePhotoStep(
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
   const input = message.trim().toLowerCase();
-  const wantsPhoto = /^(1|sim|s|foto|imagem|anexar)$/i.test(input);
+  const wantsPhoto = /^(1|sim|s|foto|imagem|anexar|url)$/i.test(input);
 
   if (wantsPhoto) {
     session.awaitingPhotoUpload = true;
     session.stage = "ETAPA8_PHOTO_UPLOAD";
-    responses.push({ text: "📷 Ótimo! Envie a foto do seu veículo agora.\n\n(Link da imagem ou anexe)" });
+    responses.push({
+      text: "📷 Ótimo! Cole ou cole a URL da foto do seu veículo (ex: https://exemplo.com/carro.jpg)",
+    });
     return responses;
   }
 
