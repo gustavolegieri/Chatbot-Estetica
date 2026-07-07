@@ -30,6 +30,7 @@ interface TestSession {
   couponCode?: string | null;
   couponDiscount?: number | null;
   vehiclePhotoAttached?: boolean;
+  vehiclePhotoUrl?: string | null;
   vehicle: {
     model: string | null;
     year: number | null;
@@ -51,6 +52,7 @@ interface TestSession {
   loyaltyPoints?: number;
   wantsPickupDelivery?: boolean | null;
   pickupDeliveryFee?: number;
+  awaitingPhotoUpload?: boolean;
 }
 
 interface TestResponse {
@@ -114,8 +116,11 @@ export async function processTestFlow({
     case "ETAPA6_UPSELL":
       return handleUpsell(message, session, responses);
 
-    case "ETAPA8_PHOTO":
+case "ETAPA8_PHOTO":
       return handlePhotoStep(message, session, responses);
+
+    case "ETAPA8_PHOTO_UPLOAD":
+      return handlePhotoUpload(message, session, responses);
 
     case "ETAPA9_COUPON":
       return handleCouponStep(message, session, responses);
@@ -514,22 +519,6 @@ async function handleUpsell(
   return responses;
 }
 
-async function handlePhotoStep(
-  message: string,
-  session: TestSession,
-  responses: TestResponse[]
-): Promise<TestResponse[]> {
-  const input = message.trim().toLowerCase();
-  const wantsPhoto = /^(1|sim|s|foto|imagem|anexar)$/i.test(input);
-
-  session.vehiclePhotoAttached = wantsPhoto;
-  session.stage = "ETAPA9_COUPON";
-
-  responses.push({ text: wantsPhoto ? "📷 Foto registrada!" : "Seguimos! " });
-  responses.push({ text: "🎟️ Tem cupom? Me envie ou diga *não*. " });
-  return responses;
-}
-
 async function handleCouponStep(
   message: string,
   session: TestSession,
@@ -772,6 +761,99 @@ async function handleFinalConfirm(
   return responses;
 }
 
+// Handler for photo step (ask if wants to upload)
+async function handlePhotoStep(
+  message: string,
+  session: TestSession,
+  responses: TestResponse[]
+): Promise<TestResponse[]> {
+  const input = message.trim().toLowerCase();
+  const wantsPhoto = /^(1|sim|s|foto|imagem|anexar)$/i.test(input);
+
+  if (wantsPhoto) {
+    session.awaitingPhotoUpload = true;
+    session.stage = "ETAPA8_PHOTO_UPLOAD";
+    responses.push({ text: "📷 Ótimo! Envie a foto do seu veículo agora." });
+    return responses;
+  }
+
+  session.vehiclePhotoAttached = false;
+  session.stage = "ETAPA9_COUPON";
+  responses.push({ text: "Seguimos sem foto! " });
+  responses.push({ text: "🎟️ Tem cupom? Me envie ou diga *não*. " });
+  return responses;
+}
+
+// Handler for photo upload and AI analysis
+async function handlePhotoUpload(
+  message: string,
+  session: TestSession,
+  responses: TestResponse[]
+): Promise<TestResponse[]> {
+  // Detecta URL de imagem na mensagem
+  const photoUrlMatch = message.match(/(https?:\/\/.*\.(jpg|jpeg|png|webp))/i);
+
+  if (!photoUrlMatch) {
+    responses.push({ text: "📷 Envie a foto do veículo (URL da imagem)." });
+    return responses;
+  }
+
+  const photoUrl = photoUrlMatch[1];
+  session.vehiclePhotoUrl = photoUrl;
+
+  // Chamar API de IA para análise
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const analysisResponse = await fetch(`${baseUrl}/api/vehicle/analyze-image`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageUrl: photoUrl }),
+    });
+
+    if (analysisResponse.ok) {
+      const result = await analysisResponse.json();
+      if (result.success && result.data) {
+        session.vehiclePhotoAttached = true;
+        session.vehicle = {
+          model: result.data.model || "Veículo identificado",
+          year: parseInt(result.data.year) || new Date().getFullYear(),
+          color: result.data.color || "prata",
+          condition: normalizeConditionValue(result.data.condition || "bom"),
+        };
+
+        responses.push({
+          text: `🤖 *Análise de IA concluída!*${result.simulated ? " (simulação)" : ""}\n\nDetectei:\n🚘 Modelo: ${result.data.model}\n📅 Ano: ${result.data.year}\n🎨 Cor: ${result.data.color}\n🔧 Estado: ${result.data.condition}\n\n`,
+        });
+
+        session.stage = "ETAPA4_VEHICLE_CONFIRM";
+        responses.push({ text: buildVehicleConfirmationPrompt(result.data) });
+        return responses;
+      }
+    }
+  } catch (error) {
+    console.error("Erro na análise de imagem:", error);
+  }
+
+  // Fallback
+  session.vehiclePhotoAttached = true;
+  session.vehicle = {
+    model: "Veículo identificado",
+    year: new Date().getFullYear() - 4,
+    color: "prata",
+    condition: "bom",
+  };
+
+  responses.push({ text: buildVehicleConfirmationPrompt({
+    model: "Veículo identificado",
+    year: String(new Date().getFullYear() - 4),
+    color: "prata",
+    condition: "bom",
+  }) });
+
+  session.stage = "ETAPA4_VEHICLE_CONFIRM";
+  return responses;
+}
+
 async function handleFAQ(
   message: string,
   session: TestSession,
@@ -788,3 +870,4 @@ function buildPaymentOptionsText() {
 
 // Exports for compatibility
 export { buildVehicleCollectionPrompt, buildBudgetSummaryText, normalizeConditionValue, buildPaymentOptionsText };
+
