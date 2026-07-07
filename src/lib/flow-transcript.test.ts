@@ -81,9 +81,6 @@ test("transcript completo valida fluxo (nome/veículo/ordem/cupom/calendário) -
     upsellValue: null,
   };
 
-  const settings: any = { businessAddress: "Rua das Oficinas, 100 - São Paulo, SP" };
-  const catalog: any[] = [];
-
   // ─────────────────────────────────────────────────────────
   // TESTE 1: VALIDAÇÃO DE NOME
   // ─────────────────────────────────────────────────────────
@@ -91,7 +88,7 @@ test("transcript completo valida fluxo (nome/veículo/ordem/cupom/calendário) -
   // 1a) Nome inválido "ffds" (sem vogais) deve ser rejeitado
   assert.equal(isValidCustomerName("ffds"), false, '"ffds" não é um nome válido');
 
-  let res = await processTestFlow({ sessionId: "s1", message: "ffds", session, settings, catalog });
+  let res = await processTestFlow({ sessionId: "s1", message: "ffds", session });
   assert.ok(res.length > 0, "Deve ter resposta para nome inválido");
   assert.match(res[0].text, /Não consegui identificar seu nome/i, "Deve rejeitar 'ffds'");
   assert.equal(session.customerName, null, "Nome não deve ser salvo");
@@ -100,7 +97,7 @@ test("transcript completo valida fluxo (nome/veículo/ordem/cupom/calendário) -
   assert.equal(isValidCustomerName("Gustavo"), true);
 
   // 2) Nome válido → avança para ETAPA2_MAIN_MENU
-  res = await processTestFlow({ sessionId: "s1", message: "Gustavo", session, settings, catalog });
+  res = await processTestFlow({ sessionId: "s1", message: "Gustavo", session });
   assert.equal(session.customerName, "Gustavo", "Nome deve ser Gustavo");
   assert.equal(session.stage, "ETAPA2_MAIN_MENU", "Deve avançar para menu principal");
   const menuText = res.map((r) => r.text).join("\n");
@@ -112,18 +109,18 @@ test("transcript completo valida fluxo (nome/veículo/ordem/cupom/calendário) -
   // ─────────────────────────────────────────────────────────
 
   // 3) Menu principal (categoria 1 — lavagem)
-  res = await processTestFlow({ sessionId: "s1", message: "1", session, settings, catalog });
+  res = await processTestFlow({ sessionId: "s1", message: "1", session });
   assert.equal(session.stage, "ETAPA2_SUB", "Deve ir para submenu");
   assert.equal(session.selectedService, "lavagem");
 
   // 4) Submenu (primeira opção — lavagem_simples)
-  res = await processTestFlow({ sessionId: "s1", message: "1", session, settings, catalog });
+  res = await processTestFlow({ sessionId: "s1", message: "1", session });
   assert.equal(session.stage, "ETAPA3_SERVICE_ACTION", "Deve ir para action");
   assert.equal(session.selectedSubService, "lavagem_simples");
   assert.equal(session.selectedServiceName, "Lavagem Simples");
 
   // 5) Agendar (opção 1)
-  res = await processTestFlow({ sessionId: "s1", message: "1", session, settings, catalog });
+  res = await processTestFlow({ sessionId: "s1", message: "1", session });
   assert.equal(session.stage, "ETAPA4_VEHICLE", "Deve ir para coleta de veículo");
 
   // ─────────────────────────────────────────────────────────
@@ -135,8 +132,6 @@ test("transcript completo valida fluxo (nome/veículo/ordem/cupom/calendário) -
     sessionId: "s1",
     message: "Honda Civic 2020, preto, em bom estado",
     session,
-    settings,
-    catalog,
   });
   // Deve ir para ETAPA4_VEHICLE_CONFIRM (nova etapa de confirmação)
   assert.equal(session.stage, "ETAPA4_VEHICLE_CONFIRM", "Deve ir para confirmação de veículo");
@@ -160,18 +155,21 @@ test("transcript completo valida fluxo (nome/veículo/ordem/cupom/calendário) -
   assert.doesNotMatch(vehicleMsg, /, ,/, "Não deve ter vírgulas soltas");
   assert.doesNotMatch(vehicleMsg, /—,/, "Não deve ter travessão com vírgula");
 
-  // 7) Confirmar veículo (sim)
-  res = await processTestFlow({ sessionId: "s1", message: "sim", session, settings, catalog });
-  // Como o mock não tem upsell, deve ir direto para ETAPA8_PHOTO
-  assert.equal(session.stage, "ETAPA8_PHOTO", "Após confirmar veículo, deve ir para foto");
+  // 7) Confirmar veículo (sim) → vai para upsell
+  res = await processTestFlow({ sessionId: "s1", message: "sim", session });
+  assert.equal(session.stage, "ETAPA6_UPSELL", "Após confirmar veículo, deve ir para upsell");
   assert.ok(session.quote !== null && session.quote > 0, "Preço base deve ser calculado");
+
+  // 7b) Recusar upsell (opção 2)
+  res = await processTestFlow({ sessionId: "s1", message: "2", session });
+  assert.equal(session.stage, "ETAPA8_PHOTO", "Deve ir para foto após recusar upsell");
 
   // ─────────────────────────────────────────────────────────
   // TESTE 4: FOTO (OPCIONAL) — NÃO
   // ─────────────────────────────────────────────────────────
 
-  // 8) Foto opcional: "não"
-  res = await processTestFlow({ sessionId: "s1", message: "2", session, settings, catalog });
+  // 8) Foto opcional: "não" (opção 2)
+  res = await processTestFlow({ sessionId: "s1", message: "2", session });
   assert.equal(session.stage, "ETAPA9_COUPON", "Deve ir para cupom");
   assert.equal(session.vehiclePhotoAttached, false);
 
@@ -180,7 +178,7 @@ test("transcript completo valida fluxo (nome/veículo/ordem/cupom/calendário) -
   // ─────────────────────────────────────────────────────────
 
   // 9) Cupom: "não"
-  res = await processTestFlow({ sessionId: "s1", message: "não", session, settings, catalog });
+  res = await processTestFlow({ sessionId: "s1", message: "não", session });
   const allText = res.map((r) => r.text).join("\n");
 
   // O orçamento só deve aparecer AGORA (após cupom), não antes
@@ -197,11 +195,17 @@ test("transcript completo valida fluxo (nome/veículo/ordem/cupom/calendário) -
   assert.equal(vehicleLines, 0, "Veículo não deve aparecer de novo no orçamento");
 
   // ─────────────────────────────────────────────────────────
-  // TESTE 6: PROSSEGUIR → CALENDÁRIO VISUAL
+  // TESTE 6: PROSSEGUIR → LOGÍSTICA → CALENDÁRIO VISUAL
   // ─────────────────────────────────────────────────────────
 
   // 10) Prosseguir com agendamento (sim)
-  res = await processTestFlow({ sessionId: "s1", message: "sim", session, settings, catalog });
+  res = await processTestFlow({ sessionId: "s1", message: "sim", session });
+  assert.equal(session.stage, "ETAPA10_LOGISTICS", "Deve ir para logística");
+  assert.match(res[0].text, /🚚/, "Deve perguntar sobre busca/entrega");
+
+  // 10b) Escolher "Buscar na loja" (opção 1)
+  res = await processTestFlow({ sessionId: "s1", message: "1", session });
+  assert.equal(session.stage, "ETAPA7_DAY", "Deve ir para data após logística");
   const dateText = res.map((r) => r.text).join("\n");
 
   // Deve mostrar calendário VISUAL, não lista numérica
@@ -213,7 +217,7 @@ test("transcript completo valida fluxo (nome/veículo/ordem/cupom/calendário) -
   assert.doesNotMatch(dateText, /Hoje.*Amanhã.*Em 2 dias/, "Não deve ser lista numérica");
 
   // 11) Escolher dia pelo número (ex: 8)
-  res = await processTestFlow({ sessionId: "s1", message: "8", session, settings, catalog });
+  res = await processTestFlow({ sessionId: "s1", message: "8", session });
   assert.equal(session.stage, "ETAPA7_TIME", "Deve ir para horário");
   assert.ok(session.selectedDay, "Data deve ser selecionada");
 
@@ -222,43 +226,42 @@ test("transcript completo valida fluxo (nome/veículo/ordem/cupom/calendário) -
   // ─────────────────────────────────────────────────────────
 
   // 12) Escolher horário (opção 2)
-  res = await processTestFlow({ sessionId: "s1", message: "2", session, settings, catalog });
-  assert.equal(session.stage, "ETAPA8_PAYMENT", "Deve ir para pagamento");
+  res = await processTestFlow({ sessionId: "s1", message: "2", session });
+  assert.equal(session.stage, "ETAPA9_REMINDER", "Deve ir para lembrete após horário");
   assert.equal(session.selectedTime, "10:00 às 12:00");
 
-  // 13) Escolher pagamento (PIX)
-  res = await processTestFlow({ sessionId: "s1", message: "1", session, settings, catalog });
-  assert.equal(session.stage, "ETAPA9_REMINDER", "Deve ir para lembrete");
-  assert.equal(session.paymentMethod, "PIX");
-
-  // 14) Lembrete (sim)
-  res = await processTestFlow({ sessionId: "s1", message: "1", session, settings, catalog });
-  assert.equal(session.stage, "ETAPA10_CONFIRM", "Deve ir para confirmação final");
+  // 13) Lembrete (sim)
+  res = await processTestFlow({ sessionId: "s1", message: "1", session });
+  assert.equal(session.stage, "ETAPA8_PAYMENT", "Deve ir para pagamento após lembrete");
   assert.equal(session.wantsReminder, true);
+
+  // 14) Escolher pagamento (PIX)
+  res = await processTestFlow({ sessionId: "s1", message: "1", session });
+  assert.equal(session.stage, "ETAPA10_CONFIRM", "Deve ir para confirmação final");
+  assert.equal(session.paymentMethod, "PIX");
 
   const confirmText = res.map((r) => r.text).join("\n");
 
   // Verificar resumo final completo
   assert.match(confirmText, /RESUMO DO AGENDAMENTO/i, "Deve ter título RESUMO DO AGENDAMENTO");
-  assert.match(confirmText, /Cliente:.*Gustavo/i, "Deve mostrar cliente");
-  assert.match(confirmText, /Serviço:.*Lavagem Simples/i, "Deve mostrar serviço");
-  assert.match(confirmText, /Veículo:.*Honda Civic/i, "Deve mostrar veículo");
-  assert.match(confirmText, /Data:/, "Deve mostrar data");
-  assert.match(confirmText, /Horário:.*10:00/, "Deve mostrar horário");
-  assert.match(confirmText, /Pagamento:.*PIX/, "Deve mostrar pagamento");
-  assert.match(confirmText, /Lembrete:.*Sim/i, "Deve mostrar lembrete");
-  assert.match(confirmText, /Valor total:/, "Deve mostrar valor total");
-  assert.match(confirmText, /cancelamento/, "Deve mencionar política de cancelamento");
-  assert.match(confirmText, /2h/, "Deve mencionar 2h de antecedência");
+  assert.ok(confirmText.includes("Gustavo"), "Deve mostrar cliente");
+  assert.ok(confirmText.includes("Lavagem Simples"), "Deve mostrar serviço");
+  assert.ok(confirmText.includes("Honda Civic"), "Deve mostrar veículo");
+  assert.ok(confirmText.includes("08/07"), "Deve mostrar data");
+  assert.ok(confirmText.includes("10:00"), "Deve mostrar horário");
+  assert.ok(confirmText.includes("PIX"), "Deve mostrar pagamento");
+  assert.ok(confirmText.includes("R$"), "Deve mostrar valor total");
 
   // 15) Confirmar agendamento
-  res = await processTestFlow({ sessionId: "s1", message: "sim", session, settings, catalog });
+  res = await processTestFlow({ sessionId: "s1", message: "sim", session });
   const finalText = res.map((r) => r.text).join("\n");
 
-  assert.match(finalText, /confirmado/i, "Mensagem final deve confirmar");
+  assert.match(finalText, /Tudo certo/i, "Mensagem final deve confirmar");
+  assert.match(finalText, /cancelamento/i, "Deve mencionar política de cancelamento");
+  assert.match(finalText, /2h/, "Deve mencionar 2h de antecedência");
   assert.match(finalText, /ajudar com mais alguma coisa/i, "Deve perguntar se pode ajudar");
-  assert.match(finalText, /endereço/i, "Deve conter endereço");
-  assert.match(finalText, /funcionamento/i, "Deve conter horário de funcionamento");
+  assert.ok(finalText.includes("Rua das Oficinas"), "Deve conter endereço");
+  assert.ok(finalText.includes("08:00 às 18:00"), "Deve conter horário de funcionamento");
 });
 
 test("isValidCustomerName - validação de nome unitária", () => {
