@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { testSessions } from "@/lib/test-sessions-store";
 import { processTestFlow } from "@/lib/test-bot-processor";
 
@@ -23,22 +22,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Processar mensagem
-    const settings = await prisma.settings.findUnique({
-      where: { id: "default" },
-    });
-
-    const catalog = await prisma.service.findMany({
-      include: { media: true },
-    });
-
     // Chamar processador de fluxo
     const responses = await processTestFlow({
       sessionId,
       message: message.trim(),
       session,
-      settings,
-      catalog,
     });
 
     // Atualizar sessão no mapa

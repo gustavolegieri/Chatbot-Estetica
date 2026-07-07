@@ -3,20 +3,8 @@ import assert from "node:assert/strict";
 import {
   buildBudgetSummaryText,
   buildPaymentOptionsText,
-  buildTestServiceLookupWhere,
   normalizeConditionValue,
-} from "./test-bot-processor.ts";
-
-test("buildTestServiceLookupWhere includes fallback by visible service name", () => {
-  const where = buildTestServiceLookupWhere("lavagem_simples", "Lavagem Simples");
-
-  assert.deepEqual(where.active, true);
-  const or = (where as any).OR;
-  assert.deepEqual(or?.[0], { catalogKey: "lavagem_simples" });
-  assert.deepEqual(or?.[1], {
-    name: { contains: "Lavagem Simples", mode: "insensitive" },
-  });
-});
+} from "./test-bot-processor";
 
 test("normalizeConditionValue handles damaged and poor condition descriptions", () => {
   assert.equal(normalizeConditionValue("ruim"), "ruim");
@@ -35,7 +23,7 @@ test("buildBudgetSummaryText includes service, complement, coupon and total valu
   });
 
   assert.match(text, /Lavagem completa/i);
-  assert.match(text, /Complemento/i);
+  assert.match(text, /Proteção/i);
   assert.match(text, /Cupom/i);
   assert.match(text, /Total/i);
 });

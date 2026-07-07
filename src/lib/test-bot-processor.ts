@@ -762,7 +762,7 @@ async function handleFinalConfirm(
   if (isYes) {
     session.stage = "ETAPA2_MAIN_MENU";
     responses.push({
-      text: `✅ *Tudo certo, ${session.customerName ?? "Cliente"}!* 🎉\n\nSeu horário tá garantido — mal podemos esperar pra deixar seu carro brilhando. ✨\n\n📍 *Rua das Oficinas, 100 - SP*\n🕐 *Seg a Sáb, 08:00 às 18:00*\n\n📌 *Cancelamento até 2h antes sem custo.*\n\nPosso ajudar com mais alguma coisa? `,
+      text: `✅ *Tudo certo, ${session.customerName ?? "Cliente"}!* 🎉\n\nSeu horário tá garantido — mal podemos esperar pra deixar seu carro brilhando. ✨\n\n📍 *Rua das Oficinas, 100 - SP*\n🕐 *Seg a Sáb, 08:00 às 18:00*\n\n📌 *Cancelamento até 2h antes sem custo.*\n\n─────────────────\n⭐ **Avaliação pós-serviço**\n\nGostou do atendimento? Avalie de 1 a 5!\n\n*1* - ⭐\n*2* - ⭐⭐\n*3* - ⭐⭐⭐\n*4* - ⭐⭐⭐⭐\n*5* - ⭐⭐⭐⭐⭐\n\nE indicou alguém? Ambos ganham 10% no próximo! 🤝\n\n─────────────────\nPosso ajudar com mais alguma coisa? `,
     });
     return responses;
   }

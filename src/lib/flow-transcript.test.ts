@@ -262,6 +262,11 @@ test("transcript completo valida fluxo (nome/veículo/ordem/cupom/calendário) -
   assert.match(finalText, /ajudar com mais alguma coisa/i, "Deve perguntar se pode ajudar");
   assert.ok(finalText.includes("Rua das Oficinas"), "Deve conter endereço");
   assert.ok(finalText.includes("08:00 às 18:00"), "Deve conter horário de funcionamento");
+
+  // Avaliação pós-serviço (nova etapa)
+  assert.ok(finalText.includes("Avaliação pós-serviço"), "Deve incluir avaliação pós-serviço");
+  assert.ok(finalText.includes("1 a 5"), "Deve mostrar escala de avaliação");
+  assert.ok(finalText.includes("🤝"), "Deve oferecer convite de indicação");
 });
 
 test("isValidCustomerName - validação de nome unitária", () => {
