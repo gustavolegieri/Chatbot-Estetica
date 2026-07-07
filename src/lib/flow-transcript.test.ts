@@ -119,9 +119,13 @@ test("transcript completo valida fluxo (nome/veículo/ordem/cupom/calendário) -
   assert.equal(session.selectedSubService, "lavagem_simples");
   assert.equal(session.selectedServiceName, "Lavagem Simples");
 
-  // 5) Agendar (opção 1)
+  // 5) Agendar (opção 1) → vai para ETAPA8_PHOTO (foto antes do veículo)
   res = await processTestFlow({ sessionId: "s1", message: "1", session });
-  assert.equal(session.stage, "ETAPA4_VEHICLE", "Deve ir para coleta de veículo");
+  assert.equal(session.stage, "ETAPA8_PHOTO", "Deve ir para foto (agora antes do veículo)");
+
+  // 5b) Recusar foto → vai para coleta manual de veículo
+  res = await processTestFlow({ sessionId: "s1", message: "2", session });
+  assert.equal(session.stage, "ETAPA4_VEHICLE", "Deve ir para coleta de veículo manual");
 
   // ─────────────────────────────────────────────────────────
   // TESTE 3: VEÍCULO — PARSING E CONFIRMAÇÃO SEM CAMPOS VAZIOS
@@ -160,24 +164,15 @@ test("transcript completo valida fluxo (nome/veículo/ordem/cupom/calendário) -
   assert.equal(session.stage, "ETAPA6_UPSELL", "Após confirmar veículo, deve ir para upsell");
   assert.ok(session.quote !== null && session.quote > 0, "Preço base deve ser calculado");
 
-  // 7b) Recusar upsell (opção 2)
+  // 7b) Recusar upsell (opção 2) → vai direto para cupom (sem foto aqui)
   res = await processTestFlow({ sessionId: "s1", message: "2", session });
-  assert.equal(session.stage, "ETAPA8_PHOTO", "Deve ir para foto após recusar upsell");
+  assert.equal(session.stage, "ETAPA9_COUPON", "Deve ir para cupom após recusar upsell");
 
   // ─────────────────────────────────────────────────────────
-  // TESTE 4: FOTO (OPCIONAL) — NÃO
+  // TESTE 4: CUPOM → ORÇAMENTO DISCRIMINADO
   // ─────────────────────────────────────────────────────────
 
-  // 8) Foto opcional: "não" (opção 2)
-  res = await processTestFlow({ sessionId: "s1", message: "2", session });
-  assert.equal(session.stage, "ETAPA9_COUPON", "Deve ir para cupom");
-  assert.equal(session.vehiclePhotoAttached, false);
-
-  // ─────────────────────────────────────────────────────────
-  // TESTE 5: CUPOM → ORÇAMENTO DISCRIMINADO
-  // ─────────────────────────────────────────────────────────
-
-  // 9) Cupom: "não"
+  // 8) Cupom: "não"
   res = await processTestFlow({ sessionId: "s1", message: "não", session });
   const allText = res.map((r) => r.text).join("\n");
 

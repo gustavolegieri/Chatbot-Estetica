@@ -397,13 +397,11 @@ async function handleServiceAction(
 
   switch (choice) {
     case "1":
-      session.stage = "ETAPA4_VEHICLE";
-      // Perguntar se é o mesmo veículo (se recorrente)
-      if (session.savedVehicle) {
-        responses.push({ text: `📅 *Agendar ${session.selectedServiceName}*?\n\nJá é pro mesmo ${session.savedVehicle}? Ou outro veículo?` });
-      } else {
-        responses.push({ text: "🚘 Me conta sobre seu veículo?\n\nModelo, ano, cor e estado." });
-      }
+      // PRIMEIRO: Foto do veículo (para IA analisar)
+      session.stage = "ETAPA8_PHOTO";
+      responses.push({
+        text: "📸 Quer enviar foto do veículo primeiro?\n\nA IA analisa modelo, ano e estado automaticamente!\n\n*1* - Sim, enviar foto\n*2* - Não, digitar manualmente",
+      });
       break;
 
     case "2":
@@ -514,8 +512,9 @@ async function handleUpsell(
     responses.push({ text: "Tudo bem! " });
   }
 
-  session.stage = "ETAPA8_PHOTO";
-  responses.push({ text: "📸 Quer enviar foto do veículo? (opcional)\n\n*1* - Sim\n*2* - Não " });
+  // Ir direto para cupom (foto já foi feita antes do veículo)
+  session.stage = "ETAPA9_COUPON";
+  responses.push({ text: "🎟️ Tem cupom? Me envie ou diga *não*. " });
   return responses;
 }
 
@@ -773,14 +772,13 @@ async function handlePhotoStep(
   if (wantsPhoto) {
     session.awaitingPhotoUpload = true;
     session.stage = "ETAPA8_PHOTO_UPLOAD";
-    responses.push({ text: "📷 Ótimo! Envie a foto do seu veículo agora." });
+    responses.push({ text: "📷 Ótimo! Envie a foto do seu veículo agora.\n\n(Link da imagem ou anexe)" });
     return responses;
   }
 
-  session.vehiclePhotoAttached = false;
-  session.stage = "ETAPA9_COUPON";
-  responses.push({ text: "Seguimos sem foto! " });
-  responses.push({ text: "🎟️ Tem cupom? Me envie ou diga *não*. " });
+  // Se não quer foto, vai para coleta manual de veículo
+  session.stage = "ETAPA4_VEHICLE";
+  responses.push({ text: "Sem problemas! Me conta sobre seu veículo?\n\nModelo, ano, cor e estado." });
   return responses;
 }
 
