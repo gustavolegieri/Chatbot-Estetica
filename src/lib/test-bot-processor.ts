@@ -444,23 +444,26 @@ async function handleVehicleCollection(
     model: vehicleInfo.model || session.vehicle.model,
     year: vehicleInfo.year ? parseInt(vehicleInfo.year) : session.vehicle.year,
     color: vehicleInfo.color || session.vehicle.color,
-    condition: normalizedCondition,
+    condition: normalizedCondition || session.vehicle.condition,
   };
 
-  if (!session.vehicle.model || !session.vehicle.year || !session.vehicle.color) {
-    responses.push({ text: buildVehicleCollectionPrompt({
-      model: session.vehicle.model || null,
-      year: session.vehicle.year?.toString() ?? null,
-      color: session.vehicle.color || null,
-      condition: session.vehicle.condition || null,
-    }) });
+  // Verifica se tem todos os campos necessários
+  const missing: string[] = [];
+  if (!session.vehicle.model) missing.push("modelo");
+  if (!session.vehicle.year) missing.push("ano");
+  if (!session.vehicle.color) missing.push("cor");
+
+  if (missing.length > 0) {
+    responses.push({
+      text: `📝 Faltam: ${missing.join(", ")}. Me informe para completar.\n\nEx: "Honda Civic 2020, preto"`,
+    });
     return responses;
   }
 
   session.stage = "ETAPA4_VEHICLE_CONFIRM";
   responses.push({ text: buildVehicleConfirmationPrompt({
     model: session.vehicle.model,
-    year: session.vehicle.year?.toString() ?? null,
+    year: session.vehicle.year?.toString() ?? "",
     color: session.vehicle.color,
     condition: session.vehicle.condition,
   }) });
