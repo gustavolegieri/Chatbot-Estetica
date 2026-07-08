@@ -108,16 +108,13 @@ export async function processTestFlow({
       return handleServiceAction(message, session, prompts, responses);
 
     case "ETAPA4_VEHICLE":
-      return handleVehicleCollection(message, session, responses);
+      return handleVehicleStage(message, session, responses);
 
-    case "ETAPA4_VEHICLE_CONFIRM":
-      return handleVehicleConfirm(message, session, responses);
+    case "ETAPA5_QUOTE":
+      return handleQuoteStep(message, session, responses);
 
     case "ETAPA6_UPSELL":
       return handleUpsell(message, session, responses);
-
-case "ETAPA8_PHOTO":
-      return handlePhotoStep(message, session, responses);
 
     case "ETAPA8_PHOTO_UPLOAD":
       return handlePhotoUpload(message, session, responses);
@@ -397,10 +394,9 @@ async function handleServiceAction(
 
   switch (choice) {
     case "1":
-      // PRIMEIRO: Foto do veículo (para IA analisar)
-      session.stage = "ETAPA8_PHOTO";
+      session.stage = "ETAPA4_VEHICLE";
       responses.push({
-        text: "📸 Quer enviar foto do veículo primeiro?\n\nA IA analisa modelo, ano e estado automaticamente!\n\n*1* - Sim, enviar foto\n*2* - Não, digitar manualmente",
+        text: "🚘 Me diga os dados do veículo para continuar.\n\nModelo, ano, cor e estado.",
       });
       break;
 
@@ -422,17 +418,41 @@ async function handleServiceAction(
   return responses;
 }
 
-async function handleVehicleCollection(
+async function handleVehicleStage(
   message: string,
   session: TestSession,
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
   const input = message.trim().toLowerCase();
+  const isYes = /^(sim|s|1|yes|confirmo|confirma|tudo certo)$/i.test(input);
+  const isNo = /^(nao|não|n|2|no|errado|alterar|tudo errado|nada certo)$/i.test(input);
+
+  if (isYes) {
+    const basePrice = calculateBasePrice(session);
+    session.quote = basePrice;
+    session.stage = "ETAPA5_QUOTE";
+    responses.push({
+      text: buildBudgetSummaryText({
+        serviceLabel: session.selectedServiceName || "Serviço premium",
+        serviceValue: basePrice,
+        complementValue: session.upsellValue ?? 0,
+        couponDiscount: session.couponDiscount ?? 0,
+        totalValue: basePrice + (session.upsellValue ?? 0) - (session.couponDiscount ?? 0),
+      }),
+    });
+    responses.push({ text: "Quer agendar? (sim/não) " });
+    return responses;
+  }
+
+  if (isNo) {
+    session.stage = "ETAPA4_VEHICLE";
+    responses.push({ text: "Sem problemas! Me informe os dados corretos. " });
+    return responses;
+  }
 
   // Resposta "mesmo veículo" para cliente recorrente
   if (/^(mesmo|mesmo veiculo|sim|1)$/i.test(input) && session.savedVehicle) {
     session.vehicle = { model: "Honda Civic", year: 2020, color: "preto", condition: "bom" };
-    session.stage = "ETAPA4_VEHICLE_CONFIRM";
     responses.push({ text: buildVehicleConfirmationPrompt({ model: "Honda Civic", year: "2020", color: "preto", condition: "bom" }) });
     return responses;
   }
@@ -460,7 +480,6 @@ async function handleVehicleCollection(
     return responses;
   }
 
-  session.stage = "ETAPA4_VEHICLE_CONFIRM";
   responses.push({ text: buildVehicleConfirmationPrompt({
     model: session.vehicle.model,
     year: session.vehicle.year?.toString() ?? "",
@@ -470,32 +489,24 @@ async function handleVehicleCollection(
   return responses;
 }
 
-async function handleVehicleConfirm(
+async function handleQuoteStep(
   message: string,
   session: TestSession,
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
   const input = message.trim().toLowerCase();
-  const isYes = /^(sim|s|1|yes|confirmo|confirma|tudo certo)$/i.test(input);
-  const isNo = /^(nao|não|n|2|no|errado|alterar|tudo errado|nada certo)$/i.test(input);
+  const isYes = /^(sim|s|1|yes|quero|agendar|confirmo)$/i.test(input);
 
-  if (isYes) {
-    const basePrice = calculateBasePrice(session);
-    session.quote = basePrice;
-    session.stage = "ETAPA6_UPSELL";
-    responses.push({
-      text: "✨ Que tal adicionar *Proteção de Pintura Vitrificada*?\n\n💰 **R$ 85,00** a mais\n\n*1* - Sim, incluir\n*2* - Não, obrigado",
-    });
+  if (!isYes) {
+    responses.push({ text: "Sem problemas! Voltar ao menu? (sim/não) " });
+    session.stage = "ETAPA2_MAIN_MENU";
     return responses;
   }
 
-  if (isNo) {
-    session.stage = "ETAPA4_VEHICLE";
-    responses.push({ text: "Sem problemas! Me informe os dados corretos. " });
-    return responses;
-  }
-
-  responses.push({ text: "❔ Confirma os dados? (sim/não) " });
+  session.stage = "ETAPA6_UPSELL";
+  responses.push({
+    text: "✨ Que tal adicionar *Proteção de Pintura Vitrificada*?\n\n💰 **R$ 85,00** a mais\n\n*1* - Sim, incluir\n*2* - Não, obrigado",
+  });
   return responses;
 }
 
@@ -515,9 +526,8 @@ async function handleUpsell(
     responses.push({ text: "Tudo bem! " });
   }
 
-  // Ir direto para cupom (foto já foi feita antes do veículo)
-  session.stage = "ETAPA9_COUPON";
-  responses.push({ text: "🎟️ Tem cupom? Me envie ou diga *não*. " });
+  session.stage = "ETAPA7_DAY";
+  responses.push({ text: buildCalendarPrompt(new Date()) });
   return responses;
 }
 
@@ -677,10 +687,10 @@ async function handleTimeSelection(
 
   const slot = timeSlots[message.trim()];
   session.selectedTime = `${slot.start} às ${slot.end}`;
-  session.stage = "ETAPA9_REMINDER";
+  session.stage = "ETAPA8_PAYMENT";
 
   responses.push({ text: `⏰ *${slot.start}* — ótimo! ` });
-  responses.push({ text: "🔔 Lembrete 1h antes?\n\n*1* - Sim\n*2* - Não " });
+  responses.push({ text: buildPaymentOptionsText() });
   return responses;
 }
 
