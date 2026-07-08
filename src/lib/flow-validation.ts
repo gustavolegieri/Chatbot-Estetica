@@ -86,7 +86,7 @@ export function buildCalendarPrompt(date = new Date()): string {
   const weekdayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
   const year = date.getFullYear();
   const month = date.getMonth();
-  const today = new Date().getDate();
+  const today = date.getDate();
   const firstDay = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const startDay = firstDay.getDay();
@@ -98,21 +98,19 @@ export function buildCalendarPrompt(date = new Date()): string {
   for (let row = 0; row < 6; row += 1) {
     const week: string[] = [];
     for (let col = 0; col < 7; col += 1) {
-      const index = row * 7 + col;
-      if (index < startDay || day > daysInMonth) {
-        week.push("  ");
+      if (row === 0 && col < startDay) {
+        week.push("   ");
+      } else if (day > daysInMonth) {
+        week.push("   ");
       } else {
-        const dayNumber = day;
-        let cell = ` ${dayNumber.toString().padStart(2, "0")}`;
-        if (dayNumber === today) {
-          cell = `[${dayNumber.toString().padStart(2, "0")}]`;
-        } else if (busyDays.has(dayNumber)) {
-          cell = `🔴${dayNumber.toString().padStart(2, "0")}`;
-        } else if (lightDays.has(dayNumber)) {
-          cell = `🟡${dayNumber.toString().padStart(2, "0")}`;
-        } else {
-          cell = `🟢${dayNumber.toString().padStart(2, "0")}`;
-        }
+        const dayNumber = day.toString().padStart(2, "0");
+        const isToday = day === today;
+        const marker = isToday
+          ? "["
+          : busyDays.has(day) ? "🔴"
+          : lightDays.has(day) ? "🟡"
+          : "🟢";
+        const cell = isToday ? `[${dayNumber}]` : `${marker}${dayNumber}`;
         week.push(cell);
         day += 1;
       }
@@ -121,10 +119,12 @@ export function buildCalendarPrompt(date = new Date()): string {
     if (day > daysInMonth) break;
   }
 
+  const rows = weeks.map((week) => week.join(" "));
+
   return [
     `📅 ${monthNames[month]} ${year}`,
-    ` ${weekdayNames.join("  ")}`,
-    ...weeks.map((week) => ` ${week.join("  ")}`),
+    weekdayNames.join(" "),
+    ...rows,
     "",
     "✅ Dias disponíveis: 🟢 mais vazio, 🟡 médio, 🔴 mais movimentado",
     "🚫 Domingos: fechado",

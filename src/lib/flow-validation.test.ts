@@ -46,6 +46,7 @@ test("buildVehicleConfirmationPrompt and buildCalendarPrompt render the new stru
 
   const calendar = buildCalendarPrompt(new Date("2026-07-01T12:00:00Z"));
   assert.match(calendar, /Julho 2026/i);
+  assert.match(calendar, /Dom Seg Ter Qua Qui Sex Sáb/i);
   assert.match(calendar, /Hoje/i);
   assert.match(calendar, /dias disponíveis/i);
   assert.match(calendar, /🔴|🟡|🟢/i);
