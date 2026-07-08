@@ -48,4 +48,6 @@ test("buildVehicleConfirmationPrompt and buildCalendarPrompt render the new stru
   assert.match(calendar, /Julho 2026/i);
   assert.match(calendar, /Hoje/i);
   assert.match(calendar, /dias disponíveis/i);
+  assert.match(calendar, /🔴|🟡|🟢/i);
+  assert.match(calendar, /voltar ao início/i);
 });

@@ -85,6 +85,11 @@ test("transcript completo valida fluxo alinhado ao WhatsApp flow", async () => {
   assert.equal(session.customerName, "Gustavo");
   assert.equal(session.stage, "ETAPA2_MAIN_MENU");
 
+  const polimentoSession = { ...session, customerName: "Gustavo", stage: "ETAPA2_MAIN_MENU" };
+  res = await processTestFlow({ sessionId: "s2", message: "2", session: polimentoSession });
+  assert.equal(polimentoSession.stage, "ETAPA2_SUB", "Categoria 2 deve abrir submenu de polimento");
+  assert.equal(polimentoSession.selectedService, "polimento", "Categoria 2 deve mapear para polimento");
+
   res = await processTestFlow({ sessionId: "s1", message: "1", session });
   assert.equal(session.stage, "ETAPA2_SUB");
 
@@ -117,7 +122,8 @@ test("transcript completo valida fluxo alinhado ao WhatsApp flow", async () => {
   assert.equal(session.stage, "ETAPA10_CONFIRM");
 
   res = await processTestFlow({ sessionId: "s1", message: "sim", session });
-  assert.equal(session.stage, "ETAPA2_MAIN_MENU");
+  assert.equal(session.stage, "ETAPA1_AWAITING_NAME");
+  assert.equal(session.customerName, null);
   assert.match(res[0].text, /Tudo certo/i);
 });
 

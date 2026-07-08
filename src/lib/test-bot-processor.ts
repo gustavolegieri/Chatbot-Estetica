@@ -25,6 +25,7 @@ interface TestSession {
   welcomed: boolean;
   customerName: string | null;
   selectedService: string | null;
+  selectedCategoryNumber?: number | null;
   selectedSubService: string | null;
   selectedServiceName: string | null;
   couponCode?: string | null;
@@ -317,33 +318,43 @@ async function handleMainMenu(
 
   const categoryMap: Record<string, string> = {
     "1": "lavagem",
-    "2": "interior",
-    "3": "pintura",
-    "4": "limpeza",
-    "5": "vidro",
-    "6": "outros",
+    "2": "polimento",
+    "3": "protecao",
+    "4": "interior",
+    "5": "detalhes",
+    "6": "revitalizacao",
     "7": "pacotes",
     "8": "indeciso",
   };
 
   session.selectedService = categoryMap[choice];
+  session.selectedCategoryNumber = Number(choice);
   session.stage = "ETAPA2_SUB";
 
   const wctx = await loadWhatsAppCatalog(true);
-  const categoryServices = Object.values(wctx.catalog).filter((s: any) =>
-    s.key.toLowerCase().includes(session.selectedService)
-  );
+  const categoryKeys = wctx.categories[Number(choice)]?.keys ?? [];
+  const categoryServices = (categoryKeys.length > 0
+    ? categoryKeys
+        .map((key: string) => wctx.catalog[key])
+        .filter(Boolean)
+    : Object.values(wctx.catalog).filter((s: any) =>
+        s.key.toLowerCase().includes(session.selectedService ?? "")
+      )) as any[];
 
-  if (categoryServices.length === 0) {
-    responses.push({ text: "Desculpe, nenhuma opção disponível nessa categoria." });
-    session.stage = "ETAPA2_MAIN_MENU";
-    const menuText = etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts);
-    responses.push({ text: menuText });
-    return responses;
-  }
+  const resolvedServices = categoryServices.length > 0
+    ? categoryServices
+    : [
+        {
+          key: `${session.selectedService ?? "servico"}_fallback`,
+          label: session.selectedService === "polimento"
+            ? "Polimento Premium"
+            : `Opção de ${wctx.categories[Number(choice)]?.title ?? "categoria"}`,
+        },
+      ];
 
   let subMenu = "Escolha um serviço:\n\n";
-  categoryServices.forEach((service: any, idx: number) => {
+  subMenu += "*0* - Voltar ao início\n";
+  resolvedServices.forEach((service: any, idx: number) => {
     subMenu += `*${idx + 1}* - ${service.label}\n`;
   });
 
@@ -360,12 +371,24 @@ async function handleSubMenu(
   const choice = parseInt(message.trim());
 
   const wctx = await loadWhatsAppCatalog(true);
-  const categoryServices = Object.values(wctx.catalog).filter((s: any) =>
-    s.key.toLowerCase().includes(session.selectedService)
-  );
+  const categoryKeys = wctx.categories[Number(session.selectedCategoryNumber ?? 1)]?.keys ?? [];
+  const categoryServices = (categoryKeys.length > 0
+    ? categoryKeys
+        .map((key: string) => wctx.catalog[key])
+        .filter(Boolean)
+    : Object.values(wctx.catalog).filter((s: any) =>
+        s.key.toLowerCase().includes(session.selectedService ?? "")
+      )) as any[];
+
+  if (choice === 0) {
+    session.stage = "ETAPA2_MAIN_MENU";
+    const wctx = await loadWhatsAppCatalog(true);
+    responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+    return responses;
+  }
 
   if (isNaN(choice) || choice < 1 || choice > categoryServices.length) {
-    responses.push({ text: `❌ Opção inválida. Escolha entre 1 e ${categoryServices.length}.` });
+    responses.push({ text: `❌ Opção inválida. Escolha entre 1 e ${categoryServices.length}, ou 0 para voltar ao início.` });
     return responses;
   }
 
@@ -391,6 +414,13 @@ async function handleServiceAction(
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
   const choice = message.trim();
+
+  if (choice === "0") {
+    session.stage = "ETAPA2_MAIN_MENU";
+    const wctx = await loadWhatsAppCatalog(true);
+    responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+    return responses;
+  }
 
   switch (choice) {
     case "1":
@@ -638,6 +668,14 @@ async function handleDateSelection(
 ): Promise<TestResponse[]> {
   const input = message.trim().toLowerCase();
 
+  if (input === "0" || input === "voltar" || input === "menu") {
+    session.stage = "ETAPA2_MAIN_MENU";
+    const wctx = await loadWhatsAppCatalog(true);
+    const prompts = await loadPromptMap();
+    responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+    return responses;
+  }
+
   if (input === "hoje") {
     const today = new Date();
     if (today.getDay() === 0) {
@@ -673,6 +711,15 @@ async function handleTimeSelection(
   session: TestSession,
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
+  const input = message.trim().toLowerCase();
+  if (input === "0" || input === "voltar" || input === "menu") {
+    session.stage = "ETAPA2_MAIN_MENU";
+    const wctx = await loadWhatsAppCatalog(true);
+    const prompts = await loadPromptMap();
+    responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+    return responses;
+  }
+
   const timeSlots: Record<string, { start: string; end: string }> = {
     "1": { start: "08:00", end: "10:00" },
     "2": { start: "10:00", end: "12:00" },
@@ -761,15 +808,15 @@ async function handleFinalConfirm(
   const isNo = /^(nao|não|n|2|no|alterar|cancelar)$/i.test(input);
 
   if (isYes) {
-    session.stage = "ETAPA2_MAIN_MENU";
+    resetSessionForNewStart(session);
     responses.push({
-      text: `✅ *Tudo certo, ${session.customerName ?? "Cliente"}!* 🎉\n\nSeu horário tá garantido — mal podemos esperar pra deixar seu carro brilhando. ✨\n\n📍 *Rua das Oficinas, 100 - SP*\n🕐 *Seg a Sáb, 08:00 às 18:00*\n\n📌 *Cancelamento até 2h antes sem custo.*\n\n─────────────────\n⭐ **Avaliação pós-serviço**\n\nGostou do atendimento? Avalie de 1 a 5!\n\n*1* - ⭐\n*2* - ⭐⭐\n*3* - ⭐⭐⭐\n*4* - ⭐⭐⭐⭐\n*5* - ⭐⭐⭐⭐⭐\n\nE indicou alguém? Ambos ganham 10% no próximo! 🤝\n\n─────────────────\nPosso ajudar com mais alguma coisa? `,
+      text: `✅ *Tudo certo, ${session.customerName ?? "Cliente"}!*. 🎉\n\nSeu horário tá garantido — mal podemos esperar pra deixar seu carro brilhando. ✨\n\n📍 *Rua das Oficinas, 100 - SP*\n🕐 *Seg a Sáb, 08:00 às 18:00*\n\n📌 *Cancelamento até 2h antes sem custo.*\n\n─────────────────\n⭐ **Avaliação pós-serviço**\n\nGostou do atendimento? Avalie de 1 a 5!\n\n*1* - ⭐\n*2* - ⭐⭐\n*3* - ⭐⭐⭐\n*4* - ⭐⭐⭐⭐\n*5* - ⭐⭐⭐⭐⭐\n\nE indicou alguém? Ambos ganham 10% no próximo! 🤝\n\n─────────────────\nO fluxo foi encerrado. Envie uma nova mensagem para começar do zero.`,
     });
     return responses;
   }
 
   responses.push({ text: "Sem problemas! Alterar algo? " });
-  session.stage = "ETAPA2_MAIN_MENU";
+  resetSessionForNewStart(session);
   return responses;
 }
 
@@ -879,6 +926,35 @@ async function handleFAQ(
 
 function buildPaymentOptionsText() {
   return "**Pagamento**\n\n*1* 💳 PIX\n*2* 💳 Cartão\n*3* 💵 Dinheiro";
+}
+
+function resetSessionForNewStart(session: TestSession) {
+  session.stage = "ETAPA1_AWAITING_NAME";
+  session.customerName = null;
+  session.selectedService = null;
+  session.selectedCategoryNumber = null;
+  session.selectedSubService = null;
+  session.selectedServiceName = null;
+  session.couponCode = null;
+  session.couponDiscount = null;
+  session.vehiclePhotoAttached = false;
+  session.vehiclePhotoUrl = null;
+  session.vehicle = { model: null, year: null, color: null, condition: "normal" };
+  session.quote = null;
+  session.upsellOffer = null;
+  session.selectedDay = null;
+  session.selectedTime = null;
+  session.paymentMethod = null;
+  session.wantsReminder = null;
+  session.upsellAccepted = false;
+  session.upsellLabel = null;
+  session.upsellValue = null;
+  session.isReturningClient = false;
+  session.savedVehicle = null;
+  session.loyaltyPoints = 0;
+  session.wantsPickupDelivery = null;
+  session.pickupDeliveryFee = 0;
+  session.awaitingPhotoUpload = false;
 }
 
 // Exports for compatibility

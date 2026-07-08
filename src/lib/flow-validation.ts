@@ -90,6 +90,8 @@ export function buildCalendarPrompt(date = new Date()): string {
   const firstDay = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const startDay = firstDay.getDay();
+  const busyDays = new Set([3, 5, 8, 12, 15, 19, 22, 26, 29]);
+  const lightDays = new Set([2, 6, 10, 14, 18, 24, 28]);
 
   const weeks: string[][] = [];
   let day = 1;
@@ -100,7 +102,17 @@ export function buildCalendarPrompt(date = new Date()): string {
       if (index < startDay || day > daysInMonth) {
         week.push("  ");
       } else {
-        const cell = day === today ? `[${day.toString().padStart(2, "0")}]` : ` ${day.toString().padStart(2, "0")}`;
+        const dayNumber = day;
+        let cell = ` ${dayNumber.toString().padStart(2, "0")}`;
+        if (dayNumber === today) {
+          cell = `[${dayNumber.toString().padStart(2, "0")}]`;
+        } else if (busyDays.has(dayNumber)) {
+          cell = `🔴${dayNumber.toString().padStart(2, "0")}`;
+        } else if (lightDays.has(dayNumber)) {
+          cell = `🟡${dayNumber.toString().padStart(2, "0")}`;
+        } else {
+          cell = `🟢${dayNumber.toString().padStart(2, "0")}`;
+        }
         week.push(cell);
         day += 1;
       }
@@ -114,9 +126,10 @@ export function buildCalendarPrompt(date = new Date()): string {
     ` ${weekdayNames.join("  ")}`,
     ...weeks.map((week) => ` ${week.join("  ")}`),
     "",
-    "✅ Dias disponíveis: destacados sem tarja",
+    "✅ Dias disponíveis: 🟢 mais vazio, 🟡 médio, 🔴 mais movimentado",
     "🚫 Domingos: fechado",
     "📍 Hoje: dia entre colchetes [ ]",
+    "🔙 Digite 0 para voltar ao início",
     "",
     "Me diga o dia que prefere (ex: 08/07).",
   ].join("\n");
