@@ -1181,9 +1181,35 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
 
       flow.startTime = chosen;
       flow.periodLabel = chosen;
-      flow.stage = "ETAPA8_PAYMENT";
+      flow.stage = "ETAPA9_COUPON";
       await saveFlow(msg.phone, flow);
-      await sendText({ number: msg.phone, text: etapa8Payment(!!ctx.pixKey, prompts) });
+      await sendText({
+        number: msg.phone,
+        text: `Você tem um cupom de desconto?\n\nSe sim, me envie o código agora.\nSe não, responda *não* para seguir para o pagamento.`,
+      });
+      return;
+    }
+
+    case "ETAPA9_COUPON": {
+      if (/(nao|não|nenhum|sem cupom|sem desconto|pular|skip)/i.test(lower)) {
+        flow.stage = "ETAPA8_PAYMENT";
+        await saveFlow(msg.phone, flow);
+        await sendText({ number: msg.phone, text: etapa8Payment(!!ctx.pixKey, prompts) });
+        return;
+      }
+
+      if (await applyCouponPhase(msg, flow, lower, ctx, wctx, num, input)) {
+        if (!flow.couponError) {
+          flow.stage = "ETAPA8_PAYMENT";
+          await saveFlow(msg.phone, flow);
+        }
+        return;
+      }
+
+      await sendText({
+        number: msg.phone,
+        text: `Você tem um cupom de desconto?\n\nSe sim, me envie o código agora.\nSe não, responda *não* para seguir para o pagamento.`,
+      });
       return;
     }
 
@@ -1362,12 +1388,19 @@ async function applyCouponPhase(
   flow.quoteMax = applied.flow.quoteMax;
   await saveFlow(msg.phone, flow);
 
-  const discountText = applied.discountApplied > 0 ? `Desconto: *R$ ${applied.discountApplied}*` : `Cupom aplicado!`;
+  const formattedCouponCode = code.toUpperCase();
+  const formattedDiscount = applied.discountApplied > 0 ? `*R$ ${applied.discountApplied.toFixed(2).replace(".", ",")}*` : "*sem valor fixo*";
+  const finalValue = Math.max(0, (flow.quoteMin ?? 0));
+  const formattedFinalValue = `*R$ ${finalValue.toFixed(2).replace(".", ",")}*`;
+  const couponName = formattedCouponCode;
+
   await sendText({
     number: msg.phone,
-    text: `✅ Cupom *${code.toUpperCase()}* aplicado!
+    text: `✅ Cupom *${formattedCouponCode}* aplicado com sucesso!
 
-${discountText}
+🎁 ${couponName}
+💸 Desconto aplicado: ${formattedDiscount}
+💰 Valor final do agendamento: ${formattedFinalValue}
 
 Agora escolha a forma de pagamento.`,
   });
