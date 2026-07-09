@@ -20,7 +20,6 @@ import { recordTestBotRating } from "./test-bot-evaluation-store";
 import { loadPromptMap } from "./bot-prompts";
 import { parseVehicleMessage } from "./whatsapp-vehicle-parse";
 import { loadWhatsAppCatalog } from "./whatsapp-service-catalog";
-import { findCouponByCode } from "./coupons";
 
 interface TestSession {
   sessionId: string;
@@ -153,22 +152,14 @@ export async function processTestFlow({
     case "ETAPA7_TIME":
       return handleTimeSelection(message, session, responses);
 
-    case "ETAPA9_COUPON":
-      return handleCouponStep(message, session, responses);
+    case "ETAPA9_REMINDER":
+      return handleReminderStep(message, session, responses);
 
     case "ETAPA8_PAYMENT":
       return handlePaymentSelection(message, session, responses);
 
-    case "ETAPA14_REMINDER":
-      return handleReminderStep(message, session, responses);
-
-    case "ETAPA15_SUMMARY_CONFIRM":
+    case "ETAPA10_CONFIRM":
       return handleFinalConfirm(message, session, responses);
-
-    case "ETAPA16_CONFIRMATION":
-      responses.push({ text: "✅ Agendamento confirmado! Sua reserva foi registrada." });
-      resetSessionForNewStart(session);
-      return responses;
 
     case "ETAPA11_RATING":
       return handleRating(message, session, responses);
@@ -637,40 +628,20 @@ async function handleCouponStep(
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
   const input = message.trim();
-  const skip = /^(nao|não|n|sem|pular|ignorar|nenhum|skip)$/i.test(input);
+  const skip = /^(nao|não|n|sem|pular|ignorar|nenhum)$/i.test(input);
 
   if (skip) {
-    session.stage = "ETAPA8_PAYMENT";
-    responses.push({ text: buildPaymentOptionsText() });
-    return responses;
+    // Ir para pontos de fidelidade se houver
+    if (session.loyaltyPoints && session.loyaltyPoints > 0) {
+      session.stage = "ETAPA9_LOYALTY";
+      responses.push({ text: `🌟 Você tem ${session.loyaltyPoints} pontos! Troca por 10% de desconto?\n\n*1* - Sim\n*2* - Não ` });
+      return responses;
+    }
+    session.stage = "ETAPA10_BUDGET";
+    return handleShowBudget(session, responses);
   }
 
-  const normalizedCode = input.toUpperCase();
-  if (!/^[A-Z0-9_-]{2,20}$/.test(normalizedCode)) {
-    responses.push({ text: "Perfeito 😊 Me envie o código do cupom (ex: *VALE10*). Se não tiver, responda *não*." });
-    return responses;
-  }
-
-  const coupon = await findCouponByCode(normalizedCode);
-  if (!coupon || !coupon.active) {
-    responses.push({ text: "Cupom inválido ou inativo 😔 Se preferir, diga *não* para seguir sem desconto." });
-    return responses;
-  }
-
-  const baseValue = Number(session.quote ?? calculateBasePrice(session)) + Number(session.upsellValue ?? 0);
-  const amount = Number(coupon.amount ?? 0);
-  const discount = coupon.type === "percent"
-    ? Math.max(0, Math.min(baseValue, (baseValue * amount) / 100))
-    : Math.max(0, Math.min(baseValue, amount));
-
-  session.couponCode = normalizedCode;
-  session.couponDiscount = discount;
-  session.stage = "ETAPA8_PAYMENT";
-
-  responses.push({
-    text: `✅ Cupom *${normalizedCode}* aplicado com sucesso!\n\n💸 Desconto: *R$ ${discount.toFixed(2).replace(".", ",")}*\n💰 Valor final: *R$ ${(baseValue - discount).toFixed(2).replace(".", ",")}*\n\nAgora escolha a forma de pagamento.`,
-  });
-  responses.push({ text: buildPaymentOptionsText() });
+  responses.push({ text: "🎟️ Cupom inválido. Se preferir, diga *não*. " });
   return responses;
 }
 
@@ -824,12 +795,10 @@ async function handleTimeSelection(
 
   const slot = timeSlots[message.trim()];
   session.selectedTime = `${slot.start} às ${slot.end}`;
-  session.stage = "ETAPA9_COUPON";
+  session.stage = "ETAPA8_PAYMENT";
 
   responses.push({ text: `⏰ *${slot.start}* — ótimo! ` });
-  responses.push({
-    text: "Você tem um cupom de desconto?\n\nSe sim, me envie o código agora.\nSe não, responda *não* para seguir para o pagamento.",
-  });
+  responses.push({ text: buildPaymentOptionsText() });
   return responses;
 }
 
@@ -840,30 +809,29 @@ async function handleReminderStep(
 ): Promise<TestResponse[]> {
   const input = message.trim().toLowerCase();
   session.wantsReminder = /^(1|sim|s|quero|yes)$/i.test(input);
-  session.stage = "ETAPA15_SUMMARY_CONFIRM";
+  session.stage = "ETAPA10_CONFIRM";
 
   const baseQuote = Number(session.quote ?? calculateBasePrice(session));
   const complementValue = Number(session.upsellValue ?? 0);
-  const couponDiscount = Number(session.couponDiscount ?? 0);
-  const totalValue = Math.max(0, baseQuote + complementValue - couponDiscount);
+  const totalValue = baseQuote + complementValue;
 
   const lines = [
     "━━━━━━━━━━━━━━━",
-    "📋 *Resumo do agendamento*",
-    `👤 Cliente: *${session.customerName ?? "Cliente"}*`,
-    `🧽 Serviço: *${session.selectedServiceName ?? "Serviço"}*`,
+    "📋 **RESUMO DO AGENDAMENTO**",
+    `👤 ${session.customerName ?? "Cliente"}`,
+    `🧽 *${session.selectedServiceName ?? "Serviço"}*`,
     `${session.upsellLabel ? `✨ + ${session.upsellLabel}` : ""}`,
-    `🚘 Veículo: *${session.vehicle.model ?? "—"} ${session.vehicle.year ?? ""}*`.
-      replace(/\s+/g, " ").trim(),
-    `📅 Data: *${session.selectedDay ?? "—"}*`,
-    `⏰ Horário: *${session.selectedTime ?? "—"}*`,
-    `🎟️ Cupom: *${session.couponCode?.toUpperCase() ?? "nenhum"}*`,
-    `💳 Pagamento: *${session.paymentMethod ?? "—"}*`,
-    `🔔 Lembrete: *${session.wantsReminder ? "sim" : "não"}*`,
-    `💰 Valor total: *R$ ${totalValue.toFixed(2).replace(".", ",")}*`,
+    `🚘 ${session.vehicle.model} ${session.vehicle.year ?? ""}`,
+    `📅 ${session.selectedDay ?? "—"}`,
+    `⏰ ${session.selectedTime ?? "—"}`,
+    `💳 ${session.paymentMethod}`,
+    `🔔 Lembrete 30 min antes: ${session.wantsReminder ? "sim" : "não"}`,
+    `💰 **R$ ${totalValue.toFixed(2).replace(".", ",")}**`,
     "━━━━━━━━━━━━━━━",
     "",
-    "Confirma o agendamento? (sim/não)",
+    "⏱️ Cancelamento até 2h antes sem custo.",
+    "",
+    "✅ Confirma? (sim/não)",
   ];
 
   responses.push({ text: lines.join("\n") });
@@ -877,18 +845,17 @@ async function handlePaymentSelection(
 ): Promise<TestResponse[]> {
   const paymentMethods: Record<string, string> = {
     "1": "PIX",
-    "2": "Débito",
-    "3": "Crédito",
-    "4": "Dinheiro",
+    "2": "Cartão",
+    "3": "Dinheiro",
   };
 
   if (!paymentMethods[message.trim()]) {
-    responses.push({ text: "❌ Forma inválida. Selecione uma opção entre 1 e 4." });
+    responses.push({ text: "❌ Forma inválida. " });
     return responses;
   }
 
   session.paymentMethod = paymentMethods[message.trim()];
-  session.stage = "ETAPA14_REMINDER";
+  session.stage = "ETAPA9_REMINDER";
 
   responses.push({
     text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
@@ -906,15 +873,15 @@ async function handleFinalConfirm(
   const isNo = /^(nao|não|n|2|no|alterar|cancelar)$/i.test(input);
 
   if (isYes) {
-    session.stage = "ETAPA16_CONFIRMATION";
+    session.stage = "ETAPA11_RATING";
     responses.push({
-      text: `✅ *Agendamento confirmado!*\n\nSeu atendimento está reservado na Garagem do Ka.\n\n📍 Endereço: *Rua das Oficinas, 100 - São Paulo, SP*\n🕒 Horário: *Segunda a sábado, 08:00 às 18:00*\n\nCancelamentos com até 2h de antecedência sem custo.\n\nPosso te ajudar com mais alguma coisa? 😊`,
+      text: `✅ *Tudo certo, ${session.customerName ?? "Cliente"}!*. 🎉\n\nSeu horário tá garantido — mal podemos esperar pra deixar seu carro brilhando. ✨\n\n📍 *Rua das Oficinas, 100 - SP*\n🕐 *Seg a Sáb, 08:00 às 18:00*\n\n📌 *Cancelamento até 2h antes sem custo.*\n📩 *Confirmação do agendamento será enviada 2h antes do horário.*\n\n─────────────────\n⭐ **Avaliação pós-serviço**\n\nGostou do atendimento? Avalie de 1 a 5!\n\n*1* - ⭐\n*2* - ⭐⭐\n*3* - ⭐⭐⭐\n*4* - ⭐⭐⭐⭐\n*5* - ⭐⭐⭐⭐⭐`,
     });
     return responses;
   }
 
-  responses.push({ text: "Tudo bem 😊 O que gostaria de alterar?" });
-  session.stage = "ETAPA2_MAIN_MENU";
+  responses.push({ text: "Sem problemas! Alterar algo? " });
+  resetSessionForNewStart(session);
   return responses;
 }
 
@@ -1040,7 +1007,7 @@ async function handleFAQ(
 }
 
 function buildPaymentOptionsText() {
-  return "**Pagamento**\n\n*1* PIX\n*2* Débito\n*3* Crédito\n*4* Dinheiro";
+  return "**Pagamento**\n\n*1* 💳 PIX\n*2* 💳 Cartão\n*3* 💵 Dinheiro";
 }
 
 function resetSessionForNewStart(session: TestSession) {
