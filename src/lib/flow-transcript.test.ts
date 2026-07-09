@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { processTestFlow, buildBudgetSummaryText } from "./test-bot-processor";
 import { isValidCustomerName, buildCalendarPrompt } from "./flow-validation";
 
-test("transcript completo valida fluxo alinhado ao WhatsApp flow", async () => {
+test("transcript completo valida fluxo antigo do test-bot", async () => {
   (globalThis as any).__BB_USE_PROMPT_FALLBACK__ = true;
 
   (globalThis as any).__BB_PRISMA_MOCK__ = {
@@ -125,6 +125,38 @@ test("transcript completo valida fluxo alinhado ao WhatsApp flow", async () => {
   assert.equal(session.stage, "ETAPA10_CONFIRM");
 
   res = await processTestFlow({ sessionId: "s1", message: "sim", session });
+  assert.equal(session.stage, "ETAPA11_RATING");
+  assert.match(res[0].text, /Tudo certo/i);
+});
+
+test("fluxo de coupon/payment/reminder segue o roteiro antigo do test-bot", async () => {
+  (globalThis as any).__BB_USE_PROMPT_FALLBACK__ = true;
+  const session: any = {
+    stage: "ETAPA7_TIME",
+    welcomed: true,
+    customerName: "Gustavo",
+    selectedService: "lavagem",
+    selectedServiceName: "Lavagem Simples",
+    selectedCategoryNumber: 1,
+    vehicle: { model: "Honda Civic", year: 2020, color: "preto", condition: "bom" },
+    quote: 75,
+    upsellValue: 0,
+    couponCode: null,
+    couponDiscount: null,
+    paymentMethod: null,
+    wantsReminder: null,
+  };
+
+  let res = await processTestFlow({ sessionId: "coupon-flow", message: "2", session });
+  assert.equal(session.stage, "ETAPA8_PAYMENT");
+
+  res = await processTestFlow({ sessionId: "coupon-flow", message: "1", session });
+  assert.equal(session.stage, "ETAPA9_REMINDER");
+
+  res = await processTestFlow({ sessionId: "coupon-flow", message: "1", session });
+  assert.equal(session.stage, "ETAPA10_CONFIRM");
+
+  res = await processTestFlow({ sessionId: "coupon-flow", message: "sim", session });
   assert.equal(session.stage, "ETAPA11_RATING");
   assert.match(res[0].text, /Tudo certo/i);
 });
