@@ -16,11 +16,13 @@ import {
   serviceDetail,
   formatHours,
 } from "./whatsapp-flow-messages";
+import { recordTestBotRating } from "./test-bot-evaluation-store";
 import { loadPromptMap } from "./bot-prompts";
 import { parseVehicleMessage } from "./whatsapp-vehicle-parse";
 import { loadWhatsAppCatalog } from "./whatsapp-service-catalog";
 
 interface TestSession {
+  sessionId: string;
   stage: string;
   welcomed: boolean;
   customerName: string | null;
@@ -894,6 +896,7 @@ async function handleRating(
     return responses;
   }
 
+  recordTestBotRating(session.sessionId ?? "unknown", rating);
   responses.push({ text: `🙏 Obrigado pela sua avaliação de ${rating} estrelas! Sua opinião ajuda a melhorar nosso serviço.` });
   resetSessionForNewStart(session);
   return responses;

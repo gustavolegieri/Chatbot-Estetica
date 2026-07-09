@@ -97,6 +97,7 @@ export async function POST(req: NextRequest) {
 
     // Salvar sessão
     testSessions.set(sessionId, {
+      sessionId,
       stage: "ETAPA1_AWAITING_NAME",
       welcomed: false,
       customerName: null,
