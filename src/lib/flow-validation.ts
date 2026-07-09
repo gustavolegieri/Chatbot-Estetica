@@ -95,23 +95,28 @@ export function buildCalendarPrompt(date = new Date()): string {
 
   const weeks: string[][] = [];
   let day = 1;
+
+  const cellWidth = 4;
+  const formatCell = (text: string) => text.padStart(cellWidth, " ");
+
   for (let row = 0; row < 6; row += 1) {
     const week: string[] = [];
     for (let col = 0; col < 7; col += 1) {
       if (row === 0 && col < startDay) {
-        week.push("   ");
+        week.push(formatCell(""));
       } else if (day > daysInMonth) {
-        week.push("   ");
+        week.push(formatCell(""));
       } else {
         const dayNumber = day.toString().padStart(2, "0");
         const isToday = day === today;
-        const marker = isToday
-          ? "["
-          : busyDays.has(day) ? "🔴"
-          : lightDays.has(day) ? "🟡"
-          : "🟢";
-        const cell = isToday ? `[${dayNumber}]` : `${marker}${dayNumber}`;
-        week.push(cell);
+        const cellText = isToday
+          ? `[${dayNumber}]`
+          : busyDays.has(day)
+          ? `🔴${dayNumber}`
+          : lightDays.has(day)
+          ? `🟡${dayNumber}`
+          : `🟢${dayNumber}`;
+        week.push(formatCell(cellText));
         day += 1;
       }
     }
@@ -119,7 +124,7 @@ export function buildCalendarPrompt(date = new Date()): string {
     if (day > daysInMonth) break;
   }
 
-  const rows = weeks.map((week) => week.join(" "));
+  const rows = weeks.map((week) => week.join(" ").trimEnd());
 
   return [
     `📅 ${monthNames[month]} ${year}`,

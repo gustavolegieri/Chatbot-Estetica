@@ -28,6 +28,8 @@ interface TestSession {
   selectedCategoryNumber?: number | null;
   selectedSubService: string | null;
   selectedServiceName: string | null;
+  lastInteractionAt?: number | null;
+  upsellOfferIndex?: number;
   couponCode?: string | null;
   couponDiscount?: number | null;
   vehiclePhotoAttached?: boolean;
@@ -72,6 +74,16 @@ export async function processTestFlow({
   session: TestSession;
 }): Promise<TestResponse[]> {
   const responses: TestResponse[] = [];
+  const now = Date.now();
+
+  if (session.lastInteractionAt && now - session.lastInteractionAt > 30 * 60 * 1000) {
+    resetSessionForNewStart(session);
+    session.lastInteractionAt = now;
+    responses.push({ text: buildWelcomeText() });
+    return responses;
+  }
+
+  session.lastInteractionAt = now;
   const prompts = await loadPromptMap();
 
   // 🚫 Handoff request detection (shared with WhatsApp flow)
@@ -147,6 +159,9 @@ export async function processTestFlow({
     case "ETAPA10_CONFIRM":
       return handleFinalConfirm(message, session, responses);
 
+    case "ETAPA11_RATING":
+      return handleRating(message, session, responses);
+
     case "ETAPA10_FAQ":
       return handleFAQ(message, session, responses);
 
@@ -180,6 +195,10 @@ const buildMainMenu = (categories: Record<number, { title: string; keys: string[
     .join("\n");
 };
 
+function buildWelcomeText(): string {
+  return "👋 Olá! Sou o Teste Bot da Garagem do Ka. Vamos começar? Me diz como posso te chamar.";
+}
+
 function calculateBasePrice(session: TestSession): number {
   const isSuv = isSuvLikeVehicle(session.vehicle.model ?? "");
   const isBad = session.vehicle.condition === "ruim";
@@ -190,6 +209,37 @@ function isSuvLikeVehicle(model: string | null): boolean {
   if (!model) return false;
   const t = model.toLowerCase();
   return /suv|pickup|picape|van|camionete|4x4|hilux|ranger|s10|toro|compass|renegade|t-cross|creta|hrv|sw4/i.test(t);
+}
+
+function getUpsellVariants(category: string | null) {
+  const variants: Record<string, { label: string; value: number }[]> = {
+    polimento: [
+      { label: "Proteção de Pintura Vitrificada", value: 85 },
+      { label: "Polimento Técnico + Brilho Extremo", value: 95 },
+      { label: "Revitalização de Cristalização", value: 90 },
+    ],
+    lavagem: [
+      { label: "Hidratação de Plásticos + Shine", value: 45 },
+      { label: "Impermeabilização de Tecidos", value: 55 },
+      { label: "Proteção NanoShield", value: 65 },
+    ],
+    interior: [
+      { label: "Aromatização Premium", value: 35 },
+      { label: "Limpeza de Couro + Hidratação", value: 70 },
+      { label: "Proteção Antibacteriana", value: 60 },
+    ],
+    protecao: [
+      { label: "Selante Cerâmico Rápido", value: 120 },
+      { label: "Proteção de Pintura Vitrificada", value: 85 },
+      { label: "Blindagem Leve de Pintura", value: 110 },
+    ],
+    default: [
+      { label: "Proteção de Pintura Vitrificada", value: 85 },
+      { label: "Aromatização Premium", value: 35 },
+      { label: "Hidratação de Plásticos + Shine", value: 45 },
+    ],
+  };
+  return variants[category ?? "default"] ?? variants.default;
 }
 
 function normalizeConditionValue(value: string): "excelente" | "bom" | "normal" | "ruim" {
@@ -533,9 +583,15 @@ async function handleQuoteStep(
     return responses;
   }
 
+  const offers = getUpsellVariants(session.selectedService);
+  const nextIndex = session.upsellOfferIndex ?? 0;
+  const offer = offers[nextIndex % offers.length];
+  session.upsellOfferIndex = (nextIndex + 1) % offers.length;
+  session.upsellOffer = offer;
+
   session.stage = "ETAPA6_UPSELL";
   responses.push({
-    text: "✨ Que tal adicionar *Proteção de Pintura Vitrificada*?\n\n💰 **R$ 85,00** a mais\n\n*1* - Sim, incluir\n*2* - Não, obrigado",
+    text: `✨ Que tal adicionar *${offer.label}*?\n\n💰 **R$ ${offer.value.toFixed(2)}** a mais\n\n*1* - Sim, incluir\n*2* - Não, obrigado`,
   });
   return responses;
 }
@@ -546,14 +602,17 @@ async function handleUpsell(
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
   const choice = message.trim();
+  const offer = session.upsellOffer ?? getUpsellVariants(session.selectedService)[0];
 
   if (choice === "1" || choice.toLowerCase() === "sim") {
     session.upsellAccepted = true;
-    session.upsellLabel = "Proteção de Pintura Vitrificada";
-    session.upsellValue = 85;
-    responses.push({ text: "✅ Incluído! " });
+    session.upsellLabel = offer.label;
+    session.upsellValue = offer.value;
+    responses.push({ text: `✅ Incluído! *${offer.label}* adicionado ao seu agendamento.` });
   } else {
-    responses.push({ text: "Tudo bem! " });
+    session.upsellAccepted = false;
+    session.upsellValue = 0;
+    responses.push({ text: "Tudo bem! Seguindo com o serviço principal." });
   }
 
   session.stage = "ETAPA7_DAY";
@@ -747,11 +806,33 @@ async function handleReminderStep(
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
   const input = message.trim().toLowerCase();
-  session.wantsReminder = /^(1|sim|s|quero|yes)$/.test(input);
-  session.stage = "ETAPA8_PAYMENT";
+  session.wantsReminder = /^(1|sim|s|quero|yes)$/i.test(input);
+  session.stage = "ETAPA10_CONFIRM";
 
-  responses.push({ text: session.wantsReminder ? "🔔 Lembrete ativado! " : "Ok! " });
-  responses.push({ text: buildPaymentOptionsText() });
+  const baseQuote = Number(session.quote ?? calculateBasePrice(session));
+  const complementValue = Number(session.upsellValue ?? 0);
+  const totalValue = baseQuote + complementValue;
+
+  const lines = [
+    "━━━━━━━━━━━━━━━",
+    "📋 **RESUMO DO AGENDAMENTO**",
+    `👤 ${session.customerName ?? "Cliente"}`,
+    `🧽 *${session.selectedServiceName ?? "Serviço"}*`,
+    `${session.upsellLabel ? `✨ + ${session.upsellLabel}` : ""}`,
+    `🚘 ${session.vehicle.model} ${session.vehicle.year ?? ""}`,
+    `📅 ${session.selectedDay ?? "—"}`,
+    `⏰ ${session.selectedTime ?? "—"}`,
+    `💳 ${session.paymentMethod}`,
+    `🔔 Lembrete 30 min antes: ${session.wantsReminder ? "sim" : "não"}`,
+    `💰 **R$ ${totalValue.toFixed(2).replace(".", ",")}**`,
+    "━━━━━━━━━━━━━━━",
+    "",
+    "⏱️ Cancelamento até 2h antes sem custo.",
+    "",
+    "✅ Confirma? (sim/não)",
+  ];
+
+  responses.push({ text: lines.join("\n") });
   return responses;
 }
 
@@ -772,28 +853,10 @@ async function handlePaymentSelection(
   }
 
   session.paymentMethod = paymentMethods[message.trim()];
-  session.stage = "ETAPA10_CONFIRM";
-
-  const baseQuote = Number(session.quote ?? calculateBasePrice(session));
-  const complementValue = Number(session.upsellValue ?? 0);
-  const totalValue = baseQuote + complementValue;
+  session.stage = "ETAPA9_REMINDER";
 
   responses.push({
-    text: [
-      "━━━━━━━━━━━━━━━",
-      "📋 **RESUMO DO AGENDAMENTO**",
-      `👤 ${session.customerName ?? "Cliente"}`,
-      `🧽 *${session.selectedServiceName ?? "Serviço"}*`,
-      `${session.upsellLabel ? `✨ + ${session.upsellLabel}` : ""}`,
-      `🚘 ${session.vehicle.model} ${session.vehicle.year ?? ""}`,
-      `📅 ${session.selectedDay ?? "—"}`,
-      `⏰ ${session.selectedTime ?? "—"}`,
-      `💳 ${session.paymentMethod}`,
-      `💰 **R$ ${totalValue.toFixed(2).replace(".", ",")}**`,
-      "━━━━━━━━━━━━━━━",
-      "",
-      "✅ Confirma? (sim/não)",
-    ].join("\n"),
+    text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
   });
   return responses;
 }
@@ -808,14 +871,30 @@ async function handleFinalConfirm(
   const isNo = /^(nao|não|n|2|no|alterar|cancelar)$/i.test(input);
 
   if (isYes) {
-    resetSessionForNewStart(session);
+    session.stage = "ETAPA11_RATING";
     responses.push({
-      text: `✅ *Tudo certo, ${session.customerName ?? "Cliente"}!*. 🎉\n\nSeu horário tá garantido — mal podemos esperar pra deixar seu carro brilhando. ✨\n\n📍 *Rua das Oficinas, 100 - SP*\n🕐 *Seg a Sáb, 08:00 às 18:00*\n\n📌 *Cancelamento até 2h antes sem custo.*\n\n─────────────────\n⭐ **Avaliação pós-serviço**\n\nGostou do atendimento? Avalie de 1 a 5!\n\n*1* - ⭐\n*2* - ⭐⭐\n*3* - ⭐⭐⭐\n*4* - ⭐⭐⭐⭐\n*5* - ⭐⭐⭐⭐⭐\n\nE indicou alguém? Ambos ganham 10% no próximo! 🤝\n\n─────────────────\nO fluxo foi encerrado. Envie uma nova mensagem para começar do zero.`,
+      text: `✅ *Tudo certo, ${session.customerName ?? "Cliente"}!*. 🎉\n\nSeu horário tá garantido — mal podemos esperar pra deixar seu carro brilhando. ✨\n\n📍 *Rua das Oficinas, 100 - SP*\n🕐 *Seg a Sáb, 08:00 às 18:00*\n\n📌 *Cancelamento até 2h antes sem custo.*\n📩 *Confirmação do agendamento será enviada 2h antes do horário.*\n\n─────────────────\n⭐ **Avaliação pós-serviço**\n\nGostou do atendimento? Avalie de 1 a 5!\n\n*1* - ⭐\n*2* - ⭐⭐\n*3* - ⭐⭐⭐\n*4* - ⭐⭐⭐⭐\n*5* - ⭐⭐⭐⭐⭐`,
     });
     return responses;
   }
 
   responses.push({ text: "Sem problemas! Alterar algo? " });
+  resetSessionForNewStart(session);
+  return responses;
+}
+
+async function handleRating(
+  message: string,
+  session: TestSession,
+  responses: TestResponse[]
+): Promise<TestResponse[]> {
+  const rating = parseInt(message.trim(), 10);
+  if (![1, 2, 3, 4, 5].includes(rating)) {
+    responses.push({ text: "Por favor, avalie com um número de 1 a 5." });
+    return responses;
+  }
+
+  responses.push({ text: `🙏 Obrigado pela sua avaliação de ${rating} estrelas! Sua opinião ajuda a melhorar nosso serviço.` });
   resetSessionForNewStart(session);
   return responses;
 }
