@@ -9,6 +9,7 @@ import {
   type CatalogItem,
 } from "./whatsapp-catalog";
 import { loadPromptMap, renderPrompt, type PromptMap } from "./bot-prompts";
+import { resolveServiceCategoryNum } from "./service-category";
 
 export interface WhatsAppCatalogContext {
   catalog: Record<string, CatalogItem>;
@@ -58,7 +59,7 @@ function buildCategoriesFromServices(
     .sort((a, b) => a.menuOrder - b.menuOrder || a.name.localeCompare(b.name));
 
   for (const s of whatsappServices) {
-    const catNum = s.categoryNum ?? 1;
+    const catNum = resolveServiceCategoryNum(s);
     if (!result[catNum]) {
       result[catNum] = { title: `Categoria ${catNum}`, keys: [] };
     }

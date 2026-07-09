@@ -6,6 +6,7 @@ import { AdminHeader } from "@/components/layout/AdminHeader";
 import { Modal } from "@/components/ui/Modal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatCurrency } from "@/lib/utils";
+import { resolveServiceCategoryNum } from "@/lib/service-category";
 
 interface Service {
   id: string;
@@ -103,7 +104,7 @@ export default function ServicosPage() {
   const groupedServices = useMemo(() => {
     const grouped = categoryOptions.map((option) => ({
       ...option,
-      services: services.filter((service) => (service.categoryNum ?? 1) === option.value),
+      services: services.filter((service) => resolveServiceCategoryNum(service) === option.value),
     }));
 
     return grouped.sort((a, b) => a.value - b.value);
@@ -187,7 +188,7 @@ export default function ServicosPage() {
         }
       />
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+      <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900 shadow-sm">
         Os serviços cadastrados aqui são usados automaticamente no catálogo do WhatsApp, no fluxo oficial e no fluxo de teste.
       </div>
 
