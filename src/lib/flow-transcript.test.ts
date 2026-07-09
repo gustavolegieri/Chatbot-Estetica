@@ -116,15 +116,55 @@ test("transcript completo valida fluxo alinhado ao WhatsApp flow", async () => {
   assert.equal(session.stage, "ETAPA7_TIME");
 
   res = await processTestFlow({ sessionId: "s1", message: "2", session });
+  assert.equal(session.stage, "ETAPA9_COUPON");
+
+  res = await processTestFlow({ sessionId: "s1", message: "não", session });
   assert.equal(session.stage, "ETAPA8_PAYMENT");
 
   res = await processTestFlow({ sessionId: "s1", message: "1", session });
-  assert.equal(session.stage, "ETAPA10_CONFIRM");
+  assert.equal(session.stage, "ETAPA14_REMINDER");
+
+  res = await processTestFlow({ sessionId: "s1", message: "1", session });
+  assert.equal(session.stage, "ETAPA15_SUMMARY_CONFIRM");
 
   res = await processTestFlow({ sessionId: "s1", message: "sim", session });
-  assert.equal(session.stage, "ETAPA1_AWAITING_NAME");
-  assert.equal(session.customerName, null);
-  assert.match(res[0].text, /Tudo certo/i);
+  assert.equal(session.stage, "ETAPA16_CONFIRMATION");
+  assert.match(res[0].text, /Agendamento confirmado/i);
+});
+
+test("fluxo de coupon/payment/reminder segue o mesmo roteiro do WhatsApp flow", async () => {
+  (globalThis as any).__BB_USE_PROMPT_FALLBACK__ = true;
+  const session: any = {
+    stage: "ETAPA7_TIME",
+    welcomed: true,
+    customerName: "Gustavo",
+    selectedService: "lavagem",
+    selectedServiceName: "Lavagem Simples",
+    selectedCategoryNumber: 1,
+    vehicle: { model: "Honda Civic", year: 2020, color: "preto", condition: "bom" },
+    quote: 75,
+    upsellValue: 0,
+    couponCode: null,
+    couponDiscount: null,
+    paymentMethod: null,
+    wantsReminder: null,
+  };
+
+  let res = await processTestFlow({ sessionId: "coupon-flow", message: "2", session });
+  assert.equal(session.stage, "ETAPA9_COUPON");
+
+  res = await processTestFlow({ sessionId: "coupon-flow", message: "não", session });
+  assert.equal(session.stage, "ETAPA8_PAYMENT");
+
+  res = await processTestFlow({ sessionId: "coupon-flow", message: "1", session });
+  assert.equal(session.stage, "ETAPA14_REMINDER");
+
+  res = await processTestFlow({ sessionId: "coupon-flow", message: "1", session });
+  assert.equal(session.stage, "ETAPA15_SUMMARY_CONFIRM");
+
+  res = await processTestFlow({ sessionId: "coupon-flow", message: "sim", session });
+  assert.equal(session.stage, "ETAPA16_CONFIRMATION");
+  assert.match(res[0].text, /Agendamento confirmado/i);
 });
 
 test("isValidCustomerName - validação de nome unitária", () => {
