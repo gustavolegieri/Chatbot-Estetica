@@ -18,14 +18,14 @@ export function resolveServiceCategoryNum(service: ServiceCategoryLike): number 
 
   const haystack = `${service.catalogKey ?? ""} ${service.name ?? ""} ${service.description ?? ""}`.toLowerCase();
 
-  if (/lavagem|lava|lavaj|chuveiro/.test(haystack)) return 1;
-  if (/polimento|polir|correção|correcao|retoque/.test(haystack)) return 2;
   if (/cristal|enceramento|vitrif|cera|protec|ceram|brilho|farol|farois/.test(haystack)) return 3;
   if (/higien|couro|estof|tecido|banco|tapete|interior/.test(haystack)) return 4;
   if (/revital|plasti|plastic|recondi|restaur/.test(haystack)) return 5;
   if (/motor|detalh|vidro|limpeza|descontamin|premium/.test(haystack)) return 6;
   if (/pacote|combo|kit|completo/.test(haystack)) return 7;
   if (/ajuda|consult|indeciso|escolh/.test(haystack)) return 8;
+  if (/polimento|polir|correção|correcao|retoque/.test(haystack)) return 2;
+  if (/lavagem|lava|lavaj|chuveiro/.test(haystack)) return 1;
 
   return 1;
 }

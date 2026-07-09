@@ -203,7 +203,7 @@ export default function ServicosPage() {
       ) : (
         <div className="space-y-4">
           {groupedServices.map((group) => (
-            <section key={group.value} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <section key={group.value} className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <h3 className="font-semibold text-slate-900">{group.label}</h3>
@@ -224,7 +224,7 @@ export default function ServicosPage() {
               ) : (
                 <div className="grid gap-3 lg:grid-cols-2">
                   {group.services.map((service) => (
-                    <div key={service.id} className="rounded-xl border border-slate-200 p-4">
+                    <div key={service.id} className="rounded-xl border border-amber-200 bg-white/80 p-4 shadow-sm">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="font-semibold text-slate-900">{service.name}</p>
