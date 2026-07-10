@@ -777,7 +777,7 @@ async function handleLogistics(
     session.pickupDeliveryFee = distance ? calculatePickupFee(distance.distanceKm, feePerKm, feeBase) : 0;
     session.awaitingPickupAddress = false;
     session.awaitingReturnPreference = true;
-    responses.push({ text: `📍 Endereço salvo. Quer que devolvamos o veículo até você após o serviço?\n\n*1* Sim\n*2* Não` });
+    responses.push({ text: `📍 Endereço salvo.\n💰 Taxa de busca (R$ ${feePerKm.toFixed(2)}/km × ${distance?.distanceKm ?? 0} km): R$ ${session.pickupDeliveryFee?.toFixed(2)}\n\nQuer que devolvamos o veículo até você após o serviço?\n\n*1* Sim\n*2* Não` });
     return responses;
   }
 
