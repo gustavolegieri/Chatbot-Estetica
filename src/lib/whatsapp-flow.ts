@@ -143,13 +143,15 @@ function clientDisplayName(flow: FlowState, pushName?: string): string {
 
 function storeVehicle(flow: FlowState, text: string): FlowState {
   const p = parseVehicleMessage(text);
+  const normalizedModel = (p.model || "").trim();
+  const normalizedCondition = normalizeConditionValue(p.condition || flow.vehicleCondition);
   return {
     ...flow,
     vehicleRaw: p.summary,
-    vehicleModel: p.model || flow.vehicleModel,
+    vehicleModel: normalizedModel || flow.vehicleModel,
     vehicleYear: p.year || flow.vehicleYear,
-    vehicleColor: p.color,
-    vehicleCondition: p.condition,
+    vehicleColor: p.color || flow.vehicleColor,
+    vehicleCondition: normalizedCondition,
     vehicleIsSuv: p.isSuv,
     vehicleCollectStep: undefined,
   };
@@ -1059,7 +1061,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         await saveFlow(msg.phone, { ...flow, ...parsed, vehicleConfirmed: false });
         await sendText({
           number: msg.phone,
-          text: `🚘 *Confirmando os dados do veículo*\n\nModelo: *${parsed.vehicleModel ?? "—"}*\nAno: *${parsed.vehicleYear ?? "—"}*\nCor: *${parsed.vehicleColor ?? "—"}*\nEstado: *${parsed.vehicleCondition ?? "—"}*\n\nEstá certo? (sim/não)`,
+          text: `🚘 *Confirmando os dados do veículo*\n\nModelo: *${parsed.vehicleModel || "—"}*\nAno: *${parsed.vehicleYear || "—"}*\nCor: *${parsed.vehicleColor || "—"}*\nEstado: *${parsed.vehicleCondition || "—"}*\n\nEstá certo? (sim/não)`,
         });
         return;
       }
@@ -1269,13 +1271,21 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         return;
       }
 
+      if (/^(1|sim|s|yes|tenho|com cupom)$/i.test(lower)) {
+        await sendText({
+          number: msg.phone,
+          text: `Perfeito 😊 Me envie o *código do cupom* (ex: *AA*).`,
+        });
+        return;
+      }
+
       if (await applyCouponPhase(msg, flow, lower, ctx, wctx, num, input)) {
         if (!flow.couponError) {
           flow.stage = "ETAPA9_PICKUP";
           await saveFlow(msg.phone, flow);
           await sendText({
             number: msg.phone,
-            text: `Quer que a gente busque e devolva seu carro? 🚗💨\n\n*1* Sim, quero o leva e traz\n*2* Não, vou levar até a loja`,
+            text: `Quer que a gente venha buscar o carro? 🚗💨\n\n*1* Sim, quero o leva e traz\n*2* Não, eu levo até a loja`,
           });
         }
         return;
@@ -1444,9 +1454,13 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       }
       flow.stage = "ETAPA15_SUMMARY_CONFIRM";
       await saveFlow(msg.phone, flow);
+      const totalValue = Math.max(0, Number(flow.quoteMin ?? 0) + Number(flow.pickupFee ?? 0) - Number(flow.couponDiscountApplied ?? 0));
+      const paymentMethod = flow.paymentMethod || "—";
+      const reminderText = flow.reminderEnabled ? "sim" : "não";
+      const pickupText = flow.needsPickup ? "sim" : "não";
       await sendText({
         number: msg.phone,
-        text: `━━━━━━━━━━━━━━━\n📋 *Resumo do agendamento*\n\n👤 Cliente: *${clientDisplayName(flow, msg.pushName)}*\n🧽 Serviço: *${flow.serviceLabel ?? "—"}*\n🚘 Veículo: *${vehicleDisplayFromFlow(flow)}*\n📅 Data: *${flow.dayLabel ?? flow.dayDate ?? "—"}*\n⏰ Horário: *${flow.startTime ?? "—"}*\n🎟️ Cupom: *${flow.couponCode?.toUpperCase() ?? "nenhum"}*\n� Leva e traz: *${flow.needsPickup ? "sim" : "não"}*\n📍 Endereço: *${flow.pickupAddress ?? "—"}*\n💳 Pagamento: *${flow.paymentMethod ?? "—"}*\n🔔 Lembrete: *${flow.reminderEnabled ? "sim" : "não"}*\n💰 Valor total: *R$ ${Math.max(0, Number(flow.quoteMin ?? 0) + Number(flow.pickupFee ?? 0) - Number(flow.couponDiscountApplied ?? 0)).toFixed(2).replace(".", ",")}*\n━━━━━━━━━━━━━━━\n\nConfirma o agendamento? (sim/não)`,
+        text: `━━━━━━━━━━━━━━━\n📋 *Resumo do agendamento*\n\n👤 Cliente: *${clientDisplayName(flow, msg.pushName)}*\n🧽 Serviço: *${flow.serviceLabel ?? "—"}*\n🚘 Veículo: *${vehicleDisplayFromFlow(flow) || "—"}*\n📅 Data: *${flow.dayLabel ?? flow.dayDate ?? "—"}*\n⏰ Horário: *${flow.startTime ?? "—"}*\n🎟️ Cupom: *${flow.couponCode?.toUpperCase() ?? "nenhum"}*\n🚚 Leva e traz: *${pickupText}*\n📍 Endereço: *${flow.pickupAddress ?? "—"}*\n💳 Pagamento: *${paymentMethod}*\n🔔 Lembrete: *${reminderText}*\n💰 Valor total: *R$ ${totalValue.toFixed(2).replace(".", ",")}*\n━━━━━━━━━━━━━━━\n\nConfirma o agendamento? (sim/não)`,
       });
       return;
     }

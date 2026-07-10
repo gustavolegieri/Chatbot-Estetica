@@ -656,16 +656,16 @@ async function handleCouponStep(
   const skip = shouldSkipCouponPrompt(input);
 
   if (skip) {
-    session.stage = "ETAPA10_LOGISTICS";
-    responses.push({ text: "🚚 Como prefere?\n\n*1* - Eu levo o carro até a loja\n*2* - A estética vai buscar o carro" });
-    return responses;
-  }
-
-  if (/^(1|sim|s|yes|ok|prosseguir)$/i.test(input)) {
     session.stage = "ETAPA9_REMINDER";
     responses.push({
       text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
     });
+    return responses;
+  }
+
+  if (/^(1|sim|s|yes|ok|prosseguir|tenho|com cupom)$/i.test(input)) {
+    session.stage = "ETAPA9_COUPON";
+    responses.push({ text: "💬 Me envie o código do cupom para validar.\n\nEx: *SAVE10*" });
     return responses;
   }
 

@@ -79,6 +79,7 @@ export function parseModelFromText(text: string): string | null {
 function cleanModelText(text: string): string {
   let t = text;
   t = t.replace(/(?:em\s+)?(?:bom|otimo|ótimo|excelente|ruim|regular|normal)\s+estado/gi, "");
+  t = t.replace(/\b(?:bom|otimo|ótimo|excelente|ruim|regular|normal)\b/gi, "");
   t = t.replace(/precisa\s+de\s+aten[çcç]ão/g, "");
   t = t.replace(/pouco\s+uso|bem\s+conservado|bem\s+cuidado|carro\s+novo|zero\s+km|seminovo/gi, "");
   t = t.replace(/\b(em|de|da|do|no|na|um|uma)\b\s*/gi, "");
@@ -101,7 +102,7 @@ export function parseVehicleMessage(text: string): ParsedVehicle {
     }
   }
 
-  if (/bom\s+estado|ótimo\s+estado|otimo\s+estado|excelente\s+estado|pouco\s+uso|bem\s+conservado|bem\s+cuidado/i.test(lower)) {
+  if (/bom\s+estado|ótimo\s+estado|otimo\s+estado|excelente\s+estado|pouco\s+uso|bem\s+conservado|bem\s+cuidado|\bbom\b/i.test(lower)) {
     condition = "bom";
   } else if (/ruim\s+estado|precisa\s+de\s+atenção|precisa\s+de\s+atencao|muito\s+sujo|gasto/i.test(lower)) {
     condition = "precisa de atenção";
