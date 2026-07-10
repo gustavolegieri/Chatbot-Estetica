@@ -759,7 +759,8 @@ async function handleLogistics(
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
   const input = message.trim();
-  const wantsDelivery = /^(1|busca|entrega|sim|s|delivery)$/i.test(input.toLowerCase());
+  const choice = input.trim();
+  const wantsDelivery = choice === "2" || /^(busca|entrega|sim|delivery)$/i.test(input.toLowerCase());
 
   if (session.awaitingPickupAddress) {
     const address = input.trim();
