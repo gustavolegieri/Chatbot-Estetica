@@ -628,22 +628,20 @@ async function handleUpsell(
   const choice = message.trim();
   const offer = session.upsellOffer ?? getUpsellVariants(session.selectedService)[0];
 
-  const couponPrompt = "🎟️ Você tem algum cupom de desconto?\n\n*1* Sim, tenho um cupom\n*2* Não tenho";
-
   if (choice === "1" || choice.toLowerCase() === "sim") {
     session.upsellAccepted = true;
     session.upsellLabel = offer.label;
     session.upsellValue = offer.value;
-    responses.push({ text: couponPrompt });
     responses.push({ text: `✅ Incluído! *${offer.label}* adicionado ao seu agendamento.` });
   } else {
     session.upsellAccepted = false;
     session.upsellValue = 0;
-    responses.push({ text: couponPrompt });
     responses.push({ text: "Tudo bem! Seguindo com o serviço principal." });
   }
 
-  session.stage = "ETAPA9_COUPON";
+  // After upsell, proceed directly to date selection like the official flow
+  session.stage = "ETAPA7_DAY";
+  responses.push({ text: buildCalendarPrompt(new Date()) });
   return responses;
 }
 
