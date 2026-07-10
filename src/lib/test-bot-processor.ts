@@ -641,9 +641,11 @@ async function handleUpsell(
     responses.push({ text: "Tudo bem! Seguindo com o serviço principal." });
   }
 
-  // After upsell, proceed directly to date selection like the official flow
-  session.stage = "ETAPA7_DAY";
-  responses.push({ text: buildCalendarPrompt(new Date()) });
+  // After upsell, ask about logistics before date selection
+  session.stage = "ETAPA10_LOGISTICS";
+  responses.push({
+    text: "🚚 Como prefere?\n\n*1* - Eu levo o carro até a loja\n*2* - A estética vai buscar o carro (+R$30)"
+  });
   return responses;
 }
 
