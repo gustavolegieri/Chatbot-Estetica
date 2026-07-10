@@ -6,8 +6,10 @@ import { sendText, sendMedia } from "./evolution-api";
 import {
   calculateEndTime,
   formatDurationLabel,
-  getAvailableSlots,
+  generateAvailableSlots,
+  overlapsExisting,
   parseTimeInput,
+  timeToMinutes,
 } from "./appointments";
 import { normalizePhone } from "./utils";
 import {
@@ -422,7 +424,7 @@ async function proceedToTimeSelection(
 
   if (!flow.dayDate) return;
 
-  const slots = await getAvailableSlots(flow.dayDate, durationMin);
+  const slots = await generateAvailableSlots(flow.dayDate, durationMin);
   flow.serviceDurationMin = durationMin;
   flow.availableSlots = slots;
   const { prompts } = wctx;
@@ -528,21 +530,46 @@ async function applyCouponToFlowValue(params: {
 
 async function createAppointment(flow: FlowState, phone: string) {
   const client = await prisma.client.findUnique({ where: { phone: normalizePhone(phone) } });
-  if (!client || !flow.dbServiceId || !flow.dayDate || !flow.startTime) return null;
+  if (!client || !flow.dbServiceId || !flow.dayDate || !flow.startTime) {
+    return { appointment: null, conflict: false };
+  }
 
 
 
 
   const service = await prisma.service.findUnique({ where: { id: flow.dbServiceId } });
-  if (!service) return null;
+  if (!service) {
+    return { appointment: null, conflict: false };
+  }
 
   const durationMin = flow.serviceDurationMin ?? service.durationMin;
+  const startMin = timeToMinutes(flow.startTime);
+  const date = parse(flow.dayDate, "yyyy-MM-dd", new Date());
+  const dayStart = new Date(date);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(date);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  const existing = await prisma.appointment.findMany({
+    where: {
+      date: {
+        gte: dayStart,
+        lt: dayEnd,
+      },
+      status: { notIn: ["CANCELLED", "NO_SHOW"] },
+    },
+    select: { startTime: true, endTime: true },
+  });
+
+  if (overlapsExisting(startMin, durationMin, existing)) {
+    return { appointment: null, conflict: true };
+  }
 
   const appointment = await prisma.appointment.create({
     data: {
       clientId: client.id,
       serviceId: service.id,
-      date: parse(flow.dayDate, "yyyy-MM-dd", new Date()),
+      date,
       startTime: flow.startTime,
       endTime: calculateEndTime(flow.startTime, durationMin),
       status: AppointmentStatus.CONFIRMED,
@@ -570,7 +597,7 @@ async function createAppointment(flow: FlowState, phone: string) {
     },
   });
 
-  return appointment;
+  return { appointment, conflict: false };
 }
 
 function faqAnswer(text: string, flow: FlowState): string | null {
@@ -1162,7 +1189,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       }
 
       if (flow.dayDate) {
-        const fresh = await getAvailableSlots(flow.dayDate, durationMin);
+        const fresh = await generateAvailableSlots(flow.dayDate, durationMin);
         if (!fresh.includes(chosen)) {
           flow.availableSlots = fresh;
           await saveFlow(msg.phone, flow);
@@ -1454,7 +1481,28 @@ async function confirmFinal(
   wctx: WhatsAppCatalogContext,
   includePix = false
 ) {
-  const appointment = await createAppointment(flow, msg.phone);
+  const result = await createAppointment(flow, msg.phone);
+  const appointment = result?.appointment;
+
+  if (result?.conflict) {
+    const durationMin = flow.serviceDurationMin ?? 60;
+    const fresh = await generateAvailableSlots(flow.dayDate ?? "", durationMin);
+    flow.availableSlots = fresh;
+    flow.startTime = undefined;
+    flow.periodLabel = undefined;
+    flow.stage = "ETAPA7_TIME";
+    await saveFlow(msg.phone, flow);
+    await sendText({
+      number: msg.phone,
+      text: `Esse horário acabou de ser reservado 😔\n\n${etapa7Time(
+        flow.dayLabel ?? flow.dayDate ?? "este dia",
+        fresh,
+        formatDurationLabel(durationMin),
+        wctx.prompts
+      )}`,
+    });
+    return;
+  }
 
   // Se houver cupom aplicado, registrar redemption vinculado ao agendamento
   if (appointment?.id && flow.couponCode) {

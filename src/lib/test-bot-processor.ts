@@ -20,6 +20,9 @@ import { recordTestBotRating } from "./test-bot-evaluation-store";
 import { loadPromptMap } from "./bot-prompts";
 import { parseVehicleMessage } from "./whatsapp-vehicle-parse";
 import { loadWhatsAppCatalog } from "./whatsapp-service-catalog";
+import { prisma } from "./prisma";
+import { buildAvailableSlotsForDay } from "./appointments";
+import { format } from "date-fns";
 
 interface TestSession {
   sessionId: string;
@@ -45,7 +48,9 @@ interface TestSession {
   quote: number | null;
   upsellOffer: any | null;
   selectedDay?: string | null;
+  selectedDateIso?: string | null;
   selectedTime?: string | null;
+  availableSlots?: string[] | null;
   paymentMethod?: string | null;
   wantsReminder?: boolean | null;
   upsellAccepted?: boolean;
@@ -722,6 +727,52 @@ async function handleLogistics(
   return responses;
 }
 
+async function getDynamicTimeSlots(session: TestSession, dateStr: string): Promise<string[]> {
+  const wctx = await loadWhatsAppCatalog(true);
+  const serviceKey = session.selectedSubService ?? session.selectedService ?? "lavagem_detalhada";
+  const service = wctx.servicesByKey[serviceKey];
+  const durationMin = service?.durationMin ?? 90;
+
+  const settings = await prisma.settings.findUnique({ where: { id: "default" } });
+  const fallbackSettings = {
+    businessHoursStart: "08:00",
+    businessHoursEnd: "18:00",
+    lunchBreakStart: null as string | null,
+    lunchBreakEnd: null as string | null,
+    slotDurationMin: 30,
+    workingDays: "1,2,3,4,5,6",
+  };
+
+  const existingAppointments = await prisma.appointment.findMany({
+    where: {
+      date: {
+        gte: new Date(`${dateStr}T00:00:00`),
+        lt: new Date(`${dateStr}T23:59:59.999`),
+      },
+      status: { notIn: ["CANCELLED", "NO_SHOW"] },
+    },
+    select: { startTime: true, endTime: true },
+  });
+
+  return buildAvailableSlotsForDay({
+    dateStr,
+    durationMin,
+    settings: settings
+      ? {
+          businessHoursStart: settings.businessHoursStart,
+          businessHoursEnd: settings.businessHoursEnd,
+          lunchBreakStart: settings.lunchBreakStart,
+          lunchBreakEnd: settings.lunchBreakEnd,
+          slotDurationMin: settings.slotDurationMin,
+          workingDays: settings.workingDays,
+        }
+      : fallbackSettings,
+    existingAppointments,
+    now: new Date(),
+    blockedWindow: null,
+  });
+}
+
 async function handleDateSelection(
   message: string,
   session: TestSession,
@@ -743,9 +794,14 @@ async function handleDateSelection(
       responses.push({ text: "❌ Domingo fechamos. " });
       return responses;
     }
+    const dateStr = format(today, "yyyy-MM-dd");
+    const slots = await getDynamicTimeSlots(session, dateStr);
     session.selectedDay = today.toLocaleDateString("pt-BR");
+    session.selectedDateIso = dateStr;
+    session.availableSlots = slots;
     session.stage = "ETAPA7_TIME";
-    responses.push({ text: `📅 *Hoje* (${today.toLocaleDateString("pt-BR")})\n\n⏰ Qual horário?\n\n*1* - 08:00\n*2* - 10:00\n*3* - 14:00\n*4* - 16:00 ` });
+    const optionsText = slots.length > 0 ? slots.map((time, i) => `*${i + 1}* - ${time}`).join("\n") : "Sem horários disponíveis";
+    responses.push({ text: `📅 *Hoje* (${today.toLocaleDateString("pt-BR")})\n\n⏰ Qual horário?\n\n${optionsText}` });
     return responses;
   }
 
@@ -757,9 +813,14 @@ async function handleDateSelection(
       responses.push({ text: "❌ Domingo fechamos. " });
       return responses;
     }
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    const slots = await getDynamicTimeSlots(session, dateStr);
     session.selectedDay = selectedDate.toLocaleDateString("pt-BR");
+    session.selectedDateIso = dateStr;
+    session.availableSlots = slots;
     session.stage = "ETAPA7_TIME";
-    responses.push({ text: `📅 ${selectedDate.toLocaleDateString("pt-BR", { weekday: "long" })}\n\n⏰ Horários?\n\n*1* - 08:00\n*2* - 10:00\n*3* - 14:00\n*4* - 16:00 ` });
+    const optionsText = slots.length > 0 ? slots.map((time, i) => `*${i + 1}* - ${time}`).join("\n") : "Sem horários disponíveis";
+    responses.push({ text: `📅 ${selectedDate.toLocaleDateString("pt-BR", { weekday: "long" })}\n\n⏰ Horários?\n\n${optionsText}` });
     return responses;
   }
 
@@ -781,23 +842,21 @@ async function handleTimeSelection(
     return responses;
   }
 
-  const timeSlots: Record<string, { start: string; end: string }> = {
-    "1": { start: "08:00", end: "10:00" },
-    "2": { start: "10:00", end: "12:00" },
-    "3": { start: "14:00", end: "16:00" },
-    "4": { start: "16:00", end: "18:00" },
-  };
+  const slots = session.availableSlots ?? [];
+  const choiceIndex = Number(message.trim());
+  const chosen = Number.isInteger(choiceIndex) && choiceIndex >= 1 && choiceIndex <= slots.length
+    ? slots[choiceIndex - 1]
+    : null;
 
-  if (!timeSlots[message.trim()]) {
+  if (!chosen) {
     responses.push({ text: "❌ Horário inválido. " });
     return responses;
   }
 
-  const slot = timeSlots[message.trim()];
-  session.selectedTime = `${slot.start} às ${slot.end}`;
+  session.selectedTime = chosen;
   session.stage = "ETAPA8_PAYMENT";
 
-  responses.push({ text: `⏰ *${slot.start}* — ótimo! ` });
+  responses.push({ text: `⏰ *${chosen}* — ótimo! ` });
   responses.push({ text: buildPaymentOptionsText() });
   return responses;
 }

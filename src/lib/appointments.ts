@@ -1,4 +1,4 @@
-import { addMinutes, format, parse, isBefore, isAfter } from "date-fns";
+import { addMinutes, format, parse } from "date-fns";
 import { prisma } from "./prisma";
 import { localDayRange, parseIsoDateLocal } from "./date-br";
 
@@ -44,7 +44,66 @@ function isInBlockedWindow(cursor: number, durationMin: number, blockStart?: str
   return cursor < bEnd && bStart < slotEnd;
 }
 
-export async function getAvailableSlots(
+export interface BuildAvailableSlotsForDayInput {
+  dateStr: string;
+  durationMin: number;
+  settings: {
+    businessHoursStart: string;
+    businessHoursEnd: string;
+    lunchBreakStart?: string | null;
+    lunchBreakEnd?: string | null;
+    slotDurationMin: number;
+    workingDays: string;
+  };
+  existingAppointments: { startTime: string; endTime: string }[];
+  now?: Date;
+  blockedWindow?: { blockStart?: string | null; blockEnd?: string | null } | null;
+}
+
+export function buildAvailableSlotsForDay({
+  dateStr,
+  durationMin,
+  settings,
+  existingAppointments,
+  now = new Date(),
+  blockedWindow,
+}: BuildAvailableSlotsForDayInput): string[] {
+  if (durationMin <= 0) return [];
+
+  const workingDays = settings.workingDays
+    .split(",")
+    .map((value) => Number(value.trim()))
+    .filter((value) => !Number.isNaN(value));
+  const date = parseIsoDateLocal(dateStr);
+  const dayOfWeek = date.getDay();
+
+  if (!workingDays.includes(dayOfWeek)) return [];
+
+  const [startH, startM] = settings.businessHoursStart.split(":").map(Number);
+  const [endH, endM] = settings.businessHoursEnd.split(":").map(Number);
+  const dayStartMin = startH * 60 + startM;
+  const dayEndMin = endH * 60 + endM;
+
+  if (dayStartMin >= dayEndMin) return [];
+
+  const slots: string[] = [];
+  const step = Math.max(1, Number(settings.slotDurationMin) || 30);
+  const isToday = format(date, "yyyy-MM-dd") === format(now, "yyyy-MM-dd");
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+
+  for (let cursor = dayStartMin; cursor + durationMin <= dayEndMin; cursor += step) {
+    if (isToday && cursor < nowMin) continue;
+    if (isInLunchBreak(cursor, durationMin, settings.lunchBreakStart, settings.lunchBreakEnd)) continue;
+    if (isInBlockedWindow(cursor, durationMin, blockedWindow?.blockStart, blockedWindow?.blockEnd)) continue;
+    if (!overlapsExisting(cursor, durationMin, existingAppointments)) {
+      slots.push(minutesToTime(cursor));
+    }
+  }
+
+  return slots;
+}
+
+export async function generateAvailableSlots(
   dateStr: string,
   durationMin: number,
   excludeAppointmentId?: string
@@ -52,25 +111,10 @@ export async function getAvailableSlots(
   const settings = await prisma.settings.findUnique({ where: { id: "default" } });
   if (!settings) return [];
 
-  const workingDays = settings.workingDays.split(",").map(Number);
-  const date = parseIsoDateLocal(dateStr);
-  const dayOfWeek = date.getDay();
-
-  if (!workingDays.includes(dayOfWeek)) return [];
-
   const { gte: dayStart, lt: dayEnd } = localDayRange(dateStr);
-
-  const blocked = await prisma.blockedDate.findUnique({
-    where: { date: dayStart },
-  });
+  const blocked = await prisma.blockedDate.findUnique({ where: { date: dayStart } });
 
   if (blocked && !blocked.blockStart && !blocked.blockEnd) return [];
-
-  const [startH, startM] = settings.businessHoursStart.split(":").map(Number);
-  const [endH, endM] = settings.businessHoursEnd.split(":").map(Number);
-
-  const dayStartMin = startH * 60 + startM;
-  const dayEndMin = endH * 60 + endM;
 
   const existing = await prisma.appointment.findMany({
     where: {
@@ -84,24 +128,24 @@ export async function getAvailableSlots(
     select: { startTime: true, endTime: true },
   });
 
-  const slots: string[] = [];
-  const step = settings.slotDurationMin;
-  const isToday = format(date, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
-  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-
-  if (durationMin <= 0) return [];
-
-  for (let cursor = dayStartMin; cursor + durationMin <= dayEndMin; cursor += step) {
-    if (isToday && cursor < nowMin) continue;
-    if (isInLunchBreak(cursor, durationMin, settings.lunchBreakStart, settings.lunchBreakEnd)) continue;
-    if (isInBlockedWindow(cursor, durationMin, blocked?.blockStart, blocked?.blockEnd)) continue;
-    if (!overlapsExisting(cursor, durationMin, existing)) {
-      slots.push(minutesToTime(cursor));
-    }
-  }
-
-  return slots;
+  return buildAvailableSlotsForDay({
+    dateStr,
+    durationMin,
+    settings: {
+      businessHoursStart: settings.businessHoursStart,
+      businessHoursEnd: settings.businessHoursEnd,
+      lunchBreakStart: settings.lunchBreakStart,
+      lunchBreakEnd: settings.lunchBreakEnd,
+      slotDurationMin: settings.slotDurationMin,
+      workingDays: settings.workingDays,
+    },
+    existingAppointments: existing,
+    now: new Date(),
+    blockedWindow: blocked,
+  });
 }
+
+export const getAvailableSlots = generateAvailableSlots;
 
 export function calculateEndTime(startTime: string, durationMin: number): string {
   const base = parse(startTime, "HH:mm", new Date());

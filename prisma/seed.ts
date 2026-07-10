@@ -20,6 +20,30 @@ function menuOrderForKey(key: string): number {
   return 0;
 }
 
+const durationByKey: Record<string, number> = {
+  lavagem_simples: 60,
+  lavagem_completa: 90,
+  lavagem_detalhada: 120,
+  limpeza_motor: 60,
+  cristalizacao_farois: 90,
+  descontaminacao_pintura: 60,
+  descontaminacao_vidro: 60,
+  higienizacao_tecido: 90,
+  higienizacao_couro: 90,
+  higienizacao_tecido_completa: 150,
+  higienizacao_couro_completa: 150,
+  polimento_cotacao: 240,
+  revitalizacao_pintura: 360,
+  descontaminacao: 150,
+  limpeza_premium: 180,
+  pacotes: 480,
+  indeciso: 0,
+};
+
+function durationForKey(key: string): number {
+  return durationByKey[key] ?? 120;
+}
+
 async function main() {
   const passwordHash = await bcrypt.hash("admin123", 12);
 
@@ -36,12 +60,28 @@ async function main() {
 
   await prisma.settings.upsert({
     where: { id: "default" },
-    update: { sessionResetMin: 30 },
+    update: {
+      businessName: "Garagem do Ka",
+      businessPhone: "(11) 99999-9999",
+      businessAddress: "Rua das Oficinas, 100 - São Paulo, SP",
+      businessHoursStart: "08:00",
+      businessHoursEnd: "18:00",
+      slotDurationMin: 30,
+      workingDays: "1,2,3,4,5,6",
+      lunchBreakStart: "12:00",
+      lunchBreakEnd: "13:00",
+      sessionResetMin: 30,
+      whatsappWelcomeMsg: "Olá! Bem-vindo à Garagem do Ka 🚗 Estética automotiva premium.",
+    },
     create: {
       id: "default",
       businessName: "Garagem do Ka",
       businessPhone: "(11) 99999-9999",
       businessAddress: "Rua das Oficinas, 100 - São Paulo, SP",
+      businessHoursStart: "08:00",
+      businessHoursEnd: "18:00",
+      slotDurationMin: 30,
+      workingDays: "1,2,3,4,5,6",
       lunchBreakStart: "12:00",
       lunchBreakEnd: "13:00",
       sessionResetMin: 30,
@@ -65,33 +105,12 @@ async function main() {
   for (const [key, item] of Object.entries(CATALOG)) {
     if (key === "indeciso") continue;
 
-    const existing = await prisma.service.findFirst({ where: { catalogKey: key } });
     const basePrice = item.hatchMin > 0 ? item.hatchMin : 0;
-    const durationMap: Record<string, number> = {
-      lavagem_simples: 60,
-      lavagem_completa: 90,
-      lavagem_detalhada: 120,
-      limpeza_motor: 60,
-      cristalizacao_farois: 90,
-      descontaminacao_pintura: 60,
-      descontaminacao_vidro: 60,
-      higienizacao_tecido: 90,
-      higienizacao_couro: 90,
-      higienizacao_tecido_completa: 150,
-      higienizacao_couro_completa: 150,
-      polimento_cotacao: 240,
-      revitalizacao_pintura: 360,
-      descontaminacao: 150,
-      limpeza_premium: 180,
-      pacotes: 480,
-      indeciso: 0,
-    };
-
     const data = {
       name: item.label,
       description: item.short,
       price: basePrice > 0 ? basePrice : 0,
-      durationMin: durationMap[key] ?? 120,
+      durationMin: durationForKey(key),
       active: true,
       catalogKey: key,
       categoryNum: categoryForKey(key),
@@ -106,13 +125,12 @@ async function main() {
       showInWhatsApp: true,
     };
 
-    if (existing) {
-      const updated = await prisma.service.update({ where: { id: existing.id }, data });
-      serviceIds[key] = updated.id;
-    } else {
-      const created = await prisma.service.create({ data });
-      serviceIds[key] = created.id;
-    }
+    const upserted = await prisma.service.upsert({
+      where: { catalogKey: key },
+      update: data,
+      create: data,
+    });
+    serviceIds[key] = upserted.id;
   }
 
   for (const [key, upsell] of Object.entries(UPSELL_BY_KEY)) {

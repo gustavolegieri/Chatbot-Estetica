@@ -8,6 +8,317 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+model User {
+  id               String            @id @default(cuid())
+  email            String            @unique
+  name             String
+  password         String
+  role             UserRole          @default(OPERATOR)
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  financialRecords FinancialRecord[]
+}
+
+model Client {
+  id                String             @id @default(cuid())
+  name              String
+  phone             String             @unique
+  email             String?
+  vehiclePlate      String?
+  vehicleModel      String?
+  notes             String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  appointments      Appointment[]
+  couponRedemptions CouponRedemption[]
+  whatsappMessages  WhatsAppMessage[]
+  whatsappSessions  WhatsAppSession[]
+}
+
+model Service {
+  id               String            @id @default(cuid())
+  name             String
+  description      String?
+  price            Decimal           @db.Decimal(10, 2)
+  durationMin      Int               @default(60)
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  catalogKey       String?           @unique
+  categoryNum      Int?
+  menuOrder        Int               @default(0)
+  priceHatchMax    Decimal?          @db.Decimal(10, 2)
+  priceHatchMin    Decimal?          @db.Decimal(10, 2)
+  priceSuvMax      Decimal?          @db.Decimal(10, 2)
+  priceSuvMin      Decimal?          @db.Decimal(10, 2)
+  showInWhatsApp   Boolean           @default(true)
+  timeEstimate     String?
+  upsellBenefit    String?
+  upsellServiceId  String?
+  whatsappDetail   String?
+  whatsappPitch    String?
+  whatsappShort    String?
+  appointments     Appointment[]
+  financialRecords FinancialRecord[]
+  upsellService    Service?          @relation("ServiceUpsell", fields: [upsellServiceId], references: [id])
+  upsellFor        Service[]         @relation("ServiceUpsell")
+  media            ServiceMedia[]
+}
+
+model Appointment {
+  id                   String            @id @default(cuid())
+  clientId             String
+  serviceId            String
+  date                 DateTime
+  startTime            String
+  endTime              String
+  status               AppointmentStatus @default(PENDING)
+  notes                String?
+  source               String            @default("admin")
+  reminderSentAt       DateTime?
+  reminder4hSentAt     DateTime?
+  confirmWarningSentAt DateTime?
+  clientConfirmedAt    DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  client               Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  service              Service           @relation(fields: [serviceId], references: [id])
+  financialRecords     FinancialRecord[]
+
+  @@index([date])
+  @@index([clientId])
+  @@index([status])
+}
+
+model FinancialRecord {
+  id            String            @id @default(cuid())
+  type          FinancialType
+  category      FinancialCategory @default(OTHER)
+  amount        Decimal           @db.Decimal(10, 2)
+  description   String
+  date          DateTime          @default(now())
+  appointmentId String?
+  serviceId     String?
+  userId        String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  appointment   Appointment?      @relation(fields: [appointmentId], references: [id])
+  service       Service?          @relation(fields: [serviceId], references: [id])
+  user          User?             @relation(fields: [userId], references: [id])
+
+  @@index([date])
+  @@index([type])
+}
+
+model Settings {
+  id                    String   @id @default("default")
+  businessName          String   @default("Estética Automotiva")
+  businessPhone         String?
+  businessAddress       String?
+  businessHoursStart    String   @default("08:00")
+  businessHoursEnd      String   @default("18:00")
+  slotDurationMin       Int      @default(60)
+  workingDays           String   @default("1,2,3,4,5,6")
+  whatsappEnabled       Boolean  @default(true)
+  whatsappWelcomeMsg    String   @default("Olá! Bem-vindo à nossa estética automotiva. Como posso ajudar?")
+  evolutionApiUrl       String?
+  evolutionApiKey       String?
+  evolutionInstanceName String?
+  pixKey                String?
+  pixHolderName         String?
+  pixBank               String?
+  updatedAt             DateTime @updatedAt
+  autoCancelMin         Int      @default(10)
+  followupIdleMin       Int      @default(10)
+  lunchBreakEnd         String?
+  lunchBreakStart       String?
+  reminder30minMin      Int      @default(30)
+  reminder4hMin         Int      @default(240)
+  sessionResetMin       Int      @default(30)
+}
+
+model Brand {
+  id          String   @id @default("default")
+  displayName String?
+  themeColor  String?
+  logoPath    String?
+  updatedAt   DateTime @updatedAt
+}
+
+model NotificationSetting {
+  id                         String   @id @default("default")
+  notifyNewAppointment       Boolean  @default(true)
+  notifyClientHandoff        Boolean  @default(true)
+  notifyCancelledAppointment Boolean  @default(true)
+  notifyMonthlyGoal          Boolean  @default(false)
+  monthlyGoalAmount          Decimal? @db.Decimal(10, 2)
+  notifyByEmail              Boolean  @default(false)
+  notifyEmailAddress         String?
+  updatedAt                  DateTime @updatedAt
+}
+
+model Coupon {
+  id               String             @id @default(cuid())
+  code             String             @unique
+  type             String             @default("percent")
+  amount           Decimal            @db.Decimal(10, 2)
+  validFrom        DateTime?
+  validTo          DateTime?
+  usageLimit       Int?
+  usagePerCustomer Int?               @default(1)
+  active           Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  redemptions      CouponRedemption[]
+}
+
+model CouponRedemption {
+  id            String   @id @default(cuid())
+  couponId      String
+  clientId      String
+  appointmentId String?
+  amountApplied Decimal? @db.Decimal(10, 2)
+  createdAt     DateTime @default(now())
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  coupon        Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  @@index([couponId])
+  @@index([clientId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String
+  data      Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model ServiceMedia {
+  id        String   @id @default(cuid())
+  serviceId String?
+  filename  String
+  path      String
+  mimeType  String
+  size      Int
+  createdAt DateTime @default(now())
+  service   Service? @relation(fields: [serviceId], references: [id])
+
+  @@index([serviceId])
+}
+
+model BotPrompt {
+  key       String   @id
+  label     String
+  category  String   @default("geral")
+  content   String
+  hint      String?
+  updatedAt DateTime @updatedAt
+}
+
+model BlockedDate {
+  id         String   @id @default(cuid())
+  date       DateTime @unique @db.Date
+  reason     String
+  isHoliday  Boolean  @default(false)
+  blockStart String?
+  blockEnd   String?
+  createdAt  DateTime @default(now())
+}
+
+model BlockedPhone {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  reason    String   @default("Bloqueado pelo administrador")
+  createdAt DateTime @default(now())
+}
+
+model WhatsAppSession {
+  id                   String              @id @default(cuid())
+  clientId             String?
+  phone                String              @unique
+  step                 WhatsAppSessionStep @default(IDLE)
+  selectedServiceId    String?
+  selectedDate         String?
+  selectedTime         String?
+  pendingAppointmentId String?
+  metadata             Json?
+  updatedAt            DateTime            @updatedAt
+  createdAt            DateTime            @default(now())
+  botPaused            Boolean             @default(false)
+  handoffAt            DateTime?
+  handoffNote          String?
+  handoffReason        String?
+  handoffResolvedAt    DateTime?
+  handoffStatus        HandoffStatus       @default(NONE)
+  lastMessageAt        DateTime?
+  lastMessagePreview   String?
+  unreadCount          Int                 @default(0)
+  messages             WhatsAppMessage[]
+  client               Client?             @relation(fields: [clientId], references: [id])
+
+  @@index([handoffStatus])
+  @@index([lastMessageAt])
+  @@index([updatedAt])
+}
+
+model WhatsAppMessage {
+  id        String           @id @default(cuid())
+  sessionId String?
+  phone     String
+  clientId  String?
+  direction MessageDirection
+  sender    MessageSender
+  body      String
+  flowStage String?
+  createdAt DateTime         @default(now())
+  client    Client?          @relation(fields: [clientId], references: [id])
+  session   WhatsAppSession? @relation(fields: [sessionId], references: [id])
+
+  @@index([phone])
+  @@index([sessionId])
+  @@index([createdAt])
+  @@index([clientId])
+}
+
+model Campaign {
+  id              String          @id @default(cuid())
+  name            String
+  message         String
+  selectorType    String
+  selectorMeta    Json?
+  status          CampaignStatus  @default(DRAFT)
+  totalRecipients Int?
+  successCount    Int             @default(0)
+  failCount       Int             @default(0)
+  createdById     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  queue           CampaignQueue[]
+}
+
+model CampaignQueue {
+  id         String      @id @default(cuid())
+  campaignId String
+  phone      String
+  name       String?
+  status     QueueStatus @default(PENDING)
+  attempts   Int         @default(0)
+  lastError  String?
+  queuedAt   DateTime    @default(now())
+  sentAt     DateTime?
+  campaign   Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([status])
+}
+
 enum UserRole {
   ADMIN
   OPERATOR
@@ -65,297 +376,6 @@ enum HandoffStatus {
   RESOLVED
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  password  String
-  role      UserRole @default(OPERATOR)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  financialRecords FinancialRecord[]
-}
-
-model Client {
-  id           String   @id @default(cuid())
-  name         String
-  phone        String   @unique
-  email        String?
-  vehiclePlate String?
-  vehicleModel String?
-  notes        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  appointments     Appointment[]
-  whatsappSessions WhatsAppSession[]
-  whatsappMessages WhatsAppMessage[]
-  couponRedemptions CouponRedemption[]
-}
-
-model Service {
-  id              String   @id @default(cuid())
-  name            String
-  description     String?
-  price           Decimal  @db.Decimal(10, 2)
-  durationMin     Int      @default(60)
-  active          Boolean  @default(true)
-  catalogKey      String?  @unique
-  categoryNum     Int?
-  menuOrder       Int      @default(0)
-  whatsappPitch   String?
-  whatsappShort   String?
-  whatsappDetail  String?  @db.Text
-  priceHatchMin   Decimal? @db.Decimal(10, 2)
-  priceHatchMax   Decimal? @db.Decimal(10, 2)
-  priceSuvMin     Decimal? @db.Decimal(10, 2)
-  priceSuvMax     Decimal? @db.Decimal(10, 2)
-  timeEstimate    String?
-  upsellServiceId String?
-  upsellBenefit   String?
-  showInWhatsApp  Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  upsellService    Service?  @relation("ServiceUpsell", fields: [upsellServiceId], references: [id], onDelete: SetNull)
-  upsellFor        Service[] @relation("ServiceUpsell")
-  appointments     Appointment[]
-  financialRecords FinancialRecord[]
-  media            ServiceMedia[]
-}
-
-model Appointment {
-  id        String            @id @default(cuid())
-  clientId  String
-  serviceId String
-  date      DateTime
-  startTime String
-  endTime   String
-  status          AppointmentStatus @default(PENDING)
-  notes           String?
-  source          String            @default("admin")
-  reminderSentAt         DateTime?
-  reminder4hSentAt       DateTime?
-  confirmWarningSentAt   DateTime?
-  clientConfirmedAt      DateTime?
-  createdAt              DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-
-  client           Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  service          Service           @relation(fields: [serviceId], references: [id])
-  financialRecords FinancialRecord[]
-
-  @@index([date])
-  @@index([clientId])
-  @@index([status])
-}
-
-model FinancialRecord {
-  id            String            @id @default(cuid())
-  type          FinancialType
-  category      FinancialCategory @default(OTHER)
-  amount        Decimal           @db.Decimal(10, 2)
-  description   String
-  date          DateTime          @default(now())
-  appointmentId String?
-  serviceId     String?
-  userId        String?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-
-  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
-  service     Service?     @relation(fields: [serviceId], references: [id], onDelete: SetNull)
-  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([date])
-  @@index([type])
-}
-
-model Settings {
-  id                    String  @id @default("default")
-  businessName          String  @default("Estética Automotiva")
-  businessPhone         String?
-  businessAddress       String?
-  businessHoursStart    String  @default("08:00")
-  businessHoursEnd      String  @default("18:00")
-  lunchBreakStart       String?
-  lunchBreakEnd         String?
-  slotDurationMin       Int     @default(60)
-  workingDays           String  @default("1,2,3,4,5,6")
-  whatsappEnabled       Boolean @default(true)
-  whatsappWelcomeMsg    String  @default("Olá! Bem-vindo à nossa estética automotiva. Como posso ajudar?")
-  evolutionApiUrl       String?
-  evolutionApiKey       String?
-  evolutionInstanceName String?
-  pixKey                String?
-  pixHolderName         String?
-  pixBank               String?
-  sessionResetMin       Int     @default(30)
-  followupIdleMin       Int     @default(10)
-  reminder4hMin         Int     @default(240)
-  reminder30minMin      Int     @default(30)
-  autoCancelMin         Int     @default(10)
-  updatedAt             DateTime @updatedAt
-}
-
-model Brand {
-  id         String   @id @default("default")
-  displayName String? 
-  themeColor  String? 
-  logoPath    String? 
-  updatedAt  DateTime @updatedAt
-}
-
-model NotificationSetting {
-  id                          String  @id @default("default")
-  notifyNewAppointment        Boolean @default(true)
-  notifyClientHandoff         Boolean @default(true)
-  notifyCancelledAppointment  Boolean @default(true)
-  notifyMonthlyGoal           Boolean @default(false)
-  monthlyGoalAmount           Decimal? @db.Decimal(10, 2)
-  notifyByEmail               Boolean @default(false)
-  notifyEmailAddress          String? 
-  updatedAt                   DateTime @updatedAt
-}
-
-model Coupon {
-  id         String   @id @default(cuid())
-  code       String   @unique
-  type       String   @default("percent")
-  amount     Decimal  @db.Decimal(10, 2)
-  validFrom  DateTime?
-  validTo    DateTime?
-  usageLimit Int?
-  usagePerCustomer Int? @default(1)
-  active     Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  redemptions CouponRedemption[]
-}
-
-model CouponRedemption {
-  id         String   @id @default(cuid())
-  couponId   String
-  clientId   String
-  appointmentId String?
-  amountApplied Decimal? @db.Decimal(10,2)
-  createdAt  DateTime @default(now())
-
-  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
-  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  @@index([couponId])
-  @@index([clientId])
-}
-
-model AuditLog {
-  id        String   @id @default(cuid())
-  userId    String?
-  action    String
-  resource  String
-  data      Json?
-  ip        String?
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([createdAt])
-}
-
-model ServiceMedia {
-  id         String   @id @default(cuid())
-  serviceId  String?
-  filename   String
-  path       String
-  mimeType   String
-  size       Int
-  createdAt  DateTime @default(now())
-
-  service Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
-
-  @@index([serviceId])
-}
-
-model BotPrompt {
-  key       String   @id
-  label     String
-  category  String   @default("geral")
-  content   String   @db.Text
-  hint      String?
-  updatedAt DateTime @updatedAt
-}
-
-model BlockedDate {
-  id         String   @id @default(cuid())
-  date       DateTime @db.Date
-  reason     String
-  isHoliday  Boolean  @default(false)
-  blockStart String?
-  blockEnd   String?
-  createdAt  DateTime @default(now())
-
-  @@unique([date])
-}
-
-model BlockedPhone {
-  id        String   @id @default(cuid())
-  phone     String   @unique
-  reason    String   @default("Bloqueado pelo administrador")
-  createdAt DateTime @default(now())
-}
-
-
-model WhatsAppSession {
-  id                   String              @id @default(cuid())
-  clientId             String?
-  phone                String              @unique
-  step                 WhatsAppSessionStep @default(IDLE)
-  selectedServiceId    String?
-  selectedDate         String?
-  selectedTime         String?
-  pendingAppointmentId String?
-  metadata             Json?
-  handoffStatus        HandoffStatus       @default(NONE)
-  handoffAt            DateTime?
-  handoffReason        String?
-  handoffNote          String?
-  handoffResolvedAt    DateTime?
-  botPaused            Boolean             @default(false)
-  lastMessageAt        DateTime?
-  lastMessagePreview   String?
-  unreadCount          Int                 @default(0)
-  updatedAt            DateTime            @updatedAt
-  createdAt            DateTime            @default(now())
-
-  client   Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  messages WhatsAppMessage[]
-
-  @@index([handoffStatus])
-  @@index([lastMessageAt])
-  @@index([updatedAt])
-}
-
-model WhatsAppMessage {
-  id        String           @id @default(cuid())
-  sessionId String?
-  phone     String
-  clientId  String?
-  direction MessageDirection
-  sender    MessageSender
-  body      String           @db.Text
-  flowStage String?
-  createdAt DateTime         @default(now())
-
-  session WhatsAppSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
-  client  Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
-
-  @@index([phone])
-  @@index([sessionId])
-  @@index([createdAt])
-  @@index([clientId])
-}
-
 enum CampaignStatus {
   DRAFT
   RUNNING
@@ -368,38 +388,4 @@ enum QueueStatus {
   SENDING
   SENT
   FAILED
-}
-
-model Campaign {
-  id              String         @id @default(cuid())
-  name            String
-  message         String         @db.Text
-  selectorType    String         // all | inactive | service
-  selectorMeta    Json?
-  status          CampaignStatus @default(DRAFT)
-  totalRecipients Int? 
-  successCount    Int     @default(0)
-  failCount       Int     @default(0)
-  createdById     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  queue CampaignQueue[]
-}
-
-model CampaignQueue {
-  id         String    @id @default(cuid())
-  campaignId String
-  phone      String
-  name       String?
-  status     QueueStatus @default(PENDING)
-  attempts   Int       @default(0)
-  lastError  String?
-  queuedAt   DateTime  @default(now())
-  sentAt     DateTime?
-
-  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-
-  @@index([campaignId])
-  @@index([status])
 }
