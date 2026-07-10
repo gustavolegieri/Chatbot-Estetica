@@ -183,8 +183,8 @@ async function goToVehicleStep(msg: IncomingMessage, flow: FlowState, wctx: What
   await sendText({ number: msg.phone, text: etapa4Vehicle(false, wctx.prompts) });
 }
 
-function normalizeConditionValue(value: string): "excelente" | "bom" | "normal" | "ruim" {
-  const normalized = (value || "").toLowerCase().trim();
+function normalizeConditionValue(value: string | null | undefined): "excelente" | "bom" | "normal" | "ruim" {
+  const normalized = (value ?? "").toLowerCase().trim();
   if (!normalized) return "normal";
   if (/(excelente|novo|zero km|seminovo|otimo|ótimo)/.test(normalized)) return "excelente";
   if (/(bom|bom estado|pouco uso|bem|limpo)/.test(normalized)) return "bom";
