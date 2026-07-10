@@ -28,6 +28,9 @@ model Client {
   vehiclePlate      String?
   vehicleModel      String?
   notes             String?
+  address           String?
+  addressLat        Decimal?           @db.Decimal(10, 7)
+  addressLng        Decimal?           @db.Decimal(10, 7)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   appointments      Appointment[]
@@ -80,10 +83,19 @@ model Appointment {
   reminder4hSentAt     DateTime?
   confirmWarningSentAt DateTime?
   clientConfirmedAt    DateTime?
+  needsPickup          Boolean           @default(false)
+  needsReturn          Boolean           @default(false)
+  pickupAddress        String?
+  pickupDistanceKm     Decimal?          @db.Decimal(6, 2)
+  pickupFee            Decimal?          @db.Decimal(10, 2)
+  couponId             String?
+  couponDiscount       Decimal?          @db.Decimal(10, 2)
+  finalPrice           Decimal?          @db.Decimal(10, 2)
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   client               Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
   service              Service           @relation(fields: [serviceId], references: [id])
+  coupon               Coupon?           @relation(fields: [couponId], references: [id])
   financialRecords     FinancialRecord[]
 
   @@index([date])
@@ -116,6 +128,13 @@ model Settings {
   businessName          String   @default("Estética Automotiva")
   businessPhone         String?
   businessAddress       String?
+  storeAddress          String   @default("Rua Professor Benedito Loureiro de Lima, 146, Jardim Esplanada, Jundiaí, SP")
+  storeLat              Decimal? @db.Decimal(10, 7)
+  storeLng              Decimal? @db.Decimal(10, 7)
+  pickupDeliveryEnabled Boolean  @default(true)
+  pickupFeePerKm        Decimal  @default(2.50) @db.Decimal(10, 2)
+  pickupFeeBase         Decimal  @default(0) @db.Decimal(10, 2)
+  pickupMaxDistanceKm   Int?
   businessHoursStart    String   @default("08:00")
   businessHoursEnd      String   @default("18:00")
   slotDurationMin       Int      @default(60)
@@ -171,6 +190,7 @@ model Coupon {
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   redemptions      CouponRedemption[]
+  appointments     Appointment[]
 }
 
 model CouponRedemption {
@@ -353,6 +373,10 @@ enum WhatsAppSessionStep {
   CHOOSING_SERVICE
   CHOOSING_DATE
   CHOOSING_TIME
+  ASKING_COUPON
+  ASKING_PICKUP
+  ASKING_PICKUP_ADDRESS
+  ASKING_RETURN_PREFERENCE
   CONFIRMING
   RESCHEDULING
   CANCELLING

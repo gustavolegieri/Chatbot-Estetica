@@ -166,6 +166,34 @@ export function parseTimeInput(text: string): string | null {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+export function parseTimeSelection(userInput: string, availableSlots: string[]): string | null {
+  const trimmed = userInput.trim();
+
+  if (/^\d+$/.test(trimmed)) {
+    const index = parseInt(trimmed, 10) - 1;
+    if (index >= 0 && index < availableSlots.length) {
+      return availableSlots[index];
+    }
+    return null;
+  }
+
+  const normalized = trimmed
+    .toLowerCase()
+    .replace(/^(às|as)\s*/i, "")
+    .replace(/h(?=\d)/g, ":")
+    .replace(/h$/, "")
+    .trim();
+
+  const timeMatch = normalized.match(/^(\d{1,2}):(\d{2})$/);
+  if (!timeMatch) return null;
+
+  const hours = timeMatch[1].padStart(2, "0");
+  const minutes = timeMatch[2];
+  const candidate = `${hours}:${minutes}`;
+
+  return availableSlots.includes(candidate) ? candidate : null;
+}
+
 export async function isSlotAvailable(
   dateStr: string,
   startTime: string,

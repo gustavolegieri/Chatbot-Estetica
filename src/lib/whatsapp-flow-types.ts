@@ -22,6 +22,9 @@ export type FlowStage =
   | "ETAPA8_PAYMENT_NO_PIX"
   | "ETAPA8_PHOTO"
   | "ETAPA9_COUPON"
+  | "ETAPA9_PICKUP"
+  | "ETAPA9_PICKUP_ADDRESS"
+  | "ETAPA9_RETURN_PREFERENCE"
   | "ETAPA9_REMINDER"
   | "ETAPA10_BUDGET"
   | "ETAPA14_REMINDER"
@@ -77,6 +80,14 @@ export interface FlowState {
   couponId?: string;
   couponDiscountApplied?: number; // valor descontado (R$)
   couponError?: string;
+
+  // Leva e traz
+  needsPickup?: boolean;
+  needsReturn?: boolean;
+  pickupAddress?: string;
+  pickupDistanceKm?: number;
+  pickupFee?: number;
+  pickupAddressAttempts?: number;
 }
 
 

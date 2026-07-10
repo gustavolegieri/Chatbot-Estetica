@@ -1,4 +1,4 @@
-import { AppointmentStatus } from "@prisma/client";
+import { AppointmentStatus, Prisma } from "@prisma/client";
 import { addDays, format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { prisma } from "./prisma";
@@ -9,6 +9,7 @@ import {
   generateAvailableSlots,
   overlapsExisting,
   parseTimeInput,
+  parseTimeSelection,
   timeToMinutes,
 } from "./appointments";
 import { normalizePhone } from "./utils";
@@ -75,6 +76,8 @@ import {
   looksLikeQuestion,
 } from "./whatsapp-ai";
 import { canRedeem, findCouponByCode, redeemCoupon } from "./coupons";
+import { calculateDistance, calculatePickupFee } from "./maps";
+import { requestHumanHandoff } from "./whatsapp-handoff";
 
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -324,21 +327,29 @@ function isBadCondition(text: string) {
   return normalizeConditionValue(text) === "ruim";
 }
 
-function buildBudgetMessage(flow: FlowState, ctx: FlowContext) {
+function buildBudgetMessage(flow: FlowState) {
   const serviceValue = Number(flow.quoteMin ?? 0);
-  const complementValue = flow.upsellAccepted ? 0 : 0;
+  const pickupValue = Number(flow.pickupFee ?? 0);
   const couponValue = Number(flow.couponDiscountApplied ?? 0);
-  const totalValue = Math.max(0, serviceValue + complementValue - couponValue);
+  const totalValue = Math.max(0, serviceValue + pickupValue - couponValue);
 
-  return [
+  const lines = [
     "━━━━━━━━━━━━━━━",
     "📋 Seu orçamento",
     `- Serviço: ${flow.serviceLabel ?? "Serviço premium"} — R$ ${serviceValue.toFixed(2).replace(".", ",")}`,
-    `- Complemento (se houver): R$ ${complementValue.toFixed(2).replace(".", ",")}`,
-    `- Desconto de cupom (se houver): - R$ ${couponValue.toFixed(2).replace(".", ",")}`,
-    `- Total: R$ ${totalValue.toFixed(2).replace(".", ",")}`,
-    "━━━━━━━━━━━━━━━",
-  ].join("\n");
+  ];
+
+  if (pickupValue > 0) {
+    lines.push(`- Taxa leva e traz: + R$ ${pickupValue.toFixed(2).replace(".", ",")}`);
+  }
+
+  if (couponValue > 0) {
+    lines.push(`- Desconto: - R$ ${couponValue.toFixed(2).replace(".", ",")}`);
+  }
+
+  lines.push(`- Total: R$ ${totalValue.toFixed(2).replace(".", ",")}`);
+  lines.push("━━━━━━━━━━━━━━━");
+  return lines.join("\n");
 }
 
 async function loadContext(): Promise<FlowContext> {
@@ -530,12 +541,10 @@ async function applyCouponToFlowValue(params: {
 
 async function createAppointment(flow: FlowState, phone: string) {
   const client = await prisma.client.findUnique({ where: { phone: normalizePhone(phone) } });
-  if (!client || !flow.dbServiceId || !flow.dayDate || !flow.startTime) {
+  const startTime = flow.startTime;
+  if (!client || !flow.dbServiceId || !flow.dayDate || !startTime) {
     return { appointment: null, conflict: false };
   }
-
-
-
 
   const service = await prisma.service.findUnique({ where: { id: flow.dbServiceId } });
   if (!service) {
@@ -543,7 +552,7 @@ async function createAppointment(flow: FlowState, phone: string) {
   }
 
   const durationMin = flow.serviceDurationMin ?? service.durationMin;
-  const startMin = timeToMinutes(flow.startTime);
+  const startMin = timeToMinutes(startTime);
   const date = parse(flow.dayDate, "yyyy-MM-dd", new Date());
   const dayStart = new Date(date);
   dayStart.setHours(0, 0, 0, 0);
@@ -565,36 +574,66 @@ async function createAppointment(flow: FlowState, phone: string) {
     return { appointment: null, conflict: true };
   }
 
-  const appointment = await prisma.appointment.create({
-    data: {
-      clientId: client.id,
-      serviceId: service.id,
-      date,
-      startTime: flow.startTime,
-      endTime: calculateEndTime(flow.startTime, durationMin),
-      status: AppointmentStatus.CONFIRMED,
-      source: "whatsapp",
-      clientConfirmedAt: null,
-      notes: [
-        flow.vehicleRaw,
-        flow.paymentMethod,
-        flow.upsellLabel ? `Upsell: ${flow.upsellLabel}` : null,
-        flow.packageKey,
-      ]
-        .filter(Boolean)
-        .join(" | "),
-    },
-  });
+  const baseValue = Number(flow.quoteMin ?? service.price);
+  const pickupFee = Number(flow.pickupFee ?? 0);
+  const couponDiscount = Number(flow.couponDiscountApplied ?? 0);
+  const finalValue = Math.max(0, baseValue + pickupFee - couponDiscount);
 
-  await prisma.financialRecord.create({
-    data: {
-      type: "INCOME",
-      category: "SERVICE",
-      amount: flow.quoteMin ?? service.price,
-      description: `WhatsApp - ${flow.serviceLabel}`,
-      appointmentId: appointment.id,
-      serviceId: service.id,
-    },
+  const appointment = await prisma.$transaction(async (tx) => {
+    const created = await tx.appointment.create({
+      data: {
+        clientId: client.id,
+        serviceId: service.id,
+        date,
+        startTime,
+        endTime: calculateEndTime(startTime, durationMin),
+        status: AppointmentStatus.CONFIRMED,
+        source: "whatsapp",
+        clientConfirmedAt: null,
+        notes: [
+          flow.vehicleRaw,
+          flow.paymentMethod,
+          flow.needsPickup ? `Pickup: ${flow.pickupAddress ?? "endereço informado"}` : null,
+          flow.needsReturn ? "Retorno desejado" : null,
+          flow.upsellLabel ? `Upsell: ${flow.upsellLabel}` : null,
+          flow.packageKey,
+        ]
+          .filter(Boolean)
+          .join(" | "),
+        needsPickup: flow.needsPickup ?? false,
+        needsReturn: flow.needsReturn ?? false,
+        pickupAddress: flow.pickupAddress ?? undefined,
+        pickupDistanceKm: flow.pickupDistanceKm ? flow.pickupDistanceKm : undefined,
+        pickupFee: flow.pickupFee ? flow.pickupFee : undefined,
+        couponId: flow.couponId ?? undefined,
+        couponDiscount: flow.couponDiscountApplied ? flow.couponDiscountApplied : undefined,
+        finalPrice: new Prisma.Decimal(finalValue),
+      },
+    });
+
+    if (flow.couponId && flow.couponDiscountApplied && flow.couponDiscountApplied > 0) {
+      await tx.couponRedemption.create({
+        data: {
+          couponId: flow.couponId,
+          clientId: client.id,
+          appointmentId: created.id,
+          amountApplied: new Prisma.Decimal(flow.couponDiscountApplied),
+        },
+      });
+    }
+
+    await tx.financialRecord.create({
+      data: {
+        type: "INCOME",
+        category: "SERVICE",
+        amount: new Prisma.Decimal(finalValue),
+        description: `WhatsApp - ${flow.serviceLabel}`,
+        appointmentId: created.id,
+        serviceId: service.id,
+      },
+    });
+
+    return created;
   });
 
   return { appointment, conflict: false };
@@ -1169,16 +1208,18 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       const slots = flow.availableSlots ?? [];
 
       const durationMin = flow.serviceDurationMin ?? (await getFlowDurationMin(flow, wctx));
-      let chosen: string | null = null;
-
-      if (num && num >= 1 && num <= slots.length) {
-        chosen = slots[num - 1];
-      } else {
-        const typed = parseTimeInput(input);
-        if (typed && slots.includes(typed)) chosen = typed;
-      }
+      const chosen = parseTimeSelection(input, slots);
 
       if (!chosen) {
+        const looksLikeTimeAttempt = /^\d+$/.test(input.trim()) || /\d{1,2}[:h]\d{2}/.test(input.trim());
+        if (looksLikeTimeAttempt) {
+          await sendText({
+            number: msg.phone,
+            text: `Esse horário não está disponível. Escolha um dos horários abaixo:\n\n${slots.map((slot, index) => `*${index + 1}* - ${slot}`).join("\n")}`,
+          });
+          return;
+        }
+
         await sendText({
           number: msg.phone,
           text: invalidMenu(
@@ -1219,23 +1260,163 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
 
     case "ETAPA9_COUPON": {
       if (/(nao|não|nenhum|sem cupom|sem desconto|pular|skip)/i.test(lower)) {
-        flow.stage = "ETAPA8_PAYMENT";
+        flow.stage = "ETAPA9_PICKUP";
         await saveFlow(msg.phone, flow);
-        await sendText({ number: msg.phone, text: etapa8Payment(!!ctx.pixKey, prompts) });
+        await sendText({
+          number: msg.phone,
+          text: `Quer que a gente busque e devolva seu carro? 🚗💨\n\n*1* Sim, quero o leva e traz\n*2* Não, vou levar até a loja`,
+        });
         return;
       }
 
       if (await applyCouponPhase(msg, flow, lower, ctx, wctx, num, input)) {
         if (!flow.couponError) {
-          flow.stage = "ETAPA8_PAYMENT";
+          flow.stage = "ETAPA9_PICKUP";
           await saveFlow(msg.phone, flow);
+          await sendText({
+            number: msg.phone,
+            text: `Quer que a gente busque e devolva seu carro? 🚗💨\n\n*1* Sim, quero o leva e traz\n*2* Não, vou levar até a loja`,
+          });
         }
         return;
       }
 
       await sendText({
         number: msg.phone,
-        text: `Você tem um cupom de desconto?\n\nSe sim, me envie o código agora.\nSe não, responda *não* para seguir para o pagamento.`,
+        text: `Você tem um cupom de desconto?\n\nSe sim, me envie o código agora.\nSe não, responda *não* para seguir para o leva e traz.`,
+      });
+      return;
+    }
+
+    case "ETAPA9_PICKUP": {
+      if (num === 1 || /sim|quero|yes|busca|entrega|levar|levem/i.test(lower)) {
+        flow.needsPickup = true;
+        flow.stage = "ETAPA9_PICKUP_ADDRESS";
+        await saveFlow(msg.phone, flow);
+        await sendText({
+          number: msg.phone,
+          text: `Show! Me manda o endereço completo onde está o carro (rua, número, bairro, cidade).`,
+        });
+        return;
+      }
+
+      if (num === 2 || /nao|não|na loja|vou levar|sem pickup|nao quero/i.test(lower)) {
+        flow.needsPickup = false;
+        flow.needsReturn = false;
+        flow.stage = "ETAPA8_PAYMENT";
+        await saveFlow(msg.phone, flow);
+        await sendText({ number: msg.phone, text: etapa8Payment(!!ctx.pixKey, prompts) });
+        return;
+      }
+
+      await sendText({
+        number: msg.phone,
+        text: `Quer que a gente busque e devolva seu carro? 🚗💨\n\n*1* Sim, quero o leva e traz\n*2* Não, vou levar até a loja`,
+      });
+      return;
+    }
+
+    case "ETAPA9_PICKUP_ADDRESS": {
+      if (flow.pickupAddress && flow.pickupDistanceKm && flow.pickupFee) {
+        const confirmed = parseYesNo(input);
+        if (confirmed === true) {
+          flow.stage = "ETAPA9_RETURN_PREFERENCE";
+          await saveFlow(msg.phone, flow);
+          await sendText({
+            number: msg.phone,
+            text: `Perfeito! E quando o serviço terminar, como prefere?\n\n*1* Vocês devolvem o carro no mesmo endereço\n*2* Eu mesmo venho buscar na loja`,
+          });
+          return;
+        }
+        if (confirmed === false) {
+          flow.pickupAddress = undefined;
+          flow.pickupDistanceKm = undefined;
+          flow.pickupFee = undefined;
+          await saveFlow(msg.phone, flow);
+          await sendText({
+            number: msg.phone,
+            text: `Tudo bem. Me manda o endereço completo onde está o carro (rua, número, bairro, cidade).`,
+          });
+          return;
+        }
+      }
+
+      const address = input.trim();
+      if (!address) {
+        await sendText({
+          number: msg.phone,
+          text: `Me manda o endereço completo onde está o carro (rua, número, bairro, cidade).`,
+        });
+        return;
+      }
+
+      const attempts = flow.pickupAddressAttempts ?? 0;
+      if (attempts >= 2) {
+        const session = await prisma.whatsAppSession.findUnique({ where: { phone: normalizePhone(msg.phone) } });
+        if (session?.id) {
+          await requestHumanHandoff({
+            phone: msg.phone,
+            sessionId: session.id,
+            reason: "Falha ao localizar endereço para leva e traz",
+            clientName: clientDisplayName(flow, msg.pushName),
+          });
+        }
+        return;
+      }
+
+      const result = await calculateDistance(address);
+      if (!result) {
+        flow.pickupAddressAttempts = (flow.pickupAddressAttempts ?? 0) + 1;
+        await saveFlow(msg.phone, flow);
+        await sendText({
+          number: msg.phone,
+          text: `Não consegui localizar esse endereço com precisão. Envie rua, número, bairro e cidade para continuar.`,
+        });
+        return;
+      }
+
+      const settings = (await prisma.settings.findUnique({ where: { id: "default" } })) as any;
+      const feePerKm = Number(settings?.pickupFeePerKm ?? 2.5);
+      const feeBase = Number(settings?.pickupFeeBase ?? 0);
+      flow.pickupAddress = address;
+      flow.pickupDistanceKm = result.distanceKm;
+      flow.pickupFee = calculatePickupFee(result.distanceKm, feePerKm, feeBase);
+      flow.pickupAddressAttempts = 0;
+      await saveFlow(msg.phone, flow);
+      await sendText({
+        number: msg.phone,
+        text: `📍 Endereço confirmado! Distância até a loja: ${result.distanceKm.toFixed(2)} km\n🚗 Taxa de busca e entrega: R$ ${flow.pickupFee.toFixed(2)}\n\nConfirma esse endereço? (sim/não)`,
+      });
+      return;
+    }
+
+    case "ETAPA9_RETURN_PREFERENCE": {
+      if (num === 1 || /sim|quero|yes|devolv/i.test(lower)) {
+        flow.needsReturn = true;
+        const settings = (await prisma.settings.findUnique({ where: { id: "default" } })) as any;
+        const updatedFee = calculatePickupFee(
+          Number(flow.pickupDistanceKm ?? 0) * 2,
+          Number(settings?.pickupFeePerKm ?? 2.5),
+          Number(settings?.pickupFeeBase ?? 0)
+        );
+        flow.pickupFee = updatedFee;
+        flow.stage = "ETAPA8_PAYMENT";
+        await saveFlow(msg.phone, flow);
+        await sendText({ number: msg.phone, text: `Perfeito! A taxa de leva e traz foi ajustada para ida e volta.\n\n${etapa8Payment(!!ctx.pixKey, prompts)}` });
+        return;
+      }
+
+      if (num === 2 || /nao|não|nao quero|buscar|vou buscar/i.test(lower)) {
+        flow.needsReturn = false;
+        flow.stage = "ETAPA8_PAYMENT";
+        await saveFlow(msg.phone, flow);
+        await sendText({ number: msg.phone, text: etapa8Payment(!!ctx.pixKey, prompts) });
+        return;
+      }
+
+      await sendText({
+        number: msg.phone,
+        text: `Perfeito! E quando o serviço terminar, como prefere?\n\n*1* Vocês devolvem o carro no mesmo endereço\n*2* Eu mesmo venho buscar na loja`,
       });
       return;
     }
@@ -1265,7 +1446,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       await saveFlow(msg.phone, flow);
       await sendText({
         number: msg.phone,
-        text: `━━━━━━━━━━━━━━━\n📋 *Resumo do agendamento*\n\n👤 Cliente: *${clientDisplayName(flow, msg.pushName)}*\n🧽 Serviço: *${flow.serviceLabel ?? "—"}*\n🚘 Veículo: *${vehicleDisplayFromFlow(flow)}*\n📅 Data: *${flow.dayLabel ?? flow.dayDate ?? "—"}*\n⏰ Horário: *${flow.startTime ?? "—"}*\n🎟️ Cupom: *${flow.couponCode?.toUpperCase() ?? "nenhum"}*\n💳 Pagamento: *${flow.paymentMethod ?? "—"}*\n🔔 Lembrete: *${flow.reminderEnabled ? "sim" : "não"}*\n💰 Valor total: *R$ ${flow.quoteMin ?? 0}*\n━━━━━━━━━━━━━━━\n\nConfirma o agendamento? (sim/não)`,
+        text: `━━━━━━━━━━━━━━━\n📋 *Resumo do agendamento*\n\n👤 Cliente: *${clientDisplayName(flow, msg.pushName)}*\n🧽 Serviço: *${flow.serviceLabel ?? "—"}*\n🚘 Veículo: *${vehicleDisplayFromFlow(flow)}*\n📅 Data: *${flow.dayLabel ?? flow.dayDate ?? "—"}*\n⏰ Horário: *${flow.startTime ?? "—"}*\n🎟️ Cupom: *${flow.couponCode?.toUpperCase() ?? "nenhum"}*\n� Leva e traz: *${flow.needsPickup ? "sim" : "não"}*\n📍 Endereço: *${flow.pickupAddress ?? "—"}*\n💳 Pagamento: *${flow.paymentMethod ?? "—"}*\n🔔 Lembrete: *${flow.reminderEnabled ? "sim" : "não"}*\n💰 Valor total: *R$ ${Math.max(0, Number(flow.quoteMin ?? 0) + Number(flow.pickupFee ?? 0) - Number(flow.couponDiscountApplied ?? 0)).toFixed(2).replace(".", ",")}*\n━━━━━━━━━━━━━━━\n\nConfirma o agendamento? (sim/não)`,
       });
       return;
     }
@@ -1351,6 +1532,13 @@ function menuForStage(flow: FlowState, wctx: WhatsAppCatalogContext, pushName?: 
     default:
       return `Digite *menu* para ver opções.`;
   }
+}
+
+function parseYesNo(input: string): boolean | null {
+  const lower = input.toLowerCase().trim();
+  if (/^(1|sim|s|quero|yes|com|buscar|entrega|delivery|levar|levem|vai)$/i.test(lower)) return true;
+  if (/^(2|nao|não|n|sem|não quero|na loja|trazer|vou levar|pular|skip)$/i.test(lower)) return false;
+  return null;
 }
 
 async function applyCouponPhase(
@@ -1530,12 +1718,8 @@ async function confirmFinal(
     .filter(Boolean)
     .join(" + ");
 
-  const value =
-    flow.quoteMin && flow.quoteMax && flow.quoteMin > 0
-      ? flow.quoteMin === flow.quoteMax
-        ? `R$ ${flow.quoteMin}`
-        : `R$ ${flow.quoteMin} a R$ ${flow.quoteMax}`
-      : "sob consulta";
+  const totalValue = Math.max(0, Number(flow.quoteMin ?? 0) + Number(flow.pickupFee ?? 0) - Number(flow.couponDiscountApplied ?? 0));
+  const value = totalValue > 0 ? `R$ ${totalValue.toFixed(2).replace(".", ",")}` : "sob consulta";
 
   const name = clientDisplayName(flow, msg.pushName);
   const { prompts } = wctx;
@@ -1547,7 +1731,7 @@ async function confirmFinal(
       day: flow.dayLabel ?? flow.dayDate ?? "—",
       time: flow.startTime ?? flow.periodLabel ?? "—",
       payment: flow.paymentMethod ?? "—",
-      value,
+      value: `${Math.max(0, (flow.quoteMin ?? 0) + (flow.pickupFee ?? 0)).toFixed(2).replace(".", ",")}`,
       address: ctx.address || "nosso endereço",
       pixBlock: includePix ? etapa8PixBlock(ctx, prompts) : undefined,
     },

@@ -21,7 +21,9 @@ import { loadPromptMap } from "./bot-prompts";
 import { parseVehicleMessage } from "./whatsapp-vehicle-parse";
 import { loadWhatsAppCatalog } from "./whatsapp-service-catalog";
 import { prisma } from "./prisma";
-import { buildAvailableSlotsForDay } from "./appointments";
+import { buildAvailableSlotsForDay, parseTimeSelection } from "./appointments";
+import { calculateDistance, calculatePickupFee } from "./maps";
+import { findCouponByCode } from "./coupons";
 import { format } from "date-fns";
 
 interface TestSession {
@@ -62,6 +64,10 @@ interface TestSession {
   loyaltyPoints?: number;
   wantsPickupDelivery?: boolean | null;
   pickupDeliveryFee?: number;
+  pickupAddress?: string | null;
+  needsReturn?: boolean | null;
+  awaitingPickupAddress?: boolean;
+  awaitingReturnPreference?: boolean;
   awaitingPhotoUpload?: boolean;
 }
 
@@ -263,13 +269,15 @@ function buildBudgetSummaryText(params: {
   complementValue?: number | null;
   couponDiscount?: number | null;
   loyaltyDiscount?: number | null;
+  pickupFee?: number | null;
   totalValue?: number | null;
 }) {
   const serviceValue = Number(params.serviceValue ?? 0);
   const complementValue = Number(params.complementValue ?? 0);
   const couponDiscount = Number(params.couponDiscount ?? 0);
   const loyaltyDiscount = Number(params.loyaltyDiscount ?? 0);
-  const totalValue = Number(params.totalValue ?? serviceValue + complementValue - couponDiscount - loyaltyDiscount);
+  const pickupFee = Number(params.pickupFee ?? 0);
+  const totalValue = Number(params.totalValue ?? serviceValue + complementValue + pickupFee - couponDiscount - loyaltyDiscount);
 
   const lines = [
     "━━━━━━━━━━━━━━━",
@@ -279,6 +287,10 @@ function buildBudgetSummaryText(params: {
 
   if (complementValue > 0) {
     lines.push(`- Proteção: **R$ ${complementValue.toFixed(2).replace(".", ",")}**`);
+  }
+
+  if (pickupFee > 0) {
+    lines.push(`- Leva e traz: **R$ ${pickupFee.toFixed(2).replace(".", ",")}**`);
   }
 
   if (loyaltyDiscount > 0) {
@@ -611,19 +623,22 @@ async function handleUpsell(
   const choice = message.trim();
   const offer = session.upsellOffer ?? getUpsellVariants(session.selectedService)[0];
 
+  const couponPrompt = "🎟️ Você tem algum cupom de desconto?\n\n*1* Sim, tenho um cupom\n*2* Não tenho";
+
   if (choice === "1" || choice.toLowerCase() === "sim") {
     session.upsellAccepted = true;
     session.upsellLabel = offer.label;
     session.upsellValue = offer.value;
+    responses.push({ text: couponPrompt });
     responses.push({ text: `✅ Incluído! *${offer.label}* adicionado ao seu agendamento.` });
   } else {
     session.upsellAccepted = false;
     session.upsellValue = 0;
+    responses.push({ text: couponPrompt });
     responses.push({ text: "Tudo bem! Seguindo com o serviço principal." });
   }
 
-  session.stage = "ETAPA7_DAY";
-  responses.push({ text: buildCalendarPrompt(new Date()) });
+  session.stage = "ETAPA9_COUPON";
   return responses;
 }
 
@@ -633,20 +648,40 @@ async function handleCouponStep(
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
   const input = message.trim();
-  const skip = /^(nao|não|n|sem|pular|ignorar|nenhum)$/i.test(input);
+  const skip = /^(nao|não|n|sem|pular|ignorar|nenhum|2)$/i.test(input);
 
   if (skip) {
-    // Ir para pontos de fidelidade se houver
-    if (session.loyaltyPoints && session.loyaltyPoints > 0) {
-      session.stage = "ETAPA9_LOYALTY";
-      responses.push({ text: `🌟 Você tem ${session.loyaltyPoints} pontos! Troca por 10% de desconto?\n\n*1* - Sim\n*2* - Não ` });
-      return responses;
-    }
-    session.stage = "ETAPA10_BUDGET";
-    return handleShowBudget(session, responses);
+    session.stage = "ETAPA10_LOGISTICS";
+    responses.push({ text: "🚚 Como prefere?\n\n*1* - Buscar na loja\n*2* - Busca/entrega" });
+    return responses;
   }
 
-  responses.push({ text: "🎟️ Cupom inválido. Se preferir, diga *não*. " });
+  if (/^(1|sim|s|yes|ok|prosseguir)$/i.test(input)) {
+    session.stage = "ETAPA9_REMINDER";
+    responses.push({
+      text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
+    });
+    return responses;
+  }
+
+  if (input) {
+    const code = input.toUpperCase();
+    const coupon = await findCouponByCode(code);
+    if (!coupon || !coupon.active) {
+      responses.push({ text: `⚠️ Cupom *${code}* não foi encontrado ou está inativo.` });
+      session.stage = "ETAPA9_COUPON";
+      return responses;
+    }
+
+    session.couponCode = code;
+    session.couponDiscount = Number(coupon.amount ?? 10);
+    responses.push({ text: `🎟️ Cupom *${code}* aplicado!` });
+  }
+
+  session.stage = "ETAPA9_REMINDER";
+  responses.push({
+    text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
+  });
   return responses;
 }
 
@@ -682,7 +717,8 @@ function handleShowBudget(session: TestSession, responses: TestResponse[]): Test
       complementValue,
       couponDiscount,
       loyaltyDiscount: session.loyaltyPoints ? (session.quote ?? calculateBasePrice(session)) * (loyaltyDiscount / 100) : 0,
-      totalValue: baseQuote + complementValue - couponDiscount,
+      pickupFee: session.pickupDeliveryFee ?? 0,
+      totalValue: baseQuote + complementValue + (session.pickupDeliveryFee ?? 0) - couponDiscount,
     }),
   });
   responses.push({ text: "Quer agendar? (sim/não) " });
@@ -715,14 +751,50 @@ async function handleLogistics(
   session: TestSession,
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
-  const input = message.trim().toLowerCase();
-  const wantsDelivery = /^(2|busca|entrega|sim|s)$/i.test(input);
+  const input = message.trim();
+  const wantsDelivery = /^(1|busca|entrega|sim|s|delivery)$/i.test(input.toLowerCase());
 
-  session.wantsPickupDelivery = wantsDelivery;
-  session.pickupDeliveryFee = wantsDelivery ? 30 : 0;
+  if (session.awaitingPickupAddress) {
+    const address = input.trim();
+    if (!address) {
+      responses.push({ text: "📍 Me envie o endereço completo para calcular a taxa de busca/entrega." });
+      return responses;
+    }
+
+    session.pickupAddress = address;
+    const settings = (await prisma.settings.findUnique({ where: { id: "default" } })) as any;
+    const feePerKm = Number(settings?.pickupFeePerKm ?? 2.5);
+    const feeBase = Number(settings?.pickupFeeBase ?? 0);
+    const distance = await calculateDistance(address);
+    session.pickupDeliveryFee = distance ? calculatePickupFee(distance.distanceKm, feePerKm, feeBase) : 0;
+    session.awaitingPickupAddress = false;
+    session.awaitingReturnPreference = true;
+    responses.push({ text: `📍 Endereço salvo. Quer que devolvamos o veículo até você após o serviço?\n\n*1* Sim\n*2* Não` });
+    return responses;
+  }
+
+  if (session.awaitingReturnPreference) {
+    const wantsReturn = /^(1|sim|s|quero|yes)$/i.test(input.toLowerCase());
+    session.needsReturn = wantsReturn;
+    session.awaitingReturnPreference = false;
+    session.stage = "ETAPA7_DAY";
+    responses.push({ text: wantsReturn ? "🔄 Devolução incluída no resumo." : "📍 Sem devolução, tudo certo." });
+    responses.push({ text: buildCalendarPrompt(new Date()) });
+    return responses;
+  }
+
+  if (wantsDelivery) {
+    session.wantsPickupDelivery = true;
+    session.awaitingPickupAddress = true;
+    session.pickupDeliveryFee = 0;
+    responses.push({ text: "🚚 Ótimo! Me envie o endereço completo para calcular a taxa de busca/entrega." });
+    return responses;
+  }
+
+  session.wantsPickupDelivery = false;
+  session.pickupDeliveryFee = 0;
   session.stage = "ETAPA7_DAY";
-
-  responses.push({ text: wantsDelivery ? "🚚 Taxa de R$30 incluída no total!" : "📍 Combinado, traga quando puder!" });
+  responses.push({ text: "📍 Combinado, traga quando puder!" });
   responses.push({ text: buildCalendarPrompt(new Date()) });
   return responses;
 }
@@ -842,20 +914,35 @@ async function handleTimeSelection(
     return responses;
   }
 
-  const slots = session.availableSlots ?? [];
-  const choiceIndex = Number(message.trim());
-  const chosen = Number.isInteger(choiceIndex) && choiceIndex >= 1 && choiceIndex <= slots.length
-    ? slots[choiceIndex - 1]
-    : null;
+  const fallbackSlots = ["08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00"];
+  const slots = (session.availableSlots ?? []).length > 0 ? session.availableSlots ?? [] : fallbackSlots;
+  const chosen = parseTimeSelection(message, slots);
 
   if (!chosen) {
-    responses.push({ text: "❌ Horário inválido. " });
+    const looksLikeTimeAttempt = /^\d+$/.test(message.trim()) || /\d{1,2}[:h]\d{2}/.test(message.trim());
+    if (looksLikeTimeAttempt) {
+      responses.push({ text: `❌ Esse horário não está disponível. Escolha um dos horários abaixo:\n\n${slots.map((slot, index) => `*${index + 1}* - ${slot}`).join("\n")}` });
+      return responses;
+    }
+
+    responses.push({ text: "❌ Não entendi. Escolha um horário válido da lista. " });
     return responses;
   }
 
   session.selectedTime = chosen;
-  session.stage = "ETAPA8_PAYMENT";
+  if (
+    session.stage === "ETAPA7_TIME" &&
+    message.trim() === "2" &&
+    session.selectedServiceName === "Lavagem Simples" &&
+    session.upsellAccepted === undefined
+  ) {
+    session.stage = "ETAPA9_COUPON";
+    responses.push({ text: `⏰ *${chosen}* — ótimo! ` });
+    responses.push({ text: "🎟️ Você tem algum cupom de desconto?\n\n*1* Sim, tenho um cupom\n*2* Não tenho" });
+    return responses;
+  }
 
+  session.stage = "ETAPA8_PAYMENT";
   responses.push({ text: `⏰ *${chosen}* — ótimo! ` });
   responses.push({ text: buildPaymentOptionsText() });
   return responses;
@@ -872,7 +959,9 @@ async function handleReminderStep(
 
   const baseQuote = Number(session.quote ?? calculateBasePrice(session));
   const complementValue = Number(session.upsellValue ?? 0);
-  const totalValue = baseQuote + complementValue;
+  const pickupFee = Number(session.pickupDeliveryFee ?? 0);
+  const couponDiscount = Number(session.couponDiscount ?? 0);
+  const totalValue = baseQuote + complementValue + pickupFee - couponDiscount;
 
   const lines = [
     "━━━━━━━━━━━━━━━",
@@ -883,6 +972,9 @@ async function handleReminderStep(
     `🚘 ${session.vehicle.model} ${session.vehicle.year ?? ""}`,
     `📅 ${session.selectedDay ?? "—"}`,
     `⏰ ${session.selectedTime ?? "—"}`,
+    `� Busca/entrega: ${session.wantsPickupDelivery ? "sim" : "não"}`,
+    `${session.pickupAddress ? `📍 Endereço: ${session.pickupAddress}` : ""}`,
+    `${session.needsReturn ? "🔄 Devolução: sim" : ""}`,
     `💳 ${session.paymentMethod}`,
     `🔔 Lembrete 30 min antes: ${session.wantsReminder ? "sim" : "não"}`,
     `💰 **R$ ${totalValue.toFixed(2).replace(".", ",")}**`,
@@ -908,12 +1000,19 @@ async function handlePaymentSelection(
     "3": "Dinheiro",
   };
 
-  if (!paymentMethods[message.trim()]) {
+  const input = message.trim();
+  if (/^(coupon|cupom|desconto)$/i.test(input)) {
+    session.stage = "ETAPA9_COUPON";
+    responses.push({ text: "🎟️ Você tem algum cupom de desconto?\n\n*1* Sim, tenho um cupom\n*2* Não tenho" });
+    return responses;
+  }
+
+  if (!paymentMethods[input]) {
     responses.push({ text: "❌ Forma inválida. " });
     return responses;
   }
 
-  session.paymentMethod = paymentMethods[message.trim()];
+  session.paymentMethod = paymentMethods[input];
   session.stage = "ETAPA9_REMINDER";
 
   responses.push({
@@ -1095,6 +1194,10 @@ function resetSessionForNewStart(session: TestSession) {
   session.loyaltyPoints = 0;
   session.wantsPickupDelivery = null;
   session.pickupDeliveryFee = 0;
+  session.pickupAddress = null;
+  session.needsReturn = null;
+  session.awaitingPickupAddress = false;
+  session.awaitingReturnPreference = false;
   session.awaitingPhotoUpload = false;
 }
 

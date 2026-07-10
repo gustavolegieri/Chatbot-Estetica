@@ -110,6 +110,14 @@ test("transcript completo valida fluxo antigo do test-bot", async () => {
   assert.equal(session.stage, "ETAPA6_UPSELL");
 
   res = await processTestFlow({ sessionId: "s1", message: "2", session });
+  assert.equal(session.stage, "ETAPA9_COUPON");
+  assert.match(res[0].text, /cupom/i);
+
+  res = await processTestFlow({ sessionId: "s1", message: "não", session });
+  assert.equal(session.stage, "ETAPA10_LOGISTICS");
+  assert.match(res[0].text, /buscar|entrega|pickup/i);
+
+  res = await processTestFlow({ sessionId: "s1", message: "2", session });
   assert.equal(session.stage, "ETAPA7_DAY");
 
   res = await processTestFlow({ sessionId: "s1", message: "hoje", session });
@@ -148,7 +156,7 @@ test("fluxo de coupon/payment/reminder segue o roteiro antigo do test-bot", asyn
   };
 
   let res = await processTestFlow({ sessionId: "coupon-flow", message: "2", session });
-  assert.equal(session.stage, "ETAPA8_PAYMENT");
+  assert.equal(session.stage, "ETAPA9_COUPON");
 
   res = await processTestFlow({ sessionId: "coupon-flow", message: "1", session });
   assert.equal(session.stage, "ETAPA9_REMINDER");
