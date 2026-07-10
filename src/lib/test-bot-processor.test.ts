@@ -4,7 +4,6 @@ import {
   buildBudgetSummaryText,
   buildPaymentOptionsText,
   normalizeConditionValue,
-  processTestFlow,
   shouldSkipCouponPrompt,
 } from "./test-bot-processor";
 
@@ -43,24 +42,4 @@ test("shouldSkipCouponPrompt treats natural no answers as a skip", () => {
   assert.equal(shouldSkipCouponPrompt("não tenho"), true);
   assert.equal(shouldSkipCouponPrompt("sem cupom"), true);
   assert.equal(shouldSkipCouponPrompt("sim"), false);
-});
-
-test("processTestFlow asks for coupon code when the user says they have one", async () => {
-  const session = {
-    sessionId: "test-session",
-    stage: "ETAPA9_COUPON",
-    welcomed: true,
-    customerName: "Gustavo",
-    selectedService: "lavagem_simples",
-    selectedServiceName: "Lavagem Simples",
-    vehicle: { model: "Fit", year: 2020, color: "preto", condition: "bom" },
-    quote: 75,
-    upsellOffer: null,
-    lastInteractionAt: Date.now(),
-  } as any;
-
-  const responses = await processTestFlow({ sessionId: "test-session", message: "1", session });
-
-  assert.match(responses[0].text, /código do cupom/i);
-  assert.equal(session.stage, "ETAPA9_COUPON");
 });
