@@ -6,10 +6,10 @@ export interface DistanceResult {
 }
 
 export async function calculateDistance(clientAddress: string): Promise<DistanceResult | null> {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  const apiKey = process.env.DISTANCEMATRIX_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey || !clientAddress?.trim()) return null;
 
-  const url = new URL("https://maps.googleapis.com/maps/api/distancematrix/json");
+  const url = new URL("https://api.distancematrix.ai/maps/api/distancematrix/json");
   url.searchParams.set("origins", STORE_ADDRESS);
   url.searchParams.set("destinations", clientAddress);
   url.searchParams.set("units", "metric");

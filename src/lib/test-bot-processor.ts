@@ -212,6 +212,11 @@ function buildWelcomeText(): string {
   return "👋 Olá! Sou o Teste Bot da Garagem do Ka. Vamos começar? Me diz como posso te chamar.";
 }
 
+export function shouldSkipCouponPrompt(input: string): boolean {
+  const normalized = input.trim().toLowerCase();
+  return /^(2|nao|não|n|sem|pular|ignorar|nenhum|nao tenho|não tenho|sem cupom|sem desconto|nenhum cupom|nao tenho cupom|não tenho cupom)$/i.test(normalized);
+}
+
 function calculateBasePrice(session: TestSession): number {
   const isSuv = isSuvLikeVehicle(session.vehicle.model ?? "");
   const isBad = session.vehicle.condition === "ruim";
@@ -648,11 +653,11 @@ async function handleCouponStep(
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
   const input = message.trim();
-  const skip = /^(nao|não|n|sem|pular|ignorar|nenhum|2)$/i.test(input);
+  const skip = shouldSkipCouponPrompt(input);
 
   if (skip) {
     session.stage = "ETAPA10_LOGISTICS";
-    responses.push({ text: "🚚 Como prefere?\n\n*1* - Buscar na loja\n*2* - Busca/entrega" });
+    responses.push({ text: "🚚 Como prefere?\n\n*1* - Eu levo o carro até a loja\n*2* - A estética vai buscar o carro" });
     return responses;
   }
 
@@ -736,7 +741,7 @@ async function handleBudgetResponse(
   if (isYes) {
     session.stage = "ETAPA10_LOGISTICS";
     responses.push({
-      text: "🚚 Como prefere?\n\n*1* - Buscar na loja\n*2* - Busca/entrega (+R$30)",
+      text: "🚚 Como prefere?\n\n*1* - Eu levo o carro até a loja\n*2* - A estética vai buscar o carro (+R$30)",
     });
     return responses;
   }
@@ -757,7 +762,7 @@ async function handleLogistics(
   if (session.awaitingPickupAddress) {
     const address = input.trim();
     if (!address) {
-      responses.push({ text: "📍 Me envie o endereço completo para calcular a taxa de busca/entrega." });
+      responses.push({ text: "📍 Me envie o endereço completo onde o carro está para calcular a taxa de busca." });
       return responses;
     }
 
@@ -787,14 +792,14 @@ async function handleLogistics(
     session.wantsPickupDelivery = true;
     session.awaitingPickupAddress = true;
     session.pickupDeliveryFee = 0;
-    responses.push({ text: "🚚 Ótimo! Me envie o endereço completo para calcular a taxa de busca/entrega." });
+    responses.push({ text: "🚚 Ótimo! Me envie o endereço completo onde o carro está para calcular a taxa de busca." });
     return responses;
   }
 
   session.wantsPickupDelivery = false;
   session.pickupDeliveryFee = 0;
   session.stage = "ETAPA7_DAY";
-  responses.push({ text: "📍 Combinado, traga quando puder!" });
+  responses.push({ text: "📍 Combinado! Você pode levar o carro até a loja quando puder." });
   responses.push({ text: buildCalendarPrompt(new Date()) });
   return responses;
 }
@@ -972,7 +977,7 @@ async function handleReminderStep(
     `🚘 ${session.vehicle.model} ${session.vehicle.year ?? ""}`,
     `📅 ${session.selectedDay ?? "—"}`,
     `⏰ ${session.selectedTime ?? "—"}`,
-    `� Busca/entrega: ${session.wantsPickupDelivery ? "sim" : "não"}`,
+    `🚚 Leva e traz: ${session.wantsPickupDelivery ? "sim" : "não"}`,
     `${session.pickupAddress ? `📍 Endereço: ${session.pickupAddress}` : ""}`,
     `${session.needsReturn ? "🔄 Devolução: sim" : ""}`,
     `💳 ${session.paymentMethod}`,

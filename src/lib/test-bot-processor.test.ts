@@ -4,6 +4,7 @@ import {
   buildBudgetSummaryText,
   buildPaymentOptionsText,
   normalizeConditionValue,
+  shouldSkipCouponPrompt,
 } from "./test-bot-processor";
 
 test("normalizeConditionValue handles damaged and poor condition descriptions", () => {
@@ -33,4 +34,12 @@ test("buildPaymentOptionsText does not mention PIX discount", () => {
 
   assert.match(text, /PIX/i);
   assert.doesNotMatch(text, /5%/);
+});
+
+test("shouldSkipCouponPrompt treats natural no answers as a skip", () => {
+  assert.equal(shouldSkipCouponPrompt("2"), true);
+  assert.equal(shouldSkipCouponPrompt("não"), true);
+  assert.equal(shouldSkipCouponPrompt("não tenho"), true);
+  assert.equal(shouldSkipCouponPrompt("sem cupom"), true);
+  assert.equal(shouldSkipCouponPrompt("sim"), false);
 });

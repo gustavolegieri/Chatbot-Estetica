@@ -1259,12 +1259,12 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     }
 
     case "ETAPA9_COUPON": {
-      if (/(nao|não|nenhum|sem cupom|sem desconto|pular|skip)/i.test(lower)) {
+      if (shouldSkipCouponPrompt(input)) {
         flow.stage = "ETAPA9_PICKUP";
         await saveFlow(msg.phone, flow);
         await sendText({
           number: msg.phone,
-          text: `Quer que a gente busque e devolva seu carro? 🚗💨\n\n*1* Sim, quero o leva e traz\n*2* Não, vou levar até a loja`,
+          text: `Quer que a gente venha buscar o carro? 🚗💨\n\n*1* Sim, quero o leva e traz\n*2* Não, eu levo até a loja`,
         });
         return;
       }
@@ -1311,7 +1311,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
 
       await sendText({
         number: msg.phone,
-        text: `Quer que a gente busque e devolva seu carro? 🚗💨\n\n*1* Sim, quero o leva e traz\n*2* Não, vou levar até a loja`,
+        text: `Quer que a gente busque o carro? 🚗💨\n\n*1* Sim, quero o leva e traz\n*2* Não, eu levo até a loja`,
       });
       return;
     }
@@ -1324,7 +1324,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
           await saveFlow(msg.phone, flow);
           await sendText({
             number: msg.phone,
-            text: `Perfeito! E quando o serviço terminar, como prefere?\n\n*1* Vocês devolvem o carro no mesmo endereço\n*2* Eu mesmo venho buscar na loja`,
+            text: `Perfeito! E quando o serviço terminar, como prefere?\n\n*1* Vocês devolvem o carro no mesmo endereço\n*2* Eu mesmo venho buscar o carro`,
           });
           return;
         }
@@ -1416,7 +1416,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
 
       await sendText({
         number: msg.phone,
-        text: `Perfeito! E quando o serviço terminar, como prefere?\n\n*1* Vocês devolvem o carro no mesmo endereço\n*2* Eu mesmo venho buscar na loja`,
+        text: `Perfeito! E quando o serviço terminar, como prefere?\n\n*1* Vocês devolvem o carro no mesmo endereço\n*2* Eu mesmo venho buscar o carro`,
       });
       return;
     }
@@ -1532,6 +1532,11 @@ function menuForStage(flow: FlowState, wctx: WhatsAppCatalogContext, pushName?: 
     default:
       return `Digite *menu* para ver opções.`;
   }
+}
+
+function shouldSkipCouponPrompt(input: string): boolean {
+  const normalized = input.trim().toLowerCase();
+  return /^(2|nao|não|n|sem|pular|ignorar|nenhum|nao tenho|não tenho|sem cupom|sem desconto|nenhum cupom|nao tenho cupom|não tenho cupom)$/i.test(normalized);
 }
 
 function parseYesNo(input: string): boolean | null {
