@@ -97,17 +97,17 @@ function flowMsg(wctx: WhatsAppCatalogContext) {
 
 /** Duração estimada (min) por serviço do catálogo — usada se o DB não tiver o serviço */
 const CATALOG_DURATION_MIN: Record<string, number> = {
-  lavagem_simples: 75,
-  lavagem_completa: 105,
-  lavagem_detalhada: 150,
-  limpeza_motor: 120,
+  lavagem_simples: 60,
+  lavagem_completa: 90,
+  lavagem_detalhada: 120,
+  limpeza_motor: 60,
   cristalizacao_farois: 90,
-  descontaminacao_pintura: 150,
-  higienizacao_tecido: 150,
-  higienizacao_tecido_completa: 210,
-  higienizacao_couro: 120,
-  higienizacao_couro_completa: 210,
-  descontaminacao_vidro: 90,
+  descontaminacao_pintura: 60,
+  descontaminacao_vidro: 60,
+  higienizacao_tecido: 90,
+  higienizacao_couro: 90,
+  higienizacao_tecido_completa: 150,
+  higienizacao_couro_completa: 150,
   polimento_cotacao: 240,
 };
 

@@ -89,6 +89,8 @@ export async function getAvailableSlots(
   const isToday = format(date, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
 
+  if (durationMin <= 0) return [];
+
   for (let cursor = dayStartMin; cursor + durationMin <= dayEndMin; cursor += step) {
     if (isToday && cursor < nowMin) continue;
     if (isInLunchBreak(cursor, durationMin, settings.lunchBreakStart, settings.lunchBreakEnd)) continue;

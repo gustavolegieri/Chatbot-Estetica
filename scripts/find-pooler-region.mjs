@@ -1,7 +1,7 @@
 import fs from "fs";
 import { PrismaClient } from "@prisma/client";
 
-const PROJECT_REF = "rifvdutsxappnlroennh";
+const PROJECT_REF = "sunqmeqveevcjqfogqcw";
 const env = fs.readFileSync(".env", "utf8");
 const m = env.match(/^DATABASE_URL=(.+)$/m);
 const u = new URL(m[1].trim().replace(/^postgresql:/, "postgres:"));
