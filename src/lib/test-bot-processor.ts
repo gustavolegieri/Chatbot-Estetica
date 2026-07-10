@@ -26,6 +26,8 @@ import { calculateDistance, calculatePickupFee } from "./maps";
 import { findCouponByCode } from "./coupons";
 import { format } from "date-fns";
 
+import type { FlowStage } from "./whatsapp-flow-types";
+
 interface TestSession {
   sessionId: string;
   stage: string;
