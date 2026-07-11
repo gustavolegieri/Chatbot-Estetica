@@ -743,7 +743,7 @@ async function handleBudgetResponse(
   if (isYes) {
     session.stage = "ETAPA10_LOGISTICS";
     responses.push({
-      text: "🚚 Como prefere?\n\n*1* - Eu levo o carro até a loja\n*2* - A estética vai buscar o carro (+R$30)",
+      text: "🚚 Como prefere?\n\n*1* - Eu levo o carro até a loja\n*2* - A estética vai buscar o carro",
     });
     return responses;
   }
@@ -787,7 +787,7 @@ async function handleLogistics(
     session.awaitingReturnPreference = false;
     session.stage = "ETAPA7_DAY";
     responses.push({ text: wantsReturn ? "🔄 Devolução incluída no resumo." : "📍 Sem devolução, tudo certo." });
-    responses.push({ text: buildCalendarPrompt(new Date()) });
+    await sendCalendarWithImageAndList({ number: "1234567890", prompts });
     return responses;
   }
 
@@ -803,7 +803,7 @@ async function handleLogistics(
   session.pickupDeliveryFee = 0;
   session.stage = "ETAPA7_DAY";
   responses.push({ text: "📍 Combinado! Você pode levar o carro até a loja quando puder." });
-  responses.push({ text: buildCalendarPrompt(new Date()) });
+  await sendCalendarWithImageAndList({ number: "1234567890", prompts });
   return responses;
 }
 
@@ -904,7 +904,7 @@ async function handleDateSelection(
     return responses;
   }
 
-  responses.push({ text: buildCalendarPrompt(new Date()) });
+  await sendCalendarWithImageAndList({ number: "1234567890", prompts });
   return responses;
 }
 

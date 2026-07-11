@@ -404,50 +404,60 @@ export function etapa6Upsell(service: string, complement: string, benefit: strin
 // ─────────────────────────────────────────────────────────────
 
 export function buildCalendarPrompt(date = new Date()): string {
+  // Emoji‑rich calendar for a more interactive experience
   const year = date.getFullYear();
   const month = date.getMonth();
   const today = date.getDate();
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
   const monthLabel = date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-  const weekdayNames = ["D", "S", "T", "Q", "Q", "S", "S"];
+  const weekdayNames = ["D", "S", "T", "Q", "Q", "S", "S"]; // Domingo‑Sábado
+
+  // Build matrix of days (6 weeks × 7 days)
   const weeks: string[][] = [];
-  const startDay = firstDay.getDay();
+  const startOffset = firstDay.getDay(); // 0 = Domingo
   const daysInMonth = lastDay.getDate();
   let day = 1;
 
-  for (let row = 0; row < 6; row += 1) {
+  for (let row = 0; row < 6; row++) {
     const week: string[] = [];
-    for (let col = 0; col < 7; col += 1) {
-      const index = row * 7 + col;
-      if (index < startDay || day > daysInMonth) {
-        week.push("  ");
+    for (let col = 0; col < 7; col++) {
+      const cellIdx = row * 7 + col;
+      if (cellIdx < startOffset || day > daysInMonth) {
+        week.push("   "); // empty cell
+      } else if (day < today) {
+        // Past dates are left blank so they cannot be selected
+        week.push("   ");
+        day++;
       } else {
-        week.push(day < 10 ? ` ${day}` : `${day}`);
-        day += 1;
+        const dayStr = day.toString().padStart(2, " ");
+        // Choose emoji based on relation to today and if it's Sunday
+        let emoji = "🟢"; // future weekday (available)
+        if (col === 0) {
+          // Sunday is always closed
+          emoji = "🔴";
+        } else if (day === today) {
+          emoji = "🔵"; // today
+        }
+        week.push(`${emoji}${dayStr}`);
+        day++;
       }
     }
     weeks.push(week);
     if (day > daysInMonth) break;
   }
 
-  const formattedRows = weeks.map((week) => {
-    return week.map((cell) => {
-      const value = cell.trim();
-      if (!value) return "  ";
-      const num = Number(value);
-      return num === today ? `[${num.toString().padStart(2, "0")}]` : ` ${num.toString().padStart(2, "0")}`;
-    }).join(" ");
-  });
+  const calendarRows = weeks.map((week) => week.join(" "));
 
   return [
     `📅 *${monthLabel.replace(/(^\w|\s\w)/g, (m) => m.toUpperCase())}*`,
-    `  ${weekdayNames.join("  ")}`,
-    ...formattedRows.map((row) => ` ${row}`),
+    `   ${weekdayNames.map((d) => ` ${d} `).join("")}`,
+    ...calendarRows,
     "",
-    "✅ Dias disponíveis: destacados sem tarja",
-    "🚫 Domingos: fechado",
-    "📍 Hoje: dia entre colchetes [ ]",
+    "🟢 = data disponível",
+    "🔵 = hoje",
+    "⚫️ = data passada",
+    "🔴 = domingo (fechado)",
     "",
     "Me diga o dia que prefere (ex: 08/07).",
   ].join("\n");

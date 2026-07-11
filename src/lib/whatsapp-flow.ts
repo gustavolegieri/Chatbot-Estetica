@@ -2,7 +2,8 @@ import { AppointmentStatus, Prisma } from "@prisma/client";
 import { addDays, format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { prisma } from "./prisma";
-import { sendText, sendMedia } from "./evolution-api";
+import { sendText, sendMedia, sendList } from "./evolution-api";
+import { sendCalendarWithImageAndList } from "./whatsapp-flow-messages";
 import {
   calculateEndTime,
   formatDurationLabel,
@@ -1143,7 +1144,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       if (flow.upsellOffered) {
         flow.stage = "ETAPA7_DAY";
         await saveFlow(msg.phone, flow);
-        await sendText({ number: msg.phone, text: etapa7Day(prompts) });
+        await sendCalendarWithImageAndList({ number: msg.phone, prompts });
         return;
       }
       const key = flow.serviceKey ?? "lavagem_detalhada";
@@ -1151,7 +1152,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       if (!upsell) {
         flow.stage = "ETAPA7_DAY";
         await saveFlow(msg.phone, flow);
-        await sendText({ number: msg.phone, text: etapa7Day(prompts) });
+        await sendCalendarWithImageAndList({ number: msg.phone, prompts });
         return;
       }
       flow.upsellLabel = upsell.complement;
@@ -1176,14 +1177,14 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       flow.upsellAccepted = num === 1;
       flow.stage = "ETAPA7_DAY";
       await saveFlow(msg.phone, flow);
-      await sendText({ number: msg.phone, text: etapa7Day(prompts) });
+      await sendCalendarWithImageAndList({ number: msg.phone, prompts });
       return;
     }
 
     case "ETAPA7_PERIOD": {
       flow.stage = "ETAPA7_DAY";
       await saveFlow(msg.phone, flow);
-      await sendText({ number: msg.phone, text: etapa7Day(prompts) });
+      await sendCalendarWithImageAndList({ number: msg.phone, prompts });
       return;
     }
 
