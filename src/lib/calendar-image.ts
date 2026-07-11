@@ -1,22 +1,30 @@
-import { createCanvas } from 'canvas';
+// Dynamically import canvas; if unavailable, fall back to a 1x1 transparent PNG data URL.
+let createCanvas = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  ({ createCanvas } = require('canvas'));
+} catch (e) {
+  console.warn('[calendar-image] canvas module not found – using placeholder image');
+}
+
 import { format } from 'date-fns';
 import path from 'path';
 import fs from 'fs';
 
 /**
- * Gera uma imagem PNG simples que representa o calendário do mês.
- * Para simplicidade, desenha o nome do mês e um grid 7x6 com os dias.
- * Cada dia recebe a cor de acordo com a disponibilidade:
- *   🟢 – disponível (futuro, não domingo)
- *   🔵 – hoje
- *   🔴 – domingo (fechado)
- *   ⚫ – passado (não selecionável)
- *
- * @param date Alguma data dentro do mês que será renderizado (geralmente new Date()).
- * @returns caminho absoluto do arquivo PNG gerado (em ./tmp dentro do projeto).
+ * Generate a calendar image for the given month.
+ * If the `canvas` library is unavailable, returns a data‑URL for a 1×1 transparent PNG.
+ * @param date Any date within the month to render.
+ * @returns Absolute path to the PNG file (or a data‑URL string when canvas missing).
  */
 export async function generateCalendarImage(date: Date): Promise<string> {
-  const monthLabel = format(date, 'MMMM yyyy', { locale: undefined });
+  // Fallback when canvas cannot be loaded.
+  if (!createCanvas) {
+    // 1×1 transparent PNG data URL.
+    return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+XjJkAAAAASUVORK5CYII=';
+  }
+
+  const monthLabel = format(date, 'MMMM yyyy');
   const year = date.getFullYear();
   const month = date.getMonth(); // 0‑based
   const firstDay = new Date(year, month, 1);
@@ -39,11 +47,10 @@ export async function generateCalendarImage(date: Date): Promise<string> {
   ctx.textAlign = 'center';
   ctx.fillText(monthLabel, canvasWidth / 2, 40);
 
-  // Grid settings
+  // Grid
   const cellSize = 70;
   const startX = (canvasWidth - cellSize * 7) / 2;
   const startY = 70;
-
   const today = new Date();
   const todayDay = today.getDate();
   const todayMonth = today.getMonth();
@@ -58,41 +65,36 @@ export async function generateCalendarImage(date: Date): Promise<string> {
       ctx.strokeRect(x, y, cellSize, cellSize);
 
       const cellIdx = row * 7 + col;
-      let dayNumber = '';
       if (cellIdx >= startOffset && day <= daysInMonth) {
-        dayNumber = day.toString();
-        // Determine color
-        let bg = '#e0e0e0'; // default past
+        // Determine background color
+        let bg = '#e0e0e0'; // past default
         if (year === todayYear && month === todayMonth) {
           if (day < todayDay) {
             bg = '#e0e0e0'; // past
           } else if (day === todayDay) {
-            bg = '#add8e6'; // today (light blue)
+            bg = '#add8e6'; // today
           } else if (col === 0) {
-            bg = '#ffcccc'; // sunday closed
+            bg = '#ffcccc'; // Sunday closed
           } else {
             bg = '#ccffcc'; // available
           }
         } else {
-          // Future month – treat similarly (no past concept)
-          if (col === 0) {
-            bg = '#ffcccc';
-          } else {
-            bg = '#ccffcc';
-          }
+          // Future month – treat Sunday as closed, others available.
+          bg = col === 0 ? '#ffcccc' : '#ccffcc';
         }
         ctx.fillStyle = bg;
         ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
         ctx.fillStyle = '#000000';
         ctx.font = '20px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(dayNumber, x + cellSize / 2, y + cellSize / 2 + 6);
+        ctx.fillText(String(day), x + cellSize / 2, y + cellSize / 2 + 6);
         day++;
       }
     }
+    if (day > daysInMonth) break;
   }
 
-  // Ensure tmp dir exists
+  // Write file to ./tmp
   const tmpDir = path.resolve(process.cwd(), 'tmp');
   if (!fs.existsSync(tmpDir)) {
     fs.mkdirSync(tmpDir);
