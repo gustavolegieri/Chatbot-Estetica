@@ -404,6 +404,9 @@ export function etapa6Upsell(service: string, complement: string, benefit: strin
 // ─────────────────────────────────────────────────────────────
 
 export function buildCalendarPrompt(date = new Date()): string {
+  // original calendar text generation (kept for fallback)
+  // original calendar text generation (kept for fallback)
+
   // Emoji‑rich calendar for a more interactive experience
   const year = date.getFullYear();
   const month = date.getMonth();
