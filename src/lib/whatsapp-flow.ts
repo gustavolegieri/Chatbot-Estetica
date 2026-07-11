@@ -3,7 +3,7 @@ import { addDays, format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { prisma } from "./prisma";
 import { sendText, sendMedia, sendList } from "./evolution-api";
-import { sendCalendarWithImageAndList } from "./whatsapp-flow-messages";
+import { sendCalendarWithImageAndList } from "./calendar-helper";
 import {
   calculateEndTime,
   formatDurationLabel,
