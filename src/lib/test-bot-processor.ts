@@ -22,7 +22,6 @@ import { parseVehicleMessage } from "./whatsapp-vehicle-parse";
 import { loadWhatsAppCatalog } from "./whatsapp-service-catalog";
 import { prisma } from "./prisma";
 import { buildAvailableSlotsForDay, parseTimeSelection } from "./appointments";
-import { sendCalendarWithImageAndList } from "./calendar-helper";
 import { calculateDistance, calculatePickupFee } from "./maps";
 import { findCouponByCode } from "./coupons";
 import { format } from "date-fns";
@@ -788,7 +787,7 @@ async function handleLogistics(
     session.awaitingReturnPreference = false;
     session.stage = "ETAPA7_DAY";
     responses.push({ text: wantsReturn ? "🔄 Devolução incluída no resumo." : "📍 Sem devolução, tudo certo." });
-    await sendCalendarWithImageAndList({ number: "1234567890", prompts: {} });
+    responses.push({ text: buildCalendarPrompt() });
     return responses;
   }
 
@@ -804,7 +803,7 @@ async function handleLogistics(
   session.pickupDeliveryFee = 0;
   session.stage = "ETAPA7_DAY";
   responses.push({ text: "📍 Combinado! Você pode levar o carro até a loja quando puder." });
-  await sendCalendarWithImageAndList({ number: "1234567890", prompts: {} });
+  responses.push({ text: buildCalendarPrompt() });
   return responses;
 }
 
@@ -905,7 +904,7 @@ async function handleDateSelection(
     return responses;
   }
 
-  await sendCalendarWithImageAndList({ number: "1234567890", prompts: {} });
+  responses.push({ text: buildCalendarPrompt() });
   return responses;
 }
 
