@@ -789,6 +789,8 @@ async function handleLogistics(
     session.stage = "ETAPA7_DAY";
     responses.push({ text: wantsReturn ? "🔄 Devolução incluída no resumo." : "📍 Sem devolução, tudo certo." });
     await sendCalendarWithImageAndList({ number: "1234567890", prompts: {} });
+    // Show textual calendar fallback for the test UI
+    responses.push({ text: buildCalendarPrompt(new Date()) });
     return responses;
   }
 
@@ -805,6 +807,8 @@ async function handleLogistics(
   session.stage = "ETAPA7_DAY";
   responses.push({ text: "📍 Combinado! Você pode levar o carro até a loja quando puder." });
   await sendCalendarWithImageAndList({ number: "1234567890", prompts: {} });
+    // Show textual calendar fallback for the test UI
+    responses.push({ text: buildCalendarPrompt(new Date()) });
   return responses;
 }
 
@@ -906,6 +910,8 @@ async function handleDateSelection(
   }
 
   await sendCalendarWithImageAndList({ number: "1234567890", prompts: {} });
+    // Show textual calendar fallback for the test UI
+    responses.push({ text: buildCalendarPrompt(new Date()) });
   return responses;
 }
 
