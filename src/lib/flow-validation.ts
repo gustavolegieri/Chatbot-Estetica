@@ -70,72 +70,106 @@ export function buildVehicleConfirmationPrompt(data: VehicleCollectionData): str
 
 export function buildCalendarPrompt(date = new Date()): string {
   const monthNames = [
-    "Janeiro",
-    "Fevereiro",
-    "Março",
-    "Abril",
-    "Maio",
-    "Junho",
-    "Julho",
-    "Agosto",
-    "Setembro",
-    "Outubro",
-    "Novembro",
-    "Dezembro",
+    "Janeiro", "Fevereiro", "Março", "Abril",
+    "Maio", "Junho", "Julho", "Agosto",
+    "Setembro", "Outubro", "Novembro", "Dezembro",
   ];
   const weekdayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
   const year = date.getFullYear();
   const month = date.getMonth();
-  const today = date.getDate();
+  const todayNum = date.getDate();
+  const todayDate = new Date(year, month, todayNum);
   const firstDay = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const startDay = firstDay.getDay();
+
+  // Dias simulados de ocupação (exemplo)
   const busyDays = new Set([3, 5, 8, 12, 15, 19, 22, 26, 29]);
   const lightDays = new Set([2, 6, 10, 14, 18, 24, 28]);
 
-  const weeks: string[][] = [];
+  // Cada célula deve ter largura fixa: emoji (1) + 2 dígitos = 3
+  const cell = (emoji: string, d: number) => `${emoji}${d.toString().padStart(2, " ")}`;
+  const emptyCell = "   ";
+  const separator = " ";
+
+  const weeks: string[] = [];
   let day = 1;
 
-  const cellWidth = 4;
-  const formatCell = (text: string) => text.padStart(cellWidth, " ");
-
   for (let row = 0; row < 6; row += 1) {
-    const week: string[] = [];
+    const cells: string[] = [];
     for (let col = 0; col < 7; col += 1) {
       if (row === 0 && col < startDay) {
-        week.push(formatCell(""));
+        cells.push(emptyCell);
       } else if (day > daysInMonth) {
-        week.push(formatCell(""));
+        cells.push(emptyCell);
       } else {
-        const dayNumber = day.toString().padStart(2, "0");
-        const isToday = day === today;
-        const cellText = isToday
-          ? `[${dayNumber}]`
-          : busyDays.has(day)
-          ? `🔴${dayNumber}`
-          : lightDays.has(day)
-          ? `🟡${dayNumber}`
-          : `🟢${dayNumber}`;
-        week.push(formatCell(cellText));
+        const dayDate = new Date(year, month, day);
+        const isPast = dayDate < todayDate;
+        const isToday = day === todayNum;
+        const isSunday = col === 0;
+
+        if (isPast || isSunday) {
+          cells.push(cell("⛔", day));
+        } else if (isToday) {
+          cells.push(cell("🔵", day));
+        } else if (busyDays.has(day)) {
+          cells.push(cell("🔴", day));
+        } else if (lightDays.has(day)) {
+          cells.push(cell("🟡", day));
+        } else {
+          cells.push(cell("🟢", day));
+        }
         day += 1;
       }
     }
-    weeks.push(week);
+    weeks.push(cells.join(separator));
     if (day > daysInMonth) break;
   }
 
-  const rows = weeks.map((week) => week.join(" ").trimEnd());
+  // Cabeçalho do mês
+  const monthHeader = `  ${monthNames[month].toUpperCase()} ${year}`;
+
+  // Cabeçalho dos dias da semana
+  const dayHeader = weekdayNames.map((n) => n.padStart(3)).join(" ");
+
+  // Lista numerada apenas dos dias disponíveis (futuros e não domingo)
+  const availableDays: { num: number; name: string; occ: string; emoji: string }[] = [];
+  for (let d = 1; d <= daysInMonth; d += 1) {
+    const dayDate = new Date(year, month, d);
+    const isPast = dayDate < todayDate;
+    const isSunday = dayDate.getDay() === 0;
+    if (isPast || isSunday) continue;
+    const emoji = busyDays.has(d) ? "🔴" : lightDays.has(d) ? "🟡" : "🟢";
+    const weekDay = weekdayNames[dayDate.getDay()];
+    availableDays.push({ num: d, name: weekDay, occ: emoji, emoji });
+  }
+
+  // Lista compacta em linhas
+  const availableLines: string[] = [];
+  for (let i = 0; i < availableDays.length; i += 1) {
+    const d = availableDays[i];
+    const dayStr = d.num.toString().padStart(2, " ");
+    availableLines.push(`  ${d.emoji}  Dia ${dayStr} — ${d.name}`);
+  }
 
   return [
-    `📅 ${monthNames[month]} ${year}`,
-    weekdayNames.join(" "),
-    ...rows,
+    "━━━━━━━━━━━━━━━━━━━━━━━━",
+    `  ${monthHeader}`,
+    "━━━━━━━━━━━━━━━━━━━━━━━━",
+    `  ${dayHeader}`,
+    "━━━━━━━━━━━━━━━━━━━━━━━━",
+    ...weeks.map((w) => `  ${w}`),
+    "━━━━━━━━━━━━━━━━━━━━━━━━",
     "",
-    "✅ Dias disponíveis: 🟢 mais vazio, 🟡 médio, 🔴 mais movimentado",
-    "🚫 Domingos: fechado",
-    "📍 Hoje: dia entre colchetes [ ]",
-    "🔙 Digite 0 para voltar ao início",
+    "🟢  Disponível    🔴  Quase lotado",
+    "🟡  Poucas vagas  ⛔  Fechado/Passado",
+    "🔵  Hoje",
     "",
-    "Me diga o dia que prefere (ex: 08/07).",
+    "📋 *Dias para agendar:*",
+    ...availableLines,
+    "",
+    "💬 *Digite o número do dia* (ex: 15)",
+    "🔙 *0* para voltar",
   ].join("\n");
 }
