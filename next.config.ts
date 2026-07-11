@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "2mb",
     },
   },
+  // @napi-rs/canvas contém binários nativos (.node) que não devem ser processados pelo Webpack
+  serverExternalPackages: ["@napi-rs/canvas"],
 };
 
 
