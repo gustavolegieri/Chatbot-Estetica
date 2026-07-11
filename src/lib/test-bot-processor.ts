@@ -22,6 +22,7 @@ import { parseVehicleMessage } from "./whatsapp-vehicle-parse";
 import { loadWhatsAppCatalog } from "./whatsapp-service-catalog";
 import { prisma } from "./prisma";
 import { buildAvailableSlotsForDay, parseTimeSelection } from "./appointments";
+import { PLACEHOLDER_CALENDAR_DATA_URL } from "./calendar-image";
 import { sendCalendarWithImageAndList } from "./calendar-helper";
 import { calculateDistance, calculatePickupFee } from "./maps";
 import { findCouponByCode } from "./coupons";
@@ -789,7 +790,8 @@ async function handleLogistics(
     session.stage = "ETAPA7_DAY";
     responses.push({ text: wantsReturn ? "🔄 Devolução incluída no resumo." : "📍 Sem devolução, tudo certo." });
     await sendCalendarWithImageAndList({ number: "1234567890", prompts: {} });
-    // Show textual calendar fallback for the test UI
+    // Show calendar image placeholder and textual fallback in test UI
+    responses.push({ mediaUrl: PLACEHOLDER_CALENDAR_DATA_URL, text: 'Calendário (imagem placeholder)' });
     responses.push({ text: buildCalendarPrompt(new Date()) });
     return responses;
   }
@@ -807,7 +809,8 @@ async function handleLogistics(
   session.stage = "ETAPA7_DAY";
   responses.push({ text: "📍 Combinado! Você pode levar o carro até a loja quando puder." });
   await sendCalendarWithImageAndList({ number: "1234567890", prompts: {} });
-    // Show textual calendar fallback for the test UI
+    // Show calendar image placeholder and textual fallback in test UI
+    responses.push({ mediaUrl: PLACEHOLDER_CALENDAR_DATA_URL, text: 'Calendário (imagem placeholder)' });
     responses.push({ text: buildCalendarPrompt(new Date()) });
   return responses;
 }
@@ -910,7 +913,8 @@ async function handleDateSelection(
   }
 
   await sendCalendarWithImageAndList({ number: "1234567890", prompts: {} });
-    // Show textual calendar fallback for the test UI
+    // Show calendar image placeholder and textual fallback in test UI
+    responses.push({ mediaUrl: PLACEHOLDER_CALENDAR_DATA_URL, text: 'Calendário (imagem placeholder)' });
     responses.push({ text: buildCalendarPrompt(new Date()) });
   return responses;
 }
