@@ -1,53 +1,51 @@
-import { generateCalendarImage } from "./calendar-image";
+import { generateCalendarImage, getMonthOccupancy, buildDayListSections } from "./calendar-core";
 import { sendMedia, sendList } from "./evolution-api";
-import { format } from "date-fns";
+import { BRAND_DEFAULT } from "./whatsapp-catalog";
 
 /**
- * Sends a calendar image and an interactive list of up to 10 selectable days.
- * @param number WhatsApp number (in international format) to send the messages to.
- * @param prompts Optional prompt map – kept for signature compatibility.
+ * Envia calendário como imagem + lista interativa WhatsApp.
+ * Usa dados reais de ocupação do banco (Prisma) e gera PNG via @napi-rs/canvas.
+ * Fallback para placeholder se a biblioteca canvas não estiver disponível.
+ *
+ * @param number WhatsApp number (international format)
+ * @param prompts Prompt map opcional (compatibilidade)
  */
 export async function sendCalendarWithImageAndList({ number, prompts }: { number: string; prompts?: any }) {
   const today = new Date();
-  // Generate image and send (simulated when WASENDER_API_KEY not set)
-  const imagePath = await generateCalendarImage(today);
-  await sendMedia({ number, mediaUrl: imagePath, caption: "Calendário de disponibilidade" });
-
-  // Build list of up to 10 future weekdays (skip Sundays and past dates)
   const year = today.getFullYear();
   const month = today.getMonth();
-  const firstDay = new Date(year, month, 1);
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const startOffset = firstDay.getDay(); // 0 = Sun
 
-  const rows: { id: string; title: string; description?: string }[] = [];
-  let day = 1;
-  for (let i = 0; i < daysInMonth && rows.length < 10; i++) {
-    const date = new Date(year, month, day);
-    const col = (startOffset + i) % 7; // weekday index
-    if (col === 0) { // Sunday – closed
-      day++;
-      continue;
-    }
-    if (date < today) { // past
-      day++;
-      continue;
-    }
-    const iso = format(date, "yyyy-MM-dd");
-    rows.push({ id: iso, title: `${String(day).padStart(2, "0")} 🟢`, description: "Disponível" });
-    day++;
-  }
+  // 1. Gera e envia a IMAGEM do calendário
+  const imagePath = await generateCalendarImage(today);
+  await sendMedia({ number, mediaUrl: imagePath, caption: "📅 Calendário de disponibilidade" });
 
-  if (rows.length === 0) {
-    // No days available – nothing else to send
+  // 2. Busca dados reais de ocupação
+  const { occupancyMap } = await getMonthOccupancy(year, month);
+
+  // 3. Monta seções da List Message
+  const sections = buildDayListSections(occupancyMap, month, year);
+
+  if (sections.length === 0) {
+    // Nenhum dia disponível
+    await sendMedia({
+      number,
+      mediaUrl: imagePath,
+      caption: "Nenhum dia disponível neste mês. Tente novamente mais tarde.",
+    });
     return;
   }
 
+  // 4. Envia a lista interativa
+  const totalRows = sections.reduce((acc, s) => acc + s.rows.length, 0);
+  if (totalRows === 0) return;
+
+  // WhatsApp List Message: máximo 10 itens no total, agrupados em até 10 seções
+  // A WASender API aceita seções com rows dentro
   await sendList({
     number,
-    title: "Selecione o dia",
-    description: "Dias disponíveis (até 10).",
-    buttonText: "Escolher",
-    sections: [{ title: "Dias", rows }],
+    title: "Escolha o dia",
+    description: "Toque no dia desejado:",
+    buttonText: "Ver dias",
+    sections,
   });
 }

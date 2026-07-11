@@ -399,72 +399,11 @@ export function etapa6Upsell(service: string, complement: string, benefit: strin
   return renderPrompt(p(prompts), "etapa6_upsell", { service, complement, benefit });
 }
 
+import { buildCalendarPrompt } from "./flow-validation";
+
 // ─────────────────────────────────────────────────────────────
 // ETAPA 7 — AGENDAMENTO
 // ─────────────────────────────────────────────────────────────
-
-export function buildCalendarPrompt(date = new Date()): string {
-  // original calendar text generation (kept for fallback)
-  // original calendar text generation (kept for fallback)
-
-  // Emoji‑rich calendar for a more interactive experience
-  const year = date.getFullYear();
-  const month = date.getMonth();
-  const today = date.getDate();
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-  const monthLabel = date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-  const weekdayNames = ["D", "S", "T", "Q", "Q", "S", "S"]; // Domingo‑Sábado
-
-  // Build matrix of days (6 weeks × 7 days)
-  const weeks: string[][] = [];
-  const startOffset = firstDay.getDay(); // 0 = Domingo
-  const daysInMonth = lastDay.getDate();
-  let day = 1;
-
-  for (let row = 0; row < 6; row++) {
-    const week: string[] = [];
-    for (let col = 0; col < 7; col++) {
-      const cellIdx = row * 7 + col;
-      if (cellIdx < startOffset || day > daysInMonth) {
-        week.push("   "); // empty cell
-      } else if (day < today) {
-        // Past dates are left blank so they cannot be selected
-        week.push("   ");
-        day++;
-      } else {
-        const dayStr = day.toString().padStart(2, " ");
-        // Choose emoji based on relation to today and if it's Sunday
-        let emoji = "🟢"; // future weekday (available)
-        if (col === 0) {
-          // Sunday is always closed
-          emoji = "🔴";
-        } else if (day === today) {
-          emoji = "🔵"; // today
-        }
-        week.push(`${emoji}${dayStr}`);
-        day++;
-      }
-    }
-    weeks.push(week);
-    if (day > daysInMonth) break;
-  }
-
-  const calendarRows = weeks.map((week) => week.join(" "));
-
-  return [
-    `📅 *${monthLabel.replace(/(^\w|\s\w)/g, (m) => m.toUpperCase())}*`,
-    `   ${weekdayNames.map((d) => ` ${d} `).join("")}`,
-    ...calendarRows,
-    "",
-    "🟢 = data disponível",
-    "🔵 = hoje",
-    "⚫️ = data passada",
-    "🔴 = domingo (fechado)",
-    "",
-    "Me diga o dia que prefere (ex: 08/07).",
-  ].join("\n");
-}
 
 export function etapa7Day(prompts?: PromptMap) {
   return [buildCalendarPrompt(), "", renderPrompt(p(prompts), "etapa7_day", {})].join("\n");
