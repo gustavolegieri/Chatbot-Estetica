@@ -791,7 +791,7 @@ async function handleLogistics(
     responses.push({ text: wantsReturn ? "🔄 Devolução incluída no resumo." : "📍 Sem devolução, tudo certo." });
     await sendCalendarWithImageAndList({ number: "1234567890", prompts: {} });
     // Show calendar image placeholder and textual fallback in test UI
-    responses.push({ mediaUrl: PLACEHOLDER_CALENDAR_DATA_URL, mediaType: 'image', text: 'Calendário (imagem placeholder)' });
+    responses.push({ text: `![](${PLACEHOLDER_CALENDAR_DATA_URL})` });
     responses.push({ text: buildCalendarPrompt(new Date()) });
     return responses;
   }
@@ -810,7 +810,7 @@ async function handleLogistics(
   responses.push({ text: "📍 Combinado! Você pode levar o carro até a loja quando puder." });
   await sendCalendarWithImageAndList({ number: "1234567890", prompts: {} });
     // Show calendar image placeholder and textual fallback in test UI
-    responses.push({ mediaUrl: PLACEHOLDER_CALENDAR_DATA_URL, mediaType: 'image', text: 'Calendário (imagem placeholder)' });
+    responses.push({ text: `![](${PLACEHOLDER_CALENDAR_DATA_URL})` });
     responses.push({ text: buildCalendarPrompt(new Date()) });
   return responses;
 }
@@ -914,7 +914,7 @@ async function handleDateSelection(
 
   await sendCalendarWithImageAndList({ number: "1234567890", prompts: {} });
     // Show calendar image placeholder and textual fallback in test UI
-    responses.push({ mediaUrl: PLACEHOLDER_CALENDAR_DATA_URL, mediaType: 'image', text: 'Calendário (imagem placeholder)' });
+    responses.push({ text: `![](${PLACEHOLDER_CALENDAR_DATA_URL})` });
     responses.push({ text: buildCalendarPrompt(new Date()) });
   return responses;
 }
