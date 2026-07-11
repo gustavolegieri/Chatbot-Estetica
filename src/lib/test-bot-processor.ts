@@ -22,6 +22,7 @@ import { parseVehicleMessage } from "./whatsapp-vehicle-parse";
 import { loadWhatsAppCatalog } from "./whatsapp-service-catalog";
 import { prisma } from "./prisma";
 import { buildAvailableSlotsForDay, parseTimeSelection } from "./appointments";
+import { sendCalendarWithImageAndList } from "./calendar-helper";
 import { calculateDistance, calculatePickupFee } from "./maps";
 import { findCouponByCode } from "./coupons";
 import { format } from "date-fns";
