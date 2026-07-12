@@ -1,7 +1,7 @@
 import { prisma } from "./prisma";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isBefore, isSameDay, startOfDay } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { BRAND_DEFAULT } from "./whatsapp-catalog";
-import satori from "satori";
 
 // ─── Tipos ───────────────────────────────────────────────────────
 
@@ -164,9 +164,49 @@ export async function getMonthOccupancy(year: number, month: number, customToday
     occupancyMap[day] = info;
   }
 
-  const monthLabel = format(monthStart, "MMMM' de 'yyyy");
+  const monthLabel = format(monthStart, "MMMM 'de' yyyy", { locale: ptBR });
 
   return { year, month, monthLabel, days, occupancyMap };
+}
+
+// ─── Image generation with @napi-rs/canvas ──────────────────────
+
+async function loadCanvas() {
+  try {
+    return await import("@napi-rs/canvas");
+  } catch {
+    return null;
+  }
+}
+
+async function registerSystemFonts(canvasMod: any) {
+  const fs = await import("fs");
+  try {
+    // Try Windows Arial
+    const arialPath = "C:\\Windows\\Fonts\\arial.ttf";
+    if (fs.existsSync(arialPath)) {
+      canvasMod.registerFont(arialPath, { family: "Arial" });
+      return;
+    }
+  } catch {}
+  
+  try {
+    // Try macOS Helvetica
+    const helveticaPath = "/System/Library/Fonts/Helvetica.ttc";
+    if (fs.existsSync(helveticaPath)) {
+      canvasMod.registerFont(helveticaPath, { family: "Helvetica" });
+      return;
+    }
+  } catch {}
+  
+  try {
+    // Try Linux DejaVu
+    const dejavuPath = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+    if (fs.existsSync(dejavuPath)) {
+      canvasMod.registerFont(dejavuPath, { family: "DejaVu Sans" });
+      return;
+    }
+  } catch {}
 }
 
 const OCCUPANCY_COLORS: Record<string, string> = {
@@ -188,11 +228,20 @@ const OCCUPANCY_LABELS: Record<string, string> = {
 };
 
 /**
- * Generate a calendar SVG image using satori (React-to-SVG).
- * This properly handles text rendering with system fonts.
- * Returns SVG as data URL (WhatsApp accepts SVG data URLs).
+ * Generate a calendar PNG image with the clinic logo, month grid, and occupancy colors.
+ * Uses @napi-rs/canvas with registered system fonts for text rendering.
  */
 export async function generateCalendarImage(date: Date, customToday?: Date): Promise<string> {
+  const canvasMod = await loadCanvas();
+  if (!canvasMod) {
+    return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+XjJkAAAAASUVORK5CYII=";
+  }
+
+  // Register system fonts
+  await registerSystemFonts(canvasMod);
+
+  const { createCanvas, loadImage } = canvasMod;
+  
   const data = await getMonthOccupancy(date.getFullYear(), date.getMonth(), customToday);
 
   // Dimensions conforme especificação
@@ -209,233 +258,232 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
   
   // Canvas width: padding + cols * (cellSize + gap) - gap + padding
   const gridWidth = cols * cellSize + (cols - 1) * cellGap;
-  const width = padding * 2 + gridWidth;
+  const canvasW = padding * 2 + gridWidth;
   
   // Canvas height: padding + logo + brand text + month + margin + weekday + margin + grid + margin + legend + padding
-  const height = padding + logoHeight + 30 + headerMonthHeight + 16 + weekdayHeaderHeight + rows * cellSize + (rows - 1) * cellGap + 20 + legendHeight + padding;
+  const canvasH = padding + logoHeight + 30 + headerMonthHeight + 16 + weekdayHeaderHeight + rows * cellSize + (rows - 1) * cellGap + 20 + legendHeight + padding;
 
-  // Build calendar grid HTML
+  const canvas = createCanvas(canvasW, canvasH);
+  const ctx = canvas.getContext("2d");
+
+  // Background - fundo escuro conforme especificação
+  ctx.fillStyle = "#0d0d0d";
+  ctx.fillRect(0, 0, canvasW, canvasH);
+
+  let currentY = padding;
+
+  // 1. Logo centralizada com proporção correta
+  try {
+    const logo = await loadImage("public/logo-garagem-do-ka.png");
+    // Manter proporção original (aspect ratio)
+    const logoAspectRatio = logo.width / logo.height;
+    const logoWidth = logoHeight * logoAspectRatio;
+    const logoX = (canvasW - logoWidth) / 2;
+    ctx.drawImage(logo, logoX, currentY, logoWidth, logoHeight);
+  } catch {
+    // Fallback: text instead of logo
+    ctx.fillStyle = "#c9a24b"; // Dourado
+    ctx.font = "bold 20px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(BRAND_DEFAULT, canvasW / 2, currentY + 35);
+  }
+  
+  currentY += logoHeight + 10;
+
+  // 2. Texto "Garagem do Ka" abaixo da logo
+  ctx.fillStyle = "#c9a24b"; // Dourado
+  ctx.font = "bold 16px Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Garagem do Ka", canvasW / 2, currentY + 20);
+  
+  currentY += 30;
+
+  // 3. Título "Calendário do mês X" em dourado
+  ctx.fillStyle = "#c9a24b"; // Dourado
+  ctx.font = "bold 24px Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(`Calendário do ${data.monthLabel}`, canvasW / 2, currentY + 20);
+  
+  currentY += headerMonthHeight + 16; // Espaço 16px
+
+  // 4. Cabeçalho dias da semana - dourado claro
+  const weekdayShort = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
+  ctx.textAlign = "center";
+  ctx.font = "bold 13px Arial, sans-serif";
+  ctx.fillStyle = "#e5c07b"; // Dourado claro
+  
+  for (let c = 0; c < cols; c++) {
+    const x = padding + c * (cellSize + cellGap) + cellSize / 2;
+    ctx.fillText(weekdayShort[c], x, currentY + 20);
+  }
+  
+  currentY += weekdayHeaderHeight;
+
+  // 5. Grade do calendário
   const monthStart = new Date(data.year, data.month, 1);
   const startOffset = monthStart.getDay();
   let dayCount = 1;
   const daysInMonth = new Date(data.year, data.month + 1, 0).getDate();
 
-  const weekdayShort = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
+  // Cores pastel com mais saturação para contraste em fundo escuro
+  const bgColors = {
+    green: "#059669",      // verde mais saturado
+    yellow: "#d97706",    // amarelo mais saturado
+    red: "#dc2626",       // vermelho mais saturado
+    closed: "#374151",    // cinza escuro
+    past: "#1f2937",      // cinza muito escuro
+    today: "#059669",     // usa a cor da disponibilidade
+  };
   
-  // Build cells
-  let cellsHtml = "";
+  const textColors = {
+    green: "#ffffff",     // branco para contraste
+    yellow: "#ffffff",   // branco para contraste
+    red: "#ffffff",      // branco para contraste
+    closed: "#9ca3af",   // cinza claro
+    past: "#6b7280",      // cinza médio
+    today: "#ffffff",    // branco para contraste
+  };
+
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
+      const x = padding + c * (cellSize + cellGap);
+      const y = currentY + r * (cellSize + cellGap);
       const cellIdx = r * 7 + c;
-      let cellContent = "";
-      
+
+      // Fundo da célula e número
       if (cellIdx >= startOffset && dayCount <= daysInMonth) {
         const info = data.occupancyMap[dayCount];
-        if (info) {
-          const bgColors = {
-            green: "#059669",
-            yellow: "#d97706",
-            red: "#dc2626",
-            closed: "#374151",
-            past: "#1f2937",
-          };
-          
-          const textColors = {
-            green: "#ffffff",
-            yellow: "#ffffff",
-            red: "#ffffff",
-            closed: "#9ca3af",
-            past: "#6b7280",
-          };
-          
-          let bgColor, textColor;
-          if (info.occupancy === "past") {
-            bgColor = bgColors.past;
-            textColor = textColors.past;
-          } else if (info.occupancy === "closed") {
-            bgColor = bgColors.closed;
-            textColor = textColors.closed;
-          } else {
-            const baseOccupancy = info.occupancy === "today" ? "green" : info.occupancy;
-            bgColor = bgColors[baseOccupancy as keyof typeof bgColors] || "#ffffff";
-            textColor = textColors[baseOccupancy as keyof typeof textColors] || "#ffffff";
-          }
-          
-          const isToday = info.occupancy === "today";
-          const borderStyle = isToday ? "border: 3px solid #c9a24b;" : "";
-          
-          cellContent = `
-            <div style="
-              width: ${cellSize}px;
-              height: ${cellSize}px;
-              background-color: ${bgColor};
-              border-radius: 8px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              ${borderStyle}
-            ">
-              <span style="color: ${textColor}; font-weight: bold; font-size: 19px;">${dayCount}</span>
-            </div>
-          `;
+        if (!info) { 
+          dayCount++; 
+          continue; 
         }
+
+        // Determinar cor de fundo e texto
+        let bgColor, textColor;
+        
+        if (info.occupancy === "past") {
+          bgColor = bgColors.past;
+          textColor = textColors.past;
+        } else if (info.occupancy === "closed") {
+          bgColor = bgColors.closed;
+          textColor = textColors.closed;
+        } else {
+          // Para today, usa a cor baseada na ocupação real
+          const baseOccupancy = info.occupancy === "today" ? "green" : info.occupancy;
+          bgColor = bgColors[baseOccupancy as keyof typeof bgColors] || "#ffffff";
+          textColor = textColors[baseOccupancy as keyof typeof textColors] || "#1a1a1a";
+        }
+
+        // Desenhar célula com borda arredondada
+        ctx.fillStyle = bgColor;
+        
+        // Desenhar retângulo arredondado manualmente
+        const r = 8;
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + cellSize - r, y);
+        ctx.quadraticCurveTo(x + cellSize, y, x + cellSize, y + r);
+        ctx.lineTo(x + cellSize, y + cellSize - r);
+        ctx.quadraticCurveTo(x + cellSize, y + cellSize, x + cellSize - r, y + cellSize);
+        ctx.lineTo(x + r, y + cellSize);
+        ctx.quadraticCurveTo(x, y + cellSize, x, y + cellSize - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+        ctx.fill();
+
+        // Destaque do dia atual - borda dourada
+        if (info.occupancy === "today") {
+          ctx.strokeStyle = "#c9a24b"; // Dourado
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(x + r, y);
+          ctx.lineTo(x + cellSize - r, y);
+          ctx.quadraticCurveTo(x + cellSize, y, x + cellSize, y + r);
+          ctx.lineTo(x + cellSize, y + cellSize - r);
+          ctx.quadraticCurveTo(x + cellSize, y + cellSize, x + cellSize - r, y + cellSize);
+          ctx.lineTo(x + r, y + cellSize);
+          ctx.quadraticCurveTo(x, y + cellSize, x, y + cellSize - r);
+          ctx.lineTo(x, y + r);
+          ctx.quadraticCurveTo(x, y, x + r, y);
+          ctx.closePath();
+          ctx.stroke();
+        }
+
+        // NÚMERO DO DIA - sempre visível, centralizado, fonte 18-20px, negrito, cor escura
+        const textX = x + cellSize / 2;
+        const textY = y + cellSize / 2;
+        const text = String(dayCount);
+        
+        // Usar Arial (registrada) ou fallback
+        ctx.fillStyle = textColor;
+        ctx.font = "bold 19px Arial, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        
+        // Desenhar texto
+        ctx.fillText(text, textX, textY);
+
         dayCount++;
       }
-      cellsHtml += cellContent;
+      // Células vazias (fora do mês): completamente em branco
     }
   }
 
-  // Build full HTML
-  const html = `
-    <div style="
-      width: ${width}px;
-      height: ${height}px;
-      background-color: #0d0d0d;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: ${padding}px;
-      box-sizing: border-box;
-    ">
-      <!-- Logo placeholder -->
-      <div style="width: 120px; height: ${logoHeight}px; background-color: #1a1a1a; margin-bottom: 10px;"></div>
-      
-      <!-- Garagem do Ka -->
-      <div style="color: #c9a24b; font-weight: bold; font-size: 16px; margin-bottom: 30px;">Garagem do Ka</div>
-      
-      <!-- Month title -->
-      <div style="color: #c9a24b; font-weight: bold; font-size: 24px; margin-bottom: 16px;">Calendário do ${data.monthLabel}</div>
-      
-      <!-- Weekday headers -->
-      <div style="display: flex; gap: ${cellGap}px; margin-bottom: ${weekdayHeaderHeight}px;">
-        ${weekdayShort.map(day => `
-          <div style="width: ${cellSize}px; text-align: center; color: #e5c07b; font-weight: bold; font-size: 13px;">${day}</div>
-        `).join('')}
-      </div>
-      
-      <!-- Calendar grid -->
-      <div style="display: grid; grid-template-columns: repeat(7, ${cellSize}px); gap: ${cellGap}px;">
-        ${cellsHtml}
-      </div>
-      
-      <!-- Legend -->
-      <div style="display: flex; gap: 20px; margin-top: 20px;">
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <div style="width: 14px; height: 14px; background-color: #059669;"></div>
-          <span style="color: #e5c07b; font-weight: bold; font-size: 13px;">Mais vazio</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <div style="width: 14px; height: 14px; background-color: #d97706;"></div>
-          <span style="color: #e5c07b; font-weight: bold; font-size: 13px;">Médio</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <div style="width: 14px; height: 14px; background-color: #dc2626;"></div>
-          <span style="color: #e5c07b; font-weight: bold; font-size: 13px;">Mais movimentado</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <div style="width: 14px; height: 14px; background-color: #374151;"></div>
-          <span style="color: #e5c07b; font-weight: bold; font-size: 13px;">Fechado</span>
-        </div>
-      </div>
-    </div>
-  `;
+  currentY += rows * cellSize + (rows - 1) * cellGap + 20; // Espaço 20px
 
-  // Convert HTML to SVG using satori
+  // 6. Legenda horizontal com quadradinhos 14x14px - tema escuro/dourado
+  const legendItems = [
+    { color: "#059669", label: "Mais vazio" },
+    { color: "#d97706", label: "Médio" },
+    { color: "#dc2626", label: "Mais movimentado" },
+    { color: "#374151", label: "Fechado" },
+  ];
+  
+  // Aumentar espaçamento para deixar os itens mais próximos
+  const legendSpacing = (canvasW - padding * 2) / legendItems.length;
+  
+  legendItems.forEach((item, i) => {
+    const lx = padding + i * legendSpacing + legendSpacing / 2 - 40; // Ajuste para centralizar
+    
+    // Quadradinho 14x14px
+    ctx.fillStyle = item.color;
+    ctx.fillRect(lx, currentY, 14, 14);
+    
+    // Texto ao lado - branco/dourado claro
+    ctx.fillStyle = "#e5c07b"; // Dourado claro
+    ctx.font = "bold 13px Arial, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(item.label, lx + 20, currentY + 12);
+  });
+
+  // Return as buffer
+  const buffer = canvas.toBuffer("image/png");
+  
+  // Try to write to public/tmp directory for public access
   try {
-    console.log("[calendar-core] Starting calendar generation with satori");
-    
-    // Try to use system fonts instead of downloading
-    let fontData;
-    let fontName = "Arial";
-    
-    try {
-      // Try Windows Arial
-      const fs = await import("fs");
-      const arialPath = "C:\\Windows\\Fonts\\arial.ttf";
-      fontData = fs.readFileSync(arialPath);
-      console.log("[calendar-core] Using Arial from system, size:", fontData.byteLength);
-    } catch {
-      try {
-        // Try macOS Helvetica
-        const fs = await import("fs");
-        const helveticaPath = "/System/Library/Fonts/Helvetica.ttc";
-        fontData = fs.readFileSync(helveticaPath);
-        console.log("[calendar-core] Using Helvetica from system, size:", fontData.byteLength);
-        fontName = "Helvetica";
-      } catch {
-        // Try Linux DejaVu
-        const fs = await import("fs");
-        const dejavuPath = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
-        fontData = fs.readFileSync(dejavuPath);
-        console.log("[calendar-core] Using DejaVu from system, size:", fontData.byteLength);
-        fontName = "DejaVu Sans";
-      }
+    const fs = await import("fs");
+    const path = await import("path");
+    const publicTmpDir = path.resolve(process.cwd(), "public", "tmp");
+    if (!fs.existsSync(publicTmpDir)) {
+      fs.mkdirSync(publicTmpDir, { recursive: true });
     }
+    const fileName = `calendar-${data.year}-${String(data.month + 1).padStart(2, "0")}.png`;
+    const filePath = path.join(publicTmpDir, fileName);
+    fs.writeFileSync(filePath, buffer);
     
-    const svg = await satori(html, {
-      width,
-      height,
-      fonts: [
-        {
-          name: fontName,
-          data: fontData,
-          weight: 400,
-          style: "normal",
-        },
-        {
-          name: fontName,
-          data: fontData,
-          weight: 700,
-          style: "normal",
-        },
-      ],
-    });
-    console.log("[calendar-core] SVG generated, length:", svg.length);
-    
-    // Try to convert SVG to PNG using sharp for better compatibility
-    try {
-      const sharp = await import("sharp");
-      const svgBuffer = Buffer.from(svg);
-      const pngBuffer = await sharp.default(svgBuffer).png().toBuffer();
-      console.log("[calendar-core] PNG generated via sharp, size:", pngBuffer.length);
-      
-      // Try to write to public/tmp directory for public access
-      try {
-        const fs = await import("fs");
-        const path = await import("path");
-        const publicTmpDir = path.resolve(process.cwd(), "public", "tmp");
-        if (!fs.existsSync(publicTmpDir)) {
-          fs.mkdirSync(publicTmpDir, { recursive: true });
-        }
-        const fileName = `calendar-${data.year}-${String(data.month + 1).padStart(2, "0")}.png`;
-        const filePath = path.join(publicTmpDir, fileName);
-        fs.writeFileSync(filePath, pngBuffer);
-        console.log("[calendar-core] PNG written to:", filePath);
-        
-        // In development, use localhost URL; in production, use environment variable
-        const isDev = process.env.NODE_ENV === "development";
-        const baseUrl = isDev 
-          ? "http://localhost:3000" 
-          : (process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || "");
-        const normalizedBase = /^https?:\/\//i.test(baseUrl) ? baseUrl : `https://${baseUrl}`;
-        const finalUrl = `${normalizedBase}/tmp/${fileName}`;
-        console.log("[calendar-core] Returning public URL:", finalUrl);
-        return finalUrl;
-      } catch (err) {
-        console.warn("[calendar-core] Could not write to public/tmp directory, using base64 fallback:", err);
-        const base64 = pngBuffer.toString("base64");
-        return `data:image/png;base64,${base64}`;
-      }
-    } catch (err) {
-      console.warn("[calendar-core] Sharp not available, returning SVG as data URL:", err);
-      // Fallback to SVG data URL
-      const base64 = Buffer.from(svg).toString("base64");
-      return `data:image/svg+xml;base64,${base64}`;
-    }
+    // In development, use localhost URL; in production, use environment variable
+    const isDev = process.env.NODE_ENV === "development";
+    const baseUrl = isDev 
+      ? "http://localhost:3000" 
+      : (process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || "");
+    const normalizedBase = /^https?:\/\//i.test(baseUrl) ? baseUrl : `https://${baseUrl}`;
+    const finalUrl = `${normalizedBase}/tmp/${fileName}`;
+    return finalUrl;
   } catch (err) {
-    console.error("[calendar-core] Satori error:", err);
-    // Fallback to placeholder
-    return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+XjJkAAAAASUVORK5CYII=";
+    // Fallback to base64 data URL
+    const base64 = buffer.toString("base64");
+    return `data:image/png;base64,${base64}`;
   }
 }
 

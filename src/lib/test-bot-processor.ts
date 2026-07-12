@@ -790,7 +790,6 @@ async function handleLogistics(
     session.stage = "ETAPA7_DAY";
     responses.push({ text: wantsReturn ? "🔄 Devolução incluída no resumo." : "📍 Sem devolução, tudo certo." });
     const calendarImagePath = await generateCalendarImageOnlyForTest(session.testDate || null);
-    console.log("[test-bot-processor] Logistics -> Calendar generated:", calendarImagePath);
     responses.push({ text: generateCalendarLegend(), mediaUrl: calendarImagePath, mediaType: "image" });
     return responses;
   }
@@ -808,9 +807,7 @@ async function handleLogistics(
   session.stage = "ETAPA7_DAY";
   responses.push({ text: "📍 Combinado! Você pode levar o carro até a loja quando puder." });
   const calendarImagePath = await generateCalendarImageOnlyForTest(session.testDate || null);
-  console.log("[test-bot-processor] Logistics (no delivery) -> Calendar generated:", calendarImagePath);
   responses.push({ text: generateCalendarLegend(), mediaUrl: calendarImagePath, mediaType: "image" });
-  console.log("[test-bot-processor] Full response:", JSON.stringify(responses, null, 2));
   return responses;
 }
 
