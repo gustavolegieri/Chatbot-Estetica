@@ -179,14 +179,16 @@ async function loadCanvas() {
   }
 }
 
-async function registerSystemFonts(canvasMod: any) {
+async function registerSystemFonts(canvasMod: any): Promise<string> {
   const fs = await import("fs");
+  const https = await import("https");
+  
   try {
     // Try Windows Arial
     const arialPath = "C:\\Windows\\Fonts\\arial.ttf";
     if (fs.existsSync(arialPath)) {
       canvasMod.registerFont(arialPath, { family: "Arial" });
-      return;
+      return "Arial";
     }
   } catch {}
   
@@ -195,7 +197,7 @@ async function registerSystemFonts(canvasMod: any) {
     const helveticaPath = "/System/Library/Fonts/Helvetica.ttc";
     if (fs.existsSync(helveticaPath)) {
       canvasMod.registerFont(helveticaPath, { family: "Helvetica" });
-      return;
+      return "Helvetica";
     }
   } catch {}
   
@@ -204,9 +206,42 @@ async function registerSystemFonts(canvasMod: any) {
     const dejavuPath = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
     if (fs.existsSync(dejavuPath)) {
       canvasMod.registerFont(dejavuPath, { family: "DejaVu Sans" });
-      return;
+      return "DejaVu Sans";
     }
   } catch {}
+  
+  // Fallback: Download font from Google Fonts for Vercel/Linux
+  try {
+    const fontBuffer = await downloadFont();
+    if (fontBuffer) {
+      const path = await import("path");
+      const os = await import("os");
+      const fontPath = path.join(os.tmpdir(), "inter.ttf");
+      fs.writeFileSync(fontPath, fontBuffer);
+      canvasMod.registerFont(fontPath, { family: "Inter" });
+      return "Inter";
+    }
+  } catch {}
+  
+  return "sans-serif";
+}
+
+async function downloadFont(): Promise<Buffer | null> {
+  try {
+    const https = await import("https");
+    const url = "https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hjp-Ek-_EeA.woff2";
+    
+    return new Promise((resolve, reject) => {
+      https.get(url, (res: any) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => resolve(Buffer.concat(chunks)));
+        res.on("error", reject);
+      }).on("error", reject);
+    });
+  } catch {
+    return null;
+  }
 }
 
 const OCCUPANCY_COLORS: Record<string, string> = {
@@ -237,8 +272,8 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
     return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+XjJkAAAAASUVORK5CYII=";
   }
 
-  // Register system fonts
-  await registerSystemFonts(canvasMod);
+  // Register system fonts and get font name
+  const fontName = await registerSystemFonts(canvasMod);
 
   const { createCanvas, loadImage } = canvasMod;
   
@@ -283,7 +318,7 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
   } catch {
     // Fallback: text instead of logo
     ctx.fillStyle = "#c9a24b"; // Dourado
-    ctx.font = "bold 20px Arial, sans-serif";
+    ctx.font = `bold 20px ${fontName}, sans-serif`;
     ctx.textAlign = "center";
     ctx.fillText(BRAND_DEFAULT, canvasW / 2, currentY + 35);
   }
@@ -292,7 +327,7 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
 
   // 2. Texto "Garagem do Ka" abaixo da logo
   ctx.fillStyle = "#c9a24b"; // Dourado
-  ctx.font = "bold 16px Arial, sans-serif";
+  ctx.font = `bold 16px ${fontName}, sans-serif`;
   ctx.textAlign = "center";
   ctx.fillText("Garagem do Ka", canvasW / 2, currentY + 20);
   
@@ -300,7 +335,7 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
 
   // 3. Título "Calendário do mês X" em dourado
   ctx.fillStyle = "#c9a24b"; // Dourado
-  ctx.font = "bold 24px Arial, sans-serif";
+  ctx.font = `bold 24px ${fontName}, sans-serif`;
   ctx.textAlign = "center";
   ctx.fillText(`Calendário do ${data.monthLabel}`, canvasW / 2, currentY + 20);
   
@@ -309,7 +344,7 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
   // 4. Cabeçalho dias da semana - dourado claro
   const weekdayShort = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
   ctx.textAlign = "center";
-  ctx.font = "bold 13px Arial, sans-serif";
+  ctx.font = `bold 13px ${fontName}, sans-serif`;
   ctx.fillStyle = "#e5c07b"; // Dourado claro
   
   for (let c = 0; c < cols; c++) {
@@ -415,9 +450,9 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
         const textY = y + cellSize / 2;
         const text = String(dayCount);
         
-        // Usar Arial (registrada) ou fallback
+        // Usar fonte registrada
         ctx.fillStyle = textColor;
-        ctx.font = "bold 19px Arial, sans-serif";
+        ctx.font = `bold 19px ${fontName}, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         
@@ -452,7 +487,7 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
     
     // Texto ao lado - branco/dourado claro
     ctx.fillStyle = "#e5c07b"; // Dourado claro
-    ctx.font = "bold 13px Arial, sans-serif";
+    ctx.font = `bold 13px ${fontName}, sans-serif`;
     ctx.textAlign = "left";
     ctx.fillText(item.label, lx + 20, currentY + 12);
   });
