@@ -91,6 +91,13 @@ model Appointment {
   couponId             String?
   couponDiscount       Decimal?          @db.Decimal(10, 2)
   finalPrice           Decimal?          @db.Decimal(10, 2)
+  // Payment fields (simulated)
+  paymentStatus        PaymentStatus     @default(PENDING)
+  paymentGateway       PaymentGateway   @default(CASH)
+  paymentMethod        String?           // "PIX", "CARTAO", "DINHEIRO"
+  transactionId        String?
+  paidAt               DateTime?
+  paymentSimulationCode String?           // Código para simular pagamento no test-bot
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   client               Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
@@ -101,6 +108,7 @@ model Appointment {
   @@index([date])
   @@index([clientId])
   @@index([status])
+  @@index([paymentStatus])
 }
 
 model FinancialRecord {
@@ -155,6 +163,21 @@ model Settings {
   reminder30minMin      Int      @default(30)
   reminder4hMin         Int      @default(240)
   sessionResetMin       Int      @default(30)
+  businessHours         BusinessHour[]
+}
+
+model BusinessHour {
+  id           String   @id @default(cuid())
+  dayOfWeek    Int      // 0 = Sunday, 1 = Monday, etc.
+  openTime     String   // "08:00"
+  closeTime    String   // "18:00"
+  isOpen       Boolean  @default(true)
+  settingsId   String   @default("default")
+  settings     Settings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([settingsId, dayOfWeek])
 }
 
 model Brand {
@@ -351,6 +374,20 @@ enum AppointmentStatus {
   COMPLETED
   CANCELLED
   NO_SHOW
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentGateway {
+  CASH
+  PIX
+  CARD
+  MANUAL
 }
 
 enum FinancialType {

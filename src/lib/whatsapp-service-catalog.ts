@@ -134,6 +134,8 @@ export function buildMainMenu(categories: WhatsAppCatalogContext["categories"], 
     if (!cat) continue;
     lines.push(`*${i}* ${icons[i - 1] ?? "•"} ${cat.title}`);
   }
+  // Add option 9 for human handoff
+  lines.push(`*9* 👤 Falar com atendente`);
   return lines.join("\n");
 }
 

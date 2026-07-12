@@ -78,6 +78,12 @@ export async function POST(request: NextRequest) {
       couponId: null,
       couponDiscount: null,
       finalPrice: null,
+      paymentStatus: "PAID" as any,
+      paymentGateway: "CASH" as any,
+      paymentMethod: "DINHEIRO",
+      transactionId: null,
+      paidAt: new Date(),
+      paymentSimulationCode: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       client: {
