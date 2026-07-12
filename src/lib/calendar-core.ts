@@ -342,8 +342,10 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
 
   // Convert HTML to SVG using satori
   try {
+    console.log("[calendar-core] Starting calendar generation with satori");
     // Use system fonts
     const fontData = await fetch("https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hjp-Ek-_EeA.woff2").then(res => res.arrayBuffer());
+    console.log("[calendar-core] Font downloaded, size:", fontData.byteLength);
     
     const svg = await satori(html, {
       width,
@@ -363,12 +365,14 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
         },
       ],
     });
+    console.log("[calendar-core] SVG generated, length:", svg.length);
     
     // Try to convert SVG to PNG using sharp for better compatibility
     try {
       const sharp = await import("sharp");
       const svgBuffer = Buffer.from(svg);
       const pngBuffer = await sharp.default(svgBuffer).png().toBuffer();
+      console.log("[calendar-core] PNG generated via sharp, size:", pngBuffer.length);
       
       // Try to write to public/tmp directory for public access
       try {
@@ -381,18 +385,21 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
         const fileName = `calendar-${data.year}-${String(data.month + 1).padStart(2, "0")}.png`;
         const filePath = path.join(publicTmpDir, fileName);
         fs.writeFileSync(filePath, pngBuffer);
+        console.log("[calendar-core] PNG written to:", filePath);
         
         // Convert to public URL
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || "";
         const normalizedBase = /^https?:\/\//i.test(baseUrl) ? baseUrl : `https://${baseUrl}`;
-        return `${normalizedBase}/tmp/${fileName}`;
+        const finalUrl = `${normalizedBase}/tmp/${fileName}`;
+        console.log("[calendar-core] Returning public URL:", finalUrl);
+        return finalUrl;
       } catch (err) {
-        console.warn("[calendar-core] Could not write to public/tmp directory, using base64 fallback");
+        console.warn("[calendar-core] Could not write to public/tmp directory, using base64 fallback:", err);
         const base64 = pngBuffer.toString("base64");
         return `data:image/png;base64,${base64}`;
       }
     } catch (err) {
-      console.warn("[calendar-core] Sharp not available, returning SVG as data URL");
+      console.warn("[calendar-core] Sharp not available, returning SVG as data URL:", err);
       // Fallback to SVG data URL
       const base64 = Buffer.from(svg).toString("base64");
       return `data:image/svg+xml;base64,${base64}`;
