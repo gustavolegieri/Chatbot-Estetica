@@ -197,25 +197,17 @@ const OCCUPANCY_LABELS: Record<string, string> = {
 };
 
 /**
- * Generate a calendar PNG image with the clinic logo, month grid, and occupancy colors.
- * Uses @napi-rs/canvas (WASM, works on Vercel).
- * Falls back to placeholder data URL if canvas is unavailable.
+ * Generate a calendar SVG image with the clinic logo, month grid, and occupancy colors.
+ * Uses SVG for reliable text rendering (canvas has issues with text in WASM).
+ * Converts SVG to PNG using sharp if available, otherwise returns SVG as data URL.
  */
 export async function generateCalendarImage(date: Date, customToday?: Date): Promise<string> {
-  const canvasMod = await loadCanvas();
-  if (!canvasMod) {
-    console.warn("[calendar-core] @napi-rs/canvas not available – using placeholder");
-    return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+XjJkAAAAASUVORK5CYII=";
-  }
-
-  const { createCanvas, loadImage } = canvasMod;
-  
   const data = await getMonthOccupancy(date.getFullYear(), date.getMonth(), customToday);
 
   // Dimensions conforme especificação
   const cellSize = 70;
   const cellGap = 6;
-  const logoHeight = 60;
+  const logoHeight = 80;
   const headerMonthHeight = 50;
   const weekdayHeaderHeight = 30;
   const legendHeight = 40;
@@ -226,65 +218,68 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
   
   // Canvas width: padding + cols * (cellSize + gap) - gap + padding
   const gridWidth = cols * cellSize + (cols - 1) * cellGap;
-  const canvasW = padding * 2 + gridWidth;
+  const svgW = padding * 2 + gridWidth;
   
-  // Canvas height: padding + logo + margin + month + margin + weekday + margin + grid + margin + legend + padding
-  const canvasH = padding + logoHeight + 24 + headerMonthHeight + 16 + weekdayHeaderHeight + rows * cellSize + (rows - 1) * cellGap + 20 + legendHeight + padding;
+  // Canvas height: padding + logo + brand text + month + margin + weekday + margin + grid + margin + legend + padding
+  const svgH = padding + logoHeight + 30 + headerMonthHeight + 16 + weekdayHeaderHeight + rows * cellSize + (rows - 1) * cellGap + 20 + legendHeight + padding;
 
-  const canvas = createCanvas(canvasW, canvasH);
-  const ctx = canvas.getContext("2d");
-
-  // Background - fundo escuro conforme especificação
-  ctx.fillStyle = "#0d0d0d";
-  ctx.fillRect(0, 0, canvasW, canvasH);
-
+  // Build SVG
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}">`;
+  
+  // Background - fundo escuro
+  svg += `<rect x="0" y="0" width="${svgW}" height="${svgH}" fill="#0d0d0d"/>`;
+  
   let currentY = padding;
 
-  // 1. Logo centralizada com proporção correta
-  try {
-    const logo = await loadImage("public/logo-garagem-do-ka.png");
-    // Manter proporção original (aspect ratio)
-    const logoAspectRatio = logo.width / logo.height;
-    const logoHeight = 60;
-    const logoWidth = logoHeight * logoAspectRatio;
-    const logoX = (canvasW - logoWidth) / 2;
-    ctx.drawImage(logo, logoX, currentY, logoWidth, logoHeight);
-  } catch {
-    // Fallback: text instead of logo
-    ctx.fillStyle = "#c9a24b"; // Dourado
-    ctx.font = "bold 20px Arial, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(BRAND_DEFAULT, canvasW / 2, currentY + 35);
-  }
+  // 1. Logo centralizada (maior) com proporção correta
+  const logoWidth = 120;
+  const logoX = (svgW - logoWidth) / 2;
+  svg += `<image x="${logoX}" y="${currentY}" width="${logoWidth}" height="${logoHeight}" href="/logo-garagem-do-ka.png" preserveAspectRatio="xMidYMid meet"/>`;
   
-  currentY += logoHeight + 24; // Margem 24px abaixo da logo
+  currentY += logoHeight + 10;
 
-  // 2. Título do mês + ano centralizado - dourado
-  ctx.fillStyle = "#c9a24b"; // Dourado
-  ctx.font = "bold 30px Arial, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText(data.monthLabel, canvasW / 2, currentY + 20);
+  // 2. Texto "Garagem do Ka" abaixo da logo
+  svg += `<text x="${svgW / 2}" y="${currentY + 20}" font-family="Arial, sans-serif" font-size="16px" font-weight="bold" fill="#c9a24b" text-anchor="middle">Garagem do Ka</text>`;
   
-  currentY += headerMonthHeight + 16; // Espaço 16px
+  currentY += 30;
 
-  // 3. Cabeçalho dias da semana - branco/dourado claro
+  // 3. Título "Calendário do mês X" em dourado
+  svg += `<text x="${svgW / 2}" y="${currentY + 20}" font-family="Arial, sans-serif" font-size="24px" font-weight="bold" fill="#c9a24b" text-anchor="middle">Calendário do ${data.monthLabel}</text>`;
+  
+  currentY += headerMonthHeight + 16;
+
+  // 4. Cabeçalho dias da semana - dourado claro
   const weekdayShort = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
-  ctx.textAlign = "center";
-  ctx.font = "bold 13px Arial, sans-serif";
-  ctx.fillStyle = "#e5c07b"; // Dourado claro
   
   for (let c = 0; c < cols; c++) {
     const x = padding + c * (cellSize + cellGap) + cellSize / 2;
-    ctx.fillText(weekdayShort[c], x, currentY + 20);
+    svg += `<text x="${x}" y="${currentY + 20}" font-family="Arial, sans-serif" font-size="13px" font-weight="bold" fill="#e5c07b" text-anchor="middle">${weekdayShort[c]}</text>`;
   }
   
   currentY += weekdayHeaderHeight;
 
-  // 4. Grade do calendário
+  // 5. Grade do calendário
   const monthStart = new Date(data.year, data.month, 1);
   const startOffset = monthStart.getDay();
   let dayCount = 1;
   const daysInMonth = new Date(data.year, data.month + 1, 0).getDate();
+
+  // Cores
+  const bgColors = {
+    green: "#059669",
+    yellow: "#d97706",
+    red: "#dc2626",
+    closed: "#374151",
+    past: "#1f2937",
+  };
+  
+  const textColors = {
+    green: "#ffffff",
+    yellow: "#ffffff",
+    red: "#ffffff",
+    closed: "#9ca3af",
+    past: "#6b7280",
+  };
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -292,32 +287,9 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
       const y = currentY + r * (cellSize + cellGap);
       const cellIdx = r * 7 + c;
 
-      // Fundo da célula e número
       if (cellIdx >= startOffset && dayCount <= daysInMonth) {
         const info = data.occupancyMap[dayCount];
-        if (!info) { 
-          dayCount++; 
-          continue; 
-        }
-
-        // Cores pastel com mais saturação para contraste em fundo escuro
-        const bgColors = {
-          green: "#059669",      // verde mais saturado
-          yellow: "#d97706",    // amarelo mais saturado
-          red: "#dc2626",       // vermelho mais saturado
-          closed: "#374151",    // cinza escuro
-          past: "#1f2937",      // cinza muito escuro
-          today: "#059669",     // usa a cor da disponibilidade
-        };
-        
-        const textColors = {
-          green: "#ffffff",     // branco para contraste
-          yellow: "#ffffff",   // branco para contraste
-          red: "#ffffff",      // branco para contraste
-          closed: "#9ca3af",   // cinza claro
-          past: "#6b7280",      // cinza médio
-          today: "#ffffff",    // branco para contraste
-        };
+        if (!info) { dayCount++; continue; }
 
         // Determinar cor de fundo e texto
         let bgColor, textColor;
@@ -329,78 +301,33 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
           bgColor = bgColors.closed;
           textColor = textColors.closed;
         } else {
-          // Para today, usa a cor baseada na ocupação real
           const baseOccupancy = info.occupancy === "today" ? "green" : info.occupancy;
           bgColor = bgColors[baseOccupancy as keyof typeof bgColors] || "#ffffff";
-          textColor = textColors[baseOccupancy as keyof typeof textColors] || "#1a1a1a";
+          textColor = textColors[baseOccupancy as keyof typeof textColors] || "#ffffff";
         }
 
         // Desenhar célula com borda arredondada
-        ctx.fillStyle = bgColor;
-        
-        // Desenhar retângulo arredondado manualmente
         const r = 8;
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.lineTo(x + cellSize - r, y);
-        ctx.quadraticCurveTo(x + cellSize, y, x + cellSize, y + r);
-        ctx.lineTo(x + cellSize, y + cellSize - r);
-        ctx.quadraticCurveTo(x + cellSize, y + cellSize, x + cellSize - r, y + cellSize);
-        ctx.lineTo(x + r, y + cellSize);
-        ctx.quadraticCurveTo(x, y + cellSize, x, y + cellSize - r);
-        ctx.lineTo(x, y + r);
-        ctx.quadraticCurveTo(x, y, x + r, y);
-        ctx.closePath();
-        ctx.fill();
+        svg += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="${r}" ry="${r}" fill="${bgColor}"/>`;
 
         // Destaque do dia atual - borda dourada
         if (info.occupancy === "today") {
-          ctx.strokeStyle = "#c9a24b"; // Dourado
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.moveTo(x + r, y);
-          ctx.lineTo(x + cellSize - r, y);
-          ctx.quadraticCurveTo(x + cellSize, y, x + cellSize, y + r);
-          ctx.lineTo(x + cellSize, y + cellSize - r);
-          ctx.quadraticCurveTo(x + cellSize, y + cellSize, x + cellSize - r, y + cellSize);
-          ctx.lineTo(x + r, y + cellSize);
-          ctx.quadraticCurveTo(x, y + cellSize, x, y + cellSize - r);
-          ctx.lineTo(x, y + r);
-          ctx.quadraticCurveTo(x, y, x + r, y);
-          ctx.closePath();
-          ctx.stroke();
+          svg += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="${r}" ry="${r}" fill="none" stroke="#c9a24b" stroke-width="3"/>`;
         }
 
-        // NÚMERO DO DIA - sempre visível, centralizado, fonte 18-20px, negrito, cor escura
+        // NÚMERO DO DIA - SVG renderiza texto corretamente
         const textX = x + cellSize / 2;
-        const textY = y + cellSize / 2;
-        const text = String(dayCount);
-        
-        // Usar Arial como fonte
-        ctx.fillStyle = textColor;
-        ctx.font = "bold 19px Arial, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        
-        // Desenhar texto
-        ctx.fillText(text, textX, textY);
-        
-        // Backup: strokeText caso fillText não funcione
-        ctx.strokeStyle = textColor;
-        ctx.lineWidth = 1;
-        ctx.strokeText(text, textX, textY);
-
-        // SEM pontos/bolinhas redundantes
+        const textY = y + cellSize / 2 + 6; // +6 para ajuste de baseline
+        svg += `<text x="${textX}" y="${textY}" font-family="Arial, sans-serif" font-size="19px" font-weight="bold" fill="${textColor}" text-anchor="middle" dominant-baseline="middle">${dayCount}</text>`;
 
         dayCount++;
       }
-      // Células vazias (fora do mês): completamente em branco
     }
   }
 
-  currentY += rows * cellSize + (rows - 1) * cellGap + 20; // Espaço 20px
+  currentY += rows * cellSize + (rows - 1) * cellGap + 20;
 
-  // 5. Legenda horizontal com quadradinhos 14x14px - tema escuro/dourado
+  // 6. Legenda horizontal com quadradinhos 14x14px
   const legendItems = [
     { color: "#059669", label: "Mais vazio" },
     { color: "#d97706", label: "Médio" },
@@ -408,46 +335,52 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
     { color: "#374151", label: "Fechado" },
   ];
   
-  const legendSpacing = canvasW / legendItems.length;
+  const legendSpacing = svgW / legendItems.length;
   
   legendItems.forEach((item, i) => {
-    const lx = padding + i * legendSpacing + legendSpacing / 2 - 35; // Ajuste para centralizar
+    const lx = padding + i * legendSpacing + legendSpacing / 2 - 35;
     
     // Quadradinho 14x14px
-    ctx.fillStyle = item.color;
-    ctx.fillRect(lx, currentY, 14, 14);
+    svg += `<rect x="${lx}" y="${currentY}" width="14" height="14" fill="${item.color}"/>`;
     
-    // Texto ao lado - branco/dourado claro
-    ctx.fillStyle = "#e5c07b"; // Dourado claro
-    ctx.font = "bold 13px sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText(item.label, lx + 20, currentY + 12);
+    // Texto ao lado - dourado claro
+    svg += `<text x="${lx + 20}" y="${currentY + 12}" font-family="Arial, sans-serif" font-size="13px" font-weight="bold" fill="#e5c07b">${item.label}</text>`;
   });
 
-  // Return as buffer
-  const buffer = canvas.toBuffer("image/png");
-  
-  // Try to write to public/tmp directory for public access
+  svg += `</svg>`;
+
+  // Try to convert SVG to PNG using sharp
   try {
-    const fs = await import("fs");
-    const path = await import("path");
-    const publicTmpDir = path.resolve(process.cwd(), "public", "tmp");
-    if (!fs.existsSync(publicTmpDir)) {
-      fs.mkdirSync(publicTmpDir, { recursive: true });
-    }
-    const fileName = `calendar-${data.year}-${String(data.month + 1).padStart(2, "0")}.png`;
-    const filePath = path.join(publicTmpDir, fileName);
-    fs.writeFileSync(filePath, buffer);
+    const sharp = await import("sharp");
+    const svgBuffer = Buffer.from(svg);
+    const pngBuffer = await sharp.default(svgBuffer).png().toBuffer();
     
-    // Convert to public URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || "";
-    const normalizedBase = /^https?:\/\//i.test(baseUrl) ? baseUrl : `https://${baseUrl}`;
-    return `${normalizedBase}/tmp/${fileName}`;
+    // Try to write to public/tmp directory for public access
+    try {
+      const fs = await import("fs");
+      const path = await import("path");
+      const publicTmpDir = path.resolve(process.cwd(), "public", "tmp");
+      if (!fs.existsSync(publicTmpDir)) {
+        fs.mkdirSync(publicTmpDir, { recursive: true });
+      }
+      const fileName = `calendar-${data.year}-${String(data.month + 1).padStart(2, "0")}.png`;
+      const filePath = path.join(publicTmpDir, fileName);
+      fs.writeFileSync(filePath, pngBuffer);
+      
+      // Convert to public URL
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || "";
+      const normalizedBase = /^https?:\/\//i.test(baseUrl) ? baseUrl : `https://${baseUrl}`;
+      return `${normalizedBase}/tmp/${fileName}`;
+    } catch (err) {
+      console.warn("[calendar-core] Could not write to public/tmp directory, using base64 fallback");
+      const base64 = pngBuffer.toString("base64");
+      return `data:image/png;base64,${base64}`;
+    }
   } catch (err) {
-    console.warn("[calendar-core] Could not write to public/tmp directory, using base64 fallback");
-    // Fallback to base64 data URL
-    const base64 = buffer.toString("base64");
-    return `data:image/png;base64,${base64}`;
+    console.warn("[calendar-core] Sharp not available, returning SVG as data URL");
+    // Fallback to SVG data URL
+    const base64 = Buffer.from(svg).toString("base64");
+    return `data:image/svg+xml;base64,${base64}`;
   }
 }
 
