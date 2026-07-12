@@ -721,7 +721,7 @@ async function handleQuoteStep(
   // No cheap services available, skip upsell
   session.stage = "ETAPA10_LOGISTICS";
   responses.push({
-    text: "🚚 Como prefere?\n\n*1* - Eu levo o carro até a loja\n*2* - A estética vai buscar o carro",
+    text: "🚚 Como prefere?\n\n*1* - Deixe eu levo o carro até a estética\n*2* - A estética vai buscar o carro",
   });
   return responses;
 }
@@ -748,7 +748,7 @@ async function handleUpsell(
   // After upsell, ask about logistics before date selection
   session.stage = "ETAPA10_LOGISTICS";
   responses.push({
-    text: "🚚 Como prefere?\n\n*1* - Eu levo o carro até a loja\n*2* - A estética vai buscar o carro (+R$30)"
+    text: "🚚 Como prefere?\n\n*1* - Deixe eu levo o carro até a estética\n*2* - A estética vai buscar o carro"
   });
   return responses;
 }
@@ -847,7 +847,7 @@ async function handleBudgetResponse(
   if (isYes) {
     session.stage = "ETAPA10_LOGISTICS";
     responses.push({
-      text: "🚚 Como prefere?\n\n*1* - Eu levo o carro até a loja\n*2* - A estética vai buscar o carro",
+      text: "🚚 Como prefere?\n\n*1* - Deixe eu levo o carro até a estética\n*2* - A estética vai buscar o carro",
     });
     return responses;
   }
@@ -940,6 +940,9 @@ async function getDynamicTimeSlots(session: TestSession, dateStr: string): Promi
     select: { startTime: true, endTime: true },
   });
 
+  // Use test date if available, otherwise use current date
+  const now = session.testDate ? new Date(session.testDate) : new Date();
+
   return buildAvailableSlotsForDay({
     dateStr,
     durationMin,
@@ -954,7 +957,7 @@ async function getDynamicTimeSlots(session: TestSession, dateStr: string): Promi
         }
       : fallbackSettings,
     existingAppointments,
-    now: new Date(),
+    now,
     blockedWindow: null,
   });
 }
@@ -1407,11 +1410,13 @@ async function handleFAQ(
       let matchedService: any = null;
       
       // First, try to extract service name if AI response starts with "Recomendo:"
-      const recommendedMatch = aiResponse.match(/recomendo:?\s*([^.-]+)/i);
+      const recommendedMatch = aiResponse.match(/recomendo:?\s*([^.:—–-]+)/i);
       if (recommendedMatch) {
-        const recommendedName = recommendedMatch[1].trim().toLowerCase();
+        const recommendedName = recommendedMatch[1].trim().toLowerCase().replace(/\*/g, '');
         for (const [catalogKey, service] of Object.entries(wctx.catalog)) {
-          if (service.label.toLowerCase().includes(recommendedName) || recommendedName.includes(service.label.toLowerCase())) {
+          const serviceName = service.label.toLowerCase();
+          // Check for partial match (at least 3 characters)
+          if (recommendedName.length >= 3 && (serviceName.includes(recommendedName) || recommendedName.includes(serviceName.substring(0, recommendedName.length)))) {
             const { key: _, ...serviceWithoutKey } = service;
             matchedService = { key: catalogKey, ...serviceWithoutKey };
             break;
@@ -1423,7 +1428,22 @@ async function handleFAQ(
       if (!matchedService) {
         for (const [catalogKey, service] of Object.entries(wctx.catalog)) {
           const serviceName = service.label.toLowerCase();
-          if (aiResponse.includes(serviceName) || serviceName.includes(aiResponse.substring(0, 20))) {
+          // Check if service name appears in AI response or vice versa
+          if (aiResponse.includes(serviceName) || (serviceName.length >= 5 && aiResponse.includes(serviceName.substring(0, 5)))) {
+            const { key: _, ...serviceWithoutKey } = service;
+            matchedService = { key: catalogKey, ...serviceWithoutKey };
+            break;
+          }
+        }
+      }
+      
+      // Last resort: try to match by keywords
+      if (!matchedService) {
+        const keywords = aiResponse.split(/\s+/).filter((w: string) => w.length >= 4);
+        for (const [catalogKey, service] of Object.entries(wctx.catalog)) {
+          const serviceName = service.label.toLowerCase();
+          const hasKeyword = keywords.some((k: string) => serviceName.includes(k) || k.includes(serviceName.substring(0, k.length)));
+          if (hasKeyword) {
             const { key: _, ...serviceWithoutKey } = service;
             matchedService = { key: catalogKey, ...serviceWithoutKey };
             break;
