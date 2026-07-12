@@ -703,12 +703,20 @@ async function handleQuoteStep(
 
   // Try to get dynamic upsell from database first
   const dynamicOffer = await getDynamicUpsellOffer(session);
-  const offer = dynamicOffer ?? getUpsellVariants(session.selectedService)[0];
-  session.upsellOffer = offer;
-
-  session.stage = "ETAPA6_UPSELL";
+  
+  if (dynamicOffer) {
+    session.upsellOffer = dynamicOffer;
+    session.stage = "ETAPA6_UPSELL";
+    responses.push({
+      text: `✨ Que tal adicionar *${dynamicOffer.label}*?\n\n💰 **R$ ${dynamicOffer.value.toFixed(2)}** a mais\n\n*1* - Sim, incluir\n*2* - Não, obrigado`,
+    });
+    return responses;
+  }
+  
+  // No cheap services available, skip upsell
+  session.stage = "ETAPA10_LOGISTICS";
   responses.push({
-    text: `✨ Que tal adicionar *${offer.label}*?\n\n💰 **R$ ${offer.value.toFixed(2)}** a mais\n\n*1* - Sim, incluir\n*2* - Não, obrigado`,
+    text: "🚚 Como prefere?\n\n*1* - Eu levo o carro até a loja\n*2* - A estética vai buscar o carro",
   });
   return responses;
 }
@@ -962,9 +970,12 @@ async function handleDateSelection(
   }
 
   if (input === "hoje") {
-    const today = new Date();
+    // Use test date if available, otherwise use current date
+    const today = session.testDate ? new Date(session.testDate) : new Date();
     if (today.getDay() === 0) {
       responses.push({ text: "❌ Domingo fechamos. " });
+      const calendarImagePath = await generateCalendarImageOnlyForTest(session.testDate || null);
+      responses.push({ text: generateCalendarLegend(), mediaUrl: calendarImagePath, mediaType: "image" });
       return responses;
     }
     const dateStr = format(today, "yyyy-MM-dd");
@@ -980,7 +991,8 @@ async function handleDateSelection(
 
   const dayNum = parseInt(input);
   if (!isNaN(dayNum) && dayNum >= 1 && dayNum <= 31) {
-    const today = new Date();
+    // Use test date if available, otherwise use current date
+    const today = session.testDate ? new Date(session.testDate) : new Date();
     const selectedDate = new Date(today.getFullYear(), today.getMonth(), dayNum);
     
     // Check if date is in the past
@@ -995,6 +1007,8 @@ async function handleDateSelection(
     
     if (selectedDate.getDay() === 0) {
       responses.push({ text: "❌ Domingo fechamos. " });
+      const calendarImagePath = await generateCalendarImageOnlyForTest(session.testDate || null);
+      responses.push({ text: generateCalendarLegend(), mediaUrl: calendarImagePath, mediaType: "image" });
       return responses;
     }
     const dateStr = format(selectedDate, "yyyy-MM-dd");
@@ -1285,13 +1299,41 @@ async function handleFAQ(
     const choice = message.trim();
     if (choice === "1") {
       // User wants to schedule with recommended service
-      responses.push({ text: "✅ Ótimo! Vamos prosseguir com o agendamento. Por favor, selecione a categoria do serviço desejado no menu principal." });
-      session.serviceRecommendation = null;
-      session.stage = "ETAPA2_MAIN_MENU";
+      // Extract service name from AI response and try to find it in catalog
       const wctx = await loadWhatsAppCatalog(true);
-      const prompts = await loadPromptMap();
-      responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
-      return responses;
+      const aiResponse = session.serviceRecommendation.toLowerCase();
+      
+      // Try to find a matching service in the catalog
+      let matchedService: any = null;
+      for (const [catalogKey, service] of Object.entries(wctx.catalog)) {
+        if (service.label.toLowerCase().includes(aiResponse) || aiResponse.includes(service.label.toLowerCase())) {
+          const { key: _, ...serviceWithoutKey } = service;
+          matchedService = { key: catalogKey, ...serviceWithoutKey };
+          break;
+        }
+      }
+      
+      if (matchedService) {
+        session.selectedSubService = matchedService.key;
+        session.selectedServiceName = matchedService.label;
+        session.serviceRecommendation = null;
+        session.stage = "ETAPA3_SERVICE_ACTION";
+        const prompts = await loadPromptMap();
+        const description = serviceDetail(matchedService, prompts);
+        responses.push({ text: description });
+        responses.push({
+          text: "Como deseja prosseguir?\n\n*1* 📅 Agendar agora\n*2* 🔄 Ver outros\n*3* 💬 Tenho dúvidas",
+        });
+        return responses;
+      } else {
+        // Couldn't find exact match, go to menu
+        responses.push({ text: "Não consegui identificar o serviço específico. Por favor, selecione a categoria desejada no menu principal." });
+        session.serviceRecommendation = null;
+        session.stage = "ETAPA2_MAIN_MENU";
+        const prompts = await loadPromptMap();
+        responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+        return responses;
+      }
     } else if (choice === "2") {
       // User wants to go back to menu
       session.serviceRecommendation = null;
