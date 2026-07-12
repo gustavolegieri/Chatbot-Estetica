@@ -209,6 +209,7 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
   }
 
   const { createCanvas, loadImage } = canvasMod;
+  
   const data = await getMonthOccupancy(date.getFullYear(), date.getMonth(), customToday);
 
   // Dimensions conforme especificação
@@ -233,41 +234,44 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
   const canvas = createCanvas(canvasW, canvasH);
   const ctx = canvas.getContext("2d");
 
-  // Background - off-white conforme especificação
-  ctx.fillStyle = "#fafafa";
+  // Background - fundo escuro conforme especificação
+  ctx.fillStyle = "#0d0d0d";
   ctx.fillRect(0, 0, canvasW, canvasH);
 
   let currentY = padding;
 
-  // 1. Logo centralizada
+  // 1. Logo centralizada com proporção correta
   try {
     const logo = await loadImage("public/logo-garagem-do-ka.png");
-    const logoWidth = 100;
+    // Manter proporção original (aspect ratio)
+    const logoAspectRatio = logo.width / logo.height;
+    const logoHeight = 60;
+    const logoWidth = logoHeight * logoAspectRatio;
     const logoX = (canvasW - logoWidth) / 2;
     ctx.drawImage(logo, logoX, currentY, logoWidth, logoHeight);
   } catch {
     // Fallback: text instead of logo
-    ctx.fillStyle = "#1a1a1a";
-    ctx.font = "bold 20px sans-serif";
+    ctx.fillStyle = "#c9a24b"; // Dourado
+    ctx.font = "bold 20px Arial, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(BRAND_DEFAULT, canvasW / 2, currentY + 35);
   }
   
   currentY += logoHeight + 24; // Margem 24px abaixo da logo
 
-  // 2. Título do mês + ano centralizado
-  ctx.fillStyle = "#1a1a1a";
-  ctx.font = "bold 30px sans-serif";
+  // 2. Título do mês + ano centralizado - dourado
+  ctx.fillStyle = "#c9a24b"; // Dourado
+  ctx.font = "bold 30px Arial, sans-serif";
   ctx.textAlign = "center";
   ctx.fillText(data.monthLabel, canvasW / 2, currentY + 20);
   
   currentY += headerMonthHeight + 16; // Espaço 16px
 
-  // 3. Cabeçalho dias da semana
+  // 3. Cabeçalho dias da semana - branco/dourado claro
   const weekdayShort = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
   ctx.textAlign = "center";
-  ctx.font = "bold 13px sans-serif";
-  ctx.fillStyle = "#6b7280";
+  ctx.font = "bold 13px Arial, sans-serif";
+  ctx.fillStyle = "#e5c07b"; // Dourado claro
   
   for (let c = 0; c < cols; c++) {
     const x = padding + c * (cellSize + cellGap) + cellSize / 2;
@@ -291,25 +295,28 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
       // Fundo da célula e número
       if (cellIdx >= startOffset && dayCount <= daysInMonth) {
         const info = data.occupancyMap[dayCount];
-        if (!info) { dayCount++; continue; }
+        if (!info) { 
+          dayCount++; 
+          continue; 
+        }
 
-        // Cores pastel conforme especificação
+        // Cores pastel com mais saturação para contraste em fundo escuro
         const bgColors = {
-          green: "#d1fae5",      // verde pastel
-          yellow: "#fef3c7",    // amarelo pastel
-          red: "#fee2e2",       // vermelho pastel
-          closed: "#f3f4f6",    // cinza claro
-          past: "#f9fafb",      // branco quase puro
-          today: "#d1fae5",     // usa a cor da disponibilidade
+          green: "#059669",      // verde mais saturado
+          yellow: "#d97706",    // amarelo mais saturado
+          red: "#dc2626",       // vermelho mais saturado
+          closed: "#374151",    // cinza escuro
+          past: "#1f2937",      // cinza muito escuro
+          today: "#059669",     // usa a cor da disponibilidade
         };
         
         const textColors = {
-          green: "#065f46",     // verde escuro
-          yellow: "#92400e",   // marrom/amarelo escuro
-          red: "#991b1b",      // vermelho escuro
-          closed: "#9ca3af",   // cinza
-          past: "#9ca3af",      // cinza
-          today: "#065f46",    // usa a cor da disponibilidade
+          green: "#ffffff",     // branco para contraste
+          yellow: "#ffffff",   // branco para contraste
+          red: "#ffffff",      // branco para contraste
+          closed: "#9ca3af",   // cinza claro
+          past: "#6b7280",      // cinza médio
+          today: "#ffffff",    // branco para contraste
         };
 
         // Determinar cor de fundo e texto
@@ -348,7 +355,7 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
 
         // Destaque do dia atual - borda dourada
         if (info.occupancy === "today") {
-          ctx.strokeStyle = "#d4af37"; // Dourado
+          ctx.strokeStyle = "#c9a24b"; // Dourado
           ctx.lineWidth = 3;
           ctx.beginPath();
           ctx.moveTo(x + r, y);
@@ -365,11 +372,23 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
         }
 
         // NÚMERO DO DIA - sempre visível, centralizado, fonte 18-20px, negrito, cor escura
+        const textX = x + cellSize / 2;
+        const textY = y + cellSize / 2;
+        const text = String(dayCount);
+        
+        // Usar Arial como fonte
         ctx.fillStyle = textColor;
-        ctx.font = "bold 19px sans-serif";
+        ctx.font = "bold 19px Arial, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(String(dayCount), x + cellSize / 2, y + cellSize / 2);
+        
+        // Desenhar texto
+        ctx.fillText(text, textX, textY);
+        
+        // Backup: strokeText caso fillText não funcione
+        ctx.strokeStyle = textColor;
+        ctx.lineWidth = 1;
+        ctx.strokeText(text, textX, textY);
 
         // SEM pontos/bolinhas redundantes
 
@@ -381,12 +400,12 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
 
   currentY += rows * cellSize + (rows - 1) * cellGap + 20; // Espaço 20px
 
-  // 5. Legenda horizontal com quadradinhos 14x14px
+  // 5. Legenda horizontal com quadradinhos 14x14px - tema escuro/dourado
   const legendItems = [
-    { color: "#d1fae5", label: "Mais vazio" },
-    { color: "#fef3c7", label: "Médio" },
-    { color: "#fee2e2", label: "Mais movimentado" },
-    { color: "#f3f4f6", label: "Fechado" },
+    { color: "#059669", label: "Mais vazio" },
+    { color: "#d97706", label: "Médio" },
+    { color: "#dc2626", label: "Mais movimentado" },
+    { color: "#374151", label: "Fechado" },
   ];
   
   const legendSpacing = canvasW / legendItems.length;
@@ -398,8 +417,8 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
     ctx.fillStyle = item.color;
     ctx.fillRect(lx, currentY, 14, 14);
     
-    // Texto ao lado
-    ctx.fillStyle = "#4b5563"; // Cinza escuro
+    // Texto ao lado - branco/dourado claro
+    ctx.fillStyle = "#e5c07b"; // Dourado claro
     ctx.font = "bold 13px sans-serif";
     ctx.textAlign = "left";
     ctx.fillText(item.label, lx + 20, currentY + 12);
