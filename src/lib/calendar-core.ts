@@ -364,9 +364,39 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
       ],
     });
     
-    // Return SVG as data URL
-    const base64 = Buffer.from(svg).toString("base64");
-    return `data:image/svg+xml;base64,${base64}`;
+    // Try to convert SVG to PNG using sharp for better compatibility
+    try {
+      const sharp = await import("sharp");
+      const svgBuffer = Buffer.from(svg);
+      const pngBuffer = await sharp.default(svgBuffer).png().toBuffer();
+      
+      // Try to write to public/tmp directory for public access
+      try {
+        const fs = await import("fs");
+        const path = await import("path");
+        const publicTmpDir = path.resolve(process.cwd(), "public", "tmp");
+        if (!fs.existsSync(publicTmpDir)) {
+          fs.mkdirSync(publicTmpDir, { recursive: true });
+        }
+        const fileName = `calendar-${data.year}-${String(data.month + 1).padStart(2, "0")}.png`;
+        const filePath = path.join(publicTmpDir, fileName);
+        fs.writeFileSync(filePath, pngBuffer);
+        
+        // Convert to public URL
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || "";
+        const normalizedBase = /^https?:\/\//i.test(baseUrl) ? baseUrl : `https://${baseUrl}`;
+        return `${normalizedBase}/tmp/${fileName}`;
+      } catch (err) {
+        console.warn("[calendar-core] Could not write to public/tmp directory, using base64 fallback");
+        const base64 = pngBuffer.toString("base64");
+        return `data:image/png;base64,${base64}`;
+      }
+    } catch (err) {
+      console.warn("[calendar-core] Sharp not available, returning SVG as data URL");
+      // Fallback to SVG data URL
+      const base64 = Buffer.from(svg).toString("base64");
+      return `data:image/svg+xml;base64,${base64}`;
+    }
   } catch (err) {
     console.error("[calendar-core] Satori error:", err);
     // Fallback to placeholder
