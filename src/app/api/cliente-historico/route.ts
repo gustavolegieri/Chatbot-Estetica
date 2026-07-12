@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 // GET - Buscar histórico de agendamentos de um cliente
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ phone: string }> }
-) {
+export async function GET(request: NextRequest) {
   try {
-    const { phone } = await params;
+    const { searchParams } = new URL(request.url);
+    const phone = searchParams.get('phone');
+    
+    if (!phone) {
+      return NextResponse.json({ error: "Phone required" }, { status: 400 });
+    }
     
     // Buscar cliente pelo telefone
     const client = await prisma.client.findUnique({
