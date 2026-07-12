@@ -26,8 +26,44 @@ import { calculateDistance, calculatePickupFee } from "./maps";
 import { findCouponByCode } from "./coupons";
 import { format } from "date-fns";
 import { answerCustomerDoubt } from "./whatsapp-ai";
-
+import { generateSummaryCard, generateSummaryText } from "./summary-card";
 import type { FlowStage } from "./whatsapp-flow-types";
+
+// Analytics logging function
+async function logStageTransition(sessionId: string, stage: string, message: string) {
+  try {
+    // For test-bot, we just log to console since we don't have WhatsAppSession
+    console.log(`[ANALYTICS] Session: ${sessionId}, Stage: ${stage}, Message: ${message}, Time: ${new Date().toISOString()}`);
+    
+    // In production, this would log to StageTransition table
+    // await prisma.stageTransition.create({
+    //   data: {
+    //     sessionId: session.whatsappSessionId,
+    //     stage,
+    //     message,
+    //   },
+    // });
+  } catch (error) {
+    console.error("[ANALYTICS] Error logging stage transition:", error);
+  }
+}
+
+// Natural response normalization
+function normalizeYes(input: string): boolean {
+  const yesPatterns = [
+    /^(sim|s|1|yes|quero|ok|vamos|confirmo|agendar|aceito|bora|tá|estou|de acordo|positivo)$/i,
+    /^(claro|certo|entendido|combina|boa|beleza|perfeito|sucesso)$/i,
+  ];
+  return yesPatterns.some(pattern => pattern.test(input));
+}
+
+function normalizeNo(input: string): boolean {
+  const noPatterns = [
+    /^(nao|não|n|2|no|cancelar|alterar|desistir|rejeito|negativo|nao quero|não quero|desculpe)$/i,
+    /^(ops|esqueci|melhor depois|talvez|mais tarde|ainda não|ainda nao)$/i,
+  ];
+  return noPatterns.some(pattern => pattern.test(input));
+}
 
 interface TestSession {
   sessionId: string;
@@ -102,6 +138,20 @@ export async function processTestFlow({
   const responses: TestResponse[] = [];
   const now = Date.now();
 
+  // Universal "0" to go back to main menu
+  if (message.trim() === "0") {
+    const wctx = await loadWhatsAppCatalog(true);
+    const prompts = await loadPromptMap();
+    session.stage = "ETAPA2_MAIN_MENU";
+    responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+    return responses;
+  }
+
+  // Log analytics: stage transition
+  await logStageTransition(sessionId, session.stage, message.trim());
+  session.lastInteractionAt = now;
+
+  // Session timeout check
   if (session.lastInteractionAt && now - session.lastInteractionAt > 30 * 60 * 1000) {
     resetSessionForNewStart(session);
     session.lastInteractionAt = now;
@@ -693,8 +743,8 @@ async function handleVehicleStage(
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
   const input = message.trim().toLowerCase();
-  const isYes = /^(sim|s|1|yes|confirmo|confirma|tudo certo)$/i.test(input);
-  const isNo = /^(nao|não|n|2|no|errado|alterar|tudo errado|nada certo)$/i.test(input);
+  const isYes = normalizeYes(input);
+  const isNo = normalizeNo(input);
 
   if (isYes) {
     const basePrice = await calculateBasePrice(session);
@@ -1250,6 +1300,18 @@ async function handleReminderStep(
   const couponDiscount = Number(session.couponDiscount ?? 0);
   const totalValue = baseQuote + complementValue + pickupFee - couponDiscount;
 
+  // Generate summary card image
+  const summaryCardUrl = await generateSummaryCard({
+    customerName: session.customerName || "Cliente",
+    serviceName: session.selectedServiceName || "Serviço",
+    vehicle: `${session.vehicle.model} ${session.vehicle.year ?? ""}`,
+    date: session.selectedDay || "—",
+    time: session.selectedTime || "—",
+    paymentMethod: session.paymentMethod || "—",
+    totalPrice: totalValue,
+    pickupAddress: session.pickupAddress || undefined,
+  });
+
   const lines = [
     "━━━━━━━━━━━━━━━",
     "📋 **RESUMO DO AGENDAMENTO**",
@@ -1273,6 +1335,7 @@ async function handleReminderStep(
   ];
 
   responses.push({ text: lines.join("\n") });
+  responses.push({ text: "", mediaUrl: summaryCardUrl, mediaType: "image" });
   return responses;
 }
 

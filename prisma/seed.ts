@@ -91,6 +91,22 @@ async function main() {
 
   await seedBotPrompts();
 
+  // Criar cupom de primeira vez
+  await prisma.coupon.upsert({
+    where: { code: "PRIMEIRA10" },
+    update: {},
+    create: {
+      code: "PRIMEIRA10",
+      type: "percent",
+      amount: 10,
+      validFrom: new Date(),
+      validTo: new Date("2030-12-31"),
+      usageLimit: 999999,
+      usagePerCustomer: 1,
+      active: true,
+    },
+  });
+
   const validKeys = new Set(Object.keys(CATALOG).filter((k) => k !== "indeciso"));
   await prisma.service.updateMany({
     where: {

@@ -26,8 +26,65 @@ import { calculateDistance, calculatePickupFee } from "./maps";
 import { findCouponByCode } from "./coupons";
 import { format } from "date-fns";
 import { answerCustomerDoubt } from "./whatsapp-ai";
+import { generateSummaryCard, generateSummaryText } from "./summary-card";
+import { generatePixQrCode, generatePixPayload } from "./pix-qr";
 
 import type { FlowStage } from "./whatsapp-flow-types";
+
+// Analytics logging function
+async function logStageTransition(sessionId: string, stage: string, message: string) {
+  try {
+    console.log(`[ANALYTICS] Session: ${sessionId}, Stage: ${stage}, Message: ${message}, Time: ${new Date().toISOString()}`);
+  } catch (error) {
+    console.error("[ANALYTICS] Error logging stage transition:", error);
+  }
+}
+
+// First-time customer discount check
+async function isFirstTimeCustomer(phone: string): Promise<boolean> {
+  try {
+    const appointments = await prisma.appointment.count({
+      where: {
+        client: { phone },
+        status: { in: ["COMPLETED", "CONFIRMED"] },
+      },
+    });
+    return appointments === 0;
+  } catch (error) {
+    console.error("[isFirstTimeCustomer] Error:", error);
+    return false;
+  }
+}
+
+async function applyFirstTimeDiscount(session: TestSession, responses: TestResponse[]): Promise<void> {
+  if (session.couponCode) return; // Já tem cupom aplicado
+
+  const coupon = await findCouponByCode("PRIMEIRA10");
+  if (coupon && coupon.active) {
+    session.couponCode = "PRIMEIRA10";
+    session.couponDiscount = coupon.type === "percent" 
+      ? (session.quote || 0) * (Number(coupon.amount) / 100)
+      : Number(coupon.amount);
+    responses.push({ text: `🎁 *Bônus!* Primeira vez: 10% de desconto aplicado! (-R$ ${session.couponDiscount?.toFixed(2).replace('.', ',')})` });
+  }
+}
+
+// Natural response normalization
+function normalizeYes(input: string): boolean {
+  const yesPatterns = [
+    /^(sim|s|1|yes|quero|ok|vamos|confirmo|agendar|aceito|bora|tá|estou|de acordo|positivo)$/i,
+    /^(claro|certo|entendido|combina|boa|beleza|perfeito|sucesso)$/i,
+  ];
+  return yesPatterns.some(pattern => pattern.test(input));
+}
+
+function normalizeNo(input: string): boolean {
+  const noPatterns = [
+    /^(nao|não|n|2|no|cancelar|alterar|desistir|rejeito|negativo|nao quero|não quero|desculpe)$/i,
+    /^(ops|esqueci|melhor depois|talvez|mais tarde|ainda não|ainda nao)$/i,
+  ];
+  return noPatterns.some(pattern => pattern.test(input));
+}
 
 interface TestSession {
   sessionId: string;
@@ -56,7 +113,6 @@ interface TestSession {
   selectedDateIso?: string | null;
   selectedTime?: string | null;
   availableSlots?: string[] | null;
-  paymentMethod?: string | null;
   wantsReminder?: boolean | null;
   upsellAccepted?: boolean;
   upsellLabel?: string | null;
@@ -68,7 +124,16 @@ interface TestSession {
   wantsPickupDelivery?: boolean | null;
   pickupDeliveryFee?: number;
   pickupAddress?: string | null;
-  needsReturn?: boolean | null;
+  needsReturn?: boolean;
+  // Payment fields
+  paymentStatus?: string | null;
+  paymentGateway?: string | null;
+  paymentMethod?: string | null;
+  transactionId?: string | null;
+  paidAt?: Date | null;
+  paymentSimulationCode?: string | null;
+  // Reminder preference
+  reminderPreference?: string | null;
   awaitingPickupAddress?: boolean;
   awaitingReturnPreference?: boolean;
   awaitingPhotoUpload?: boolean;
@@ -97,6 +162,19 @@ export async function processTestFlow({
   const responses: TestResponse[] = [];
   const now = Date.now();
 
+  // Universal "0" to go back to main menu
+  if (message.trim() === "0") {
+    const wctx = await loadWhatsAppCatalog(true);
+    const prompts = await loadPromptMap();
+    session.stage = "ETAPA2_MAIN_MENU";
+    responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+    return responses;
+  }
+
+  // Log analytics: stage transition
+  await logStageTransition(sessionId, session.stage, message.trim());
+  session.lastInteractionAt = now;
+
   if (session.lastInteractionAt && now - session.lastInteractionAt > 30 * 60 * 1000) {
     resetSessionForNewStart(session);
     session.lastInteractionAt = now;
@@ -104,7 +182,6 @@ export async function processTestFlow({
     return responses;
   }
 
-  session.lastInteractionAt = now;
   const prompts = await loadPromptMap();
 
   // 🚫 Handoff request detection (shared with WhatsApp flow)
@@ -419,6 +496,12 @@ async function handleNameCollection(
   }
 
   session.customerName = name;
+
+  // Check if first-time customer and apply discount
+  const isFirstTime = await isFirstTimeCustomer(sessionId); // For test-bot, use sessionId as phone proxy
+  if (isFirstTime) {
+    await applyFirstTimeDiscount(session, responses);
+  }
 
   // Simular cliente recorrente (para teste)
   if (sessionId.includes("returning")) {
@@ -1099,6 +1182,18 @@ async function handleReminderStep(
   const couponDiscount = Number(session.couponDiscount ?? 0);
   const totalValue = baseQuote + complementValue + pickupFee - couponDiscount;
 
+  // Generate summary card image
+  const summaryCardUrl = await generateSummaryCard({
+    customerName: session.customerName || "Cliente",
+    serviceName: session.selectedServiceName || "Serviço",
+    vehicle: `${session.vehicle.model} ${session.vehicle.year ?? ""}`,
+    date: session.selectedDay || "—",
+    time: session.selectedTime || "—",
+    paymentMethod: session.paymentMethod || "—",
+    totalPrice: totalValue,
+    pickupAddress: session.pickupAddress || undefined,
+  });
+
   const lines = [
     "━━━━━━━━━━━━━━━",
     "📋 **RESUMO DO AGENDAMENTO**",
@@ -1112,7 +1207,7 @@ async function handleReminderStep(
     `${session.pickupAddress ? `📍 Endereço: ${session.pickupAddress}` : ""}`,
     `${session.needsReturn ? "🔄 Devolução: sim" : ""}`,
     `💳 ${session.paymentMethod}`,
-    `🔔 Lembrete 30 min antes: ${session.wantsReminder ? "sim" : "não"}`,
+    `🔔 Lembrete: ${session.reminderPreference === "none" ? "não" : session.reminderPreference}`,
     `💰 **R$ ${totalValue.toFixed(2).replace(".", ",")}**`,
     "━━━━━━━━━━━━━━━",
     "",
@@ -1122,6 +1217,7 @@ async function handleReminderStep(
   ];
 
   responses.push({ text: lines.join("\n") });
+  responses.push({ text: "", mediaUrl: summaryCardUrl, mediaType: "image" });
   return responses;
 }
 
@@ -1149,6 +1245,33 @@ async function handlePaymentSelection(
   }
 
   session.paymentMethod = paymentMethods[input];
+  
+  // If PIX selected, show QR code
+  if (session.paymentMethod === "PIX") {
+    const totalValue = Number(session.quote ?? 0) + Number(session.upsellValue ?? 0) + Number(session.pickupDeliveryFee ?? 0) - Number(session.couponDiscount ?? 0);
+    const pixQrUrl = await generatePixQrCode({
+      amount: totalValue,
+      description: `Agendamento ${session.selectedServiceName}`,
+      merchantName: "Garagem do Ka",
+      merchantCity: "Sao Paulo",
+      key: "pix@garagemdoka.com.br", // Substituir por chave PIX real
+    });
+    
+    const pixPayload = generatePixPayload({
+      amount: totalValue,
+      description: `Agendamento ${session.selectedServiceName}`,
+      merchantName: "Garagem do Ka",
+      merchantCity: "Sao Paulo",
+      key: "pix@garagemdoka.com.br",
+    });
+    
+    responses.push({ text: `💳 **Pagamento via PIX**\n\nEscaneie o QR Code abaixo para pagar:\n\nValor: R$ ${totalValue.toFixed(2).replace('.', ',')}` });
+    responses.push({ text: "", mediaUrl: pixQrUrl, mediaType: "image" });
+    responses.push({ text: `Ou copie e cole o código PIX:\n\`${pixPayload}\`\n\n🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não` });
+    session.stage = "ETAPA9_REMINDER";
+    return responses;
+  }
+  
   session.stage = "ETAPA9_REMINDER";
 
   responses.push({
@@ -1582,7 +1705,7 @@ function resetSessionForNewStart(session: TestSession) {
   session.wantsPickupDelivery = null;
   session.pickupDeliveryFee = 0;
   session.pickupAddress = null;
-  session.needsReturn = null;
+  session.needsReturn = false;
   session.awaitingPickupAddress = false;
   session.awaitingReturnPreference = false;
   session.awaitingPhotoUpload = false;
