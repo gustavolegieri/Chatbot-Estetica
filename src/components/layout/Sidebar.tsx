@@ -34,6 +34,7 @@ const navItems = [
   { href: "/admin/usuarios", label: "Usuários", icon: Users, adminOnly: true },
   { href: "/admin/teste", label: "Teste Bot", icon: TestTube },
   { href: "/admin/teste/avaliacao", label: "Avaliação Bot", icon: Star },
+  { href: "/admin/painel-teste", label: "Painel Teste", icon: BarChart2 },
   { href: "/admin/notificacoes", label: "Notificações", icon: Bell },
   { href: "/admin/campanhas", label: "Campanhas", icon: Send },
   { href: "/admin/midia", label: "Galeria/Mídia", icon: ImageIcon },
@@ -49,6 +50,7 @@ const navItems = [
   { href: "/admin/bot/prompts", label: "Prompts Bot", icon: MessageSquare },
   { href: "/admin/bloqueio", label: "Bloqueio", icon: MessageSquare },
   { href: "/admin/feriados", label: "Feriados", icon: CalendarOff },
+  { href: "/admin/horarios", label: "Horários", icon: Calendar },
   { href: "/admin/configuracoes", label: "Configurações", icon: Settings },
 ];
 
