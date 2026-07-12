@@ -228,17 +228,12 @@ async function registerSystemFonts(canvasMod: any): Promise<string> {
 
 async function downloadFont(): Promise<Buffer | null> {
   try {
-    const https = await import("https");
+    // Use fetch instead of https module for better compatibility
     const url = "https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hjp-Ek-_EeA.woff2";
-    
-    return new Promise((resolve, reject) => {
-      https.get(url, (res: any) => {
-        const chunks: Buffer[] = [];
-        res.on("data", (chunk: Buffer) => chunks.push(chunk));
-        res.on("end", () => resolve(Buffer.concat(chunks)));
-        res.on("error", reject);
-      }).on("error", reject);
-    });
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
   } catch {
     return null;
   }
@@ -253,33 +248,7 @@ const OCCUPANCY_COLORS: Record<string, string> = {
   todayBorder: "#3b82f6",
 };
 
-const OCCUPANCY_LABELS: Record<string, string> = {
-  green: "Disponível",
-  yellow: "Médio",
-  red: "Cheio",
-  closed: "Fechado",
-  past: "",
-  today: "Hoje",
-};
-
-/**
- * Generate a calendar PNG image with the clinic logo, month grid, and occupancy colors.
- * Uses @napi-rs/canvas with registered system fonts for text rendering.
- */
-export async function generateCalendarImage(date: Date, customToday?: Date): Promise<string> {
-  const canvasMod = await loadCanvas();
-  if (!canvasMod) {
-    return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+XjJkAAAAASUVORK5CYII=";
-  }
-
-  // Register system fonts and get font name
-  const fontName = await registerSystemFonts(canvasMod);
-
-  const { createCanvas, loadImage } = canvasMod;
-  
-  const data = await getMonthOccupancy(date.getFullYear(), date.getMonth(), customToday);
-
-  // Dimensions conforme especificação
+export function generateCalendarSVG(data: CalendarData): string {
   const cellSize = 70;
   const cellGap = 6;
   const logoHeight = 80;
@@ -291,183 +260,72 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
   const cols = 7;
   const rows = Math.ceil(data.days.length / 7);
   
-  // Canvas width: padding + cols * (cellSize + gap) - gap + padding
   const gridWidth = cols * cellSize + (cols - 1) * cellGap;
   const canvasW = padding * 2 + gridWidth;
-  
-  // Canvas height: padding + logo + brand text + month + margin + weekday + margin + grid + margin + legend + padding
   const canvasH = padding + logoHeight + 30 + headerMonthHeight + 16 + weekdayHeaderHeight + rows * cellSize + (rows - 1) * cellGap + 20 + legendHeight + padding;
 
-  const canvas = createCanvas(canvasW, canvasH);
-  const ctx = canvas.getContext("2d");
-
-  // Background - fundo escuro conforme especificação
-  ctx.fillStyle = "#0d0d0d";
-  ctx.fillRect(0, 0, canvasW, canvasH);
-
+  let svg = `<svg width="${canvasW}" height="${canvasH}" xmlns="http://www.w3.org/2000/svg">`;
+  
+  // Background
+  svg += `<rect width="100%" height="100%" fill="#0d0d0d"/>`;
+  
   let currentY = padding;
-
-  // 1. Logo centralizada com proporção correta
-  try {
-    const logo = await loadImage("public/logo-garagem-do-ka.png");
-    // Manter proporção original (aspect ratio)
-    const logoAspectRatio = logo.width / logo.height;
-    const logoWidth = logoHeight * logoAspectRatio;
-    const logoX = (canvasW - logoWidth) / 2;
-    ctx.drawImage(logo, logoX, currentY, logoWidth, logoHeight);
-  } catch {
-    // Fallback: text instead of logo
-    ctx.fillStyle = "#c9a24b"; // Dourado
-    ctx.font = `bold 20px ${fontName}, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.fillText(BRAND_DEFAULT, canvasW / 2, currentY + 35);
-  }
+  
+  // Logo placeholder
+  svg += `<rect x="${(canvasW - 100)/2}" y="${currentY}" width="100" height="${logoHeight}" fill="#c9a24b" rx="8"/>`;
+  svg += `<text x="${canvasW/2}" y="${currentY + logoHeight/2 + 10}" text-anchor="middle" fill="#0d0d0d" font-family="Arial, sans-serif" font-weight="bold" font-size="14">LOGO</text>`;
   
   currentY += logoHeight + 10;
-
-  // 2. Texto "Garagem do Ka" abaixo da logo
-  ctx.fillStyle = "#c9a24b"; // Dourado
-  ctx.font = `bold 16px ${fontName}, sans-serif`;
-  ctx.textAlign = "center";
-  ctx.fillText("Garagem do Ka", canvasW / 2, currentY + 20);
+  
+  // Brand text
+  svg += `<text x="${canvasW/2}" y="${currentY + 20}" text-anchor="middle" fill="#c9a24b" font-family="Arial, sans-serif" font-weight="bold" font-size="16">Garagem do Ka</text>`;
   
   currentY += 30;
-
-  // 3. Título "Calendário do mês X" em dourado
-  ctx.fillStyle = "#c9a24b"; // Dourado
-  ctx.font = `bold 24px ${fontName}, sans-serif`;
-  ctx.textAlign = "center";
-  ctx.fillText(`Calendário do ${data.monthLabel}`, canvasW / 2, currentY + 20);
   
-  currentY += headerMonthHeight + 16; // Espaço 16px
-
-  // 4. Cabeçalho dias da semana - dourado claro
+  // Month title
+  svg += `<text x="${canvasW/2}" y="${currentY + 20}" text-anchor="middle" fill="#c9a24b" font-family="Arial, sans-serif" font-weight="bold" font-size="24">Calendário do ${data.monthLabel}</text>`;
+  
+  currentY += headerMonthHeight + 16;
+  
+  // Weekday headers
   const weekdayShort = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
-  ctx.textAlign = "center";
-  ctx.font = `bold 13px ${fontName}, sans-serif`;
-  ctx.fillStyle = "#e5c07b"; // Dourado claro
-  
+  svg += `<g font-family="Arial, sans-serif" font-weight="bold" font-size="13" fill="#e5c07b" text-anchor="middle">`;
   for (let c = 0; c < cols; c++) {
     const x = padding + c * (cellSize + cellGap) + cellSize / 2;
-    ctx.fillText(weekdayShort[c], x, currentY + 20);
+    svg += `<text x="${x}" y="${currentY + 20}">${weekdayShort[c]}</text>`;
   }
+  svg += `</g>`;
   
   currentY += weekdayHeaderHeight;
-
-  // 5. Grade do calendário
-  const monthStart = new Date(data.year, data.month, 1);
-  const startOffset = monthStart.getDay();
-  let dayCount = 1;
-  const daysInMonth = new Date(data.year, data.month + 1, 0).getDate();
-
-  // Cores pastel com mais saturação para contraste em fundo escuro
-  const bgColors = {
-    green: "#059669",      // verde mais saturado
-    yellow: "#d97706",    // amarelo mais saturado
-    red: "#dc2626",       // vermelho mais saturado
-    closed: "#374151",    // cinza escuro
-    past: "#1f2937",      // cinza muito escuro
-    today: "#059669",     // usa a cor da disponibilidade
-  };
   
-  const textColors = {
-    green: "#ffffff",     // branco para contraste
-    yellow: "#ffffff",   // branco para contraste
-    red: "#ffffff",      // branco para contraste
-    closed: "#9ca3af",   // cinza claro
-    past: "#6b7280",      // cinza médio
-    today: "#ffffff",    // branco para contraste
-  };
-
+  // Calendar grid
+  let dayCount = 0;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
+      if (dayCount >= data.days.length) break;
+      
+      const dayInfo = data.days[dayCount];
       const x = padding + c * (cellSize + cellGap);
       const y = currentY + r * (cellSize + cellGap);
-      const cellIdx = r * 7 + c;
-
-      // Fundo da célula e número
-      if (cellIdx >= startOffset && dayCount <= daysInMonth) {
-        const info = data.occupancyMap[dayCount];
-        if (!info) { 
-          dayCount++; 
-          continue; 
-        }
-
-        // Determinar cor de fundo e texto
-        let bgColor, textColor;
-        
-        if (info.occupancy === "past") {
-          bgColor = bgColors.past;
-          textColor = textColors.past;
-        } else if (info.occupancy === "closed") {
-          bgColor = bgColors.closed;
-          textColor = textColors.closed;
-        } else {
-          // Para today, usa a cor baseada na ocupação real
-          const baseOccupancy = info.occupancy === "today" ? "green" : info.occupancy;
-          bgColor = bgColors[baseOccupancy as keyof typeof bgColors] || "#ffffff";
-          textColor = textColors[baseOccupancy as keyof typeof textColors] || "#1a1a1a";
-        }
-
-        // Desenhar célula com borda arredondada
-        ctx.fillStyle = bgColor;
-        
-        // Desenhar retângulo arredondado manualmente
-        const r = 8;
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.lineTo(x + cellSize - r, y);
-        ctx.quadraticCurveTo(x + cellSize, y, x + cellSize, y + r);
-        ctx.lineTo(x + cellSize, y + cellSize - r);
-        ctx.quadraticCurveTo(x + cellSize, y + cellSize, x + cellSize - r, y + cellSize);
-        ctx.lineTo(x + r, y + cellSize);
-        ctx.quadraticCurveTo(x, y + cellSize, x, y + cellSize - r);
-        ctx.lineTo(x, y + r);
-        ctx.quadraticCurveTo(x, y, x + r, y);
-        ctx.closePath();
-        ctx.fill();
-
-        // Destaque do dia atual - borda dourada
-        if (info.occupancy === "today") {
-          ctx.strokeStyle = "#c9a24b"; // Dourado
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.moveTo(x + r, y);
-          ctx.lineTo(x + cellSize - r, y);
-          ctx.quadraticCurveTo(x + cellSize, y, x + cellSize, y + r);
-          ctx.lineTo(x + cellSize, y + cellSize - r);
-          ctx.quadraticCurveTo(x + cellSize, y + cellSize, x + cellSize - r, y + cellSize);
-          ctx.lineTo(x + r, y + cellSize);
-          ctx.quadraticCurveTo(x, y + cellSize, x, y + cellSize - r);
-          ctx.lineTo(x, y + r);
-          ctx.quadraticCurveTo(x, y, x + r, y);
-          ctx.closePath();
-          ctx.stroke();
-        }
-
-        // NÚMERO DO DIA - sempre visível, centralizado, fonte 18-20px, negrito, cor escura
-        const textX = x + cellSize / 2;
-        const textY = y + cellSize / 2;
-        const text = String(dayCount);
-        
-        // Usar fonte registrada
-        ctx.fillStyle = textColor;
-        ctx.font = `bold 19px ${fontName}, sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        
-        // Desenhar texto
-        ctx.fillText(text, textX, textY);
-
-        dayCount++;
+      
+      const color = OCCUPANCY_COLORS[dayInfo.occupancy] || "#374151";
+      svg += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" fill="${color}" rx="6"/>`;
+      
+      // Today border
+      if (dayInfo.occupancy === "today") {
+        svg += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" fill="none" stroke="#c9a24b" stroke-width="3" rx="6"/>`;
       }
-      // Células vazias (fora do mês): completamente em branco
+      
+      const textColor = dayInfo.occupancy === "past" ? "#6b7280" : "#ffffff";
+      svg += `<text x="${x + cellSize/2}" y="${y + cellSize/2 + 7}" text-anchor="middle" fill="${textColor}" font-family="Arial, sans-serif" font-weight="bold" font-size="19">${dayInfo.day}</text>`;
+      
+      dayCount++;
     }
   }
-
-  currentY += rows * cellSize + (rows - 1) * cellGap + 20; // Espaço 20px
-
-  // 6. Legenda horizontal com quadradinhos 14x14px - tema escuro/dourado
+  
+  currentY += rows * cellSize + (rows - 1) * cellGap + 20;
+  
+  // Legend
   const legendItems = [
     { color: "#059669", label: "Mais vazio" },
     { color: "#d97706", label: "Médio" },
@@ -475,51 +333,42 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
     { color: "#374151", label: "Fechado" },
   ];
   
-  // Aumentar espaçamento para deixar os itens mais próximos
   const legendSpacing = (canvasW - padding * 2) / legendItems.length;
   
-  legendItems.forEach((item, i) => {
-    const lx = padding + i * legendSpacing + legendSpacing / 2 - 40; // Ajuste para centralizar
+  for (let i = 0; i < legendItems.length; i++) {
+    const item = legendItems[i];
+    const lx = padding + i * legendSpacing + legendSpacing / 2 - 40;
     
-    // Quadradinho 14x14px
-    ctx.fillStyle = item.color;
-    ctx.fillRect(lx, currentY, 14, 14);
-    
-    // Texto ao lado - branco/dourado claro
-    ctx.fillStyle = "#e5c07b"; // Dourado claro
-    ctx.font = `bold 13px ${fontName}, sans-serif`;
-    ctx.textAlign = "left";
-    ctx.fillText(item.label, lx + 20, currentY + 12);
-  });
-
-  // Return as buffer
-  const buffer = canvas.toBuffer("image/png");
-  
-  // Try to write to public/tmp directory for public access
-  try {
-    const fs = await import("fs");
-    const path = await import("path");
-    const publicTmpDir = path.resolve(process.cwd(), "public", "tmp");
-    if (!fs.existsSync(publicTmpDir)) {
-      fs.mkdirSync(publicTmpDir, { recursive: true });
-    }
-    const fileName = `calendar-${data.year}-${String(data.month + 1).padStart(2, "0")}.png`;
-    const filePath = path.join(publicTmpDir, fileName);
-    fs.writeFileSync(filePath, buffer);
-    
-    // In development, use localhost URL; in production, use environment variable
-    const isDev = process.env.NODE_ENV === "development";
-    const baseUrl = isDev 
-      ? "http://localhost:3000" 
-      : (process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || "");
-    const normalizedBase = /^https?:\/\//i.test(baseUrl) ? baseUrl : `https://${baseUrl}`;
-    const finalUrl = `${normalizedBase}/tmp/${fileName}`;
-    return finalUrl;
-  } catch (err) {
-    // Fallback to base64 data URL
-    const base64 = buffer.toString("base64");
-    return `data:image/png;base64,${base64}`;
+    svg += `<rect x="${lx}" y="${currentY}" width="14" height="14" fill="${item.color}" rx="2"/>`;
+    svg += `<text x="${lx + 20}" y="${currentY + 12}" fill="#e5c07b" font-family="Arial, sans-serif" font-weight="bold" font-size="13">${item.label}</text>`;
   }
+  
+  svg += `</svg>`;
+  return svg;
+}
+
+const OCCUPANCY_LABELS: Record<string, string> = {
+  green: "Disponível",
+  yellow: "Médio",
+  red: "Cheio",
+  closed: "Fechado",
+  past: "",
+  today: "Hoje",
+};
+
+/**
+ * Generate a calendar SVG image with the clinic logo, month grid, and occupancy colors.
+ * SVG is used to avoid font dependency issues on Vercel/Linux.
+ */
+export async function generateCalendarImage(date: Date, customToday?: Date): Promise<string> {
+  const data = await getMonthOccupancy(date.getFullYear(), date.getMonth(), customToday);
+  
+  // Generate SVG directly
+  const svg = generateCalendarSVG(data);
+  
+  // Return as data URL (SVG is natively supported by browsers and WhatsApp)
+  const base64 = Buffer.from(svg).toString("base64");
+  return `data:image/svg+xml;base64,${base64}`;
 }
 
 // ─── Build WhatsApp List Message Sections ────────────────────────
