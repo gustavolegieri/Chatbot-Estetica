@@ -10,21 +10,21 @@ O calendário de agendamento foi aprimorado para usar uma imagem visual gerada d
 
 - **Imagem gerada dinamicamente**: O calendário é gerado como uma imagem PNG usando `@napi-rs/canvas`
 - **Dados reais de ocupação**: As cores refletem a ocupação real de agendamentos no banco de dados
-- **Destaque visual**:
-  - 🟢 **Verde**: Dias com pouca ocupação (≤30%)
-  - 🟡 **Amarelo**: Dias com ocupação média (≤70%)
-  - 🔴 **Vermelho**: Dias com alta ocupação (>70%)
-  - 🔵 **Azul**: Dia atual (destacado com borda)
-  - ⛔ **Cinza**: Domingos (fechado)
+- **Layout profissional**: Cabeçalho com logo, nome do mês/ano, dias da semana e grade organizada
+- **Destaque visual melhorado**:
+  - 🟢 **Verde claro**: Dias com pouca ocupação (≤30%) - fundo verde claro + badge verde
+  - 🟡 **Amarelo claro**: Dias com ocupação média (≤70%) - fundo amarelo claro + badge amarelo
+  - 🔴 **Vermelho claro**: Dias com alta ocupação (>70%) - fundo vermelho claro + badge vermelho
+  - 🔵 **Azul claro**: Dia atual (fundo azul + borda azul grossa)
+  - ⬜ **Cinza claro**: Domingos (fechado) - fundo cinza + X vermelho indicando fechado
+  - ⬛ **Cinza médio**: Dias passados (não selecionáveis)
 
-### Legenda Explicativa
+### Legenda Visual
 
-Após a imagem, é exibido um texto explicativo com:
-- Legenda das cores de disponibilidade
-- Aviso sobre domingos fechados
-- Destaque do dia atual
-- Instruções de uso (digitar o número do dia)
-- Opção de voltar ao menu (digitar 0)
+O calendário inclui uma legenda clara no rodapé com:
+- Bolinhas coloridas + texto explicativo
+- Layout horizontal organizado
+- Cores consistentes com a grade do calendário
 
 ## Implementação
 
@@ -169,6 +169,77 @@ Possíveis melhorias para o calendário:
 - [ ] Personalização de cores da marca
 - [ ] Cache de imagens geradas para evitar regeneração
 
+## Melhorias Visuais Implementadas
+
+### Layout Aprimorado
+
+1. **Cabeçalho Profissional**:
+   - Logo da estética posicionada no topo esquerdo
+   - Nome do mês e ano em destaque (28px, bold) no topo direito
+   - Espaçamento adequado entre logo e grade
+
+2. **Dias da Semana**:
+   - Nomes abreviados (Dom, Seg, Ter, Qua, Qui, Sex, Sáb)
+   - Alinhados centralmente acima das colunas
+   - Domingo destacado em vermelho para indicar fechado
+   - Fonte bold 14px para melhor legibilidade
+
+3. **Grade do Calendário**:
+   - Células maiores (85x85px) para melhor visualização
+   - Números dos dias em 22px bold, bem legíveis
+   - Bordas sutis entre células
+   - Fundo colorido conforme disponibilidade
+
+4. **Sistema de Cores**:
+   - **Verde claro (#dcfce7)**: Dias livres com badge verde (#22c55e)
+   - **Amarelo claro (#fef9c3)**: Dias com ocupação média com badge amarelo (#eab308)
+   - **Vermelho claro (#fee2e2)**: Dias cheios com badge vermelho (#ef4444)
+   - **Azul claro (#dbeafe)**: Dia atual com borda azul grossa (#3b82f6)
+   - **Cinza claro (#f8fafc)**: Domingos fechados com X vermelho
+   - **Cinza médio (#f1f5f9)**: Dias passados
+
+5. **Indicadores de Disponibilidade**:
+   - Badges coloridos no canto superior direito de cada célula
+   - Borda branca ao redor dos badges para contraste
+   - Tamanho de 8px para visibilidade clara
+
+6. **Destaque do Dia Atual**:
+   - Fundo azul claro (#dbeafe)
+   - Borda azul grossa (4px) ao redor da célula
+   - Número do dia em destaque
+
+7. **Indicação de Domingos Fechados**:
+   - Fundo cinza muito claro (#f8fafc)
+   - X vermelho desenhado no centro da célula
+   - Número do dia em cinza (#94a3b8)
+
+8. **Legenda no Rodapé**:
+   - Layout horizontal organizado
+   - Bolinhas coloridas com texto ao lado
+   - Cores consistentes com a grade
+   - Fonte bold 13px para legibilidade
+
+### Correções de Bugs
+
+1. **Números dos Dias Aparecendo**:
+   - Aumentado tamanho da fonte de 16px para 22px
+   - Cores de texto ajustadas para contraste adequado
+   - Texto desenhado após o fundo da célula (ordem correta)
+   - Cores de texto: preto (#1e293b) para dias ativos, cinza para fechados/passados
+
+2. **Alinhamento de Elementos**:
+   - Dias da semana centralizados nas colunas
+   - Números dos dias centralizados nas células
+   - Legenda alinhada horizontalmente no rodapé
+
+### Paleta de Cores
+
+As cores foram escolhidas para:
+- Ser suaves e profissionais
+- Proporcionar bom contraste
+- Ser consistentes com identidade visual moderna
+- Funcionar bem em diferentes dispositivos
+
 ## Exemplo de Uso
 
 ### No WhatsApp Flow
@@ -217,4 +288,4 @@ responses.push({
 
 ## Conclusão
 
-O calendário com imagem proporciona uma experiência muito mais profissional e intuitiva, mantendo todas as regras de negócio originais e funcionando tanto no WhatsApp quanto no test-bot do painel admin. A adição do suporte a data customizada no test-bot permite testar o calendário em qualquer situação, independentemente da data atual.
+O calendário com imagem foi completamente redesenhado para corrigir os problemas visuais e proporcionar uma experiência muito mais profissional. Os números dos dias agora aparecem claramente, o layout está organizado com cabeçalho profissional, dias da semana alinhados, e uma legenda legível. As cores de disponibilidade são claras e consistentes, e o dia atual se destaca visualmente. A adição do suporte a data customizada no test-bot permite testar o calendário em qualquer situação, independentemente da data atual.

@@ -211,53 +211,62 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
   const { createCanvas, loadImage } = canvasMod;
   const data = await getMonthOccupancy(date.getFullYear(), date.getMonth(), customToday);
 
-  // Dimensions
-  const cellSize = 72;
-  const headerHeight = 30;
-  const logoHeight = 50;
-  const padding = 20;
+  // Dimensions - aumentadas para melhor visualização
+  const cellSize = 85;
+  const headerHeight = 50;
+  const logoHeight = 60;
+  const weekdayHeaderHeight = 35;
+  const padding = 25;
   const cols = 7;
   const rows = Math.ceil(data.days.length / 7);
+  const legendHeight = 50;
   const canvasW = cols * cellSize + padding * 2;
-  const canvasH = logoHeight + headerHeight + rows * cellSize + padding * 2 + 40;
+  const canvasH = logoHeight + headerHeight + weekdayHeaderHeight + rows * cellSize + padding * 2 + legendHeight;
 
   const canvas = createCanvas(canvasW, canvasH);
   const ctx = canvas.getContext("2d");
 
-  // Background
+  // Background - branco limpo
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, canvasW, canvasH);
+
+  // Borda suave ao redor
+  ctx.strokeStyle = "#e2e8f0";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, canvasW - 2, canvasH - 2);
 
   // Try to load logo
   try {
     const logo = await loadImage("public/logo-garagem-do-ka.png");
-    ctx.drawImage(logo, padding, 8, 100, logoHeight);
+    ctx.drawImage(logo, padding, padding, 120, logoHeight);
   } catch {
     // Fallback: text instead of logo
     ctx.fillStyle = "#1e293b";
-    ctx.font = "bold 18px sans-serif";
-    ctx.fillText(BRAND_DEFAULT, padding, 30);
+    ctx.font = "bold 20px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(BRAND_DEFAULT, padding, padding + 25);
   }
 
-  // Month title
+  // Month title - maior e mais destacado
   ctx.fillStyle = "#1e293b";
-  ctx.font = "bold 20px sans-serif";
+  ctx.font = "bold 28px sans-serif";
   ctx.textAlign = "right";
-  ctx.fillText(data.monthLabel, canvasW - padding, 35);
+  ctx.fillText(data.monthLabel, canvasW - padding, padding + 35);
 
-  // Weekday headers
+  // Weekday headers - mais destacados
   const weekdayShort = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
   ctx.textAlign = "center";
-  ctx.font = "13px sans-serif";
-  ctx.fillStyle = "#64748b";
-  const topY = padding + logoHeight + 10;
+  ctx.font = "bold 14px sans-serif";
+  const weekdayY = padding + logoHeight + 15;
+  
   for (let c = 0; c < cols; c++) {
     const x = padding + c * cellSize + cellSize / 2;
-    ctx.fillText(weekdayShort[c], x, topY + 15);
+    ctx.fillStyle = c === 0 ? "#ef4444" : "#64748b"; // Domingo em vermelho
+    ctx.fillText(weekdayShort[c], x, weekdayY);
   }
 
   // Calendar grid
-  const gridY = topY + 25;
+  const gridY = weekdayY + 25;
   const monthStart = new Date(data.year, data.month, 1);
   const startOffset = monthStart.getDay();
   let dayCount = 1;
@@ -278,37 +287,68 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
         const info = data.occupancyMap[dayCount];
         if (!info) { dayCount++; continue; }
 
-        // Cell background
-        if (info.occupancy !== "past" && info.occupancy !== "closed") {
-          const bgColor = OCCUPANCY_COLORS[info.occupancy === "today" ? "green" : info.occupancy];
-          ctx.fillStyle = bgColor + "30"; // 30 = ~19% opacity
+        // Cell background - cores mais visíveis
+        if (info.occupancy === "past") {
+          ctx.fillStyle = "#f1f5f9"; // Cinza claro para dias passados
           ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
         } else if (info.occupancy === "closed") {
-          ctx.fillStyle = "#f1f5f9";
+          ctx.fillStyle = "#f8fafc"; // Bem claro para domingos fechados
+          ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+          // X para indicar fechado
+          ctx.strokeStyle = "#cbd5e1";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x + 15, y + 15);
+          ctx.lineTo(x + cellSize - 15, y + cellSize - 15);
+          ctx.moveTo(x + cellSize - 15, y + 15);
+          ctx.lineTo(x + 15, y + cellSize - 15);
+          ctx.stroke();
+        } else if (info.occupancy === "today") {
+          // Hoje com fundo azul mais visível
+          ctx.fillStyle = "#dbeafe"; // Azul claro
+          ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+          // Borda azul mais grossa
+          ctx.strokeStyle = "#3b82f6";
+          ctx.lineWidth = 4;
+          ctx.strokeRect(x + 2, y + 2, cellSize - 4, cellSize - 4);
+        } else {
+          // Cores de disponibilidade mais visíveis
+          const bgColors = {
+            green: "#dcfce7", // Verde claro
+            yellow: "#fef9c3", // Amarelo claro
+            red: "#fee2e2", // Vermelho claro
+          };
+          ctx.fillStyle = bgColors[info.occupancy as keyof typeof bgColors] || "#ffffff";
           ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
         }
 
-        // Today highlight (border)
-        if (info.occupancy === "today") {
-          ctx.strokeStyle = OCCUPANCY_COLORS.todayBorder;
-          ctx.lineWidth = 3;
-          ctx.strokeRect(x + 1.5, y + 1.5, cellSize - 3, cellSize - 3);
-        }
-
-        // Day number
-        ctx.fillStyle = info.occupancy === "closed" ? "#94a3b8" : "#1e293b";
-        ctx.font = "bold 16px sans-serif";
+        // Day number - maior e mais legível
+        ctx.fillStyle = info.occupancy === "closed" ? "#94a3b8" : 
+                      info.occupancy === "past" ? "#9ca3af" : "#1e293b";
+        ctx.font = "bold 22px sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(String(dayCount), x + cellSize / 2, y + cellSize / 2);
 
-        // Small indicator dot for availability
+        // Indicator badge for availability (bolinha maior e mais visível)
         if (info.occupancy !== "past" && info.occupancy !== "closed" && info.occupancy !== "today") {
-          const dotColor = OCCUPANCY_COLORS[info.occupancy];
-          ctx.fillStyle = dotColor;
+          const badgeColors = {
+            green: "#22c55e",
+            yellow: "#eab308",
+            red: "#ef4444",
+          };
+          const badgeColor = badgeColors[info.occupancy as keyof typeof badgeColors] || "#6b7280";
+          
+          // Bolinha no canto superior direito
+          ctx.fillStyle = badgeColor;
           ctx.beginPath();
-          ctx.arc(x + cellSize / 2, y + cellSize - 10, 5, 0, Math.PI * 2);
+          ctx.arc(x + cellSize - 12, y + 12, 8, 0, Math.PI * 2);
           ctx.fill();
+          
+          // Borda branca ao redor da bolinha
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 2;
+          ctx.stroke();
         }
 
         dayCount++;
@@ -316,27 +356,35 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
     }
   }
 
-  // Legend
-  const legendY = gridY + rows * cellSize + 10;
-  ctx.textAlign = "center";
-  ctx.font = "12px sans-serif";
+  // Legend - mais clara e legível
+  const legendY = gridY + rows * cellSize + 20;
+  ctx.textAlign = "left";
+  ctx.font = "bold 13px sans-serif";
+  
   const legendItems = [
-    { color: "#22c55e", label: "Disponível" },
-    { color: "#eab308", label: "Médio" },
-    { color: "#ef4444", label: "Cheio" },
-    { color: "#3b82f6", label: "Hoje" },
-    { color: "#6b7280", label: "Fechado" },
+    { color: "#22c55e", label: "🟢 Livre" },
+    { color: "#eab308", label: "🟡 Médio" },
+    { color: "#ef4444", label: "🔴 Cheio" },
+    { color: "#3b82f6", label: "🔵 Hoje" },
+    { color: "#94a3b8", label: "⬜ Fechado" },
   ];
+  
+  const legendX = padding;
   const legendSpacing = canvasW / legendItems.length;
+  
   legendItems.forEach((item, i) => {
-    const lx = legendSpacing * i + legendSpacing / 2;
+    const lx = legendX + i * legendSpacing + 10;
+    
+    // Bolinha da legenda
     ctx.fillStyle = item.color;
     ctx.beginPath();
-    ctx.arc(lx - 25, legendY + 5, 5, 0, Math.PI * 2);
+    ctx.arc(lx, legendY + 8, 8, 0, Math.PI * 2);
     ctx.fill();
+    
+    // Texto da legenda
     ctx.fillStyle = "#475569";
-    ctx.textAlign = "left";
-    ctx.fillText(item.label, lx - 15, legendY + 9);
+    ctx.font = "bold 13px sans-serif";
+    ctx.fillText(item.label, lx + 15, legendY + 12);
   });
 
   // Return as buffer
