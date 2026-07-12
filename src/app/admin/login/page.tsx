@@ -18,22 +18,27 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      console.log("Iniciando login...", { email });
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
+      console.log("Resposta recebida:", res.status, res.statusText);
       const data = await res.json();
+      console.log("Dados da resposta:", data);
 
       if (!res.ok) {
         setError(data.error ?? "Erro ao fazer login");
         return;
       }
 
+      console.log("Login bem-sucedido, redirecionando...");
       router.push("/admin/dashboard");
       router.refresh();
-    } catch {
+    } catch (err) {
+      console.error("Erro no login:", err);
       setError("Erro de conexão");
     } finally {
       setLoading(false);
