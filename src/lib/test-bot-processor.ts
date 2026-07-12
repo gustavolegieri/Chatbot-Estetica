@@ -25,6 +25,7 @@ import { buildAvailableSlotsForDay, parseTimeSelection } from "./appointments";
 import { calculateDistance, calculatePickupFee } from "./maps";
 import { findCouponByCode } from "./coupons";
 import { format } from "date-fns";
+import { answerCustomerDoubt } from "./whatsapp-ai";
 
 import type { FlowStage } from "./whatsapp-flow-types";
 
@@ -71,6 +72,8 @@ interface TestSession {
   awaitingPickupAddress?: boolean;
   awaitingReturnPreference?: boolean;
   awaitingPhotoUpload?: boolean;
+  awaitingServiceRecommendation?: boolean;
+  serviceRecommendation?: string | null;
   testDate?: string | null;
   testHours?: string | null;
 }
@@ -221,7 +224,37 @@ export function shouldSkipCouponPrompt(input: string): boolean {
   return /^(2|nao|não|n|sem|pular|ignorar|nenhum|nao tenho|não tenho|sem cupom|sem desconto|nenhum cupom|nao tenho cupom|não tenho cupom)$/i.test(normalized);
 }
 
-function calculateBasePrice(session: TestSession): number {
+async function calculateBasePrice(session: TestSession): Promise<number> {
+  // Try to get real price from database based on selected service
+  const serviceKey = session.selectedSubService ?? session.selectedService;
+  if (serviceKey) {
+    try {
+      const service = await prisma.service.findFirst({
+        where: {
+          active: true,
+          OR: [
+            { catalogKey: serviceKey },
+            { name: { contains: serviceKey, mode: "insensitive" } },
+          ],
+        },
+      });
+      if (service?.price) {
+        const isSuv = isSuvLikeVehicle(session.vehicle.model ?? "");
+        const isBad = session.vehicle.condition === "ruim";
+        let basePrice = Number(service.price);
+        
+        // Apply SUV/bad condition multipliers
+        if (isSuv) basePrice = Math.round(basePrice * 1.2);
+        if (isBad) basePrice = Math.round(basePrice * 1.08);
+        
+        return basePrice;
+      }
+    } catch (err) {
+      console.error("[test-bot] Error fetching service price:", err);
+    }
+  }
+  
+  // Fallback to hardcoded values if service not found
   const isSuv = isSuvLikeVehicle(session.vehicle.model ?? "");
   const isBad = session.vehicle.condition === "ruim";
   return isSuv ? (isBad ? 130 : 110) : (isBad ? 85 : 75);
@@ -231,6 +264,46 @@ function isSuvLikeVehicle(model: string | null): boolean {
   if (!model) return false;
   const t = model.toLowerCase();
   return /suv|pickup|picape|van|camionete|4x4|hilux|ranger|s10|toro|compass|renegade|t-cross|creta|hrv|sw4/i.test(t);
+}
+
+async function getDynamicUpsellOffer(session: TestSession): Promise<{ label: string; value: number } | null> {
+  try {
+    // Get all active services from database
+    const allServices = await prisma.service.findMany({
+      where: { active: true },
+      select: { id: true, name: true, price: true, catalogKey: true },
+    });
+    
+    if (allServices.length === 0) return null;
+    
+    // Get current service key to exclude it
+    const currentServiceKey = session.selectedSubService ?? session.selectedService;
+    
+    // Filter cheap services (price < R$ 60)
+    const cheapServices = allServices.filter(s => {
+      const price = Number(s.price);
+      // Exclude current service
+      if (currentServiceKey && (s.catalogKey === currentServiceKey || s.name.toLowerCase().includes(currentServiceKey.toLowerCase()))) {
+        return false;
+      }
+      // Filter by price (cheap services for upsell)
+      return price > 0 && price < 60;
+    });
+    
+    if (cheapServices.length === 0) return null;
+    
+    // Randomly select one
+    const randomIndex = Math.floor(Math.random() * cheapServices.length);
+    const selected = cheapServices[randomIndex];
+    
+    return {
+      label: selected.name,
+      value: Number(selected.price),
+    };
+  } catch (err) {
+    console.error("[test-bot] Error fetching upsell services:", err);
+    return null;
+  }
 }
 
 function getUpsellVariants(category: string | null) {
@@ -536,7 +609,7 @@ async function handleVehicleStage(
   const isNo = /^(nao|não|n|2|no|errado|alterar|tudo errado|nada certo)$/i.test(input);
 
   if (isYes) {
-    const basePrice = calculateBasePrice(session);
+    const basePrice = await calculateBasePrice(session);
     session.quote = basePrice;
     session.stage = "ETAPA5_QUOTE";
     responses.push({
@@ -611,10 +684,9 @@ async function handleQuoteStep(
     return responses;
   }
 
-  const offers = getUpsellVariants(session.selectedService);
-  const nextIndex = session.upsellOfferIndex ?? 0;
-  const offer = offers[nextIndex % offers.length];
-  session.upsellOfferIndex = (nextIndex + 1) % offers.length;
+  // Try to get dynamic upsell from database first
+  const dynamicOffer = await getDynamicUpsellOffer(session);
+  const offer = dynamicOffer ?? getUpsellVariants(session.selectedService)[0];
   session.upsellOffer = offer;
 
   session.stage = "ETAPA6_UPSELL";
@@ -710,11 +782,11 @@ async function handleLoyaltyStep(
   }
 
   session.stage = "ETAPA10_BUDGET";
-  return handleShowBudget(session, responses);
+  return await handleShowBudget(session, responses);
 }
 
-function handleShowBudget(session: TestSession, responses: TestResponse[]): TestResponse[] {
-  const baseQuote = Number(session.quote ?? calculateBasePrice(session));
+async function handleShowBudget(session: TestSession, responses: TestResponse[]): Promise<TestResponse[]> {
+  const baseQuote = Number(session.quote ?? await calculateBasePrice(session));
   const complementValue = Number(session.upsellValue ?? 0);
   const couponDiscount = Number(session.couponDiscount ?? 0);
   const loyaltyDiscount = session.loyaltyPoints && session.loyaltyPoints >= 100 ? 10 : 0;
@@ -725,7 +797,7 @@ function handleShowBudget(session: TestSession, responses: TestResponse[]): Test
       serviceValue: baseQuote,
       complementValue,
       couponDiscount,
-      loyaltyDiscount: session.loyaltyPoints ? (session.quote ?? calculateBasePrice(session)) * (loyaltyDiscount / 100) : 0,
+      loyaltyDiscount: session.loyaltyPoints ? (session.quote ?? await calculateBasePrice(session)) * (loyaltyDiscount / 100) : 0,
       pickupFee: session.pickupDeliveryFee ?? 0,
       totalValue: baseQuote + complementValue + (session.pickupDeliveryFee ?? 0) - couponDiscount,
     }),
@@ -1172,8 +1244,85 @@ async function handleFAQ(
   session: TestSession,
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
-  responses.push({ text: "👍 Vou ajudar! 'menu' pra voltar. " });
-  session.stage = "ETAPA2_MAIN_MENU";
+  // Check if this is the first interaction (asking for description)
+  if (!session.awaitingServiceRecommendation) {
+    session.awaitingServiceRecommendation = true;
+    responses.push({ text: "🤔 Descreva em texto livre o que você precisa ou está procurando para o seu carro (ex: 'preciso de limpeza interna', 'tem manchas no estofado', 'quer dar brilho na pintura')." });
+    return responses;
+  }
+
+  // Check if user is responding to AI recommendation (1 = schedule, 2 = menu)
+  if (session.serviceRecommendation) {
+    const choice = message.trim();
+    if (choice === "1") {
+      // User wants to schedule with recommended service
+      responses.push({ text: "✅ Ótimo! Vamos prosseguir com o agendamento. Por favor, selecione a categoria do serviço desejado no menu principal." });
+      session.serviceRecommendation = null;
+      session.stage = "ETAPA2_MAIN_MENU";
+      const wctx = await loadWhatsAppCatalog(true);
+      const prompts = await loadPromptMap();
+      responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+      return responses;
+    } else if (choice === "2") {
+      // User wants to go back to menu
+      session.serviceRecommendation = null;
+      session.stage = "ETAPA2_MAIN_MENU";
+      const wctx = await loadWhatsAppCatalog(true);
+      const prompts = await loadPromptMap();
+      responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+      return responses;
+    }
+  }
+
+  // User provided description - use AI to recommend service
+  session.awaitingServiceRecommendation = false;
+  const userDescription = message.trim();
+  
+  if (userDescription.length < 10) {
+    responses.push({ text: "⚠️ A descrição é muito curta. Por favor, seja mais específico sobre o que você precisa, ou digite 'menu' para ver as categorias disponíveis." });
+    session.stage = "ETAPA2_MAIN_MENU";
+    return responses;
+  }
+
+  try {
+    const wctx = await loadWhatsAppCatalog(true);
+    const ctx = {
+      businessName: "Garagem do Ka",
+      hours: "08:00 às 18:00",
+      address: "",
+      pixKey: null,
+      pixHolder: null,
+      pixBank: null,
+    };
+    
+    const aiResponse = await answerCustomerDoubt({
+      question: `Preciso de ajuda para escolher um serviço. Descrição do que preciso: ${userDescription}`,
+      flow: {
+        serviceLabel: null,
+        estimatedTime: null,
+        quoteMin: null,
+        quoteMax: null,
+        vehicleCondition: session.vehicle.condition,
+      } as any,
+      ctx,
+      wctx,
+    });
+
+    if (aiResponse) {
+      session.serviceRecommendation = aiResponse;
+      responses.push({ text: `🤖 *Recomendação da IA:*${aiResponse}` });
+      responses.push({ text: "\n\n*1* - Agendar com o serviço recomendado\n*2* - Voltar ao menu principal" });
+      session.stage = "ETAPA10_FAQ";
+    } else {
+      responses.push({ text: "😕 Não consegui identificar um serviço adequado com essa descrição. Por favor, tente ser mais específico ou digite 'menu' para ver as categorias disponíveis." });
+      session.stage = "ETAPA2_MAIN_MENU";
+    }
+  } catch (err) {
+    console.error("[test-bot] Error in AI recommendation:", err);
+    responses.push({ text: "😕 Ocorreu um erro ao processar sua solicitação. Por favor, digite 'menu' para ver as categorias disponíveis." });
+    session.stage = "ETAPA2_MAIN_MENU";
+  }
+
   return responses;
 }
 
