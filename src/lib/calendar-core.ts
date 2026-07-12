@@ -356,6 +356,25 @@ const OCCUPANCY_LABELS: Record<string, string> = {
   today: "Hoje",
 };
 
+// Cache logo base64 to avoid reading file on every generation
+let logoBase64Cache: string | null = null;
+
+async function getLogoBase64(): Promise<string> {
+  if (logoBase64Cache) return logoBase64Cache;
+  
+  try {
+    const fs = await import("fs");
+    const path = await import("path");
+    const logoPath = path.resolve(process.cwd(), "public", "logo-garagem-do-ka.png");
+    const logoBuffer = fs.readFileSync(logoPath);
+    logoBase64Cache = logoBuffer.toString("base64");
+    return logoBase64Cache;
+  } catch {
+    // Fallback: return empty string if logo not found
+    return "";
+  }
+}
+
 /**
  * Generate a calendar SVG image with the clinic logo, month grid, and occupancy colors.
  * SVG is used to avoid font dependency issues on Vercel/Linux.
@@ -363,12 +382,128 @@ const OCCUPANCY_LABELS: Record<string, string> = {
 export async function generateCalendarImage(date: Date, customToday?: Date): Promise<string> {
   const data = await getMonthOccupancy(date.getFullYear(), date.getMonth(), customToday);
   
+  // Get logo base64
+  const logoBase64 = await getLogoBase64();
+  
   // Generate SVG directly
-  const svg = generateCalendarSVG(data);
+  const svg = generateCalendarSVGInternal(data, logoBase64);
   
   // Return as data URL (SVG is natively supported by browsers and WhatsApp)
   const base64 = Buffer.from(svg).toString("base64");
   return `data:image/svg+xml;base64,${base64}`;
+}
+
+function generateCalendarSVGInternal(data: CalendarData, logoBase64: string): string {
+  const cellSize = 70;
+  const cellGap = 6;
+  const logoHeight = 80;
+  const headerMonthHeight = 50;
+  const weekdayHeaderHeight = 30;
+  const legendHeight = 40;
+  const padding = 24;
+  
+  const cols = 7;
+  const rows = Math.ceil(data.days.length / 7);
+  
+  const gridWidth = cols * cellSize + (cols - 1) * cellGap;
+  const canvasW = padding * 2 + gridWidth;
+  const canvasH = padding + logoHeight + 30 + headerMonthHeight + 16 + weekdayHeaderHeight + rows * cellSize + (rows - 1) * cellGap + 20 + legendHeight + padding;
+
+  let svg = `<svg width="${canvasW}" height="${canvasH}" xmlns="http://www.w3.org/2000/svg">`;
+  
+  // Background
+  svg += `<rect width="100%" height="100%" fill="#0d0d0d"/>`;
+  
+  let currentY = padding;
+  
+  // Logo - use real image if available, otherwise placeholder
+  if (logoBase64) {
+    // Use actual logo image with proper aspect ratio
+    svg += `<image href="data:image/png;base64,${logoBase64}" x="${(canvasW - 100)/2}" y="${currentY}" width="100" height="${logoHeight}" preserveAspectRatio="xMidYMid meet"/>`;
+  } else {
+    // Fallback placeholder
+    svg += `<rect x="${(canvasW - 100)/2}" y="${currentY}" width="100" height="${logoHeight}" fill="#c9a24b" rx="8"/>`;
+    svg += `<text x="${canvasW/2}" y="${currentY + logoHeight/2 + 10}" text-anchor="middle" fill="#0d0d0d" font-family="Arial, sans-serif" font-weight="bold" font-size="14">LOGO</text>`;
+  }
+  
+  currentY += logoHeight + 10;
+  
+  // Brand text
+  svg += `<text x="${canvasW/2}" y="${currentY + 20}" text-anchor="middle" fill="#c9a24b" font-family="Arial, sans-serif" font-weight="bold" font-size="16">Garagem do Ka</text>`;
+  
+  currentY += 30;
+  
+  // Month title
+  svg += `<text x="${canvasW/2}" y="${currentY + 20}" text-anchor="middle" fill="#c9a24b" font-family="Arial, sans-serif" font-weight="bold" font-size="24">Calendário do ${data.monthLabel}</text>`;
+  
+  currentY += headerMonthHeight + 16;
+  
+  // Weekday headers
+  const weekdayShort = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
+  svg += `<g font-family="Arial, sans-serif" font-weight="bold" font-size="13" fill="#e5c07b" text-anchor="middle">`;
+  for (let c = 0; c < cols; c++) {
+    const x = padding + c * (cellSize + cellGap) + cellSize / 2;
+    svg += `<text x="${x}" y="${currentY + 20}">${weekdayShort[c]}</text>`;
+  }
+  svg += `</g>`;
+  
+  currentY += weekdayHeaderHeight;
+  
+  // Calendar grid - CORRECTED: calculate starting weekday
+  const monthStart = new Date(data.year, data.month, 1);
+  const startOffset = monthStart.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  
+  let dayCount = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cellIdx = r * 7 + c;
+      const x = padding + c * (cellSize + cellGap);
+      const y = currentY + r * (cellSize + cellGap);
+      
+      // Check if this cell should have a day
+      // Days start at startOffset and go through all days in the month
+      if (cellIdx >= startOffset && dayCount < data.days.length) {
+        const dayInfo = data.days[dayCount];
+        
+        const color = OCCUPANCY_COLORS[dayInfo.occupancy] || "#374151";
+        svg += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" fill="${color}" rx="6"/>`;
+        
+        // Today border
+        if (dayInfo.occupancy === "today") {
+          svg += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" fill="none" stroke="#c9a24b" stroke-width="3" rx="6"/>`;
+        }
+        
+        const textColor = dayInfo.occupancy === "past" ? "#6b7280" : "#ffffff";
+        svg += `<text x="${x + cellSize/2}" y="${y + cellSize/2 + 7}" text-anchor="middle" fill="${textColor}" font-family="Arial, sans-serif" font-weight="bold" font-size="19">${dayInfo.day}</text>`;
+        
+        dayCount++;
+      }
+      // Empty cells (before startOffset or after all days) - leave blank
+    }
+  }
+  
+  currentY += rows * cellSize + (rows - 1) * cellGap + 20;
+  
+  // Legend
+  const legendItems = [
+    { color: "#059669", label: "Mais vazio" },
+    { color: "#d97706", label: "Médio" },
+    { color: "#dc2626", label: "Mais movimentado" },
+    { color: "#374151", label: "Fechado" },
+  ];
+  
+  const legendSpacing = (canvasW - padding * 2) / legendItems.length;
+  
+  for (let i = 0; i < legendItems.length; i++) {
+    const item = legendItems[i];
+    const lx = padding + i * legendSpacing + legendSpacing / 2 - 40;
+    
+    svg += `<rect x="${lx}" y="${currentY}" width="14" height="14" fill="${item.color}" rx="2"/>`;
+    svg += `<text x="${lx + 20}" y="${currentY + 12}" fill="#e5c07b" font-family="Arial, sans-serif" font-weight="bold" font-size="13">${item.label}</text>`;
+  }
+  
+  svg += `</svg>`;
+  return svg;
 }
 
 // ─── Build WhatsApp List Message Sections ────────────────────────
