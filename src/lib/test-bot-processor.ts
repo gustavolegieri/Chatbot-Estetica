@@ -276,16 +276,26 @@ async function getDynamicUpsellOffer(session: TestSession): Promise<{ label: str
     
     if (allServices.length === 0) return null;
     
-    // Get current service key to exclude it
+    // Get current service info to exclude it
     const currentServiceKey = session.selectedSubService ?? session.selectedService;
+    const currentServiceName = session.selectedServiceName?.toLowerCase() || "";
     
     // Filter cheap services (price < R$ 60)
     const cheapServices = allServices.filter(s => {
       const price = Number(s.price);
-      // Exclude current service
-      if (currentServiceKey && (s.catalogKey === currentServiceKey || s.name.toLowerCase().includes(currentServiceKey.toLowerCase()))) {
+      const serviceName = s.name.toLowerCase();
+      const serviceKey = s.catalogKey?.toLowerCase() || "";
+      
+      // Exclude current service by key or name
+      if (currentServiceKey) {
+        if (serviceKey.includes(currentServiceKey.toLowerCase()) || currentServiceKey.toLowerCase().includes(serviceKey)) {
+          return false;
+        }
+      }
+      if (serviceName.includes(currentServiceName) || currentServiceName.includes(serviceName)) {
         return false;
       }
+      
       // Filter by price (cheap services for upsell)
       return price > 0 && price < 60;
     });
@@ -467,6 +477,14 @@ async function handleMainMenu(
     return responses;
   }
 
+  // Special case: option 8 is "Ajuda na escolha" - go directly to AI FAQ
+  if (choice === "8") {
+    session.stage = "ETAPA10_FAQ";
+    responses.push({ text: "🤔 Descreva em texto livre o que você precisa ou está procurando para o seu carro (ex: 'preciso de limpeza interna', 'tem manchas no estofado', 'quer dar brilho na pintura')." });
+    session.awaitingServiceRecommendation = true;
+    return responses;
+  }
+
   const categoryMap: Record<string, string> = {
     "1": "lavagem",
     "2": "polimento",
@@ -475,7 +493,6 @@ async function handleMainMenu(
     "5": "detalhes",
     "6": "revitalizacao",
     "7": "pacotes",
-    "8": "indeciso",
   };
 
   session.selectedService = categoryMap[choice];
@@ -965,6 +982,17 @@ async function handleDateSelection(
   if (!isNaN(dayNum) && dayNum >= 1 && dayNum <= 31) {
     const today = new Date();
     const selectedDate = new Date(today.getFullYear(), today.getMonth(), dayNum);
+    
+    // Check if date is in the past
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const selectedMidnight = new Date(today.getFullYear(), today.getMonth(), dayNum);
+    if (selectedMidnight < todayMidnight) {
+      responses.push({ text: "❌ Não é possível agendar para datas passadas. Por favor, escolha uma data a partir de hoje." });
+      const calendarImagePath = await generateCalendarImageOnlyForTest(session.testDate || null);
+      responses.push({ text: generateCalendarLegend(), mediaUrl: calendarImagePath, mediaType: "image" });
+      return responses;
+    }
+    
     if (selectedDate.getDay() === 0) {
       responses.push({ text: "❌ Domingo fechamos. " });
       return responses;
@@ -980,6 +1008,7 @@ async function handleDateSelection(
     return responses;
   }
 
+  responses.push({ text: "❌ Opção inválida. Digite o número do dia ou 'menu' para voltar." });
   const calendarImagePath = await generateCalendarImageOnlyForTest(session.testDate || null);
   responses.push({ text: generateCalendarLegend(), mediaUrl: calendarImagePath, mediaType: "image" });
   return responses;
