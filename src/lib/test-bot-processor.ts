@@ -74,6 +74,7 @@ interface TestSession {
   awaitingPhotoUpload?: boolean;
   awaitingServiceRecommendation?: boolean;
   serviceRecommendation?: string | null;
+  awaitingServiceQuestion?: boolean;
   testDate?: string | null;
   testHours?: string | null;
 }
@@ -184,6 +185,9 @@ export async function processTestFlow({
 
     case "ETAPA10_FAQ":
       return handleFAQ(message, session, responses);
+
+    case "ETAPA11_SERVICE_QUESTION":
+      return handleServiceQuestion(message, session, responses);
 
     default:
       const wctx = await loadWhatsAppCatalog(true);
@@ -605,8 +609,9 @@ async function handleServiceAction(
       break;
 
     case "3":
-      session.stage = "ETAPA10_FAQ";
-      responses.push({ text: "📝 Qual sua dúvida? Vou ajudar! " });
+      session.stage = "ETAPA11_SERVICE_QUESTION";
+      session.awaitingServiceQuestion = true;
+      responses.push({ text: "📝 Qual sua dúvida sobre o serviço selecionado? Vou ajudar! " });
       break;
 
     default:
@@ -1282,6 +1287,101 @@ async function handlePhotoUpload(
   return responses;
 }
 
+async function handleServiceQuestion(
+  message: string,
+  session: TestSession,
+  responses: TestResponse[]
+): Promise<TestResponse[]> {
+  // Check if user is responding to AI answer
+  if (!session.awaitingServiceQuestion) {
+    const choice = message.trim();
+    if (choice === "1") {
+      // Back to service action to schedule
+      session.stage = "ETAPA3_SERVICE_ACTION";
+      const prompts = await loadPromptMap();
+      const wctx = await loadWhatsAppCatalog(true);
+      const serviceKey = session.selectedSubService ?? session.selectedService;
+      const service = serviceKey ? wctx.catalog[serviceKey] : null;
+      if (service) {
+        const description = serviceDetail(service, prompts);
+        responses.push({ text: description });
+      }
+      responses.push({
+        text: "Como deseja prosseguir?\n\n*1* 📅 Agendar agora\n*2* 🔄 Ver outros\n*3* 💬 Tenho dúvidas",
+      });
+      return responses;
+    } else if (choice === "2") {
+      // Back to main menu
+      session.stage = "ETAPA2_MAIN_MENU";
+      const wctx = await loadWhatsAppCatalog(true);
+      const prompts = await loadPromptMap();
+      responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+      return responses;
+    } else if (choice === "3") {
+      // More questions
+      session.awaitingServiceQuestion = true;
+      responses.push({ text: "📝 Qual sua próxima dúvida sobre o serviço? " });
+      return responses;
+    }
+  }
+
+  const userQuestion = message.trim();
+  
+  if (userQuestion.length < 5) {
+    responses.push({ text: "⚠️ A pergunta é muito curta. Por favor, seja mais específico sobre sua dúvida, ou digite 'menu' para voltar." });
+    return responses;
+  }
+
+  try {
+    const wctx = await loadWhatsAppCatalog(true);
+    const ctx = {
+      businessName: "Garagem do Ka",
+      hours: "08:00 às 18:00",
+      address: "",
+      pixKey: null,
+      pixHolder: null,
+      pixBank: null,
+    };
+    
+    // Get service details
+    const serviceKey = session.selectedSubService ?? session.selectedService;
+    const service = serviceKey ? wctx.catalog[serviceKey] : null;
+    const serviceName = session.selectedServiceName || "o serviço selecionado";
+    const serviceDescription = service ? service.label : serviceName;
+    
+    const aiResponse = await answerCustomerDoubt({
+      question: `Dúvida sobre o serviço "${serviceName}": ${userQuestion}. 
+      
+      Detalhes do serviço: ${serviceDescription}`,
+      flow: {
+        serviceLabel: serviceName,
+        estimatedTime: service?.time || null,
+        quoteMin: service?.hatchMin || null,
+        quoteMax: service?.hatchMax || null,
+        vehicleCondition: session.vehicle.condition,
+      } as any,
+      ctx,
+      wctx,
+    });
+
+    if (aiResponse) {
+      responses.push({ text: `🤖 *Resposta:*${aiResponse}` });
+      responses.push({ text: "\n\n*1* - Voltar e agendar\n*2* - Ver outros serviços\n*3* - Mais dúvidas" });
+      session.awaitingServiceQuestion = false;
+      session.stage = "ETAPA11_SERVICE_QUESTION";
+    } else {
+      responses.push({ text: "😕 Não consegui responder sua dúvida. Por favor, tente reformular ou digite 'menu' para voltar." });
+      session.stage = "ETAPA2_MAIN_MENU";
+    }
+  } catch (err) {
+    console.error("[test-bot] Error in service question:", err);
+    responses.push({ text: "😕 Ocorreu um erro ao processar sua dúvida. Por favor, digite 'menu' para voltar." });
+    session.stage = "ETAPA2_MAIN_MENU";
+  }
+
+  return responses;
+}
+
 async function handleFAQ(
   message: string,
   session: TestSession,
@@ -1305,11 +1405,29 @@ async function handleFAQ(
       
       // Try to find a matching service in the catalog
       let matchedService: any = null;
-      for (const [catalogKey, service] of Object.entries(wctx.catalog)) {
-        if (service.label.toLowerCase().includes(aiResponse) || aiResponse.includes(service.label.toLowerCase())) {
-          const { key: _, ...serviceWithoutKey } = service;
-          matchedService = { key: catalogKey, ...serviceWithoutKey };
-          break;
+      
+      // First, try to extract service name if AI response starts with "Recomendo:"
+      const recommendedMatch = aiResponse.match(/recomendo:?\s*([^.-]+)/i);
+      if (recommendedMatch) {
+        const recommendedName = recommendedMatch[1].trim().toLowerCase();
+        for (const [catalogKey, service] of Object.entries(wctx.catalog)) {
+          if (service.label.toLowerCase().includes(recommendedName) || recommendedName.includes(service.label.toLowerCase())) {
+            const { key: _, ...serviceWithoutKey } = service;
+            matchedService = { key: catalogKey, ...serviceWithoutKey };
+            break;
+          }
+        }
+      }
+      
+      // If no match with extracted name, try fuzzy match on full response
+      if (!matchedService) {
+        for (const [catalogKey, service] of Object.entries(wctx.catalog)) {
+          const serviceName = service.label.toLowerCase();
+          if (aiResponse.includes(serviceName) || serviceName.includes(aiResponse.substring(0, 20))) {
+            const { key: _, ...serviceWithoutKey } = service;
+            matchedService = { key: catalogKey, ...serviceWithoutKey };
+            break;
+          }
         }
       }
       
@@ -1342,6 +1460,10 @@ async function handleFAQ(
       const prompts = await loadPromptMap();
       responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
       return responses;
+    } else {
+      // Invalid choice, show options again
+      responses.push({ text: "Por favor, escolha uma opção:\n\n*1* - Agendar com o serviço recomendado\n*2* - Voltar ao menu principal" });
+      return responses;
     }
   }
 
@@ -1366,8 +1488,20 @@ async function handleFAQ(
       pixBank: null,
     };
     
+    // Build services list for context
+    const servicesList = Object.entries(wctx.catalog)
+      .map(([key, service]: [string, any]) => `${service.label} (R$ ${service.hatchMin || 'a consultar'})`)
+      .join(', ');
+    
     const aiResponse = await answerCustomerDoubt({
-      question: `Preciso de ajuda para escolher um serviço. Descrição do que preciso: ${userDescription}`,
+      question: `Preciso de ajuda para escolher um serviço. Descrição do que preciso: ${userDescription}. 
+      
+      Serviços disponíveis: ${servicesList}
+      
+      Por favor, recomende APENAS UM serviço específico da lista acima que melhor se encaixa na descrição do cliente. 
+      Responda de forma direta: "Recomendo: [Nome do Serviço] - [breve explicação de 1 frase]".
+      NÃO mencione "falar com o dono", NÃO peça para o cliente falar com alguém.
+      Se não conseguir identificar um serviço claro, responda: "Não consegui identificar um serviço específico."`,
       flow: {
         serviceLabel: null,
         estimatedTime: null,
