@@ -399,14 +399,14 @@ export function etapa6Upsell(service: string, complement: string, benefit: strin
   return renderPrompt(p(prompts), "etapa6_upsell", { service, complement, benefit });
 }
 
-import { buildCalendarPrompt } from "./flow-validation";
+import { generateCalendarLegend } from "./calendar-helper";
 
 // ─────────────────────────────────────────────────────────────
 // ETAPA 7 — AGENDAMENTO
 // ─────────────────────────────────────────────────────────────
 
 export function etapa7Day(prompts?: PromptMap) {
-  return [buildCalendarPrompt(), "", renderPrompt(p(prompts), "etapa7_day", {})].join("\n");
+  return [generateCalendarLegend(), "", renderPrompt(p(prompts), "etapa7_day", {})].join("\n");
 }
 
 export function etapa7Time(dayLabel: string, slots: string[], durationLabel: string, prompts?: PromptMap) {

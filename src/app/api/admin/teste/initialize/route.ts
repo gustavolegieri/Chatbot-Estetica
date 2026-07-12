@@ -9,7 +9,7 @@ import { testSessions } from "@/lib/test-sessions-store";
 
 export async function POST(req: NextRequest) {
   try {
-    const { sessionId, testHours } = await req.json();
+    const { sessionId, testHours, testDate } = await req.json();
 
     if (!sessionId) {
       return NextResponse.json(
@@ -34,10 +34,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ⏰ Permitir override do horário para testes
+    // 📅⏰ Permitir override da data e horário para testes
+    // testDate pode ser: "2026-07-15" — simula que hoje é essa data
     // testHours pode ser: "08:00", "14:30", etc. — simula que agora é esse horário
     let now = new Date();
-    if (testHours && typeof testHours === "string" && /^\d{1,2}:\d{2}$/.test(testHours)) {
+    if (testDate && typeof testDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(testDate)) {
+      const [y, m, d] = testDate.split("-").map(Number);
+      // Se não informou horário, usa o horário atual
+      if (testHours && typeof testHours === "string" && /^\d{1,2}:\d{2}$/.test(testHours)) {
+        const [h, min] = testHours.split(":").map(Number);
+        now = new Date(y, m - 1, d, h, min, 0, 0);
+      } else {
+        now = new Date(y, m - 1, d, now.getHours(), now.getMinutes(), 0, 0);
+      }
+    } else if (testHours && typeof testHours === "string" && /^\d{1,2}:\d{2}$/.test(testHours)) {
       const [h, m] = testHours.split(":").map(Number);
       now = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0, 0);
     }
@@ -111,6 +121,8 @@ export async function POST(req: NextRequest) {
       },
       quote: null,
       upsellOffer: null,
+      testDate: testDate || null, // Salvar data de teste para uso no calendário
+      testHours: testHours || null, // Salvar horário de teste
     });
 
     return NextResponse.json({

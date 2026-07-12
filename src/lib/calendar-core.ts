@@ -88,12 +88,12 @@ function countTotalSlots(date: Date, config: BusinessConfig): number {
  *   yellow → <=70% of slots booked
  *   red    → >70% of slots booked
  */
-export async function getMonthOccupancy(year: number, month: number): Promise<CalendarData> {
+export async function getMonthOccupancy(year: number, month: number, customToday?: Date): Promise<CalendarData> {
   const monthStart = startOfMonth(new Date(year, month));
   const monthEnd = endOfMonth(monthStart);
   const allDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const config = await loadConfig();
-  const today = startOfDay(new Date());
+  const today = customToday ? startOfDay(customToday) : startOfDay(new Date());
 
   // Get existing appointments for this month
   const appointments = await prisma.appointment.findMany({
@@ -201,7 +201,7 @@ const OCCUPANCY_LABELS: Record<string, string> = {
  * Uses @napi-rs/canvas (WASM, works on Vercel).
  * Falls back to placeholder data URL if canvas is unavailable.
  */
-export async function generateCalendarImage(date: Date): Promise<string> {
+export async function generateCalendarImage(date: Date, customToday?: Date): Promise<string> {
   const canvasMod = await loadCanvas();
   if (!canvasMod) {
     console.warn("[calendar-core] @napi-rs/canvas not available – using placeholder");
@@ -209,7 +209,7 @@ export async function generateCalendarImage(date: Date): Promise<string> {
   }
 
   const { createCanvas, loadImage } = canvasMod;
-  const data = await getMonthOccupancy(date.getFullYear(), date.getMonth());
+  const data = await getMonthOccupancy(date.getFullYear(), date.getMonth(), customToday);
 
   // Dimensions
   const cellSize = 72;
@@ -341,17 +341,29 @@ export async function generateCalendarImage(date: Date): Promise<string> {
 
   // Return as buffer
   const buffer = canvas.toBuffer("image/png");
-  // Write to tmp file
-  const fs = await import("fs");
-  const path = await import("path");
-  const tmpDir = path.resolve(process.cwd(), "tmp");
-  if (!fs.existsSync(tmpDir)) {
-    fs.mkdirSync(tmpDir);
+  
+  // Try to write to public/tmp directory for public access
+  try {
+    const fs = await import("fs");
+    const path = await import("path");
+    const publicTmpDir = path.resolve(process.cwd(), "public", "tmp");
+    if (!fs.existsSync(publicTmpDir)) {
+      fs.mkdirSync(publicTmpDir, { recursive: true });
+    }
+    const fileName = `calendar-${data.year}-${String(data.month + 1).padStart(2, "0")}.png`;
+    const filePath = path.join(publicTmpDir, fileName);
+    fs.writeFileSync(filePath, buffer);
+    
+    // Convert to public URL
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || "";
+    const normalizedBase = /^https?:\/\//i.test(baseUrl) ? baseUrl : `https://${baseUrl}`;
+    return `${normalizedBase}/tmp/${fileName}`;
+  } catch (err) {
+    console.warn("[calendar-core] Could not write to public/tmp directory, using base64 fallback");
+    // Fallback to base64 data URL
+    const base64 = buffer.toString("base64");
+    return `data:image/png;base64,${base64}`;
   }
-  const fileName = `calendar-${data.year}-${String(data.month + 1).padStart(2, "0")}.png`;
-  const filePath = path.join(tmpDir, fileName);
-  fs.writeFileSync(filePath, buffer);
-  return filePath;
 }
 
 // ─── Build WhatsApp List Message Sections ────────────────────────

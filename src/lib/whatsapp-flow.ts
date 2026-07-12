@@ -3,7 +3,7 @@ import { addDays, format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { prisma } from "./prisma";
 import { sendText, sendMedia, sendList } from "./evolution-api";
-import { sendCalendarWithImageAndList } from "./calendar-helper";
+import { sendCalendarWithImageAndList, generateCalendarImageOnly, generateCalendarLegend } from "./calendar-helper";
 import {
   calculateEndTime,
   formatDurationLabel,
@@ -1145,6 +1145,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         flow.stage = "ETAPA7_DAY";
         await saveFlow(msg.phone, flow);
         await sendCalendarWithImageAndList({ number: msg.phone, prompts });
+        await sendText({ number: msg.phone, text: generateCalendarLegend() });
         return;
       }
       const key = flow.serviceKey ?? "lavagem_detalhada";
@@ -1153,6 +1154,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         flow.stage = "ETAPA7_DAY";
         await saveFlow(msg.phone, flow);
         await sendCalendarWithImageAndList({ number: msg.phone, prompts });
+        await sendText({ number: msg.phone, text: generateCalendarLegend() });
         return;
       }
       flow.upsellLabel = upsell.complement;
@@ -1178,6 +1180,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       flow.stage = "ETAPA7_DAY";
       await saveFlow(msg.phone, flow);
       await sendCalendarWithImageAndList({ number: msg.phone, prompts });
+      await sendText({ number: msg.phone, text: generateCalendarLegend() });
       return;
     }
 
@@ -1185,6 +1188,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       flow.stage = "ETAPA7_DAY";
       await saveFlow(msg.phone, flow);
       await sendCalendarWithImageAndList({ number: msg.phone, prompts });
+      await sendText({ number: msg.phone, text: generateCalendarLegend() });
       return;
     }
 

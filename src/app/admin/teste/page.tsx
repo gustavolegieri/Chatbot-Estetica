@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, RotateCcw, Loader, Clock } from "lucide-react";
+import { Send, RotateCcw, Loader, Clock, Calendar } from "lucide-react";
 
 interface Message {
   id: string;
@@ -17,6 +17,7 @@ export default function TesteBotPage() {
   const [loading, setLoading] = useState(false);
   const [testSessionId] = useState(() => `test-${Date.now()}`);
   const [testHours, setTestHours] = useState("");
+  const [testDate, setTestDate] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -39,6 +40,10 @@ export default function TesteBotPage() {
       // Se o usuário informou um horário de teste, envia para o backend
       if (testHours && /^\d{1,2}:\d{2}$/.test(testHours)) {
         body.testHours = testHours;
+      }
+      // Se o usuário informou uma data de teste, envia para o backend
+      if (testDate && /^\d{4}-\d{2}-\d{2}$/.test(testDate)) {
+        body.testDate = testDate;
       }
 
       const response = await fetch("/api/admin/teste/initialize", {
@@ -123,6 +128,18 @@ export default function TesteBotPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {/* 📅 Simulador de data */}
+          <div className="flex items-center gap-2 rounded-lg bg-slate-800/60 px-3 py-1.5">
+            <Calendar className="h-4 w-4 text-slate-400" />
+            <input
+              type="date"
+              value={testDate}
+              onChange={(e) => setTestDate(e.target.value)}
+              className="w-36 rounded bg-slate-700/50 px-2 py-1 text-xs text-slate-300 placeholder-slate-500 focus:border-brand-500 focus:outline-none"
+              placeholder="Data"
+              title="Simular data (deixe vazio para usar a data real)"
+            />
+          </div>
           {/* ⏰ Simulador de horário */}
           <div className="flex items-center gap-2 rounded-lg bg-slate-800/60 px-3 py-1.5">
             <Clock className="h-4 w-4 text-slate-400" />

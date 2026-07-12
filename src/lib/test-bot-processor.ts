@@ -8,8 +8,8 @@ import {
   normalizeVehicleConditionValue,
   buildVehicleCollectionPrompt,
   buildVehicleConfirmationPrompt,
-  buildCalendarPrompt,
 } from "./flow-validation";
+import { generateCalendarImageOnlyForTest, generateCalendarLegend } from "./calendar-helper";
 import {
   etapa1Welcome,
   etapa2MainMenu,
@@ -71,6 +71,8 @@ interface TestSession {
   awaitingPickupAddress?: boolean;
   awaitingReturnPreference?: boolean;
   awaitingPhotoUpload?: boolean;
+  testDate?: string | null;
+  testHours?: string | null;
 }
 
 interface TestResponse {
@@ -787,7 +789,8 @@ async function handleLogistics(
     session.awaitingReturnPreference = false;
     session.stage = "ETAPA7_DAY";
     responses.push({ text: wantsReturn ? "🔄 Devolução incluída no resumo." : "📍 Sem devolução, tudo certo." });
-    responses.push({ text: buildCalendarPrompt() });
+    const calendarImagePath = await generateCalendarImageOnlyForTest(session.testDate || null);
+    responses.push({ text: generateCalendarLegend(), mediaUrl: calendarImagePath, mediaType: "image" });
     return responses;
   }
 
@@ -803,7 +806,8 @@ async function handleLogistics(
   session.pickupDeliveryFee = 0;
   session.stage = "ETAPA7_DAY";
   responses.push({ text: "📍 Combinado! Você pode levar o carro até a loja quando puder." });
-  responses.push({ text: buildCalendarPrompt() });
+  const calendarImagePath = await generateCalendarImageOnlyForTest(session.testDate || null);
+  responses.push({ text: generateCalendarLegend(), mediaUrl: calendarImagePath, mediaType: "image" });
   return responses;
 }
 
@@ -904,7 +908,8 @@ async function handleDateSelection(
     return responses;
   }
 
-  responses.push({ text: buildCalendarPrompt() });
+  const calendarImagePath = await generateCalendarImageOnlyForTest(session.testDate || null);
+  responses.push({ text: generateCalendarLegend(), mediaUrl: calendarImagePath, mediaType: "image" });
   return responses;
 }
 

@@ -3,6 +3,46 @@ import { sendMedia, sendList } from "./evolution-api";
 import { BRAND_DEFAULT } from "./whatsapp-catalog";
 
 /**
+ * Gera apenas a imagem do calendário (sem enviar).
+ * Pode ser usada tanto no whatsapp-flow (enviar via sendMedia) quanto no test-bot (retornar mediaUrl).
+ * Usa dados reais de ocupação do banco (Prisma) e gera PNG via @napi-rs/canvas.
+ * Fallback para placeholder se a biblioteca canvas não estiver disponível.
+ *
+ * @param date Data base para o calendário (default: hoje)
+ * @returns URL pública da imagem gerada
+ */
+export async function generateCalendarImageOnly(date: Date = new Date()): Promise<string> {
+  return await generateCalendarImage(date);
+}
+
+/**
+ * Gera imagem do calendário com data customizada para testes.
+ * Aceita string de data no formato YYYY-MM-DD.
+ */
+export async function generateCalendarImageOnlyForTest(testDate: string | null): Promise<string> {
+  const date = testDate ? new Date(testDate) : new Date();
+  const customToday = testDate ? new Date(testDate) : undefined;
+  return await generateCalendarImage(date, customToday);
+}
+
+/**
+ * Gera o texto explicativo com a legenda do calendário.
+ * Pode ser usado tanto no whatsapp-flow quanto no test-bot.
+ */
+export function generateCalendarLegend(): string {
+  return [
+    "",
+    "✅ Dias disponíveis:",
+    "🟢 Mais vazio  🟡 Médio  🔴 Mais movimentado",
+    "🚫 Domingos: fechado",
+    "📍 Hoje: destacado em azul",
+    "",
+    "💬 *Digite o número do dia* (ex: 15)",
+    "🔙 *0* para voltar ao menu",
+  ].join("\n");
+}
+
+/**
  * Envia calendário como imagem + lista interativa WhatsApp.
  * Usa dados reais de ocupação do banco (Prisma) e gera PNG via @napi-rs/canvas.
  * Fallback para placeholder se a biblioteca canvas não estiver disponível.
