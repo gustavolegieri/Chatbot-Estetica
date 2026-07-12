@@ -17,6 +17,7 @@
   "dependencies": {
     "@napi-rs/canvas": "^1.0.2",
     "@prisma/client": "^6.9.0",
+    "@resvg/resvg-js": "^2.6.2",
     "bcryptjs": "^3.0.2",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -26,6 +27,7 @@
     "nodemailer": "^9.0.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "satori": "^0.26.0",
     "tailwind-merge": "^3.3.0",
     "zod": "^3.25.51"
   },

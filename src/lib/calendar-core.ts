@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isBefore, isSameDay, startOfDay } from "date-fns";
 import { BRAND_DEFAULT } from "./whatsapp-catalog";
+import satori from "satori";
 
 // ─── Tipos ───────────────────────────────────────────────────────
 
@@ -168,16 +169,6 @@ export async function getMonthOccupancy(year: number, month: number, customToday
   return { year, month, monthLabel, days, occupancyMap };
 }
 
-// ─── Image generation with @napi-rs/canvas ──────────────────────
-
-async function loadCanvas() {
-  try {
-    return await import("@napi-rs/canvas");
-  } catch {
-    return null;
-  }
-}
-
 const OCCUPANCY_COLORS: Record<string, string> = {
   green: "#22c55e",
   yellow: "#eab308",
@@ -197,9 +188,9 @@ const OCCUPANCY_LABELS: Record<string, string> = {
 };
 
 /**
- * Generate a calendar SVG image with the clinic logo, month grid, and occupancy colors.
- * Uses SVG for reliable text rendering (canvas has issues with text in WASM).
- * Converts SVG to PNG using sharp if available, otherwise returns SVG as data URL.
+ * Generate a calendar SVG image using satori (React-to-SVG).
+ * This properly handles text rendering with system fonts.
+ * Returns SVG as data URL (WhatsApp accepts SVG data URLs).
  */
 export async function generateCalendarImage(date: Date, customToday?: Date): Promise<string> {
   const data = await getMonthOccupancy(date.getFullYear(), date.getMonth(), customToday);
@@ -218,169 +209,168 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
   
   // Canvas width: padding + cols * (cellSize + gap) - gap + padding
   const gridWidth = cols * cellSize + (cols - 1) * cellGap;
-  const svgW = padding * 2 + gridWidth;
+  const width = padding * 2 + gridWidth;
   
   // Canvas height: padding + logo + brand text + month + margin + weekday + margin + grid + margin + legend + padding
-  const svgH = padding + logoHeight + 30 + headerMonthHeight + 16 + weekdayHeaderHeight + rows * cellSize + (rows - 1) * cellGap + 20 + legendHeight + padding;
+  const height = padding + logoHeight + 30 + headerMonthHeight + 16 + weekdayHeaderHeight + rows * cellSize + (rows - 1) * cellGap + 20 + legendHeight + padding;
 
-  // Build SVG
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}">`;
-  
-  // Background - fundo escuro
-  svg += `<rect x="0" y="0" width="${svgW}" height="${svgH}" fill="#0d0d0d"/>`;
-  
-  let currentY = padding;
-
-  // 1. Logo centralizada (maior) com proporção correta
-  const logoWidth = 120;
-  const logoX = (svgW - logoWidth) / 2;
-  svg += `<image x="${logoX}" y="${currentY}" width="${logoWidth}" height="${logoHeight}" href="/logo-garagem-do-ka.png" preserveAspectRatio="xMidYMid meet"/>`;
-  
-  currentY += logoHeight + 10;
-
-  // 2. Texto "Garagem do Ka" abaixo da logo
-  svg += `<text x="${svgW / 2}" y="${currentY + 20}" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16px" font-weight="bold" fill="#c9a24b" text-anchor="middle">Garagem do Ka</text>`;
-  
-  currentY += 30;
-
-  // 3. Título "Calendário do mês X" em dourado
-  svg += `<text x="${svgW / 2}" y="${currentY + 20}" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24px" font-weight="bold" fill="#c9a24b" text-anchor="middle">Calendário do ${data.monthLabel}</text>`;
-  
-  currentY += headerMonthHeight + 16;
-
-  // 4. Cabeçalho dias da semana - dourado claro
-  const weekdayShort = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
-  
-  for (let c = 0; c < cols; c++) {
-    const x = padding + c * (cellSize + cellGap) + cellSize / 2;
-    svg += `<text x="${x}" y="${currentY + 20}" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13px" font-weight="bold" fill="#e5c07b" text-anchor="middle">${weekdayShort[c]}</text>`;
-  }
-  
-  currentY += weekdayHeaderHeight;
-
-  // 5. Grade do calendário
+  // Build calendar grid HTML
   const monthStart = new Date(data.year, data.month, 1);
   const startOffset = monthStart.getDay();
   let dayCount = 1;
   const daysInMonth = new Date(data.year, data.month + 1, 0).getDate();
 
-  // Cores
-  const bgColors = {
-    green: "#059669",
-    yellow: "#d97706",
-    red: "#dc2626",
-    closed: "#374151",
-    past: "#1f2937",
-  };
+  const weekdayShort = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
   
-  const textColors = {
-    green: "#ffffff",
-    yellow: "#ffffff",
-    red: "#ffffff",
-    closed: "#9ca3af",
-    past: "#6b7280",
-  };
-
+  // Build cells
+  let cellsHtml = "";
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      const x = padding + c * (cellSize + cellGap);
-      const y = currentY + r * (cellSize + cellGap);
       const cellIdx = r * 7 + c;
-
+      let cellContent = "";
+      
       if (cellIdx >= startOffset && dayCount <= daysInMonth) {
         const info = data.occupancyMap[dayCount];
-        if (!info) { dayCount++; continue; }
-
-        // Determinar cor de fundo e texto
-        let bgColor, textColor;
-        
-        if (info.occupancy === "past") {
-          bgColor = bgColors.past;
-          textColor = textColors.past;
-        } else if (info.occupancy === "closed") {
-          bgColor = bgColors.closed;
-          textColor = textColors.closed;
-        } else {
-          const baseOccupancy = info.occupancy === "today" ? "green" : info.occupancy;
-          bgColor = bgColors[baseOccupancy as keyof typeof bgColors] || "#ffffff";
-          textColor = textColors[baseOccupancy as keyof typeof textColors] || "#ffffff";
+        if (info) {
+          const bgColors = {
+            green: "#059669",
+            yellow: "#d97706",
+            red: "#dc2626",
+            closed: "#374151",
+            past: "#1f2937",
+          };
+          
+          const textColors = {
+            green: "#ffffff",
+            yellow: "#ffffff",
+            red: "#ffffff",
+            closed: "#9ca3af",
+            past: "#6b7280",
+          };
+          
+          let bgColor, textColor;
+          if (info.occupancy === "past") {
+            bgColor = bgColors.past;
+            textColor = textColors.past;
+          } else if (info.occupancy === "closed") {
+            bgColor = bgColors.closed;
+            textColor = textColors.closed;
+          } else {
+            const baseOccupancy = info.occupancy === "today" ? "green" : info.occupancy;
+            bgColor = bgColors[baseOccupancy as keyof typeof bgColors] || "#ffffff";
+            textColor = textColors[baseOccupancy as keyof typeof textColors] || "#ffffff";
+          }
+          
+          const isToday = info.occupancy === "today";
+          const borderStyle = isToday ? "border: 3px solid #c9a24b;" : "";
+          
+          cellContent = `
+            <div style="
+              width: ${cellSize}px;
+              height: ${cellSize}px;
+              background-color: ${bgColor};
+              border-radius: 8px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              ${borderStyle}
+            ">
+              <span style="color: ${textColor}; font-weight: bold; font-size: 19px;">${dayCount}</span>
+            </div>
+          `;
         }
-
-        // Desenhar célula com borda arredondada
-        const r = 8;
-        svg += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="${r}" ry="${r}" fill="${bgColor}"/>`;
-
-        // Destaque do dia atual - borda dourada
-        if (info.occupancy === "today") {
-          svg += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="${r}" ry="${r}" fill="none" stroke="#c9a24b" stroke-width="3"/>`;
-        }
-
-        // NÚMERO DO DIA - SVG renderiza texto corretamente
-        const textX = x + cellSize / 2;
-        const textY = y + cellSize / 2 + 6; // +6 para ajuste de baseline
-        svg += `<text x="${textX}" y="${textY}" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="19px" font-weight="bold" fill="${textColor}" text-anchor="middle" dominant-baseline="middle">${dayCount}</text>`;
-
         dayCount++;
       }
+      cellsHtml += cellContent;
     }
   }
 
-  currentY += rows * cellSize + (rows - 1) * cellGap + 20;
-
-  // 6. Legenda horizontal com quadradinhos 14x14px
-  const legendItems = [
-    { color: "#059669", label: "Mais vazio" },
-    { color: "#d97706", label: "Médio" },
-    { color: "#dc2626", label: "Mais movimentado" },
-    { color: "#374151", label: "Fechado" },
-  ];
-  
-  const legendSpacing = svgW / legendItems.length;
-  
-  legendItems.forEach((item, i) => {
-    const lx = padding + i * legendSpacing + legendSpacing / 2 - 35;
-    
-    // Quadradinho 14x14px
-    svg += `<rect x="${lx}" y="${currentY}" width="14" height="14" fill="${item.color}"/>`;
-    
-    // Texto ao lado - dourado claro
-    svg += `<text x="${lx + 20}" y="${currentY + 12}" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13px" font-weight="bold" fill="#e5c07b">${item.label}</text>`;
-  });
-
-  svg += `</svg>`;
-
-  // Try to convert SVG to PNG using sharp
-  try {
-    const sharp = await import("sharp");
-    const svgBuffer = Buffer.from(svg);
-    const pngBuffer = await sharp.default(svgBuffer).png().toBuffer();
-    
-    // Try to write to public/tmp directory for public access
-    try {
-      const fs = await import("fs");
-      const path = await import("path");
-      const publicTmpDir = path.resolve(process.cwd(), "public", "tmp");
-      if (!fs.existsSync(publicTmpDir)) {
-        fs.mkdirSync(publicTmpDir, { recursive: true });
-      }
-      const fileName = `calendar-${data.year}-${String(data.month + 1).padStart(2, "0")}.png`;
-      const filePath = path.join(publicTmpDir, fileName);
-      fs.writeFileSync(filePath, pngBuffer);
+  // Build full HTML
+  const html = `
+    <div style="
+      width: ${width}px;
+      height: ${height}px;
+      background-color: #0d0d0d;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: ${padding}px;
+      box-sizing: border-box;
+    ">
+      <!-- Logo placeholder -->
+      <div style="width: 120px; height: ${logoHeight}px; background-color: #1a1a1a; margin-bottom: 10px;"></div>
       
-      // Convert to public URL
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || "";
-      const normalizedBase = /^https?:\/\//i.test(baseUrl) ? baseUrl : `https://${baseUrl}`;
-      return `${normalizedBase}/tmp/${fileName}`;
-    } catch (err) {
-      console.warn("[calendar-core] Could not write to public/tmp directory, using base64 fallback");
-      const base64 = pngBuffer.toString("base64");
-      return `data:image/png;base64,${base64}`;
-    }
-  } catch (err) {
-    console.warn("[calendar-core] Sharp not available, returning SVG as data URL");
-    // Fallback to SVG data URL
+      <!-- Garagem do Ka -->
+      <div style="color: #c9a24b; font-weight: bold; font-size: 16px; margin-bottom: 30px;">Garagem do Ka</div>
+      
+      <!-- Month title -->
+      <div style="color: #c9a24b; font-weight: bold; font-size: 24px; margin-bottom: 16px;">Calendário do ${data.monthLabel}</div>
+      
+      <!-- Weekday headers -->
+      <div style="display: flex; gap: ${cellGap}px; margin-bottom: ${weekdayHeaderHeight}px;">
+        ${weekdayShort.map(day => `
+          <div style="width: ${cellSize}px; text-align: center; color: #e5c07b; font-weight: bold; font-size: 13px;">${day}</div>
+        `).join('')}
+      </div>
+      
+      <!-- Calendar grid -->
+      <div style="display: grid; grid-template-columns: repeat(7, ${cellSize}px); gap: ${cellGap}px;">
+        ${cellsHtml}
+      </div>
+      
+      <!-- Legend -->
+      <div style="display: flex; gap: 20px; margin-top: 20px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <div style="width: 14px; height: 14px; background-color: #059669;"></div>
+          <span style="color: #e5c07b; font-weight: bold; font-size: 13px;">Mais vazio</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <div style="width: 14px; height: 14px; background-color: #d97706;"></div>
+          <span style="color: #e5c07b; font-weight: bold; font-size: 13px;">Médio</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <div style="width: 14px; height: 14px; background-color: #dc2626;"></div>
+          <span style="color: #e5c07b; font-weight: bold; font-size: 13px;">Mais movimentado</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <div style="width: 14px; height: 14px; background-color: #374151;"></div>
+          <span style="color: #e5c07b; font-weight: bold; font-size: 13px;">Fechado</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Convert HTML to SVG using satori
+  try {
+    // Use system fonts
+    const fontData = await fetch("https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hjp-Ek-_EeA.woff2").then(res => res.arrayBuffer());
+    
+    const svg = await satori(html, {
+      width,
+      height,
+      fonts: [
+        {
+          name: "Inter",
+          data: fontData,
+          weight: 400,
+          style: "normal",
+        },
+        {
+          name: "Inter",
+          data: fontData,
+          weight: 700,
+          style: "normal",
+        },
+      ],
+    });
+    
+    // Return SVG as data URL
     const base64 = Buffer.from(svg).toString("base64");
     return `data:image/svg+xml;base64,${base64}`;
+  } catch (err) {
+    console.error("[calendar-core] Satori error:", err);
+    // Fallback to placeholder
+    return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+XjJkAAAAASUVORK5CYII=";
   }
 }
 
