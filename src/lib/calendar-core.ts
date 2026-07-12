@@ -239,12 +239,12 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
   currentY += logoHeight + 10;
 
   // 2. Texto "Garagem do Ka" abaixo da logo
-  svg += `<text x="${svgW / 2}" y="${currentY + 20}" font-family="Arial, sans-serif" font-size="16px" font-weight="bold" fill="#c9a24b" text-anchor="middle">Garagem do Ka</text>`;
+  svg += `<text x="${svgW / 2}" y="${currentY + 20}" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16px" font-weight="bold" fill="#c9a24b" text-anchor="middle">Garagem do Ka</text>`;
   
   currentY += 30;
 
   // 3. Título "Calendário do mês X" em dourado
-  svg += `<text x="${svgW / 2}" y="${currentY + 20}" font-family="Arial, sans-serif" font-size="24px" font-weight="bold" fill="#c9a24b" text-anchor="middle">Calendário do ${data.monthLabel}</text>`;
+  svg += `<text x="${svgW / 2}" y="${currentY + 20}" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24px" font-weight="bold" fill="#c9a24b" text-anchor="middle">Calendário do ${data.monthLabel}</text>`;
   
   currentY += headerMonthHeight + 16;
 
@@ -253,7 +253,7 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
   
   for (let c = 0; c < cols; c++) {
     const x = padding + c * (cellSize + cellGap) + cellSize / 2;
-    svg += `<text x="${x}" y="${currentY + 20}" font-family="Arial, sans-serif" font-size="13px" font-weight="bold" fill="#e5c07b" text-anchor="middle">${weekdayShort[c]}</text>`;
+    svg += `<text x="${x}" y="${currentY + 20}" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13px" font-weight="bold" fill="#e5c07b" text-anchor="middle">${weekdayShort[c]}</text>`;
   }
   
   currentY += weekdayHeaderHeight;
@@ -318,7 +318,7 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
         // NÚMERO DO DIA - SVG renderiza texto corretamente
         const textX = x + cellSize / 2;
         const textY = y + cellSize / 2 + 6; // +6 para ajuste de baseline
-        svg += `<text x="${textX}" y="${textY}" font-family="Arial, sans-serif" font-size="19px" font-weight="bold" fill="${textColor}" text-anchor="middle" dominant-baseline="middle">${dayCount}</text>`;
+        svg += `<text x="${textX}" y="${textY}" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="19px" font-weight="bold" fill="${textColor}" text-anchor="middle" dominant-baseline="middle">${dayCount}</text>`;
 
         dayCount++;
       }
@@ -344,7 +344,7 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
     svg += `<rect x="${lx}" y="${currentY}" width="14" height="14" fill="${item.color}"/>`;
     
     // Texto ao lado - dourado claro
-    svg += `<text x="${lx + 20}" y="${currentY + 12}" font-family="Arial, sans-serif" font-size="13px" font-weight="bold" fill="#e5c07b">${item.label}</text>`;
+    svg += `<text x="${lx + 20}" y="${currentY + 12}" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13px" font-weight="bold" fill="#e5c07b">${item.label}</text>`;
   });
 
   svg += `</svg>`;
