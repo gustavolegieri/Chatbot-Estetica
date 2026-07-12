@@ -343,22 +343,47 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
   // Convert HTML to SVG using satori
   try {
     console.log("[calendar-core] Starting calendar generation with satori");
-    // Use system fonts
-    const fontData = await fetch("https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hjp-Ek-_EeA.woff2").then(res => res.arrayBuffer());
-    console.log("[calendar-core] Font downloaded, size:", fontData.byteLength);
+    
+    // Try to use system fonts instead of downloading
+    let fontData;
+    let fontName = "Arial";
+    
+    try {
+      // Try Windows Arial
+      const fs = await import("fs");
+      const arialPath = "C:\\Windows\\Fonts\\arial.ttf";
+      fontData = fs.readFileSync(arialPath);
+      console.log("[calendar-core] Using Arial from system, size:", fontData.byteLength);
+    } catch {
+      try {
+        // Try macOS Helvetica
+        const fs = await import("fs");
+        const helveticaPath = "/System/Library/Fonts/Helvetica.ttc";
+        fontData = fs.readFileSync(helveticaPath);
+        console.log("[calendar-core] Using Helvetica from system, size:", fontData.byteLength);
+        fontName = "Helvetica";
+      } catch {
+        // Try Linux DejaVu
+        const fs = await import("fs");
+        const dejavuPath = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+        fontData = fs.readFileSync(dejavuPath);
+        console.log("[calendar-core] Using DejaVu from system, size:", fontData.byteLength);
+        fontName = "DejaVu Sans";
+      }
+    }
     
     const svg = await satori(html, {
       width,
       height,
       fonts: [
         {
-          name: "Inter",
+          name: fontName,
           data: fontData,
           weight: 400,
           style: "normal",
         },
         {
-          name: "Inter",
+          name: fontName,
           data: fontData,
           weight: 700,
           style: "normal",
@@ -387,8 +412,11 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
         fs.writeFileSync(filePath, pngBuffer);
         console.log("[calendar-core] PNG written to:", filePath);
         
-        // Convert to public URL
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || "";
+        // In development, use localhost URL; in production, use environment variable
+        const isDev = process.env.NODE_ENV === "development";
+        const baseUrl = isDev 
+          ? "http://localhost:3000" 
+          : (process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || "");
         const normalizedBase = /^https?:\/\//i.test(baseUrl) ? baseUrl : `https://${baseUrl}`;
         const finalUrl = `${normalizedBase}/tmp/${fileName}`;
         console.log("[calendar-core] Returning public URL:", finalUrl);
