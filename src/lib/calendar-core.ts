@@ -211,62 +211,72 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
   const { createCanvas, loadImage } = canvasMod;
   const data = await getMonthOccupancy(date.getFullYear(), date.getMonth(), customToday);
 
-  // Dimensions - aumentadas para melhor visualização
-  const cellSize = 85;
-  const headerHeight = 50;
+  // Dimensions conforme especificação
+  const cellSize = 70;
+  const cellGap = 6;
   const logoHeight = 60;
-  const weekdayHeaderHeight = 35;
-  const padding = 25;
+  const headerMonthHeight = 50;
+  const weekdayHeaderHeight = 30;
+  const legendHeight = 40;
+  const padding = 24;
+  
   const cols = 7;
   const rows = Math.ceil(data.days.length / 7);
-  const legendHeight = 50;
-  const canvasW = cols * cellSize + padding * 2;
-  const canvasH = logoHeight + headerHeight + weekdayHeaderHeight + rows * cellSize + padding * 2 + legendHeight;
+  
+  // Canvas width: padding + cols * (cellSize + gap) - gap + padding
+  const gridWidth = cols * cellSize + (cols - 1) * cellGap;
+  const canvasW = padding * 2 + gridWidth;
+  
+  // Canvas height: padding + logo + margin + month + margin + weekday + margin + grid + margin + legend + padding
+  const canvasH = padding + logoHeight + 24 + headerMonthHeight + 16 + weekdayHeaderHeight + rows * cellSize + (rows - 1) * cellGap + 20 + legendHeight + padding;
 
   const canvas = createCanvas(canvasW, canvasH);
   const ctx = canvas.getContext("2d");
 
-  // Background - branco limpo
-  ctx.fillStyle = "#ffffff";
+  // Background - off-white conforme especificação
+  ctx.fillStyle = "#fafafa";
   ctx.fillRect(0, 0, canvasW, canvasH);
 
-  // Borda suave ao redor
-  ctx.strokeStyle = "#e2e8f0";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(1, 1, canvasW - 2, canvasH - 2);
+  let currentY = padding;
 
-  // Try to load logo
+  // 1. Logo centralizada
   try {
     const logo = await loadImage("public/logo-garagem-do-ka.png");
-    ctx.drawImage(logo, padding, padding, 120, logoHeight);
+    const logoWidth = 100;
+    const logoX = (canvasW - logoWidth) / 2;
+    ctx.drawImage(logo, logoX, currentY, logoWidth, logoHeight);
   } catch {
     // Fallback: text instead of logo
-    ctx.fillStyle = "#1e293b";
+    ctx.fillStyle = "#1a1a1a";
     ctx.font = "bold 20px sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText(BRAND_DEFAULT, padding, padding + 25);
+    ctx.textAlign = "center";
+    ctx.fillText(BRAND_DEFAULT, canvasW / 2, currentY + 35);
   }
+  
+  currentY += logoHeight + 24; // Margem 24px abaixo da logo
 
-  // Month title - maior e mais destacado
-  ctx.fillStyle = "#1e293b";
-  ctx.font = "bold 28px sans-serif";
-  ctx.textAlign = "right";
-  ctx.fillText(data.monthLabel, canvasW - padding, padding + 35);
-
-  // Weekday headers - mais destacados
-  const weekdayShort = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  // 2. Título do mês + ano centralizado
+  ctx.fillStyle = "#1a1a1a";
+  ctx.font = "bold 30px sans-serif";
   ctx.textAlign = "center";
-  ctx.font = "bold 14px sans-serif";
-  const weekdayY = padding + logoHeight + 15;
+  ctx.fillText(data.monthLabel, canvasW / 2, currentY + 20);
+  
+  currentY += headerMonthHeight + 16; // Espaço 16px
+
+  // 3. Cabeçalho dias da semana
+  const weekdayShort = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
+  ctx.textAlign = "center";
+  ctx.font = "bold 13px sans-serif";
+  ctx.fillStyle = "#6b7280";
   
   for (let c = 0; c < cols; c++) {
-    const x = padding + c * cellSize + cellSize / 2;
-    ctx.fillStyle = c === 0 ? "#ef4444" : "#64748b"; // Domingo em vermelho
-    ctx.fillText(weekdayShort[c], x, weekdayY);
+    const x = padding + c * (cellSize + cellGap) + cellSize / 2;
+    ctx.fillText(weekdayShort[c], x, currentY + 20);
   }
+  
+  currentY += weekdayHeaderHeight;
 
-  // Calendar grid
-  const gridY = weekdayY + 25;
+  // 4. Grade do calendário
   const monthStart = new Date(data.year, data.month, 1);
   const startOffset = monthStart.getDay();
   let dayCount = 1;
@@ -274,117 +284,125 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      const x = padding + c * cellSize;
-      const y = gridY + r * cellSize;
+      const x = padding + c * (cellSize + cellGap);
+      const y = currentY + r * (cellSize + cellGap);
       const cellIdx = r * 7 + c;
 
-      // Draw cell border
-      ctx.strokeStyle = "#e2e8f0";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x, y, cellSize, cellSize);
-
+      // Fundo da célula e número
       if (cellIdx >= startOffset && dayCount <= daysInMonth) {
         const info = data.occupancyMap[dayCount];
         if (!info) { dayCount++; continue; }
 
-        // Cell background - cores mais visíveis
+        // Cores pastel conforme especificação
+        const bgColors = {
+          green: "#d1fae5",      // verde pastel
+          yellow: "#fef3c7",    // amarelo pastel
+          red: "#fee2e2",       // vermelho pastel
+          closed: "#f3f4f6",    // cinza claro
+          past: "#f9fafb",      // branco quase puro
+          today: "#d1fae5",     // usa a cor da disponibilidade
+        };
+        
+        const textColors = {
+          green: "#065f46",     // verde escuro
+          yellow: "#92400e",   // marrom/amarelo escuro
+          red: "#991b1b",      // vermelho escuro
+          closed: "#9ca3af",   // cinza
+          past: "#9ca3af",      // cinza
+          today: "#065f46",    // usa a cor da disponibilidade
+        };
+
+        // Determinar cor de fundo e texto
+        let bgColor, textColor;
+        
         if (info.occupancy === "past") {
-          ctx.fillStyle = "#f1f5f9"; // Cinza claro para dias passados
-          ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+          bgColor = bgColors.past;
+          textColor = textColors.past;
         } else if (info.occupancy === "closed") {
-          ctx.fillStyle = "#f8fafc"; // Bem claro para domingos fechados
-          ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
-          // X para indicar fechado
-          ctx.strokeStyle = "#cbd5e1";
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(x + 15, y + 15);
-          ctx.lineTo(x + cellSize - 15, y + cellSize - 15);
-          ctx.moveTo(x + cellSize - 15, y + 15);
-          ctx.lineTo(x + 15, y + cellSize - 15);
-          ctx.stroke();
-        } else if (info.occupancy === "today") {
-          // Hoje com fundo azul mais visível
-          ctx.fillStyle = "#dbeafe"; // Azul claro
-          ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
-          // Borda azul mais grossa
-          ctx.strokeStyle = "#3b82f6";
-          ctx.lineWidth = 4;
-          ctx.strokeRect(x + 2, y + 2, cellSize - 4, cellSize - 4);
+          bgColor = bgColors.closed;
+          textColor = textColors.closed;
         } else {
-          // Cores de disponibilidade mais visíveis
-          const bgColors = {
-            green: "#dcfce7", // Verde claro
-            yellow: "#fef9c3", // Amarelo claro
-            red: "#fee2e2", // Vermelho claro
-          };
-          ctx.fillStyle = bgColors[info.occupancy as keyof typeof bgColors] || "#ffffff";
-          ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+          // Para today, usa a cor baseada na ocupação real
+          const baseOccupancy = info.occupancy === "today" ? "green" : info.occupancy;
+          bgColor = bgColors[baseOccupancy as keyof typeof bgColors] || "#ffffff";
+          textColor = textColors[baseOccupancy as keyof typeof textColors] || "#1a1a1a";
         }
 
-        // Day number - maior e mais legível
-        ctx.fillStyle = info.occupancy === "closed" ? "#94a3b8" : 
-                      info.occupancy === "past" ? "#9ca3af" : "#1e293b";
-        ctx.font = "bold 22px sans-serif";
+        // Desenhar célula com borda arredondada
+        ctx.fillStyle = bgColor;
+        
+        // Desenhar retângulo arredondado manualmente
+        const r = 8;
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + cellSize - r, y);
+        ctx.quadraticCurveTo(x + cellSize, y, x + cellSize, y + r);
+        ctx.lineTo(x + cellSize, y + cellSize - r);
+        ctx.quadraticCurveTo(x + cellSize, y + cellSize, x + cellSize - r, y + cellSize);
+        ctx.lineTo(x + r, y + cellSize);
+        ctx.quadraticCurveTo(x, y + cellSize, x, y + cellSize - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+        ctx.fill();
+
+        // Destaque do dia atual - borda dourada
+        if (info.occupancy === "today") {
+          ctx.strokeStyle = "#d4af37"; // Dourado
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(x + r, y);
+          ctx.lineTo(x + cellSize - r, y);
+          ctx.quadraticCurveTo(x + cellSize, y, x + cellSize, y + r);
+          ctx.lineTo(x + cellSize, y + cellSize - r);
+          ctx.quadraticCurveTo(x + cellSize, y + cellSize, x + cellSize - r, y + cellSize);
+          ctx.lineTo(x + r, y + cellSize);
+          ctx.quadraticCurveTo(x, y + cellSize, x, y + cellSize - r);
+          ctx.lineTo(x, y + r);
+          ctx.quadraticCurveTo(x, y, x + r, y);
+          ctx.closePath();
+          ctx.stroke();
+        }
+
+        // NÚMERO DO DIA - sempre visível, centralizado, fonte 18-20px, negrito, cor escura
+        ctx.fillStyle = textColor;
+        ctx.font = "bold 19px sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(String(dayCount), x + cellSize / 2, y + cellSize / 2);
 
-        // Indicator badge for availability (bolinha maior e mais visível)
-        if (info.occupancy !== "past" && info.occupancy !== "closed" && info.occupancy !== "today") {
-          const badgeColors = {
-            green: "#22c55e",
-            yellow: "#eab308",
-            red: "#ef4444",
-          };
-          const badgeColor = badgeColors[info.occupancy as keyof typeof badgeColors] || "#6b7280";
-          
-          // Bolinha no canto superior direito
-          ctx.fillStyle = badgeColor;
-          ctx.beginPath();
-          ctx.arc(x + cellSize - 12, y + 12, 8, 0, Math.PI * 2);
-          ctx.fill();
-          
-          // Borda branca ao redor da bolinha
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
+        // SEM pontos/bolinhas redundantes
 
         dayCount++;
       }
+      // Células vazias (fora do mês): completamente em branco
     }
   }
 
-  // Legend - mais clara e legível
-  const legendY = gridY + rows * cellSize + 20;
-  ctx.textAlign = "left";
-  ctx.font = "bold 13px sans-serif";
-  
+  currentY += rows * cellSize + (rows - 1) * cellGap + 20; // Espaço 20px
+
+  // 5. Legenda horizontal com quadradinhos 14x14px
   const legendItems = [
-    { color: "#22c55e", label: "🟢 Livre" },
-    { color: "#eab308", label: "🟡 Médio" },
-    { color: "#ef4444", label: "🔴 Cheio" },
-    { color: "#3b82f6", label: "🔵 Hoje" },
-    { color: "#94a3b8", label: "⬜ Fechado" },
+    { color: "#d1fae5", label: "Mais vazio" },
+    { color: "#fef3c7", label: "Médio" },
+    { color: "#fee2e2", label: "Mais movimentado" },
+    { color: "#f3f4f6", label: "Fechado" },
   ];
   
-  const legendX = padding;
   const legendSpacing = canvasW / legendItems.length;
   
   legendItems.forEach((item, i) => {
-    const lx = legendX + i * legendSpacing + 10;
+    const lx = padding + i * legendSpacing + legendSpacing / 2 - 35; // Ajuste para centralizar
     
-    // Bolinha da legenda
+    // Quadradinho 14x14px
     ctx.fillStyle = item.color;
-    ctx.beginPath();
-    ctx.arc(lx, legendY + 8, 8, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(lx, currentY, 14, 14);
     
-    // Texto da legenda
-    ctx.fillStyle = "#475569";
+    // Texto ao lado
+    ctx.fillStyle = "#4b5563"; // Cinza escuro
     ctx.font = "bold 13px sans-serif";
-    ctx.fillText(item.label, lx + 15, legendY + 12);
+    ctx.textAlign = "left";
+    ctx.fillText(item.label, lx + 20, currentY + 12);
   });
 
   // Return as buffer
