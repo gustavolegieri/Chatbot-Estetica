@@ -159,6 +159,8 @@ model Settings {
   pixKey                String?
   pixHolderName         String?
   pixBank               String?
+  pixMerchantCity       String? @default("Jundiai")
+  pixQrCodeImage        String?
   updatedAt             DateTime       @updatedAt
   autoCancelMin         Int            @default(10)
   followupIdleMin       Int            @default(10)

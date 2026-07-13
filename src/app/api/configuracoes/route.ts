@@ -22,6 +22,8 @@ const updateSchema = z.object({
   pixKey: z.string().optional().nullable(),
   pixHolderName: z.string().optional().nullable(),
   pixBank: z.string().optional().nullable(),
+  pixMerchantCity: z.string().optional().nullable(),
+  pixQrCodeImage: z.string().optional().nullable(),
   sessionResetMin: z.number().int().positive().optional(),
   followupIdleMin: z.number().int().positive().optional(),
   reminder4hMin: z.number().int().positive().optional(),
