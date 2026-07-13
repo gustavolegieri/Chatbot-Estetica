@@ -1176,14 +1176,20 @@ async function handleReminderStep(
   const isYes = normalizeYes(input);
   const isNo = normalizeNo(input);
   
+  console.log("[handleReminderStep] Input:", input, "isYes:", isYes, "isNo:", isNo);
+  
   if (isYes) {
     session.reminderPreference = "30min";
+    console.log("[handleReminderStep] Set reminderPreference to 30min");
   } else if (isNo) {
     session.reminderPreference = "none";
+    console.log("[handleReminderStep] Set reminderPreference to none");
   } else {
     responses.push({ text: "❌ Opção inválida. Por favor, escolha *1* para sim ou *2* para não." });
     return responses;
   }
+  
+  console.log("[handleReminderStep] reminderPreference after set:", session.reminderPreference);
   
   session.stage = "ETAPA10_CONFIRM";
 
@@ -1206,6 +1212,7 @@ async function handleReminderStep(
   });
 
   const reminderText = session.reminderPreference === "none" ? "não" : session.reminderPreference;
+  console.log("[handleReminderStep] reminderText:", reminderText);
 
   const lines = [
     "━━━━━━━━━━━━━━━",

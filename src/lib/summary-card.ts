@@ -16,7 +16,7 @@ interface SummaryCardData {
  */
 export async function generateSummaryCard(data: SummaryCardData): Promise<string> {
   try {
-    console.log("[generateSummaryCard] Generating card with data:", data);
+    console.log("[generateSummaryCard] Generating card with data:", JSON.stringify(data, null, 2));
     
     const width = 600;
     const height = 450;
@@ -102,8 +102,9 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
     return `/${filename}`;
   } catch (error) {
     console.error("[generateSummaryCard] Error:", error);
-    // Fallback to placeholder
-    return `https://placehold.co/600x450/1a1a2e/FFD700?text=Resumo+do+Agendamento&text=${encodeURIComponent(data.customerName)}&text=${encodeURIComponent(data.serviceName)}`;
+    // Fallback to placeholder with actual data
+    const text = `${data.customerName} - ${data.serviceName} - R$ ${data.totalPrice.toFixed(2)}`;
+    return `https://placehold.co/600x450/1a1a2e/FFD700?text=${encodeURIComponent(text)}`;
   }
 }
 
