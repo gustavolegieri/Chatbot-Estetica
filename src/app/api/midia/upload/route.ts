@@ -59,7 +59,7 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ data: media });
+    return NextResponse.json({ success: true, url: relPath, data: media });
   } catch (err: unknown) {
     console.error('[Midia Upload]', err);
     const message =
