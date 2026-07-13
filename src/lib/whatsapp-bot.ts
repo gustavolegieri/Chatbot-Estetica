@@ -3,6 +3,7 @@ import { prisma } from "./prisma";
 import { normalizePhone } from "./utils";
 import { isValidPrivateRecipient } from "./whatsapp-jid";
 import { goToMainMenu, processNumberedFlow, startFlow } from "./whatsapp-flow";
+import { enqueueWhatsAppMessage } from "./whatsapp-debounce";
 import { tryHandleAppointmentConfirmation } from "./appointment-confirmation";
 import { applyWelcomeRestartIfNeeded } from "./whatsapp-session-reset";
 import { sendWelcomeFlow } from "./whatsapp-welcome";
@@ -66,7 +67,7 @@ async function getOrCreateSession(phone: string, pushName?: string) {
   return session;
 }
 
-async function handleMessage(msg: IncomingMessage) {
+async function handleMessageInternal(msg: IncomingMessage) {
   console.log("[WhatsApp Bot] 📱 Mensagem recebida:", { phone: msg.phone, text: msg.text, buttonId: msg.buttonId, listId: msg.listId, pushName: msg.pushName });
 
   if (!isValidPrivateRecipient(msg.phone)) {
@@ -214,5 +215,18 @@ async function handleMessage(msg: IncomingMessage) {
 }
 
 export async function processWhatsAppMessage(msg: IncomingMessage) {
-  await handleMessage(msg);
+  enqueueWhatsAppMessage(
+    {
+      phone: msg.phone,
+      text: msg.text,
+      pushName: msg.pushName,
+      buttonId: msg.buttonId,
+      listId: msg.listId,
+    },
+    async (merged) => {
+      await handleMessageInternal(merged);
+    }
+  );
 }
+
+
