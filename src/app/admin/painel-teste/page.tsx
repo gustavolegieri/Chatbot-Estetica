@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 interface Metrics {
   averageTicket: { value: number; formatted: string };
@@ -16,11 +16,7 @@ export default function PainelTestePage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  useEffect(() => {
-    fetchMetrics();
-  }, [startDate, endDate]);
-
-  const fetchMetrics = async () => {
+  const fetchMetrics = useCallback(async () => {
     try {
       const params = new URLSearchParams();
       if (startDate) params.append("startDate", startDate);
@@ -34,7 +30,11 @@ export default function PainelTestePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [startDate, endDate]);
+
+  useEffect(() => {
+    fetchMetrics();
+  }, [fetchMetrics]);
 
   if (loading) {
     return <div className="p-8">Carregando...</div>;

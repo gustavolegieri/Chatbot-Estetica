@@ -101,6 +101,8 @@ export async function POST(req: NextRequest) {
         pixKey: settings?.pixKey || null,
         pixHolder: settings?.pixHolderName || null,
         pixBank: settings?.pixBank || null,
+        pixMerchantCity: settings?.pixMerchantCity || "Jundiai",
+        pixQrCodeImage: settings?.pixQrCodeImage || null,
       },
       prompts
     );

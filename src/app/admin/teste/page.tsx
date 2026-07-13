@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Send, RotateCcw, Loader, Clock, Calendar, Upload, X } from "lucide-react";
+import Image from "next/image";
 
 interface Message {
   id: string;
@@ -32,11 +33,7 @@ export default function TesteBotPage() {
   }, [messages]);
 
   // Inicia o teste com mensagem de boas-vindas do bot
-  useEffect(() => {
-    initializeTest();
-  }, []);
-
-  const initializeTest = async () => {
+  const initializeTest = useCallback(async () => {
     setLoading(true);
     try {
       const body: Record<string, any> = { sessionId: testSessionId };
@@ -64,7 +61,11 @@ export default function TesteBotPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [testSessionId, testHours, testDate]);
+
+  useEffect(() => {
+    initializeTest();
+  }, [initializeTest]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -251,11 +252,21 @@ export default function TesteBotPage() {
                   {msg.mediaUrl && (
                     <div className="mt-2">
                       {msg.mediaType?.startsWith("image") ? (
-                        <img
-                          src={msg.mediaUrl}
-                          alt="Media"
-                          className="max-w-xs rounded"
-                        />
+                        msg.mediaUrl.startsWith('data:') ? (
+                          <img
+                            src={msg.mediaUrl}
+                            alt="Media"
+                            className="max-w-xs rounded"
+                          />
+                        ) : (
+                          <Image
+                            src={msg.mediaUrl}
+                            alt="Media"
+                            width={300}
+                            height={300}
+                            className="max-w-xs rounded"
+                          />
+                        )
                       ) : msg.mediaType?.startsWith("video") ? (
                         <video
                           src={msg.mediaUrl}

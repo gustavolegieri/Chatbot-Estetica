@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Save, QrCode, CreditCard, Smartphone, Wallet } from "lucide-react";
 import { AdminHeader } from "@/components/layout/AdminHeader";
+import Image from "next/image";
 
 interface PaymentSettings {
   pixKey: string | null;
@@ -165,10 +166,12 @@ export default function PagamentosPage() {
             <div className="mt-6 rounded-lg border border-slate-200 p-4">
               <label className="label mb-2">QR Code gerado (preview)</label>
               <div className="flex items-center gap-4">
-                <img
+                <Image
                   src={settings.pixQrCodeImage}
                   alt="QR Code PIX"
-                  className="h-32 w-32 rounded border border-slate-300"
+                  width={128}
+                  height={128}
+                  className="rounded border border-slate-300"
                 />
                 <div className="text-sm text-slate-600">
                   <p className="font-medium">QR Code para pagamentos PIX</p>
