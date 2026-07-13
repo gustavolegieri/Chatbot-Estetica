@@ -8,6 +8,8 @@ export interface FlowContext {
   pixKey: string | null;
   pixHolder: string | null;
   pixBank: string | null;
+  pixMerchantCity: string;
+  pixQrCodeImage: string | null;
 }
 
 function p(prompts: PromptMap | undefined) {

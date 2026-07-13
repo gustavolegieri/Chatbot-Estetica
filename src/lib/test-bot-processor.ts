@@ -33,6 +33,7 @@ import { answerCustomerDoubt } from "./whatsapp-ai";
 import { generateSummaryCard, generateSummaryText } from "./summary-card";
 import { generatePixQrCode, generatePixPayload } from "./pix-qr";
 import { analyzeReceiptImage, validateReceiptAmount } from "./receipt-analyzer";
+import type { FlowContext } from "./whatsapp-flow-messages";
 
 import type { FlowStage } from "./whatsapp-flow-types";
 
@@ -43,6 +44,21 @@ async function logStageTransition(sessionId: string, stage: string, message: str
   } catch (error) {
     console.error("[ANALYTICS] Error logging stage transition:", error);
   }
+}
+
+// Load payment context from database
+async function loadPaymentContext(): Promise<FlowContext> {
+  const s = await prisma.settings.findUnique({ where: { id: "default" } });
+  return {
+    businessName: s?.businessName ?? "Garagem do Ka",
+    hours: "08:00 às 18:00",
+    address: s?.businessAddress ?? "",
+    pixKey: s?.pixKey ?? null,
+    pixHolder: s?.pixHolderName ?? null,
+    pixBank: s?.pixBank ?? null,
+    pixMerchantCity: s?.pixMerchantCity ?? "Jundiai",
+    pixQrCodeImage: s?.pixQrCodeImage ?? null,
+  };
 }
 
 // First-time customer discount check
@@ -1306,6 +1322,7 @@ async function handlePixChoice(
 ): Promise<TestResponse[]> {
   const input = message.trim().toLowerCase();
   const prompts = await loadPromptMap();
+  const ctx = await loadPaymentContext();
 
   if (input === "1" || /agora|pagar agora|imediato/i.test(input)) {
     // PIX agora - precisa enviar comprovante
@@ -1317,20 +1334,27 @@ async function handlePixChoice(
 
     // Enviar QR Code e pedir comprovante
     try {
-      const pixQrUrl = await generatePixQrCode({
-        amount: totalValue,
-        description: `Agendamento ${session.selectedServiceName}`,
-        merchantName: "Garagem do Ka",
-        merchantCity: "Sao Paulo",
-        key: "pix@garagemdoka.com.br",
-      });
+      let pixQrUrl: string;
+
+      // Se tiver QR Code pré-gerado, usa ele. Caso contrário, gera um novo.
+      if (ctx.pixQrCodeImage) {
+        pixQrUrl = ctx.pixQrCodeImage;
+      } else {
+        pixQrUrl = await generatePixQrCode({
+          amount: totalValue,
+          description: `Agendamento ${session.selectedServiceName}`,
+          merchantName: ctx.pixHolder || ctx.businessName,
+          merchantCity: ctx.pixMerchantCity || ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
+          key: ctx.pixKey || "",
+        });
+      }
 
       const pixPayload = generatePixPayload({
         amount: totalValue,
         description: `Agendamento ${session.selectedServiceName}`,
-        merchantName: "Garagem do Ka",
-        merchantCity: "Sao Paulo",
-        key: "pix@garagemdoka.com.br",
+        merchantName: ctx.pixHolder || ctx.businessName,
+        merchantCity: ctx.pixMerchantCity || ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
+        key: ctx.pixKey || "",
       });
 
       responses.push({ text: `💳 **Pagamento via PIX**\n\nEscaneie o QR Code abaixo para pagar:\n\nValor: R$ ${totalValue.toFixed(2).replace('.', ',')}` });
@@ -1629,14 +1653,7 @@ async function handleServiceQuestion(
 
   try {
     const wctx = await loadWhatsAppCatalog(true);
-    const ctx = {
-      businessName: "Garagem do Ka",
-      hours: "08:00 às 18:00",
-      address: "",
-      pixKey: null,
-      pixHolder: null,
-      pixBank: null,
-    };
+    const ctx = await loadPaymentContext();
     
     // Get service details
     const serviceKey = session.selectedSubService ?? session.selectedService;
@@ -1791,14 +1808,7 @@ async function handleFAQ(
 
   try {
     const wctx = await loadWhatsAppCatalog(true);
-    const ctx = {
-      businessName: "Garagem do Ka",
-      hours: "08:00 às 18:00",
-      address: "",
-      pixKey: null,
-      pixHolder: null,
-      pixBank: null,
-    };
+    const ctx = await loadPaymentContext();
     
     // Build services list for context
     const servicesList = Object.entries(wctx.catalog)

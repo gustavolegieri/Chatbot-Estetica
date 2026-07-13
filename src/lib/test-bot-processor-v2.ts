@@ -28,13 +28,14 @@ import { format } from "date-fns";
 import { answerCustomerDoubt } from "./whatsapp-ai";
 import { generateSummaryCard, generateSummaryText } from "./summary-card";
 import type { FlowStage } from "./whatsapp-flow-types";
+import type { FlowContext } from "./whatsapp-flow-messages";
 
 // Analytics logging function
 async function logStageTransition(sessionId: string, stage: string, message: string) {
   try {
     // For test-bot, we just log to console since we don't have WhatsAppSession
     console.log(`[ANALYTICS] Session: ${sessionId}, Stage: ${stage}, Message: ${message}, Time: ${new Date().toISOString()}`);
-    
+
     // In production, this would log to StageTransition table
     // await prisma.stageTransition.create({
     //   data: {
@@ -46,6 +47,21 @@ async function logStageTransition(sessionId: string, stage: string, message: str
   } catch (error) {
     console.error("[ANALYTICS] Error logging stage transition:", error);
   }
+}
+
+// Load payment context from database
+async function loadPaymentContext(): Promise<FlowContext> {
+  const s = await prisma.settings.findUnique({ where: { id: "default" } });
+  return {
+    businessName: s?.businessName ?? "Garagem do Ka",
+    hours: "08:00 às 18:00",
+    address: s?.businessAddress ?? "",
+    pixKey: s?.pixKey ?? null,
+    pixHolder: s?.pixHolderName ?? null,
+    pixBank: s?.pixBank ?? null,
+    pixMerchantCity: s?.pixMerchantCity ?? "Jundiai",
+    pixQrCodeImage: s?.pixQrCodeImage ?? null,
+  };
 }
 
 // Natural response normalization
@@ -1519,14 +1535,7 @@ async function handleServiceQuestion(
 
   try {
     const wctx = await loadWhatsAppCatalog(true);
-    const ctx = {
-      businessName: "Garagem do Ka",
-      hours: "08:00 às 18:00",
-      address: "",
-      pixKey: null,
-      pixHolder: null,
-      pixBank: null,
-    };
+    const ctx = await loadPaymentContext();
     
     // Get service details
     const serviceKey = session.selectedSubService ?? session.selectedService;
@@ -1681,14 +1690,7 @@ async function handleFAQ(
 
   try {
     const wctx = await loadWhatsAppCatalog(true);
-    const ctx = {
-      businessName: "Garagem do Ka",
-      hours: "08:00 às 18:00",
-      address: "",
-      pixKey: null,
-      pixHolder: null,
-      pixBank: null,
-    };
+    const ctx = await loadPaymentContext();
     
     // Build services list for context
     const servicesList = Object.entries(wctx.catalog)

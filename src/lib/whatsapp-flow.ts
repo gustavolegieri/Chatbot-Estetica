@@ -380,6 +380,8 @@ async function loadContext(): Promise<FlowContext> {
     pixKey: s?.pixKey ?? null,
     pixHolder: s?.pixHolderName ?? null,
     pixBank: s?.pixBank ?? null,
+    pixMerchantCity: s?.pixMerchantCity ?? "Jundiai",
+    pixQrCodeImage: s?.pixQrCodeImage ?? null,
   };
 }
 
@@ -1507,19 +1509,26 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
 
         // Enviar QR Code e pedir comprovante
         try {
-          const pixQrUrl = await generatePixQrCode({
-            amount: totalValue,
-            description: `Agendamento ${flow.serviceLabel}`,
-            merchantName: ctx.businessName,
-            merchantCity: ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
-            key: ctx.pixKey || "",
-          });
+          let pixQrUrl: string;
+
+          // Se tiver QR Code pré-gerado, usa ele. Caso contrário, gera um novo.
+          if (ctx.pixQrCodeImage) {
+            pixQrUrl = ctx.pixQrCodeImage;
+          } else {
+            pixQrUrl = await generatePixQrCode({
+              amount: totalValue,
+              description: `Agendamento ${flow.serviceLabel}`,
+              merchantName: ctx.pixHolder || ctx.businessName,
+              merchantCity: ctx.pixMerchantCity || ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
+              key: ctx.pixKey || "",
+            });
+          }
 
           const pixPayload = generatePixPayload({
             amount: totalValue,
             description: `Agendamento ${flow.serviceLabel}`,
-            merchantName: ctx.businessName,
-            merchantCity: ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
+            merchantName: ctx.pixHolder || ctx.businessName,
+            merchantCity: ctx.pixMerchantCity || ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
             key: ctx.pixKey || "",
           });
 
