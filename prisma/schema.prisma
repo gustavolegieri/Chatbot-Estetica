@@ -81,6 +81,9 @@ model Appointment {
   source                String            @default("admin")
   reminderSentAt        DateTime?
   reminder4hSentAt      DateTime?
+  reminder30minSentAt  DateTime?
+  reminder1hSentAt      DateTime?
+  reminder1daySentAt    DateTime?
   confirmWarningSentAt  DateTime?
   clientConfirmedAt     DateTime?
   needsPickup           Boolean           @default(false)
@@ -98,6 +101,7 @@ model Appointment {
   transactionId         String?
   paidAt                DateTime?
   paymentSimulationCode String? // Código para simular pagamento no test-bot
+  reminderPreference    String? // "30min", "1hour", "1day", "none"
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
   client                Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)

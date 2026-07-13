@@ -68,6 +68,9 @@ export async function POST(request: NextRequest) {
       source: "admin" as any,
       reminderSentAt: null,
       reminder4hSentAt: null,
+      reminder30minSentAt: null,
+      reminder1hSentAt: null,
+      reminder1daySentAt: null,
       confirmWarningSentAt: null,
       clientConfirmedAt: null,
       needsPickup: false,
@@ -84,6 +87,7 @@ export async function POST(request: NextRequest) {
       transactionId: null,
       paidAt: new Date(),
       paymentSimulationCode: null,
+      reminderPreference: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       client: {

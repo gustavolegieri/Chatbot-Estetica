@@ -77,6 +77,29 @@ export async function sendReminder4h(apt: AptWithRelations) {
   return true;
 }
 
+export async function sendReminderCustom(apt: AptWithRelations, preference: string) {
+  const settings = await loadSettings();
+  if (!settings?.whatsappEnabled || !apt.client.phone) return false;
+
+  const prompts = await loadPromptMap();
+  const dateLabel = format(apt.date, "EEEE, dd/MM", { locale: ptBR });
+  const brand = settings.businessName ?? "Garagem do Ka";
+  const duration = formatDurationLabel(apt.service.durationMin);
+
+  const timeText = preference === "30min" ? "30 minutos" : preference === "1hour" ? "1 hora" : "1 dia";
+
+  await sendText({
+    number: apt.client.phone,
+    text: `🔔 Lembrete: Seu agendamento na ${brand} é em ${timeText}!\n\n` +
+          `👤 ${apt.client.name}\n` +
+          `🧽 ${apt.service.name} (${duration})\n` +
+          `📅 ${dateLabel} às ${apt.startTime}\n` +
+          `📍 ${settings.businessAddress || "Endereço"}\n\n` +
+          `Mal podemos esperar pra deixar seu carro brilhando! ✨`,
+  });
+  return true;
+}
+
 export async function sendConfirmWarning(apt: AptWithRelations) {
   const settings = await loadSettings();
   if (!settings?.whatsappEnabled || !apt.client.phone) return false;

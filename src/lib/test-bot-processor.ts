@@ -1173,8 +1173,48 @@ async function handleReminderStep(
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
   const input = message.trim().toLowerCase();
-  session.wantsReminder = /^(1|sim|s|quero|yes)$/i.test(input);
+  const isYes = normalizeYes(input);
+  const isNo = normalizeNo(input);
+  
+  if (isYes) {
+    session.reminderPreference = "30min";
+  } else if (isNo) {
+    session.reminderPreference = "none";
+  } else {
+    responses.push({ text: "❌ Opção inválida. Por favor, escolha *1* para sim ou *2* para não." });
+    return responses;
+  }
+  
   session.stage = "ETAPA10_CONFIRM";
+
+  // If PIX selected, show QR code now
+  if (session.paymentMethod === "PIX") {
+    const baseQuote = Number(session.quote ?? calculateBasePrice(session));
+    const complementValue = Number(session.upsellValue ?? 0);
+    const pickupFee = Number(session.pickupDeliveryFee ?? 0);
+    const couponDiscount = Number(session.couponDiscount ?? 0);
+    const totalValue = baseQuote + complementValue + pickupFee - couponDiscount;
+    
+    const pixQrUrl = await generatePixQrCode({
+      amount: totalValue,
+      description: `Agendamento ${session.selectedServiceName}`,
+      merchantName: "Garagem do Ka",
+      merchantCity: "Sao Paulo",
+      key: "pix@garagemdoka.com.br",
+    });
+    
+    const pixPayload = generatePixPayload({
+      amount: totalValue,
+      description: `Agendamento ${session.selectedServiceName}`,
+      merchantName: "Garagem do Ka",
+      merchantCity: "Sao Paulo",
+      key: "pix@garagemdoka.com.br",
+    });
+    
+    responses.push({ text: `💳 **Pagamento via PIX**\n\nEscaneie o QR Code abaixo para pagar:\n\nValor: R$ ${totalValue.toFixed(2).replace('.', ',')}` });
+    responses.push({ text: "", mediaUrl: pixQrUrl, mediaType: "image" });
+    responses.push({ text: `Ou copie e cole o código PIX:\n\`${pixPayload}\`` });
+  }
 
   const baseQuote = Number(session.quote ?? calculateBasePrice(session));
   const complementValue = Number(session.upsellValue ?? 0);
@@ -1245,33 +1285,6 @@ async function handlePaymentSelection(
   }
 
   session.paymentMethod = paymentMethods[input];
-  
-  // If PIX selected, show QR code
-  if (session.paymentMethod === "PIX") {
-    const totalValue = Number(session.quote ?? 0) + Number(session.upsellValue ?? 0) + Number(session.pickupDeliveryFee ?? 0) - Number(session.couponDiscount ?? 0);
-    const pixQrUrl = await generatePixQrCode({
-      amount: totalValue,
-      description: `Agendamento ${session.selectedServiceName}`,
-      merchantName: "Garagem do Ka",
-      merchantCity: "Sao Paulo",
-      key: "pix@garagemdoka.com.br", // Substituir por chave PIX real
-    });
-    
-    const pixPayload = generatePixPayload({
-      amount: totalValue,
-      description: `Agendamento ${session.selectedServiceName}`,
-      merchantName: "Garagem do Ka",
-      merchantCity: "Sao Paulo",
-      key: "pix@garagemdoka.com.br",
-    });
-    
-    responses.push({ text: `💳 **Pagamento via PIX**\n\nEscaneie o QR Code abaixo para pagar:\n\nValor: R$ ${totalValue.toFixed(2).replace('.', ',')}` });
-    responses.push({ text: "", mediaUrl: pixQrUrl, mediaType: "image" });
-    responses.push({ text: `Ou copie e cole o código PIX:\n\`${pixPayload}\`\n\n🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não` });
-    session.stage = "ETAPA9_REMINDER";
-    return responses;
-  }
-  
   session.stage = "ETAPA9_REMINDER";
 
   responses.push({
