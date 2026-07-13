@@ -1262,18 +1262,8 @@ async function handleTimeSelection(
   }
 
   session.selectedTime = chosen;
-  if (
-    session.stage === "ETAPA7_TIME" &&
-    message.trim() === "2" &&
-    session.selectedServiceName === "Lavagem Simples" &&
-    session.upsellAccepted === undefined
-  ) {
-    session.stage = "ETAPA9_COUPON";
-    responses.push({ text: `⏰ *${chosen}* — ótimo! ` });
-    responses.push({ text: "🎟️ Você tem algum cupom de desconto?\n\n*1* Sim, tenho um cupom\n*2* Não tenho" });
-    return responses;
-  }
 
+  // Fluxo normal: sempre vai para pagamento após selecionar horário
   session.stage = "ETAPA8_PAYMENT";
   responses.push({ text: `⏰ *${chosen}* — ótimo! ` });
   responses.push({ text: buildPaymentOptionsText() });
@@ -1303,54 +1293,10 @@ async function handleReminderStep(
   }
   
   console.log("[handleReminderStep] reminderPreference after set:", session.reminderPreference);
-  
-  session.stage = "ETAPA10_CONFIRM";
 
-  const baseQuote = Number(session.quote ?? calculateBasePrice(session));
-  const complementValue = Number(session.upsellValue ?? 0);
-  const pickupFee = Number(session.pickupDeliveryFee ?? 0);
-  const couponDiscount = Number(session.couponDiscount ?? 0);
-  const totalValue = baseQuote + complementValue + pickupFee - couponDiscount;
-
-  // Generate summary card image
-  const summaryCardUrl = await generateSummaryCard({
-    customerName: session.customerName || "Cliente",
-    serviceName: session.selectedServiceName || "Serviço",
-    vehicle: `${session.vehicle.model} ${session.vehicle.year ?? ""}`,
-    date: session.selectedDay || "—",
-    time: session.selectedTime || "—",
-    paymentMethod: session.paymentMethod || "—",
-    totalPrice: totalValue,
-    pickupAddress: session.pickupAddress || undefined,
-  });
-
-  const reminderText = session.reminderPreference === "none" ? "não" : session.reminderPreference || "—";
-  console.log("[handleReminderStep] reminderText:", reminderText);
-
-  const lines = [
-    "━━━━━━━━━━━━━━━",
-    "📋 **RESUMO DO AGENDAMENTO**",
-    `👤 ${session.customerName ?? "Cliente"}`,
-    `🧽 *${session.selectedServiceName ?? "Serviço"}*`,
-    `${session.upsellLabel ? `✨ + ${session.upsellLabel}` : ""}`,
-    `🚘 ${session.vehicle.model} ${session.vehicle.year ?? ""}`,
-    `📅 ${session.selectedDay ?? "—"}`,
-    `⏰ ${session.selectedTime ?? "—"}`,
-    `🚚 Leva e traz: ${session.wantsPickupDelivery ? "sim" : "não"}`,
-    `${session.pickupAddress ? `📍 Endereço: ${session.pickupAddress}` : ""}`,
-    `${session.needsReturn ? "🔄 Devolução: sim" : ""}`,
-    `💳 ${session.paymentMethod || "—"}`,
-    `🔔 Lembrete: ${reminderText}`,
-    `💰 **R$ ${totalValue.toFixed(2).replace(".", ",")}**`,
-    "━━━━━━━━━━━━━━━",
-    "",
-    "⏱️ Cancelamento até 2h antes sem custo.",
-    "",
-    "✅ Confirma? (sim/não)",
-  ];
-
-  responses.push({ text: lines.join("\n") });
-  responses.push({ text: "", mediaUrl: summaryCardUrl, mediaType: "image" });
+  // Após lembrete, vai para pagamento (não direto para confirmação)
+  session.stage = "ETAPA8_PAYMENT";
+  responses.push({ text: buildPaymentOptionsText() });
   return responses;
 }
 
