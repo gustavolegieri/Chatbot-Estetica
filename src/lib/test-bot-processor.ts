@@ -1211,7 +1211,7 @@ async function handleReminderStep(
     pickupAddress: session.pickupAddress || undefined,
   });
 
-  const reminderText = session.reminderPreference === "none" ? "não" : session.reminderPreference;
+  const reminderText = session.reminderPreference === "none" ? "não" : session.reminderPreference || "—";
   console.log("[handleReminderStep] reminderText:", reminderText);
 
   const lines = [
@@ -1226,7 +1226,7 @@ async function handleReminderStep(
     `🚚 Leva e traz: ${session.wantsPickupDelivery ? "sim" : "não"}`,
     `${session.pickupAddress ? `📍 Endereço: ${session.pickupAddress}` : ""}`,
     `${session.needsReturn ? "🔄 Devolução: sim" : ""}`,
-    `💳 ${session.paymentMethod}`,
+    `💳 ${session.paymentMethod || "—"}`,
     `🔔 Lembrete: ${reminderText}`,
     `💰 **R$ ${totalValue.toFixed(2).replace(".", ",")}**`,
     "━━━━━━━━━━━━━━━",

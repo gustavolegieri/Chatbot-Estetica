@@ -79,6 +79,8 @@ import {
 import { canRedeem, findCouponByCode, redeemCoupon } from "./coupons";
 import { calculateDistance, calculatePickupFee } from "./maps";
 import { requestHumanHandoff } from "./whatsapp-handoff";
+import { generatePixQrCode, generatePixPayload } from "./pix-qr";
+import { generateSummaryCard } from "./summary-card";
 
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -1466,9 +1468,35 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       const paymentMethod = flow.paymentMethod || "—";
       const reminderText = flow.reminderEnabled ? "sim" : "não";
       const pickupText = flow.needsPickup ? "sim" : "não";
+      const customerName = clientDisplayName(flow, msg.pushName);
+      const serviceName = flow.serviceLabel ?? "—";
+      const vehicle = vehicleDisplayFromFlow(flow) || "—";
+      const date = flow.dayLabel ?? flow.dayDate ?? "—";
+      const time = flow.startTime ?? "—";
+      const couponCode = flow.couponCode?.toUpperCase() ?? "nenhum";
+      const address = flow.pickupAddress ?? "—";
+      
+      // Generate summary card image
+      try {
+        const summaryCardUrl = await generateSummaryCard({
+          customerName: customerName,
+          serviceName: serviceName,
+          vehicle: vehicle,
+          date: date,
+          time: time,
+          paymentMethod: paymentMethod,
+          totalPrice: totalValue,
+          pickupAddress: address !== "—" ? address : undefined,
+        });
+        
+        await sendMedia({ number: msg.phone, mediaUrl: summaryCardUrl, mediaType: "image" });
+      } catch (error) {
+        console.error("[ETAPA14_REMINDER] Error generating summary card:", error);
+      }
+      
       await sendText({
         number: msg.phone,
-        text: `━━━━━━━━━━━━━━━\n📋 *Resumo do agendamento*\n\n👤 Cliente: *${clientDisplayName(flow, msg.pushName)}*\n🧽 Serviço: *${flow.serviceLabel ?? "—"}*\n🚘 Veículo: *${vehicleDisplayFromFlow(flow) || "—"}*\n📅 Data: *${flow.dayLabel ?? flow.dayDate ?? "—"}*\n⏰ Horário: *${flow.startTime ?? "—"}*\n🎟️ Cupom: *${flow.couponCode?.toUpperCase() ?? "nenhum"}*\n🚚 Leva e traz: *${pickupText}*\n📍 Endereço: *${flow.pickupAddress ?? "—"}*\n💳 Pagamento: *${paymentMethod}*\n🔔 Lembrete: *${reminderText}*\n💰 Valor total: *R$ ${totalValue.toFixed(2).replace(".", ",")}*\n━━━━━━━━━━━━━━━\n\nConfirma o agendamento? (sim/não)`,
+        text: `━━━━━━━━━━━━━━━\n📋 *Resumo do agendamento*\n\n👤 Cliente: *${customerName}*\n🧽 Serviço: *${serviceName}*\n🚘 Veículo: *${vehicle}*\n📅 Data: *${date}*\n⏰ Horário: *${time}*\n🎟️ Cupom: *${couponCode}*\n🚚 Leva e traz: *${pickupText}*\n📍 Endereço: *${address}*\n💳 Pagamento: *${paymentMethod}*\n🔔 Lembrete: *${reminderText}*\n💰 Valor total: *R$ ${totalValue.toFixed(2).replace(".", ",")}*\n━━━━━━━━━━━━━━━\n\nConfirma o agendamento? (sim/não)`,
       });
       return;
     }
@@ -1682,6 +1710,35 @@ async function handlePayment(
     await saveFlow(msg.phone, flow);
     await sendText({ number: msg.phone, text: etapa8Payment(false, prompts) });
     return;
+  }
+
+  // Se PIX for selecionado e tiver chave PIX configurada, mostrar QR Code
+  if (!isNoPix && num === 1 && ctx.pixKey) {
+    const totalValue = Math.max(0, Number(flow.quoteMin ?? 0) + Number(flow.pickupFee ?? 0) - Number(flow.couponDiscountApplied ?? 0));
+    
+    try {
+      const pixQrUrl = await generatePixQrCode({
+        amount: totalValue,
+        description: `Agendamento ${flow.serviceLabel}`,
+        merchantName: ctx.businessName,
+        merchantCity: ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
+        key: ctx.pixKey,
+      });
+      
+      const pixPayload = generatePixPayload({
+        amount: totalValue,
+        description: `Agendamento ${flow.serviceLabel}`,
+        merchantName: ctx.businessName,
+        merchantCity: ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
+        key: ctx.pixKey,
+      });
+      
+      await sendText({ number: msg.phone, text: `💳 **Pagamento via PIX**\n\nEscaneie o QR Code abaixo para pagar:\n\nValor: R$ ${totalValue.toFixed(2).replace('.', ',')}` });
+      await sendMedia({ number: msg.phone, mediaUrl: pixQrUrl, mediaType: "image" });
+      await sendText({ number: msg.phone, text: `Ou copie e cole o código PIX:\n\`${pixPayload}\`` });
+    } catch (error) {
+      console.error("[handlePayment] Error generating PIX QR code:", error);
+    }
   }
 
   flow.stage = "ETAPA14_REMINDER";
