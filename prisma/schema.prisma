@@ -62,6 +62,12 @@ model Service {
   whatsappDetail   String?
   whatsappPitch    String?
   whatsappShort    String?
+  // Upsell inteligente por tipo de veículo
+  upsellForHatchback Boolean          @default(false)
+  upsellForSedan   Boolean          @default(false)
+  upsellForSuv     Boolean          @default(false)
+  upsellForPickup  Boolean          @default(false)
+  upsellDiscount   Decimal?          @db.Decimal(10, 2) // Desconto ao aceitar upsell
   appointments     Appointment[]
   financialRecords FinancialRecord[]
   upsellService    Service?          @relation("ServiceUpsell", fields: [upsellServiceId], references: [id])
