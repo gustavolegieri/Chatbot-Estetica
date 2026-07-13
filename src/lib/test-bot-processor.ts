@@ -902,19 +902,8 @@ async function handleQuoteStep(
     return responses;
   }
 
-  // Try to get dynamic upsell from database first
-  const dynamicOffer = await getDynamicUpsellOffer(session);
-  
-  if (dynamicOffer) {
-    session.upsellOffer = dynamicOffer;
-    session.stage = "ETAPA6_UPSELL";
-    responses.push({
-      text: `✨ Que tal adicionar *${dynamicOffer.label}*?\n\n💰 **R$ ${dynamicOffer.value.toFixed(2)}** a mais\n\n*1* - Sim, incluir\n*2* - Não, obrigado`,
-    });
-    return responses;
-  }
-  
-  // No cheap services available, skip upsell
+  // Skip upsell for now - go directly to logistics
+  // TODO: Implement smart upsell based on vehicle type and service category
   session.stage = "ETAPA10_LOGISTICS";
   responses.push({
     text: "🚚 Como prefere?\n\n*1* - Deixe eu levo o carro até a estética\n*2* - A estética vai buscar o carro",
@@ -941,7 +930,7 @@ async function handleUpsell(
     responses.push({ text: "Tudo bem! Seguindo com o serviço principal." });
   }
 
-  // After upsell, ask about logistics before date selection
+  // After upsell, go to logistics (pickup/delivery)
   session.stage = "ETAPA10_LOGISTICS";
   responses.push({
     text: "🚚 Como prefere?\n\n*1* - Deixe eu levo o carro até a estética\n*2* - A estética vai buscar o carro"
