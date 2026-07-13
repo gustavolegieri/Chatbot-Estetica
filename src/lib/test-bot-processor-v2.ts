@@ -28,6 +28,7 @@ import { format } from "date-fns";
 import { answerCustomerDoubt } from "./whatsapp-ai";
 import { generateSummaryCard, generateSummaryText } from "./summary-card";
 import { generatePixQrCode, generatePixPayload } from "./pix-qr";
+import { validateReceiptAmount } from "./receipt-analyzer";
 import type { FlowStage } from "./whatsapp-flow-types";
 import type { FlowContext } from "./whatsapp-flow-messages";
 
@@ -111,6 +112,11 @@ interface TestSession {
   availableSlots?: string[] | null;
   paymentMethod?: string | null;
   wantsReminder?: boolean | null;
+  receiptImageUrl?: string;
+  receiptAmount?: number;
+  receiptValidationAttempts?: number;
+  partialPayments?: Array<{ amount: number; imageUrl: string }>;
+  totalPaid?: number;
   upsellAccepted?: boolean;
   upsellLabel?: string | null;
   upsellValue?: number | null;

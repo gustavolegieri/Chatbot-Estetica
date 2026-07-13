@@ -153,6 +153,13 @@ interface TestSession {
   transactionId?: string | null;
   paidAt?: Date | null;
   paymentSimulationCode?: string | null;
+  pixPaymentType?: "now" | "delivery";
+  receiptImageUrl?: string | null;
+  receiptAmount?: number | null;
+  receiptValidationAttempts?: number;
+  partialPayments?: Array<{ amount: number; imageUrl: string }>;
+  totalPaid?: number;
+  awaitingReceiptUpload?: boolean;
   // Reminder preference
   reminderPreference?: string | null;
   awaitingPickupAddress?: boolean;
@@ -163,12 +170,6 @@ interface TestSession {
   awaitingServiceQuestion?: boolean;
   testDate?: string | null;
   testHours?: string | null;
-  // PIX receipt fields
-  pixPaymentType?: "now" | "delivery";
-  receiptImageUrl?: string | null;
-  receiptAmount?: number | null;
-  receiptValidationAttempts?: number;
-  awaitingReceiptUpload?: boolean;
 }
 
 interface TestResponse {
@@ -1436,21 +1437,52 @@ async function handleReceiptUpload(
         });
         return responses;
       } else {
-        // Valor incorreto
-        const attempts = session.receiptValidationAttempts ?? 0;
-        if (attempts >= 2) {
-          // Muitas tentativas - voltar para métodos de pagamento
-          session.stage = "ETAPA8_PAYMENT";
+        // Valor incorreto - verificar se é pagamento parcial
+        const currentPaid = session.totalPaid ?? 0;
+        const newTotalPaid = currentPaid + receiptAmount;
+        const remaining = totalValue - newTotalPaid;
+
+        if (receiptAmount > 0 && remaining > 0) {
+          // Pagamento parcial válido
+          session.partialPayments = session.partialPayments || [];
+          session.partialPayments.push({ amount: receiptAmount, imageUrl });
+          session.totalPaid = newTotalPaid;
+          session.receiptValidationAttempts = 0;
+
+          responses.push({ text: `💰 *Pagamento parcial registrado!*\n\nValor recebido: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\nTotal pago: R$ ${newTotalPaid.toFixed(2).replace('.', ',')}\n*Falta pagar: R$ ${remaining.toFixed(2).replace('.', ',')}*\n\nPor favor, envie o comprovante do valor restante de R$ ${remaining.toFixed(2).replace('.', ',')}.` });
+          responses.push({ text: etapa8ReceiptUpload(remaining, prompts) });
+          return responses;
+        } else if (receiptAmount > 0 && remaining <= 0) {
+          // Pagamento completo com comprovante maior (aceitar)
+          session.receiptImageUrl = imageUrl;
+          session.receiptAmount = newTotalPaid;
+          session.totalPaid = newTotalPaid;
           session.receiptValidationAttempts = 0;
           session.awaitingReceiptUpload = false;
-          responses.push({ text: "O valor do comprovante não confere após várias tentativas. Vamos tentar outro método de pagamento.\n\n" + buildPaymentOptionsText() });
+          session.stage = "ETAPA9_REMINDER";
+
+          responses.push({ text: `✅ *Pagamento confirmado!*\n\nValor do comprovante: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\nTotal pago: R$ ${newTotalPaid.toFixed(2).replace('.', ',')}\n\nSeu agendamento está garantido.` });
+          responses.push({
+            text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
+          });
+          return responses;
+        } else {
+          // Valor incorreto
+          const attempts = session.receiptValidationAttempts ?? 0;
+          if (attempts >= 2) {
+            // Muitas tentativas - voltar para métodos de pagamento
+            session.stage = "ETAPA8_PAYMENT";
+            session.receiptValidationAttempts = 0;
+            session.awaitingReceiptUpload = false;
+            responses.push({ text: "O valor do comprovante não confere após várias tentativas. Vamos tentar outro método de pagamento.\n\n" + buildPaymentOptionsText() });
+            return responses;
+          }
+
+          session.receiptValidationAttempts = (session.receiptValidationAttempts ?? 0) + 1;
+          responses.push({ text: etapa8ReceiptInvalid(totalValue, receiptAmount, prompts) });
+          responses.push({ text: etapa8ReceiptUpload(totalValue, prompts) });
           return responses;
         }
-
-        session.receiptValidationAttempts = (session.receiptValidationAttempts ?? 0) + 1;
-        responses.push({ text: etapa8ReceiptInvalid(totalValue, receiptAmount, prompts) });
-        responses.push({ text: etapa8ReceiptUpload(totalValue, prompts) });
-        return responses;
       }
     } catch (error) {
       console.error("[handleReceiptUpload] Error analyzing receipt:", error);

@@ -1602,29 +1602,61 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
             flow.receiptValidationAttempts = 0;
             flow.stage = "ETAPA14_REMINDER";
             await saveFlow(msg.phone, flow);
-            
+
             await sendText({ number: msg.phone, text: `✅ *Pagamento confirmado!*\n\nValor do comprovante: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\n\nSeu agendamento está garantido.` });
             await delay(1000);
             await sendText({ number: msg.phone, text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa` });
             return;
           } else {
-            // Valor incorreto - pedir comprovante novamente com o valor correto
-            const attempts = flow.receiptValidationAttempts ?? 0;
-            if (attempts >= 2) {
-              // Muitas tentativas - voltar para métodos de pagamento
-              flow.stage = "ETAPA8_PAYMENT";
+            // Valor incorreto - verificar se é pagamento parcial
+            const currentPaid = flow.totalPaid ?? 0;
+            const newTotalPaid = currentPaid + receiptAmount;
+            const remaining = totalValue - newTotalPaid;
+
+            if (receiptAmount > 0 && remaining > 0) {
+              // Pagamento parcial válido
+              flow.partialPayments = flow.partialPayments || [];
+              flow.partialPayments.push({ amount: receiptAmount, imageUrl });
+              flow.totalPaid = newTotalPaid;
               flow.receiptValidationAttempts = 0;
               await saveFlow(msg.phone, flow);
-              await sendText({ number: msg.phone, text: `O valor do comprovante não confere após várias tentativas. Vamos tentar outro método de pagamento.\n\n${etapa8Payment(!!ctx.pixKey, prompts)}` });
+
+              await sendText({ number: msg.phone, text: `💰 *Pagamento parcial registrado!*\n\nValor recebido: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\nTotal pago: R$ ${newTotalPaid.toFixed(2).replace('.', ',')}\n*Falta pagar: R$ ${remaining.toFixed(2).replace('.', ',')}*\n\nPor favor, envie o comprovante do valor restante de R$ ${remaining.toFixed(2).replace('.', ',')}.` });
+              await delay(1000);
+              await sendText({ number: msg.phone, text: etapa8ReceiptUpload(remaining, prompts) });
+              return;
+            } else if (receiptAmount > 0 && remaining <= 0) {
+              // Pagamento completo com comprovante maior (aceitar)
+              flow.receiptImageUrl = imageUrl;
+              flow.receiptAmount = newTotalPaid;
+              flow.totalPaid = newTotalPaid;
+              flow.receiptValidationAttempts = 0;
+              flow.stage = "ETAPA14_REMINDER";
+              await saveFlow(msg.phone, flow);
+
+              await sendText({ number: msg.phone, text: `✅ *Pagamento confirmado!*\n\nValor do comprovante: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\nTotal pago: R$ ${newTotalPaid.toFixed(2).replace('.', ',')}\n\nSeu agendamento está garantido.` });
+              await delay(1000);
+              await sendText({ number: msg.phone, text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa` });
+              return;
+            } else {
+              // Valor incorreto - pedir comprovante novamente com o valor correto
+              const attempts = flow.receiptValidationAttempts ?? 0;
+              if (attempts >= 2) {
+                // Muitas tentativas - voltar para métodos de pagamento
+                flow.stage = "ETAPA8_PAYMENT";
+                flow.receiptValidationAttempts = 0;
+                await saveFlow(msg.phone, flow);
+                await sendText({ number: msg.phone, text: `O valor do comprovante não confere após várias tentativas. Vamos tentar outro método de pagamento.\n\n${etapa8Payment(!!ctx.pixKey, prompts)}` });
+                return;
+              }
+
+              flow.receiptValidationAttempts = (flow.receiptValidationAttempts ?? 0) + 1;
+              await saveFlow(msg.phone, flow);
+              await sendText({ number: msg.phone, text: etapa8ReceiptInvalid(totalValue, receiptAmount, prompts) });
+              await delay(1000);
+              await sendText({ number: msg.phone, text: etapa8ReceiptUpload(totalValue, prompts) });
               return;
             }
-
-            flow.receiptValidationAttempts = (flow.receiptValidationAttempts ?? 0) + 1;
-            await saveFlow(msg.phone, flow);
-            await sendText({ number: msg.phone, text: etapa8ReceiptInvalid(totalValue, receiptAmount, prompts) });
-            await delay(1000);
-            await sendText({ number: msg.phone, text: etapa8ReceiptUpload(totalValue, prompts) });
-            return;
           }
         } catch (error) {
           console.error("[ETAPA8_RECEIPT_UPLOAD] Error analyzing receipt:", error);

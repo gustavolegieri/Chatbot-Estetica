@@ -99,6 +99,8 @@ export interface FlowState {
   receiptImageUrl?: string;
   receiptAmount?: number;
   receiptValidationAttempts?: number;
+  partialPayments?: Array<{ amount: number; imageUrl: string }>; // Rastrear pagamentos parciais
+  totalPaid?: number; // Total já pago
 }
 
 
