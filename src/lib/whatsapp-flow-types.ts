@@ -31,6 +31,8 @@ export type FlowStage =
   | "ETAPA15_SUMMARY_CONFIRM"
   | "ETAPA16_CONFIRMATION"
   | "ETAPA10_FAQ"
+  | "ETAPA8_PIX_CHOICE"
+  | "ETAPA8_RECEIPT_UPLOAD"
   | "STALE_RETURN";
 
 export interface FlowState {
@@ -91,6 +93,12 @@ export interface FlowState {
 
   // Lembrete customizado
   reminderPreference?: "30min" | "1hour" | "1day" | "none";
+
+  // Comprovante de pagamento
+  pixPaymentType?: "now" | "delivery"; // PIX agora ou na entrega
+  receiptImageUrl?: string;
+  receiptAmount?: number;
+  receiptValidationAttempts?: number;
 }
 
 

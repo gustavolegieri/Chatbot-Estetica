@@ -15,6 +15,10 @@ import {
   etapa2MainMenu,
   serviceDetail,
   formatHours,
+  etapa8PixChoice,
+  etapa8ReceiptUpload,
+  etapa8ReceiptInvalid,
+  etapa8ReceiptError,
 } from "./whatsapp-flow-messages";
 import { recordTestBotRating } from "./test-bot-evaluation-store";
 import { loadPromptMap } from "./bot-prompts";
@@ -28,6 +32,7 @@ import { format } from "date-fns";
 import { answerCustomerDoubt } from "./whatsapp-ai";
 import { generateSummaryCard, generateSummaryText } from "./summary-card";
 import { generatePixQrCode, generatePixPayload } from "./pix-qr";
+import { analyzeReceiptImage, validateReceiptAmount } from "./receipt-analyzer";
 
 import type { FlowStage } from "./whatsapp-flow-types";
 
@@ -142,6 +147,12 @@ interface TestSession {
   awaitingServiceQuestion?: boolean;
   testDate?: string | null;
   testHours?: string | null;
+  // PIX receipt fields
+  pixPaymentType?: "now" | "delivery";
+  receiptImageUrl?: string | null;
+  receiptAmount?: number | null;
+  receiptValidationAttempts?: number;
+  awaitingReceiptUpload?: boolean;
 }
 
 interface TestResponse {
@@ -253,6 +264,12 @@ export async function processTestFlow({
 
     case "ETAPA8_PAYMENT":
       return handlePaymentSelection(message, session, responses);
+
+    case "ETAPA8_PIX_CHOICE":
+      return handlePixChoice(message, session, responses);
+
+    case "ETAPA8_RECEIPT_UPLOAD":
+      return handleReceiptUpload(message, session, responses);
 
     case "ETAPA10_CONFIRM":
       return handleFinalConfirm(message, session, responses);
@@ -1265,37 +1282,170 @@ async function handlePaymentSelection(
   }
 
   session.paymentMethod = paymentMethods[input];
-  
-  // If PIX selected, show QR code
+
+  // If PIX selected, show choice between now and delivery
   if (session.paymentMethod === "PIX") {
-    const totalValue = Number(session.quote ?? 0) + Number(session.upsellValue ?? 0) + Number(session.pickupDeliveryFee ?? 0) - Number(session.couponDiscount ?? 0);
-    
-    const pixQrUrl = await generatePixQrCode({
-      amount: totalValue,
-      description: `Agendamento ${session.selectedServiceName}`,
-      merchantName: "Garagem do Ka",
-      merchantCity: "Sao Paulo",
-      key: "pix@garagemdoka.com.br",
-    });
-    
-    const pixPayload = generatePixPayload({
-      amount: totalValue,
-      description: `Agendamento ${session.selectedServiceName}`,
-      merchantName: "Garagem do Ka",
-      merchantCity: "Sao Paulo",
-      key: "pix@garagemdoka.com.br",
-    });
-    
-    responses.push({ text: `💳 **Pagamento via PIX**\n\nEscaneie o QR Code abaixo para pagar:\n\nValor: R$ ${totalValue.toFixed(2).replace('.', ',')}` });
-    responses.push({ text: "", mediaUrl: pixQrUrl, mediaType: "image" });
-    responses.push({ text: `Ou copie e cole o código PIX:\n\`${pixPayload}\`` });
+    session.stage = "ETAPA8_PIX_CHOICE";
+    const prompts = await loadPromptMap();
+    responses.push({ text: etapa8PixChoice(prompts) });
+    return responses;
   }
-  
+
   session.stage = "ETAPA9_REMINDER";
 
   responses.push({
     text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
   });
+  return responses;
+}
+
+async function handlePixChoice(
+  message: string,
+  session: TestSession,
+  responses: TestResponse[]
+): Promise<TestResponse[]> {
+  const input = message.trim().toLowerCase();
+  const prompts = await loadPromptMap();
+
+  if (input === "1" || /agora|pagar agora|imediato/i.test(input)) {
+    // PIX agora - precisa enviar comprovante
+    session.pixPaymentType = "now";
+    session.paymentMethod = "PIX (Pagar agora)";
+    const totalValue = Number(session.quote ?? 0) + Number(session.upsellValue ?? 0) + Number(session.pickupDeliveryFee ?? 0) - Number(session.couponDiscount ?? 0);
+    session.stage = "ETAPA8_RECEIPT_UPLOAD";
+    session.awaitingReceiptUpload = true;
+
+    // Enviar QR Code e pedir comprovante
+    try {
+      const pixQrUrl = await generatePixQrCode({
+        amount: totalValue,
+        description: `Agendamento ${session.selectedServiceName}`,
+        merchantName: "Garagem do Ka",
+        merchantCity: "Sao Paulo",
+        key: "pix@garagemdoka.com.br",
+      });
+
+      const pixPayload = generatePixPayload({
+        amount: totalValue,
+        description: `Agendamento ${session.selectedServiceName}`,
+        merchantName: "Garagem do Ka",
+        merchantCity: "Sao Paulo",
+        key: "pix@garagemdoka.com.br",
+      });
+
+      responses.push({ text: `💳 **Pagamento via PIX**\n\nEscaneie o QR Code abaixo para pagar:\n\nValor: R$ ${totalValue.toFixed(2).replace('.', ',')}` });
+      responses.push({ text: "", mediaUrl: pixQrUrl, mediaType: "image" });
+      responses.push({ text: `Ou copie e cole o código PIX:\n\`${pixPayload}\`` });
+      responses.push({ text: etapa8ReceiptUpload(totalValue, prompts) });
+    } catch (error) {
+      console.error("[handlePixChoice] Error generating PIX QR code:", error);
+      responses.push({ text: etapa8ReceiptUpload(totalValue, prompts) });
+    }
+    return responses;
+  }
+
+  if (input === "2" || /entrega|pagar na entrega|depois/i.test(input)) {
+    // PIX na entrega - não precisa comprovante agora
+    session.pixPaymentType = "delivery";
+    session.paymentMethod = "PIX (Pagar na entrega)";
+    session.stage = "ETAPA9_REMINDER";
+    responses.push({ text: "Perfeito! Você pagará via PIX no dia do serviço." });
+    responses.push({
+      text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
+    });
+    return responses;
+  }
+
+  responses.push({ text: "❌ Opção inválida. Escolha *1* para PIX agora ou *2* para PIX na entrega." });
+  return responses;
+}
+
+async function handleReceiptUpload(
+  message: string,
+  session: TestSession,
+  responses: TestResponse[]
+): Promise<TestResponse[]> {
+  const prompts = await loadPromptMap();
+  const totalValue = Number(session.quote ?? 0) + Number(session.upsellValue ?? 0) + Number(session.pickupDeliveryFee ?? 0) - Number(session.couponDiscount ?? 0);
+
+  // Verificar se mensagem contém URL de imagem (simulado no test-bot)
+  if (message.match(/^(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp))/i) ||
+      message.includes("image") ||
+      message.includes("media") ||
+      message.includes("upload")) {
+
+    const imageUrl = message;
+
+    try {
+      // Analisar comprovante usando IA
+      const receiptAmount = await analyzeReceiptImage(imageUrl);
+
+      if (receiptAmount === null) {
+        // Erro na leitura
+        const attempts = session.receiptValidationAttempts ?? 0;
+        if (attempts >= 2) {
+          // Muitas tentativas - voltar para métodos de pagamento
+          session.stage = "ETAPA8_PAYMENT";
+          session.receiptValidationAttempts = 0;
+          session.awaitingReceiptUpload = false;
+          responses.push({ text: "Não consegui ler o comprovante após várias tentativas. Vamos tentar outro método de pagamento.\n\n" + buildPaymentOptionsText() });
+          return responses;
+        }
+
+        session.receiptValidationAttempts = (session.receiptValidationAttempts ?? 0) + 1;
+        responses.push({ text: etapa8ReceiptError(prompts) });
+        return responses;
+      }
+
+      // Validar valor
+      if (validateReceiptAmount(receiptAmount, totalValue, 10)) {
+        // Valor correto - aprovar pagamento
+        session.receiptImageUrl = imageUrl;
+        session.receiptAmount = receiptAmount;
+        session.receiptValidationAttempts = 0;
+        session.awaitingReceiptUpload = false;
+        session.stage = "ETAPA9_REMINDER";
+
+        responses.push({ text: `✅ *Pagamento confirmado!*\n\nValor do comprovante: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\n\nSeu agendamento está garantido.` });
+        responses.push({
+          text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
+        });
+        return responses;
+      } else {
+        // Valor incorreto
+        const attempts = session.receiptValidationAttempts ?? 0;
+        if (attempts >= 2) {
+          // Muitas tentativas - voltar para métodos de pagamento
+          session.stage = "ETAPA8_PAYMENT";
+          session.receiptValidationAttempts = 0;
+          session.awaitingReceiptUpload = false;
+          responses.push({ text: "O valor do comprovante não confere após várias tentativas. Vamos tentar outro método de pagamento.\n\n" + buildPaymentOptionsText() });
+          return responses;
+        }
+
+        session.receiptValidationAttempts = (session.receiptValidationAttempts ?? 0) + 1;
+        responses.push({ text: etapa8ReceiptInvalid(totalValue, receiptAmount, prompts) });
+        return responses;
+      }
+    } catch (error) {
+      console.error("[handleReceiptUpload] Error analyzing receipt:", error);
+      const attempts = session.receiptValidationAttempts ?? 0;
+      if (attempts >= 2) {
+        session.stage = "ETAPA8_PAYMENT";
+        session.receiptValidationAttempts = 0;
+        session.awaitingReceiptUpload = false;
+        responses.push({ text: "Erro ao processar comprovante. Vamos tentar outro método de pagamento.\n\n" + buildPaymentOptionsText() });
+        return responses;
+      }
+
+      session.receiptValidationAttempts = (session.receiptValidationAttempts ?? 0) + 1;
+      responses.push({ text: etapa8ReceiptError(prompts) });
+      return responses;
+    }
+  }
+
+  // Se não for imagem, pedir novamente
+  responses.push({ text: etapa8ReceiptUpload(totalValue, prompts) });
   return responses;
 }
 

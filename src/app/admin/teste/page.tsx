@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, RotateCcw, Loader, Clock, Calendar } from "lucide-react";
+import { Send, RotateCcw, Loader, Clock, Calendar, Upload, X } from "lucide-react";
 
 interface Message {
   id: string;
@@ -18,6 +18,9 @@ export default function TesteBotPage() {
   const [testSessionId] = useState(() => `test-${Date.now()}`);
   const [testHours, setTestHours] = useState("");
   const [testDate, setTestDate] = useState("");
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [simulatedReceiptValue, setSimulatedReceiptValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -114,7 +117,47 @@ export default function TesteBotPage() {
   const handleReset = () => {
     setMessages([]);
     setInput("");
+    setUploadedFile(null);
     initializeTest();
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/midia/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (data.success && data.url) {
+        setUploadedFile(file);
+        // Se tiver valor simulado, adiciona à URL para o analyzer reconhecer
+        const receiptUrl = simulatedReceiptValue
+          ? `${data.url}?valor${simulatedReceiptValue.replace('.', '')}`
+          : data.url;
+        setInput(receiptUrl);
+      } else {
+        alert("Erro ao fazer upload do arquivo");
+      }
+    } catch (error) {
+      console.error("Erro ao fazer upload:", error);
+      alert("Erro ao fazer upload do arquivo");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const clearUploadedFile = () => {
+    setUploadedFile(null);
+    setInput("");
+    setSimulatedReceiptValue("");
   };
 
   return (
@@ -150,6 +193,19 @@ export default function TesteBotPage() {
               className="w-28 rounded bg-slate-700/50 px-2 py-1 text-xs text-slate-300 placeholder-slate-500 focus:border-brand-500 focus:outline-none"
               placeholder="Horário"
               title="Simular horário (deixe vazio para usar o horário real)"
+            />
+          </div>
+          {/* 💰 Simulador de valor do comprovante */}
+          <div className="flex items-center gap-2 rounded-lg bg-slate-800/60 px-3 py-1.5">
+            <span className="text-xs text-slate-400">R$</span>
+            <input
+              type="number"
+              step="0.01"
+              value={simulatedReceiptValue}
+              onChange={(e) => setSimulatedReceiptValue(e.target.value)}
+              className="w-24 rounded bg-slate-700/50 px-2 py-1 text-xs text-slate-300 placeholder-slate-500 focus:border-brand-500 focus:outline-none"
+              placeholder="Valor"
+              title="Simular valor do comprovante para teste (ex: 50.00)"
             />
           </div>
           <button
@@ -228,18 +284,56 @@ export default function TesteBotPage() {
 
       {/* Input */}
       <div className="border-t border-slate-700/50 bg-slate-900/50 p-4">
+        {uploadedFile && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg bg-slate-800 px-3 py-2">
+            <div className="flex-1">
+              <p className="text-xs text-slate-300">{uploadedFile.name}</p>
+              <p className="text-xs text-slate-500">{(uploadedFile.size / 1024).toFixed(1)} KB</p>
+            </div>
+            <button
+              type="button"
+              onClick={clearUploadedFile}
+              className="rounded p-1 text-slate-400 hover:bg-slate-700 hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
         <form onSubmit={handleSendMessage} className="flex gap-3">
+          <div className="relative">
+            <input
+              type="file"
+              id="file-upload"
+              className="hidden"
+              accept="image/*,.pdf"
+              onChange={handleFileUpload}
+              disabled={loading || uploading}
+            />
+            <label
+              htmlFor="file-upload"
+              className={`inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-300 transition hover:bg-slate-700 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed ${
+                uploading ? "cursor-wait" : "cursor-pointer"
+              }`}
+            >
+              {uploading ? (
+                <Loader className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">Arquivo</span>
+            </label>
+          </div>
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={loading}
-            placeholder="Digite sua mensagem..."
+            placeholder="Digite sua mensagem ou envie um arquivo..."
             className="flex-1 rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm text-white placeholder-slate-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={loading || !input.trim()}
+            disabled={loading || uploading || (!input.trim() && !uploadedFile)}
             className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white transition hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (

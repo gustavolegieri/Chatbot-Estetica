@@ -222,6 +222,50 @@ _Pagamento realizado no dia do serviço._`,
 _Envie o comprovante no dia do serviço 😊_`,
   },
   {
+    key: "etapa8_pix_choice",
+    label: "Escolha de PIX",
+    category: "fluxo",
+    hint: "",
+    content: `💸 *Como você prefere pagar via PIX?*
+
+*1* PIX (Pagar agora)
+*2* PIX (Pagar na entrega)
+
+Escolha uma opção:`,
+  },
+  {
+    key: "etapa8_receipt_upload",
+    label: "Solicitação de comprovante",
+    category: "fluxo",
+    hint: "{value}",
+    content: `📸 *Por favor, envie o comprovante de pagamento*
+
+Valor a ser pago: *{value}*
+
+Você pode enviar uma foto ou print do comprovante PIX.`,
+  },
+  {
+    key: "etapa8_receipt_invalid",
+    label: "Comprovante inválido",
+    category: "fluxo",
+    hint: "{expected}, {received}",
+    content: `❌ *Valor do comprovante não confere*
+
+Valor esperado: *{expected}*
+Valor encontrado: *{received}*
+
+Por favor, envie um comprovante com o valor correto.`,
+  },
+  {
+    key: "etapa8_receipt_error",
+    label: "Erro ao ler comprovante",
+    category: "fluxo",
+    hint: "",
+    content: `❌ *Não foi possível ler o comprovante*
+
+Por favor, envie uma foto mais nítida do comprovante ou tente novamente.`,
+  },
+  {
     key: "etapa9_confirm",
     label: "Confirmação final",
     category: "fluxo",

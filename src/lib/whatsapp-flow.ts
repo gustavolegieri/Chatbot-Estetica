@@ -37,6 +37,10 @@ import {
   etapa7Time,
   etapa8Payment,
   etapa8PixBlock,
+  etapa8PixChoice,
+  etapa8ReceiptUpload,
+  etapa8ReceiptInvalid,
+  etapa8ReceiptError,
   etapa9Confirm,
   formatHours,
   indecisiveProblemPrompt,
@@ -81,6 +85,7 @@ import { calculateDistance, calculatePickupFee } from "./maps";
 import { requestHumanHandoff } from "./whatsapp-handoff";
 import { generatePixQrCode, generatePixPayload } from "./pix-qr";
 import { generateSummaryCard } from "./summary-card";
+import { analyzeReceiptImage, validateReceiptAmount } from "./receipt-analyzer";
 
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -589,6 +594,21 @@ async function createAppointment(flow: FlowState, phone: string) {
   const couponDiscount = Number(flow.couponDiscountApplied ?? 0);
   const finalValue = Math.max(0, baseValue + pickupFee - couponDiscount);
 
+  // Determinar status de pagamento baseado no tipo de PIX
+  let paymentStatus = "PENDING";
+  let paidAt = null;
+  let transactionId = null;
+
+  if (flow.pixPaymentType === "now" && flow.receiptAmount) {
+    // PIX pago agora com comprovante validado
+    paymentStatus = "PAID";
+    paidAt = new Date();
+    transactionId = `RECEIPT-${Date.now()}`;
+  } else if (flow.pixPaymentType === "delivery") {
+    // PIX na entrega - mantém como pendente
+    paymentStatus = "PENDING";
+  }
+
   const appointment = await prisma.$transaction(async (tx) => {
     const created = await tx.appointment.create({
       data: {
@@ -607,6 +627,7 @@ async function createAppointment(flow: FlowState, phone: string) {
           flow.needsReturn ? "Retorno desejado" : null,
           flow.upsellLabel ? `Upsell: ${flow.upsellLabel}` : null,
           flow.packageKey,
+          flow.receiptImageUrl ? `Comprovante: ${flow.receiptImageUrl}` : null,
         ]
           .filter(Boolean)
           .join(" | "),
@@ -619,6 +640,10 @@ async function createAppointment(flow: FlowState, phone: string) {
         couponDiscount: flow.couponDiscountApplied ? flow.couponDiscountApplied : undefined,
         finalPrice: new Prisma.Decimal(finalValue),
         reminderPreference: flow.reminderPreference ?? "30min", // Default 30min reminder
+        paymentStatus: paymentStatus as any,
+        paymentMethod: flow.paymentMethod,
+        paidAt: paidAt,
+        transactionId: transactionId,
       },
     });
 
@@ -1471,6 +1496,151 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       return;
     }
 
+    case "ETAPA8_PIX_CHOICE": {
+      if (num === 1 || /agora|pagar agora|imediato/i.test(lower)) {
+        // PIX agora - precisa enviar comprovante
+        flow.pixPaymentType = "now";
+        flow.paymentMethod = "PIX (Pagar agora)";
+        const totalValue = Math.max(0, Number(flow.quoteMin ?? 0) + Number(flow.pickupFee ?? 0) - Number(flow.couponDiscountApplied ?? 0));
+        flow.stage = "ETAPA8_RECEIPT_UPLOAD";
+        await saveFlow(msg.phone, flow);
+
+        // Enviar QR Code e pedir comprovante
+        try {
+          const pixQrUrl = await generatePixQrCode({
+            amount: totalValue,
+            description: `Agendamento ${flow.serviceLabel}`,
+            merchantName: ctx.businessName,
+            merchantCity: ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
+            key: ctx.pixKey || "",
+          });
+
+          const pixPayload = generatePixPayload({
+            amount: totalValue,
+            description: `Agendamento ${flow.serviceLabel}`,
+            merchantName: ctx.businessName,
+            merchantCity: ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
+            key: ctx.pixKey || "",
+          });
+
+          await sendText({ number: msg.phone, text: `💳 **Pagamento via PIX**\n\nEscaneie o QR Code abaixo para pagar:\n\nValor: R$ ${totalValue.toFixed(2).replace('.', ',')}` });
+          await sendMedia({ number: msg.phone, mediaUrl: pixQrUrl, mediaType: "image" });
+          await sendText({ number: msg.phone, text: `Ou copie e cole o código PIX:\n\`${pixPayload}\`` });
+          await delay(1000);
+          await sendText({ number: msg.phone, text: etapa8ReceiptUpload(totalValue, prompts) });
+        } catch (error) {
+          console.error("[ETAPA8_PIX_CHOICE] Error generating PIX QR code:", error);
+          await sendText({ number: msg.phone, text: etapa8ReceiptUpload(totalValue, prompts) });
+        }
+        return;
+      }
+
+      if (num === 2 || /entrega|pagar na entrega|depois/i.test(lower)) {
+        // PIX na entrega - não precisa comprovante agora
+        flow.pixPaymentType = "delivery";
+        flow.paymentMethod = "PIX (Pagar na entrega)";
+        flow.stage = "ETAPA14_REMINDER";
+        await saveFlow(msg.phone, flow);
+        await sendText({ number: msg.phone, text: `Perfeito! Você pagará via PIX no dia do serviço.\n\n${etapa8PixBlock(ctx, prompts)}` });
+        await delay(1000);
+        await sendText({ number: msg.phone, text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa` });
+        return;
+      }
+
+      await sendText({
+        number: msg.phone,
+        text: invalidMenu(etapa8PixChoice(prompts), prompts),
+      });
+      return;
+    }
+
+    case "ETAPA8_RECEIPT_UPLOAD": {
+      // Verificar se mensagem contém imagem
+      if (msg.text.match(/^(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp))/i) || 
+          msg.text.includes("image") || 
+          msg.text.includes("media")) {
+        
+        const imageUrl = msg.text;
+        const totalValue = Math.max(0, Number(flow.quoteMin ?? 0) + Number(flow.pickupFee ?? 0) - Number(flow.couponDiscountApplied ?? 0));
+        
+        try {
+          // Analisar comprovante usando IA
+          const receiptAmount = await analyzeReceiptImage(imageUrl);
+          
+          if (receiptAmount === null) {
+            // Erro na leitura
+            const attempts = flow.receiptValidationAttempts ?? 0;
+            if (attempts >= 2) {
+              // Muitas tentativas - voltar para métodos de pagamento
+              flow.stage = "ETAPA8_PAYMENT";
+              flow.receiptValidationAttempts = 0;
+              await saveFlow(msg.phone, flow);
+              await sendText({ number: msg.phone, text: `Não consegui ler o comprovante após várias tentativas. Vamos tentar outro método de pagamento.\n\n${etapa8Payment(!!ctx.pixKey, prompts)}` });
+              return;
+            }
+            
+            flow.receiptValidationAttempts = (flow.receiptValidationAttempts ?? 0) + 1;
+            await saveFlow(msg.phone, flow);
+            await sendText({ number: msg.phone, text: etapa8ReceiptError(prompts) });
+            return;
+          }
+          
+          // Validar valor
+          if (validateReceiptAmount(receiptAmount, totalValue, 10)) {
+            // Valor correto - aprovar pagamento
+            flow.receiptImageUrl = imageUrl;
+            flow.receiptAmount = receiptAmount;
+            flow.receiptValidationAttempts = 0;
+            flow.stage = "ETAPA14_REMINDER";
+            await saveFlow(msg.phone, flow);
+            
+            await sendText({ number: msg.phone, text: `✅ *Pagamento confirmado!*\n\nValor do comprovante: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\n\nSeu agendamento está garantido.` });
+            await delay(1000);
+            await sendText({ number: msg.phone, text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa` });
+            return;
+          } else {
+            // Valor incorreto
+            const attempts = flow.receiptValidationAttempts ?? 0;
+            if (attempts >= 2) {
+              // Muitas tentativas - voltar para métodos de pagamento
+              flow.stage = "ETAPA8_PAYMENT";
+              flow.receiptValidationAttempts = 0;
+              await saveFlow(msg.phone, flow);
+              await sendText({ number: msg.phone, text: `O valor do comprovante não confere após várias tentativas. Vamos tentar outro método de pagamento.\n\n${etapa8Payment(!!ctx.pixKey, prompts)}` });
+              return;
+            }
+            
+            flow.receiptValidationAttempts = (flow.receiptValidationAttempts ?? 0) + 1;
+            await saveFlow(msg.phone, flow);
+            await sendText({ number: msg.phone, text: etapa8ReceiptInvalid(totalValue, receiptAmount, prompts) });
+            return;
+          }
+        } catch (error) {
+          console.error("[ETAPA8_RECEIPT_UPLOAD] Error analyzing receipt:", error);
+          const attempts = flow.receiptValidationAttempts ?? 0;
+          if (attempts >= 2) {
+            flow.stage = "ETAPA8_PAYMENT";
+            flow.receiptValidationAttempts = 0;
+            await saveFlow(msg.phone, flow);
+            await sendText({ number: msg.phone, text: `Erro ao processar comprovante. Vamos tentar outro método de pagamento.\n\n${etapa8Payment(!!ctx.pixKey, prompts)}` });
+            return;
+          }
+          
+          flow.receiptValidationAttempts = (flow.receiptValidationAttempts ?? 0) + 1;
+          await saveFlow(msg.phone, flow);
+          await sendText({ number: msg.phone, text: etapa8ReceiptError(prompts) });
+          return;
+        }
+      }
+      
+      // Se não for imagem, pedir novamente
+      await sendText({ number: msg.phone, text: etapa8ReceiptUpload(
+        Math.max(0, Number(flow.quoteMin ?? 0) + Number(flow.pickupFee ?? 0) - Number(flow.couponDiscountApplied ?? 0)),
+        prompts
+      ) });
+      return;
+    }
+
     case "ETAPA14_REMINDER": {
       if (num === 1 || /sim|quero/i.test(lower)) {
         flow.reminderEnabled = true;
@@ -1763,33 +1933,12 @@ async function handlePayment(
     return;
   }
 
-  // Se PIX for selecionado e tiver chave PIX configurada, mostrar QR Code
+  // Se PIX for selecionado e tiver chave PIX configurada, mostrar escolha de pagamento
   if (!isNoPix && num === 1 && ctx.pixKey) {
-    const totalValue = Math.max(0, Number(flow.quoteMin ?? 0) + Number(flow.pickupFee ?? 0) - Number(flow.couponDiscountApplied ?? 0));
-    
-    try {
-      const pixQrUrl = await generatePixQrCode({
-        amount: totalValue,
-        description: `Agendamento ${flow.serviceLabel}`,
-        merchantName: ctx.businessName,
-        merchantCity: ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
-        key: ctx.pixKey,
-      });
-      
-      const pixPayload = generatePixPayload({
-        amount: totalValue,
-        description: `Agendamento ${flow.serviceLabel}`,
-        merchantName: ctx.businessName,
-        merchantCity: ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
-        key: ctx.pixKey,
-      });
-      
-      await sendText({ number: msg.phone, text: `💳 **Pagamento via PIX**\n\nEscaneie o QR Code abaixo para pagar:\n\nValor: R$ ${totalValue.toFixed(2).replace('.', ',')}` });
-      await sendMedia({ number: msg.phone, mediaUrl: pixQrUrl, mediaType: "image" });
-      await sendText({ number: msg.phone, text: `Ou copie e cole o código PIX:\n\`${pixPayload}\`` });
-    } catch (error) {
-      console.error("[handlePayment] Error generating PIX QR code:", error);
-    }
+    flow.stage = "ETAPA8_PIX_CHOICE";
+    await saveFlow(msg.phone, flow);
+    await sendText({ number: msg.phone, text: etapa8PixChoice(prompts) });
+    return;
   }
 
   flow.stage = "ETAPA14_REMINDER";

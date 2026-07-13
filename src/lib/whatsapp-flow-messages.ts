@@ -449,6 +449,27 @@ export function etapa8PixBlock(ctx: FlowContext, prompts?: PromptMap) {
   });
 }
 
+export function etapa8PixChoice(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa8_pix_choice", {});
+}
+
+export function etapa8ReceiptUpload(value: number, prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa8_receipt_upload", {
+    value: `R$ ${value.toFixed(2).replace(".", ",")}`,
+  });
+}
+
+export function etapa8ReceiptInvalid(expected: number, received: number, prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa8_receipt_invalid", {
+    expected: `R$ ${expected.toFixed(2).replace(".", ",")}`,
+    received: `R$ ${received.toFixed(2).replace(".", ",")}`,
+  });
+}
+
+export function etapa8ReceiptError(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa8_receipt_error", {});
+}
+
 // ─────────────────────────────────────────────────────────────
 // ETAPA 9 — CONFIRMAÇÃO FINAL DO AGENDAMENTO
 // ─────────────────────────────────────────────────────────────
