@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Send, RotateCcw, Loader, Clock, Calendar, Upload, X } from "lucide-react";
-import Image from "next/image";
 
 interface Message {
   id: string;
@@ -252,21 +251,12 @@ export default function TesteBotPage() {
                   {msg.mediaUrl && (
                     <div className="mt-2">
                       {msg.mediaType?.startsWith("image") ? (
-                        msg.mediaUrl.startsWith('data:') ? (
-                          <img
-                            src={msg.mediaUrl}
-                            alt="Media"
-                            className="max-w-xs rounded"
-                          />
-                        ) : (
-                          <Image
-                            src={msg.mediaUrl}
-                            alt="Media"
-                            width={300}
-                            height={300}
-                            className="max-w-xs rounded"
-                          />
-                        )
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={msg.mediaUrl}
+                          alt="Media"
+                          className="max-w-xs rounded"
+                        />
                       ) : msg.mediaType?.startsWith("video") ? (
                         <video
                           src={msg.mediaUrl}

@@ -23,6 +23,7 @@ import {
   GiftIcon,
   Star,
   TestTube,
+  QrCode,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "./BrandLogo";
