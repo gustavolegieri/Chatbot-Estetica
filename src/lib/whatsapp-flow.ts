@@ -334,25 +334,30 @@ function isBadCondition(text: string) {
 
 function buildBudgetMessage(flow: FlowState) {
   const serviceValue = Number(flow.quoteMin ?? 0);
+  const complementValue = Number(flow.upsellAccepted ? (flow.quoteMax ?? 0) - serviceValue : 0);
   const pickupValue = Number(flow.pickupFee ?? 0);
   const couponValue = Number(flow.couponDiscountApplied ?? 0);
-  const totalValue = Math.max(0, serviceValue + pickupValue - couponValue);
+  const totalValue = Math.max(0, serviceValue + complementValue + pickupValue - couponValue);
 
   const lines = [
     "━━━━━━━━━━━━━━━",
-    "📋 Seu orçamento",
-    `- Serviço: ${flow.serviceLabel ?? "Serviço premium"} — R$ ${serviceValue.toFixed(2).replace(".", ",")}`,
+    "📋 **Seu orçamento**",
+    `- Serviço: ${flow.serviceLabel ?? "Serviço premium"} — **R$ ${serviceValue.toFixed(2).replace(".", ",")}**`,
   ];
 
+  if (complementValue > 0) {
+    lines.push(`- Proteção: **R$ ${complementValue.toFixed(2).replace(".", ",")}**`);
+  }
+
   if (pickupValue > 0) {
-    lines.push(`- Taxa leva e traz: + R$ ${pickupValue.toFixed(2).replace(".", ",")}`);
+    lines.push(`- Leva e traz: **R$ ${pickupValue.toFixed(2).replace(".", ",")}**`);
   }
 
   if (couponValue > 0) {
-    lines.push(`- Desconto: - R$ ${couponValue.toFixed(2).replace(".", ",")}`);
+    lines.push(`- Cupom: **- R$ ${couponValue.toFixed(2).replace(".", ",")}**`);
   }
 
-  lines.push(`- Total: R$ ${totalValue.toFixed(2).replace(".", ",")}`);
+  lines.push(`- **Total: R$ ${totalValue.toFixed(2).replace(".", ",")}**`);
   lines.push("━━━━━━━━━━━━━━━");
   return lines.join("\n");
 }
@@ -1164,9 +1169,12 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       flow.upsellOffered = true;
       flow.stage = "ETAPA6_UPSELL";
       await saveFlow(msg.phone, flow);
+      // Alinhado com test-bot: formato simples de upsell
+      // Usar valor estimado baseado na diferença entre quoteMax e quoteMin
+      const upsellValue = (flow.quoteMax ?? 0) - (flow.quoteMin ?? 0);
       await sendText({
         number: msg.phone,
-        text: etapa6Upsell(flow.serviceLabel ?? "serviço", upsell.complement, upsell.benefit, prompts),
+        text: `✨ Que tal adicionar *${upsell.complement}*?\n\n💰 **R$ ${upsellValue.toFixed(2)}** a mais\n\n*1* - Sim, incluir\n*2* - Não, obrigado`,
       });
       return;
     }
@@ -1180,6 +1188,16 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         return;
       }
       flow.upsellAccepted = num === 1;
+      if (num === 1) {
+        const upsell = getUpsellForKey(flow.serviceKey ?? "lavagem_detalhada", wctx);
+        if (upsell) {
+          flow.upsellLabel = upsell.complement;
+          await sendText({
+            number: msg.phone,
+            text: `✅ Incluído! *${upsell.complement}* adicionado ao seu agendamento.`,
+          });
+        }
+      }
       flow.stage = "ETAPA7_DAY";
       await saveFlow(msg.phone, flow);
       await sendCalendarWithImageAndList({ number: msg.phone, prompts });
@@ -1320,10 +1338,12 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
 
       if (num === 2 || /nao|não|na loja|vou levar|sem pickup|nao quero/i.test(lower)) {
         flow.needsPickup = false;
-        flow.needsReturn = false;
-        flow.stage = "ETAPA8_PAYMENT";
+        flow.stage = "ETAPA9_RETURN_PREFERENCE";
         await saveFlow(msg.phone, flow);
-        await sendText({ number: msg.phone, text: etapa8Payment(!!ctx.pixKey, prompts) });
+        await sendText({
+          number: msg.phone,
+          text: `📍 Combinado! Você pode levar o carro até a loja quando puder.\n\nQuer que devolvamos o veículo até você após o serviço?\n\n*1* Sim\n*2* Não`,
+        });
         return;
       }
 
@@ -1477,8 +1497,9 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       const address = flow.pickupAddress ?? "—";
       
       // Generate summary card image
+      let summaryCardUrl = "";
       try {
-        const summaryCardUrl = await generateSummaryCard({
+        summaryCardUrl = await generateSummaryCard({
           customerName: customerName,
           serviceName: serviceName,
           vehicle: vehicle,
@@ -1488,16 +1509,46 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
           totalPrice: totalValue,
           pickupAddress: address !== "—" ? address : undefined,
         });
-        
-        await sendMedia({ number: msg.phone, mediaUrl: summaryCardUrl, mediaType: "image" });
       } catch (error) {
         console.error("[ETAPA14_REMINDER] Error generating summary card:", error);
       }
       
+      // Send text first (same as test-bot)
+      const reminderTextFinal = flow.reminderPreference === "none" ? "não" : flow.reminderPreference || "—";
+      const upsellLabel = flow.upsellLabel ? `✨ + ${flow.upsellLabel}` : "";
+      const needsReturn = flow.needsReturn ? "🔄 Devolução: sim" : "";
+      
+      const summaryLines = [
+        "━━━━━━━━━━━━━━━",
+        "📋 **RESUMO DO AGENDAMENTO**",
+        `👤 ${customerName}`,
+        `🧽 *${serviceName}*`,
+        upsellLabel,
+        `🚘 ${vehicle}`,
+        `📅 ${date}`,
+        `⏰ ${time}`,
+        `🚚 Leva e traz: ${pickupText}`,
+        address !== "—" ? `📍 Endereço: ${address}` : "",
+        needsReturn,
+        `💳 ${paymentMethod}`,
+        `🔔 Lembrete: ${reminderTextFinal}`,
+        `💰 **R$ ${totalValue.toFixed(2).replace(".", ",")}**`,
+        "━━━━━━━━━━━━━━━",
+        "",
+        "⏱️ Cancelamento até 2h antes sem custo.",
+        "",
+        "✅ Confirma? (sim/não)",
+      ];
+      
       await sendText({
         number: msg.phone,
-        text: `━━━━━━━━━━━━━━━\n📋 *Resumo do agendamento*\n\n👤 Cliente: *${customerName}*\n🧽 Serviço: *${serviceName}*\n🚘 Veículo: *${vehicle}*\n📅 Data: *${date}*\n⏰ Horário: *${time}*\n🎟️ Cupom: *${couponCode}*\n🚚 Leva e traz: *${pickupText}*\n📍 Endereço: *${address}*\n💳 Pagamento: *${paymentMethod}*\n🔔 Lembrete: *${reminderText}*\n💰 Valor total: *R$ ${totalValue.toFixed(2).replace(".", ",")}*\n━━━━━━━━━━━━━━━\n\nConfirma o agendamento? (sim/não)`,
+        text: summaryLines.filter(Boolean).join("\n"),
       });
+      
+      // Send image after text (same as test-bot)
+      if (summaryCardUrl) {
+        await sendMedia({ number: msg.phone, mediaUrl: summaryCardUrl, mediaType: "image" });
+      }
       return;
     }
 
