@@ -1355,7 +1355,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
           await saveFlow(msg.phone, flow);
           await sendText({
             number: msg.phone,
-            text: `Quer que a gente venha buscar o carro? 🚗💨\n\n*1* Sim, quero o leva e traz\n*2* Não, eu levo até a loja`,
+            text: `Quer que a gente vá buscar o carro? 🚗💨\n\n*1* Sim, quero que a estética busque o carro\n*2* Não, eu levo até a estética`,
           });
         }
         return;
