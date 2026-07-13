@@ -314,6 +314,16 @@ model WhatsAppSession {
   handoffStatus        HandoffStatus       @default(NONE)
   lastMessageAt        DateTime?
   lastMessagePreview   String?
+  
+  // Funil de conversão
+  abandonmentStage     String?
+  abandonmentReason    String?
+  abandonmentAt        DateTime?
+  lastStage            String?
+  funnelSteps          Json?               @default("{}") // Rastrear passos no funil
+  
+  // Sistema de desconto
+  discountOffer        Json?               @default("{}") // Oferta de desconto para cancelamento
   unreadCount          Int                 @default(0)
   messages             WhatsAppMessage[]
   client               Client?             @relation(fields: [clientId], references: [id])

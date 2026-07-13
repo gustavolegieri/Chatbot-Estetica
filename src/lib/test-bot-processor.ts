@@ -34,6 +34,10 @@ import { generateSummaryCard, generateSummaryText } from "./summary-card";
 import { generatePixQrCode, generatePixPayload } from "./pix-qr";
 import { analyzeReceiptImage, validateReceiptAmount } from "./receipt-analyzer";
 import type { FlowContext } from "./whatsapp-flow-messages";
+import { testBotLogger } from "./structured-logger";
+import { startFunnel, trackFunnelProgress, trackAbandonment, completeFunnel } from "./funnel-tracker";
+import { generateAndSendReceipt } from "./receipt-generator";
+import { detectCancellationIntent, detectCancellationReason, calculateDiscount, generateDiscountOfferMessage, saveDiscountOffer, isDiscountOfferValid } from "./cancellation-detector";
 
 import type { FlowStage } from "./whatsapp-flow-types";
 
@@ -160,6 +164,10 @@ interface TestSession {
   partialPayments?: Array<{ amount: number; imageUrl: string }>;
   totalPaid?: number;
   awaitingReceiptUpload?: boolean;
+  // Funil e desconto
+  awaitingDiscountResponse?: boolean;
+  discountOffer?: any;
+  discountOriginalPrice?: number;
   // Reminder preference
   reminderPreference?: string | null;
   awaitingPickupAddress?: boolean;
@@ -190,17 +198,88 @@ export async function processTestFlow({
   const responses: TestResponse[] = [];
   const now = Date.now();
 
+  // Iniciar rastreamento de funil se for primeira mensagem
+  if (!session.lastInteractionAt) {
+    await startFunnel(sessionId, session.customerName || session.sessionId || "");
+  }
+
+  // Detectar intenção de cancelamento
+  if (detectCancellationIntent(message)) {
+    const reason = detectCancellationReason(message);
+    const originalPrice = session.quote || 100; // Valor estimado
+    const offer = calculateDiscount(reason, originalPrice);
+
+    responses.push({
+      text: generateDiscountOfferMessage(
+        session.customerName || "Cliente",
+        originalPrice,
+        offer
+      ),
+    });
+
+    // Salvar oferta no banco
+    await saveDiscountOffer(
+      sessionId,
+      session.sessionId || "",
+      originalPrice,
+      offer.discountPercentage,
+      new Date(Date.now() + offer.validForMinutes * 60 * 1000)
+    );
+
+    // Adicionar estado de espera de resposta de desconto
+    session.awaitingDiscountResponse = true;
+    session.discountOffer = offer;
+    session.discountOriginalPrice = originalPrice;
+
+    return responses;
+  }
+
+  // Resposta a oferta de desconto
+  if (session.awaitingDiscountResponse) {
+    const input = message.trim().toLowerCase();
+    if (input === "1" || /sim|quero|aceito|aprovei/i.test(input)) {
+      // Aceitar desconto
+      const offer = session.discountOffer;
+      const discountedPrice = (session.discountOriginalPrice || 100) * (1 - offer.discountPercentage / 100);
+      session.quote = discountedPrice;
+      session.awaitingDiscountResponse = false;
+      session.discountOffer = null;
+
+      responses.push({
+        text: `✅ Ótimo! ${offer.discountReason}\n\nNovo valor: R$ ${discountedPrice.toFixed(2).replace('.', ',')}\n\nVamos continuar o agendamento com este valor especial!`,
+      });
+
+      testBotLogger.info("Cliente aceitou oferta de desconto", { sessionId, discountPercentage: offer.discountPercentage });
+      return responses;
+    } else if (input === "2" || /nao|não|cancelar|recusar/i.test(input)) {
+      // Recusar desconto e cancelar
+      session.awaitingDiscountResponse = false;
+      session.discountOffer = null;
+      session.stage = "ETAPA2_MAIN_MENU";
+
+      responses.push({
+        text: "Entendido. Sem problemas! \n\nVoltamos ao menu principal. O que você gostaria de fazer?",
+      });
+
+      testBotLogger.info("Cliente recusou oferta de desconto", { sessionId });
+      await trackAbandonment(sessionId, session.sessionId || "", "RECUSOU_DESCONTO");
+      return responses;
+    }
+  }
+
   // Universal "0" to go back to main menu
   if (message.trim() === "0") {
     const wctx = await loadWhatsAppCatalog(true);
     const prompts = await loadPromptMap();
     session.stage = "ETAPA2_MAIN_MENU";
+    await trackFunnelProgress(sessionId, session.sessionId || "", "ETAPA2_MAIN_MENU");
     responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
     return responses;
   }
 
   // Log analytics: stage transition
   await logStageTransition(sessionId, session.stage, message.trim());
+  await trackFunnelProgress(sessionId, session.sessionId || "", session.stage);
   session.lastInteractionAt = now;
 
   if (session.lastInteractionAt && now - session.lastInteractionAt > 30 * 60 * 1000) {
@@ -1444,6 +1523,21 @@ async function handleReceiptUpload(
         session.awaitingReceiptUpload = false;
         session.stage = "ETAPA9_REMINDER";
 
+        // Gerar recibo digital
+        try {
+          const receiptResult = await generateAndSendReceipt(
+            "test-" + session.sessionId,
+            session.sessionId || ""
+          );
+          if (receiptResult) {
+            responses.push({
+              text: `📄 *Recibo gerado!*\n\n` + receiptResult.receiptText,
+            });
+          }
+        } catch (error) {
+          testBotLogger.error("Erro ao gerar recibo", error as Error, { sessionId: session.sessionId });
+        }
+
         responses.push({ text: `✅ *Pagamento confirmado!*\n\nValor do comprovante: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\nTotal pago: R$ ${session.totalPaid.toFixed(2).replace('.', ',')}\n\nSeu agendamento está garantido.` });
         responses.push({
           text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
@@ -1472,6 +1566,21 @@ async function handleReceiptUpload(
           session.receiptValidationAttempts = 0;
           session.awaitingReceiptUpload = false;
           session.stage = "ETAPA9_REMINDER";
+
+          // Gerar recibo digital
+          try {
+            const receiptResult = await generateAndSendReceipt(
+              "test-" + session.sessionId,
+              session.sessionId || ""
+            );
+            if (receiptResult) {
+              responses.push({
+                text: `📄 *Recibo gerado!*\n\n` + receiptResult.receiptText,
+              });
+            }
+          } catch (error) {
+            testBotLogger.error("Erro ao gerar recibo", error as Error, { sessionId: session.sessionId });
+          }
 
           responses.push({ text: `✅ *Pagamento confirmado!*\n\nValor do comprovante: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\nTotal pago: R$ ${newTotalPaid.toFixed(2).replace('.', ',')}\n\nSeu agendamento está garantido.` });
           responses.push({
