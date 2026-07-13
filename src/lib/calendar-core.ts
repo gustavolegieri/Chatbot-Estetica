@@ -2,6 +2,7 @@ import { prisma } from "./prisma";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isBefore, isSameDay, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BRAND_DEFAULT } from "./whatsapp-catalog";
+import { renderLogo } from "./svg-utils";
 
 // ─── Tipos ───────────────────────────────────────────────────────
 
@@ -356,25 +357,6 @@ const OCCUPANCY_LABELS: Record<string, string> = {
   today: "Hoje",
 };
 
-// Cache logo base64 to avoid reading file on every generation
-let logoBase64Cache: string | null = null;
-
-async function getLogoBase64(): Promise<string> {
-  if (logoBase64Cache) return logoBase64Cache;
-  
-  try {
-    const fs = await import("fs");
-    const path = await import("path");
-    const logoPath = path.resolve(process.cwd(), "public", "logo-garagem-do-ka.png");
-    const logoBuffer = fs.readFileSync(logoPath);
-    logoBase64Cache = logoBuffer.toString("base64");
-    return logoBase64Cache;
-  } catch {
-    // Fallback: return empty string if logo not found
-    return "";
-  }
-}
-
 /**
  * Generate a calendar SVG image with the clinic logo, month grid, and occupancy colors.
  * SVG is used to avoid font dependency issues on Vercel/Linux.
@@ -382,18 +364,15 @@ async function getLogoBase64(): Promise<string> {
 export async function generateCalendarImage(date: Date, customToday?: Date): Promise<string> {
   const data = await getMonthOccupancy(date.getFullYear(), date.getMonth(), customToday);
   
-  // Get logo base64
-  const logoBase64 = await getLogoBase64();
-  
-  // Generate SVG directly
-  const svg = generateCalendarSVGInternal(data, logoBase64);
+  // Generate SVG directly with renderLogo
+  const svg = await generateCalendarSVGInternal(data);
   
   // Return as data URL (SVG is natively supported by browsers and WhatsApp)
   const base64 = Buffer.from(svg).toString("base64");
   return `data:image/svg+xml;base64,${base64}`;
 }
 
-function generateCalendarSVGInternal(data: CalendarData, logoBase64: string): string {
+async function generateCalendarSVGInternal(data: CalendarData): Promise<string> {
   const cellSize = 70;
   const cellGap = 6;
   const logoHeight = 80;
@@ -416,15 +395,9 @@ function generateCalendarSVGInternal(data: CalendarData, logoBase64: string): st
   
   let currentY = padding;
   
-  // Logo - use real image if available, otherwise placeholder
-  if (logoBase64) {
-    // Use actual logo image with proper aspect ratio
-    svg += `<image href="data:image/png;base64,${logoBase64}" x="${(canvasW - 100)/2}" y="${currentY}" width="100" height="${logoHeight}" preserveAspectRatio="xMidYMid meet"/>`;
-  } else {
-    // Fallback placeholder
-    svg += `<rect x="${(canvasW - 100)/2}" y="${currentY}" width="100" height="${logoHeight}" fill="#c9a24b" rx="8"/>`;
-    svg += `<text x="${canvasW/2}" y="${currentY + logoHeight/2 + 10}" text-anchor="middle" fill="#0d0d0d" font-family="Arial, sans-serif" font-weight="bold" font-size="14">LOGO</text>`;
-  }
+  // Logo using shared function
+  const logoSvg = await renderLogo((canvasW - 100) / 2, currentY, 100, logoHeight);
+  svg += logoSvg;
   
   currentY += logoHeight + 10;
   

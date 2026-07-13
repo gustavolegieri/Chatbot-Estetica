@@ -1,3 +1,5 @@
+import { renderLogo } from "./svg-utils";
+
 interface SummaryCardData {
   customerName: string;
   serviceName: string;
@@ -21,9 +23,6 @@ const ICONS = {
   location: `<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#e0c060"/>`
 };
 
-// Logo em base64 (simples placeholder - em produção usar a logo real)
-const LOGO_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-
 /**
  * Gera imagem visual do resumo do agendamento usando SVG (compatível com Vercel).
  */
@@ -38,8 +37,9 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
     const titleSize = 28;
     const titleMargin = 16;
     const cardPadding = 24;
-    const lineHeight = 38;
+    const lineHeight = 50; // Aumentado de 38 para 50
     const iconSize = 20;
+    const iconCircleSize = 32; // Círculo badge para ícones
     
     // Escape XML special characters
     const escapeXml = (text: string) => {
@@ -71,7 +71,7 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
       return lines.length > 0 ? lines : [text];
     };
 
-    // Campos principais (exceto total e endereço)
+    // Campos principais (incluindo endereço agora)
     const mainFields = [
       { icon: ICONS.user, label: "Cliente", value: data.customerName },
       { icon: ICONS.service, label: "Serviço", value: data.serviceName },
@@ -81,61 +81,72 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
       { icon: ICONS.card, label: "Pagamento", value: data.paymentMethod },
     ];
 
-    // Processar endereço com word wrap
+    // Processar endereço com word wrap (agora incluído nos campos principais)
     const addressLines = data.pickupAddress ? wrapText(data.pickupAddress) : [];
-    const addressExtraLines = addressLines.length > 1 ? addressLines.length - 1 : 0;
+    if (addressLines.length > 0) {
+      mainFields.push({ icon: ICONS.location, label: "Endereço", value: addressLines[0] });
+      // Linhas adicionais do endereço serão tratadas separadamente
+    }
 
     // Calcular altura dinâmica
     const logoSectionHeight = logoHeight + logoMargin;
-    const titleSectionHeight = titleSize + titleMargin + 20; // +20 para linha divisória
+    const titleSectionHeight = titleSize + titleMargin + 20;
     const mainFieldsHeight = mainFields.length * lineHeight;
-    const addressHeight = addressLines.length > 0 ? (addressLines.length * lineHeight) : 0;
-    const totalSectionHeight = 60; // espaço para total destacado
-    const cardContentHeight = cardPadding * 2 + mainFieldsHeight + addressHeight + totalSectionHeight;
+    const addressExtraHeight = addressLines.length > 1 ? (addressLines.length - 1) * 24 : 0; // Espaço menor para linhas extras
+    const totalSectionHeight = 70; // Aumentado para acomodar fundo diferenciado
+    const cardContentHeight = cardPadding * 2 + mainFieldsHeight + addressExtraHeight + totalSectionHeight;
     const footerHeight = 40;
     
     const totalHeight = padding + logoSectionHeight + titleSectionHeight + cardContentHeight + footerHeight + padding;
 
-    // Gerar SVG dos campos principais
+    // Gerar SVG dos campos principais com ícones em círculos
     let fieldsSvg = '';
     let currentY = cardPadding;
     
     mainFields.forEach((field, index) => {
       const y = currentY + (index * lineHeight);
+      const iconCircleX = cardPadding + (iconCircleSize - iconSize) / 2;
+      const iconCircleY = y + (iconCircleSize - iconSize) / 2;
+      
       fieldsSvg += `
         <g transform="translate(${cardPadding}, ${y})">
-          <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24">
+          <!-- Círculo badge para ícone -->
+          <circle cx="${iconCircleSize / 2}" cy="${iconCircleSize / 2}" r="${iconCircleSize / 2}" fill="#FFD700" opacity="0.12"/>
+          
+          <!-- Ícone -->
+          <svg x="${(iconCircleSize - iconSize) / 2}" y="${(iconCircleSize - iconSize) / 2}" width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24">
             ${field.icon}
           </svg>
-          <text x="${iconSize + 12}" y="${iconSize - 2}" fill="#e0c060" font-family="Arial, sans-serif" font-size="16" font-weight="500">${escapeXml(field.label)}:</text>
-          <text x="${iconSize + 12}" y="${iconSize + 14}" fill="#ffffff" font-family="Arial, sans-serif" font-size="18">${escapeXml(field.value)}</text>
+          
+          <!-- Label e valor -->
+          <text x="${iconCircleSize + 12}" y="${iconSize - 2}" fill="#e0c060" font-family="Arial, sans-serif" font-size="16" font-weight="500">${escapeXml(field.label)}:</text>
+          <text x="${iconCircleSize + 12}" y="${iconSize + 14}" fill="#ffffff" font-family="Arial, sans-serif" font-size="18">${escapeXml(field.value)}</text>
         </g>
+        
+        <!-- Linha divisória sutil entre campos (exceto após o último) -->
+        ${index < mainFields.length - 1 ? `
+          <line x1="${cardPadding}" y1="${y + lineHeight - 12}" x2="${width - padding * 2 - cardPadding}" y2="${y + lineHeight - 12}" stroke="#FFD700" stroke-width="1" opacity="0.08"/>
+        ` : ''}
       `;
     });
 
-    // Adicionar endereço com word wrap
-    if (addressLines.length > 0) {
-      const addressStartY = currentY + (mainFields.length * lineHeight);
-      fieldsSvg += `
-        <g transform="translate(${cardPadding}, ${addressStartY})">
-          <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24">
-            ${ICONS.location}
-          </svg>
-          <text x="${iconSize + 12}" y="${iconSize - 2}" fill="#e0c060" font-family="Arial, sans-serif" font-size="16" font-weight="500">Endereço:</text>
-        </g>
-      `;
-      
-      addressLines.forEach((line, index) => {
-        const lineY = addressStartY + (index * lineHeight) + 16;
+    // Linhas extras do endereço
+    if (addressLines.length > 1) {
+      const addressExtraStartY = currentY + (mainFields.length * lineHeight);
+      addressLines.slice(1).forEach((line, index) => {
+        const lineY = addressExtraStartY + (index * 24);
         fieldsSvg += `
-          <text x="${cardPadding + iconSize + 12}" y="${lineY}" fill="#ffffff" font-family="Arial, sans-serif" font-size="18">${escapeXml(line)}</text>
+          <text x="${cardPadding + iconCircleSize + 12}" y="${lineY}" fill="#ffffff" font-family="Arial, sans-serif" font-size="18">${escapeXml(line)}</text>
         `;
       });
     }
 
-    // Total destacado
-    const totalY = cardPadding + mainFieldsHeight + addressHeight + 20;
+    // Total destacado com fundo diferenciado
+    const totalY = cardPadding + mainFieldsHeight + addressExtraHeight + 20;
     const totalText = `R$ ${data.totalPrice.toFixed(2).replace('.', ',')}`;
+    
+    // Logo real usando função compartilhada
+    const logoSvg = await renderLogo((width - 80) / 2, padding, 80, logoHeight);
     
     const svg = `
       <svg width="${width}" height="${totalHeight}" xmlns="http://www.w3.org/2000/svg">
@@ -154,11 +165,8 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
         <!-- Fundo principal -->
         <rect width="100%" height="100%" fill="url(#bg)" />
         
-        <!-- Logo (placeholder) -->
-        <g transform="translate(${(width - 80) / 2}, ${padding})">
-          <rect width="80" height="${logoHeight}" fill="#c9a24b" rx="8"/>
-          <text x="40" y="${logoHeight / 2 + 6}" text-anchor="middle" fill="#0d0d0d" font-family="Arial, sans-serif" font-weight="bold" font-size="14">LOGO</text>
-        </g>
+        <!-- Logo real -->
+        ${logoSvg}
         
         <!-- Título -->
         <text x="${width / 2}" y="${padding + logoSectionHeight + titleSize - 6}" fill="#FFD700" font-family="Arial, sans-serif" font-size="${titleSize}" font-weight="bold" text-anchor="middle">RESUMO DO AGENDAMENTO</text>
@@ -166,15 +174,23 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
         <!-- Linha divisória com gradiente -->
         <rect x="${padding}" y="${padding + logoSectionHeight + titleSize + titleMargin - 10}" width="${width - padding * 2}" height="1" fill="url(#divider)" />
         
-        <!-- Cartão/Container -->
+        <!-- Sombra do cartão -->
+        <rect x="${padding + 4}" y="${padding + logoSectionHeight + titleSectionHeight + 4}" width="${width - padding * 2}" height="${cardContentHeight}" fill="#000000" opacity="0.2" rx="16"/>
+        
+        <!-- Cartão/Container com borda sutil -->
         <g transform="translate(${padding}, ${padding + logoSectionHeight + titleSectionHeight})">
           <rect width="${width - padding * 2}" height="${cardContentHeight}" fill="#20263f" rx="16" opacity="0.95"/>
+          <rect width="${width - padding * 2}" height="${cardContentHeight}" fill="none" stroke="#FFD700" stroke-width="1" opacity="0.15" rx="16"/>
+          
+          <!-- Elementos decorativos nos cantos superiores -->
+          <path d="M 16 0 L 16 8 M 0 16 L 8 16" stroke="#FFD700" stroke-width="2" opacity="0.3" fill="none"/>
+          <path d="M ${width - padding * 2 - 16} 0 L ${width - padding * 2 - 16} 8 M ${width - padding * 2} 16 L ${width - padding * 2 - 8} 16" stroke="#FFD700" stroke-width="2" opacity="0.3" fill="none"/>
           
           <!-- Campos -->
           ${fieldsSvg}
           
-          <!-- Linha separadora do total -->
-          <line x1="${cardPadding}" y1="${totalY - 10}" x2="${width - padding * 2 - cardPadding}" y2="${totalY - 10}" stroke="#FFD700" stroke-width="1" opacity="0.3"/>
+          <!-- Fundo diferenciado para o total -->
+          <rect x="${cardPadding}" y="${totalY - 10}" width="${width - padding * 2 - cardPadding * 2}" height="50" fill="#FFD700" opacity="0.08" rx="8"/>
           
           <!-- Total destacado -->
           <g transform="translate(${cardPadding}, ${totalY})">
