@@ -611,6 +611,7 @@ async function createAppointment(flow: FlowState, phone: string) {
         couponId: flow.couponId ?? undefined,
         couponDiscount: flow.couponDiscountApplied ? flow.couponDiscountApplied : undefined,
         finalPrice: new Prisma.Decimal(finalValue),
+        reminderPreference: flow.reminderPreference ?? "30min", // Default 30min reminder
       },
     });
 
@@ -1451,8 +1452,10 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     case "ETAPA14_REMINDER": {
       if (num === 1 || /sim|quero/i.test(lower)) {
         flow.reminderEnabled = true;
+        flow.reminderPreference = "30min"; // 30min default
       } else if (num === 2 || /nao|não|não precisa|não quero/i.test(lower)) {
         flow.reminderEnabled = false;
+        flow.reminderPreference = "none";
       } else {
         await sendText({ number: msg.phone, text: `Responda *1* para sim ou *2* para não.` });
         return;

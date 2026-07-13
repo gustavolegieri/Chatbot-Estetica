@@ -88,6 +88,9 @@ export interface FlowState {
   pickupDistanceKm?: number;
   pickupFee?: number;
   pickupAddressAttempts?: number;
+
+  // Lembrete customizado
+  reminderPreference?: "30min" | "1hour" | "1day" | "none";
 }
 
 
