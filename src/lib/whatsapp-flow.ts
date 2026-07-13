@@ -1193,6 +1193,35 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         });
         return;
       }
+
+      // Check if first-time customer for bonus
+      if (!flow.firstTimeBonusApplied) {
+        try {
+          const existingCustomer = await prisma.client.findUnique({
+            where: { phone: msg.phone }
+          });
+          
+          if (!existingCustomer) {
+            flow.isFirstTimeCustomer = true;
+            flow.firstTimeBonusDiscount = Math.round((flow.quoteMin ?? 0) * 0.1); // 10% discount
+            flow.stage = "ETAPA5_FIRST_TIME_BONUS";
+            await saveFlow(msg.phone, flow);
+            await sendText({
+              number: msg.phone,
+              text: `🎁 *Bônus! Primeira vez: 10% de desconto*\n\nÉ sua primeira vez aqui! Ganhou *10% de desconto* no primeiro serviço.\n\n💰 Desconto: R$ ${flow.firstTimeBonusDiscount.toFixed(2).replace('.', ',')}\n\n*1* ✅ Quero o desconto\n*2* ❌ Não, obrigado`,
+            });
+            return;
+          } else {
+            flow.firstTimeBonusApplied = true;
+            await saveFlow(msg.phone, flow);
+          }
+        } catch (error) {
+          console.error("[ETAPA5_QUOTE] Error checking first-time customer:", error);
+          flow.firstTimeBonusApplied = true;
+          await saveFlow(msg.phone, flow);
+        }
+      }
+
       if (flow.upsellOffered) {
         flow.stage = "ETAPA7_DAY";
         await saveFlow(msg.phone, flow);
@@ -1219,6 +1248,95 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       await sendText({
         number: msg.phone,
         text: `✨ Que tal adicionar *${upsell.complement}*?\n\n💰 **R$ ${upsellValue.toFixed(2)}** a mais\n\n*1* - Sim, incluir\n*2* - Não, obrigado`,
+      });
+      return;
+    }
+
+    case "ETAPA5_FIRST_TIME_BONUS": {
+      if (num === 1 || /sim|s|yes|quero|aceito/i.test(lower)) {
+        flow.firstTimeBonusApplied = true;
+        // Apply discount to quote
+        if (flow.firstTimeBonusDiscount) {
+          const currentQuoteMin = flow.quoteMin ?? 0;
+          const currentQuoteMax = flow.quoteMax ?? 0;
+          flow.quoteMin = Math.max(0, currentQuoteMin - flow.firstTimeBonusDiscount);
+          flow.quoteMax = Math.max(0, currentQuoteMax - flow.firstTimeBonusDiscount);
+          flow.couponDiscountApplied = flow.firstTimeBonusDiscount;
+        }
+        await saveFlow(msg.phone, flow);
+        await sendText({
+          number: msg.phone,
+          text: `✅ *Desconto aplicado!*\n\nSeu bônus de primeira compra foi ativado.\n\n💰 Novo valor: R$ ${(flow.quoteMin ?? 0).toFixed(2).replace('.', ',')}\n\nVamos continuar com o agendamento?`,
+        });
+        // Continue to upsell or calendar
+        if (flow.upsellOffered) {
+          flow.stage = "ETAPA7_DAY";
+          await saveFlow(msg.phone, flow);
+          await sendCalendarWithImageAndList({ number: msg.phone, prompts });
+          await sendText({ number: msg.phone, text: generateCalendarLegend() });
+        } else {
+          const key = flow.serviceKey ?? "lavagem_detalhada";
+          const upsell = getUpsellForKey(key, wctx) ?? getUpsellForKey("lavagem_detalhada", wctx);
+          if (upsell) {
+            flow.upsellLabel = upsell.complement;
+            flow.upsellOffered = true;
+            flow.stage = "ETAPA6_UPSELL";
+            await saveFlow(msg.phone, flow);
+            const upsellValue = (flow.quoteMax ?? 0) - (flow.quoteMin ?? 0);
+            await sendText({
+              number: msg.phone,
+              text: `✨ Que tal adicionar *${upsell.complement}*?\n\n💰 **R$ ${upsellValue.toFixed(2)}** a mais\n\n*1* - Sim, incluir\n*2* - Não, obrigado`,
+            });
+          } else {
+            flow.stage = "ETAPA7_DAY";
+            await saveFlow(msg.phone, flow);
+            await sendCalendarWithImageAndList({ number: msg.phone, prompts });
+            await sendText({ number: msg.phone, text: generateCalendarLegend() });
+          }
+        }
+        return;
+      }
+      
+      if (num === 2 || /nao|não|n|no|nao quero/i.test(lower)) {
+        flow.firstTimeBonusApplied = true;
+        flow.firstTimeBonusDiscount = 0;
+        await saveFlow(msg.phone, flow);
+        await sendText({
+          number: msg.phone,
+          text: `Sem problema! Vamos continuar com o valor original.\n\n💰 Valor: R$ ${(flow.quoteMin ?? 0).toFixed(2).replace('.', ',')}`,
+        });
+        // Continue to upsell or calendar
+        if (flow.upsellOffered) {
+          flow.stage = "ETAPA7_DAY";
+          await saveFlow(msg.phone, flow);
+          await sendCalendarWithImageAndList({ number: msg.phone, prompts });
+          await sendText({ number: msg.phone, text: generateCalendarLegend() });
+        } else {
+          const key = flow.serviceKey ?? "lavagem_detalhada";
+          const upsell = getUpsellForKey(key, wctx) ?? getUpsellForKey("lavagem_detalhada", wctx);
+          if (upsell) {
+            flow.upsellLabel = upsell.complement;
+            flow.upsellOffered = true;
+            flow.stage = "ETAPA6_UPSELL";
+            await saveFlow(msg.phone, flow);
+            const upsellValue = (flow.quoteMax ?? 0) - (flow.quoteMin ?? 0);
+            await sendText({
+              number: msg.phone,
+              text: `✨ Que tal adicionar *${upsell.complement}*?\n\n💰 **R$ ${upsellValue.toFixed(2)}** a mais\n\n*1* - Sim, incluir\n*2* - Não, obrigado`,
+            });
+          } else {
+            flow.stage = "ETAPA7_DAY";
+            await saveFlow(msg.phone, flow);
+            await sendCalendarWithImageAndList({ number: msg.phone, prompts });
+            await sendText({ number: msg.phone, text: generateCalendarLegend() });
+          }
+        }
+        return;
+      }
+
+      await sendText({
+        number: msg.phone,
+        text: invalidMenu(`*1* ✅ Quero o desconto\n*2* ❌ Não, obrigado`),
       });
       return;
     }
@@ -1512,6 +1630,28 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     case "ETAPA8_PAYMENT_NO_PIX": {
       if (await applyCouponPhase(msg, flow, lower, ctx, wctx, num, input)) return;
       await handlePayment(msg, flow, ctx, num, lower, wctx);
+      return;
+    }
+
+    case "ETAPA8_PAYMENT_CARD_TYPE": {
+      if (num === 1) {
+        flow.paymentMethod = "Cartão de débito";
+        flow.stage = "ETAPA14_REMINDER";
+        await saveFlow(msg.phone, flow);
+        await sendText({ number: msg.phone, text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa` });
+        return;
+      }
+      if (num === 2) {
+        flow.paymentMethod = "Cartão de crédito";
+        flow.stage = "ETAPA14_REMINDER";
+        await saveFlow(msg.phone, flow);
+        await sendText({ number: msg.phone, text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa` });
+        return;
+      }
+      await sendText({
+        number: msg.phone,
+        text: invalidMenu(`*1* Débito\n*2* Crédito`),
+      });
       return;
     }
 
@@ -1982,21 +2122,37 @@ async function handlePayment(
 ) {
   const { prompts } = wctx;
   const isNoPix = flow.stage === "ETAPA8_PAYMENT_NO_PIX";
-  const max = isNoPix ? 3 : 4;
+  const max = isNoPix ? 2 : 3; // Atualizado: 2 opções sem PIX, 3 com PIX
   const min = isNoPix ? 1 : 1;
 
   if (!num || num < min || num > max) {
+    // Usar template compacto para 3 opções
+    const optionsText = isNoPix 
+      ? `*1* Cartão\n*2* Dinheiro`
+      : `*1* PIX\n*2* Cartão\n*3* Dinheiro`;
     await sendText({
       number: msg.phone,
-      text: invalidMenu(etapa8Payment(!!ctx.pixKey && !isNoPix, prompts), prompts),
+      text: invalidMenu(optionsText, prompts),
     });
     return;
   }
 
-  const methodsNoPix = ["Cartão de débito", "Cartão de crédito", "Dinheiro"];
-  const methodsFull = ["PIX", "Cartão de débito", "Cartão de crédito", "Dinheiro"];
+  // Nova variante: Opção de Cartão unificado (débito + crédito)
+  const methodsNoPix = ["Cartão", "Dinheiro"];
+  const methodsFull = ["PIX", "Cartão", "Dinheiro"];
   const methods = isNoPix ? methodsNoPix : methodsFull;
   flow.paymentMethod = methods[num - 1];
+
+  // Se escolher Cartão, perguntar qual tipo
+  if (flow.paymentMethod === "Cartão") {
+    flow.stage = "ETAPA8_PAYMENT_CARD_TYPE";
+    await saveFlow(msg.phone, flow);
+    await sendText({
+      number: msg.phone,
+      text: `Qual tipo de cartão você prefere?\n\n*1* Débito\n*2* Crédito`,
+    });
+    return;
+  }
 
   if (!isNoPix && num === 1 && !ctx.pixKey) {
     flow.stage = "ETAPA8_PAYMENT_NO_PIX";

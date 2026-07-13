@@ -12,6 +12,7 @@ export type FlowStage =
   | "ETAPA4_VEHICLE"
   | "ETAPA4_VEHICLE_CONFIRM"
   | "ETAPA5_QUOTE"
+  | "ETAPA5_FIRST_TIME_BONUS"
   | "ETAPA6_UPSELL"
   | "ETAPA3_UPSELL"
   | "ETAPA7_PERIOD"
@@ -20,6 +21,7 @@ export type FlowStage =
   | "ETAPA7_CUSTOM_DAY"
   | "ETAPA8_PAYMENT"
   | "ETAPA8_PAYMENT_NO_PIX"
+  | "ETAPA8_PAYMENT_CARD_TYPE"
   | "ETAPA8_PHOTO"
   | "ETAPA9_COUPON"
   | "ETAPA9_PICKUP"
@@ -101,6 +103,11 @@ export interface FlowState {
   receiptValidationAttempts?: number;
   partialPayments?: Array<{ amount: number; imageUrl: string }>; // Rastrear pagamentos parciais
   totalPaid?: number; // Total já pago
+
+  // Bônus de primeira compra
+  isFirstTimeCustomer?: boolean;
+  firstTimeBonusApplied?: boolean;
+  firstTimeBonusDiscount?: number; // valor do desconto (R$)
 }
 
 

@@ -148,9 +148,16 @@ export async function sendText({
 /**
  * Resolve caminho relativo de mídia para URL absoluta pública.
  * Usa NEXT_PUBLIC_APP_URL ou VERCEL_URL como base.
+ * Data URLs (base64) são retornadas como estão.
  */
 function resolveMediaUrl(url: string): string {
+  // Se já for data URL (base64), retorna como está
+  if (/^data:/i.test(url)) return url;
+  
+  // Se já for URL absoluta (http/https), retorna como está
   if (/^https?:\/\//i.test(url)) return url;
+  
+  // Converte URL relativa para absoluta
   return toAbsoluteMediaUrl(url);
 }
 

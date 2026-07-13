@@ -208,6 +208,15 @@ Como você prefere pagar?
 _Pagamento realizado no dia do serviço._`,
   },
   {
+    key: "etapa8_payment_compact",
+    label: "Forma de pagamento (compacto)",
+    category: "fluxo",
+    hint: "{options}",
+    content: `Como você prefere pagar?
+
+{options}`,
+  },
+  {
     key: "etapa8_pix_block",
     label: "Dados PIX",
     category: "fluxo",
