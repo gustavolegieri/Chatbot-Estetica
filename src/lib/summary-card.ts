@@ -85,21 +85,14 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
     ctx.textAlign = "center";
     ctx.fillText("Cancelamento até 2h antes sem custo", width / 2, height - 25);
 
-    // Convert to buffer
+    // Convert to buffer and then to base64 data URL (works in Vercel)
     const buffer = canvas.toBuffer("image/png");
-    console.log("[generateSummaryCard] Image buffer size:", buffer.length);
+    const base64 = buffer.toString("base64");
+    const dataUrl = `data:image/png;base64,${base64}`;
     
-    // Save to public folder
-    const fs = require("fs");
-    const path = require("path");
-    const publicDir = path.join(process.cwd(), "public");
-    const filename = `summary-${Date.now()}.png`;
-    const filepath = path.join(publicDir, filename);
+    console.log("[generateSummaryCard] Image generated as data URL, size:", buffer.length);
     
-    fs.writeFileSync(filepath, buffer);
-    console.log("[generateSummaryCard] Image saved to:", filepath);
-    
-    return `/${filename}`;
+    return dataUrl;
   } catch (error) {
     console.error("[generateSummaryCard] Error:", error);
     // Fallback to placeholder with actual data

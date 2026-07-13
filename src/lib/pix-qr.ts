@@ -17,7 +17,7 @@ export async function generatePixQrCode(data: PixQrCodeData): Promise<string> {
   try {
     const payload = generatePixPayload(data);
     
-    // Generate QR code as base64
+    // Generate QR code as base64 data URL (works in Vercel)
     const qrCodeDataUrl = await QRCode.toDataURL(payload, {
       width: 300,
       margin: 2,
@@ -27,19 +27,10 @@ export async function generatePixQrCode(data: PixQrCodeData): Promise<string> {
       }
     });
     
-    // Convert data URL to PNG file
-    const base64Data = qrCodeDataUrl.replace(/^data:image\/png;base64,/, '');
-    const fs = require('fs');
-    const path = require('path');
-    const publicDir = path.join(process.cwd(), 'public');
-    const filename = `pix-qr-${Date.now()}.png`;
-    const filepath = path.join(publicDir, filename);
+    console.log('[generatePixQrCode] QR Code generated as data URL');
     
-    fs.writeFileSync(filepath, base64Data, 'base64');
-    
-    console.log('[generatePixQrCode] QR Code saved to:', filepath);
-    
-    return `/${filename}`;
+    // Return the data URL directly (works in Vercel serverless)
+    return qrCodeDataUrl;
   } catch (error) {
     console.error('[generatePixQrCode] Error:', error);
     // Fallback to placeholder
