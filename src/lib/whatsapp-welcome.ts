@@ -20,6 +20,8 @@ async function loadWelcomeContext() {
     pixKey: s?.pixKey ?? null,
     pixHolder: s?.pixHolderName ?? null,
     pixBank: s?.pixBank ?? null,
+    pixMerchantCity: s?.pixMerchantCity ?? "Jundiai",
+    pixQrCodeImage: s?.pixQrCodeImage ?? null,
   };
 }
 
