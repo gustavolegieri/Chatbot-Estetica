@@ -1449,6 +1449,7 @@ async function handleReceiptUpload(
 
         session.receiptValidationAttempts = (session.receiptValidationAttempts ?? 0) + 1;
         responses.push({ text: etapa8ReceiptInvalid(totalValue, receiptAmount, prompts) });
+        responses.push({ text: etapa8ReceiptUpload(totalValue, prompts) });
         return responses;
       }
     } catch (error) {

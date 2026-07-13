@@ -52,12 +52,21 @@ Se não conseguir identificar o valor, retorne amount: 0.`;
 function getSimulatedReceiptAmount(imageUrl: string): number | null {
   // Em ambiente de desenvolvimento, retorna valores simulados baseados na URL
   // Isso permite testar o fluxo sem IA configurada
-  
+
   const lower = imageUrl.toLowerCase();
-  
+
+  // Extrair valor de parâmetros na URL (ex: ?valor=55.00 ou ?valor50)
+  const valorMatch = lower.match(/[?&]valor(\d+\.?\d*)/);
+  if (valorMatch) {
+    return parseFloat(valorMatch[1]);
+  }
+
   // Simular diferentes cenários baseados em padrões na URL
   if (lower.includes("valor50") || lower.includes("50.00")) {
     return 50.00;
+  }
+  if (lower.includes("valor55") || lower.includes("55.00")) {
+    return 55.00;
   }
   if (lower.includes("valor100") || lower.includes("100.00")) {
     return 100.00;
@@ -68,8 +77,8 @@ function getSimulatedReceiptAmount(imageUrl: string): number | null {
   if (lower.includes("valor200") || lower.includes("200.00")) {
     return 200.00;
   }
-  
-  // Para URLs genéricas, retorna null para forçar erro no fluxo
+
+  // Se não conseguir identificar, retorna null para forçar erro no fluxo
   // Em produção, remover isso e usar apenas a IA
   return null;
 }

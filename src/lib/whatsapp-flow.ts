@@ -1608,7 +1608,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
             await sendText({ number: msg.phone, text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa` });
             return;
           } else {
-            // Valor incorreto
+            // Valor incorreto - pedir comprovante novamente com o valor correto
             const attempts = flow.receiptValidationAttempts ?? 0;
             if (attempts >= 2) {
               // Muitas tentativas - voltar para métodos de pagamento
@@ -1618,10 +1618,12 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
               await sendText({ number: msg.phone, text: `O valor do comprovante não confere após várias tentativas. Vamos tentar outro método de pagamento.\n\n${etapa8Payment(!!ctx.pixKey, prompts)}` });
               return;
             }
-            
+
             flow.receiptValidationAttempts = (flow.receiptValidationAttempts ?? 0) + 1;
             await saveFlow(msg.phone, flow);
             await sendText({ number: msg.phone, text: etapa8ReceiptInvalid(totalValue, receiptAmount, prompts) });
+            await delay(1000);
+            await sendText({ number: msg.phone, text: etapa8ReceiptUpload(totalValue, prompts) });
             return;
           }
         } catch (error) {

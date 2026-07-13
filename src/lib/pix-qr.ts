@@ -40,7 +40,36 @@ export async function generatePixQrCode(data: PixQrCodeData): Promise<string> {
 
 export function generatePixPayload(data: PixQrCodeData): string {
   // Gera payload PIX Copia e Cola (formato padrão do Banco Central)
-  // TODO: Implementar payload real PIX
-  
-  return `00020126580014BR.GOV.BCB.PIX0136${data.key}520400005303986540${Math.floor(data.amount * 100).toString().padStart(11, '0')}5802BR5925${data.merchantName}6009${data.merchantCity}62070503***6304`;
+  // Implementação simplificada para desenvolvimento
+
+  const key = data.key;
+  const amount = Math.floor(data.amount * 100).toString().padStart(11, '0');
+  const merchantName = data.merchantName.substring(0, 25).padEnd(25, ' ');
+  const merchantCity = data.merchantCity.substring(0, 15).padEnd(15, ' ');
+
+  // Payload simplificado para QR Code PIX
+  // Em produção, usar biblioteca oficial do Banco Central
+  const payload = `00020126580014BR.GOV.BCB.PIX0136${key}520400005303986540${amount}5802BR59${merchantName}6009${merchantCity}62070503***6304`;
+
+  // Calcular CRC16-CCITT para o payload (simplificado)
+  const crc = calculateCRC16(payload.substring(0, payload.length - 4));
+  const crcHex = crc.toString(16).toUpperCase().padStart(4, '0');
+
+  return payload.substring(0, payload.length - 4) + crcHex;
+}
+
+// Função simplificada para cálculo de CRC16-CCITT
+function calculateCRC16(data: string): number {
+  let crc = 0xFFFF;
+  for (let i = 0; i < data.length; i++) {
+    crc ^= data.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      if ((crc & 0x8000) !== 0) {
+        crc = (crc << 1) ^ 0x1021;
+      } else {
+        crc = crc << 1;
+      }
+    }
+  }
+  return crc & 0xFFFF;
 }
