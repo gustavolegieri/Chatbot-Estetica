@@ -7,6 +7,14 @@
  *
  * Variáveis que podem ser removidas do .env:
  *   EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE_NAME
+ *
+ * CORREÇÃO (fix E.164): a WasenderAPI exige o número no formato E.164
+ * (ex: "+5511944400696"), com o "+" na frente. A função phoneToWhatsApp()
+ * em utils.ts devolve só os dígitos (ex: "5511944400696"), formato que
+ * era usado para montar JIDs no padrão Evolution API/Baileys. Por isso,
+ * toda chamada que monta o campo "to" do payload agora prefixa "+"
+ * explicitamente, sem alterar phoneToWhatsApp() (que pode ser usado em
+ * outros lugares do código nesse formato sem "+").
  */
 
 import { MessageDirection, MessageSender } from "./message-enums";
@@ -44,6 +52,15 @@ interface SendButtonsParams {
   description: string;
   footer?: string;
   buttons: ButtonOption[];
+}
+
+/**
+ * Formata o número para o padrão E.164 exigido pela WasenderAPI ("to": "+5511999998888").
+ * phoneToWhatsApp() devolve só dígitos (ex: "5511944400696"); aqui garantimos o "+" na frente.
+ */
+function toE164(number: string): string {
+  const digits = phoneToWhatsApp(number);
+  return digits.startsWith("+") ? digits : `+${digits}`;
 }
 
 function getApiKey(): string | null {
@@ -135,8 +152,8 @@ export async function sendText({
     return { blocked: true, reason: "not_private_recipient" };
   }
 
-  const whatsappNumber = phoneToWhatsApp(number);
-  console.log("[WasenderAPI] 📲 Número formatado para WhatsApp:", whatsappNumber);
+  const whatsappNumber = toE164(number);
+  console.log("[WasenderAPI] 📲 Número formatado para WhatsApp (E.164):", whatsappNumber);
 
   const result = await wasenderFetch({
     to: whatsappNumber,
@@ -195,7 +212,7 @@ export async function sendMedia({
   const absoluteUrl = resolveMediaUrl(mediaUrl);
 
   const payload: Record<string, any> = {
-    to: phoneToWhatsApp(number),
+    to: toE164(number),
     text: caption,
   };
 
@@ -233,7 +250,7 @@ export async function sendButtons({
   if (footer) lines.push("", `_${footer}_`);
 
   return wasenderFetch({
-    to: phoneToWhatsApp(number),
+    to: toE164(number),
     text: lines.join("\n"),
   });
 }
@@ -271,7 +288,7 @@ export async function sendList({
   }
 
   return wasenderFetch({
-    to: phoneToWhatsApp(number),
+    to: toE164(number),
     text: lines.join("\n"),
   });
 }
