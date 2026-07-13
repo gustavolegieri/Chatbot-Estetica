@@ -19,7 +19,7 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
     console.log("[generateSummaryCard] Generating card with data:", JSON.stringify(data, null, 2));
     
     const width = 600;
-    const height = 450;
+    const height = 550;
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext("2d");
 
@@ -32,25 +32,25 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
 
     // Header
     ctx.fillStyle = "#FFD700";
-    ctx.font = "bold 28px Arial";
+    ctx.font = "bold 36px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("📋 RESUMO DO AGENDAMENTO", width / 2, 45);
+    ctx.fillText("📋 RESUMO DO AGENDAMENTO", width / 2, 55);
 
     // Line separator
     ctx.strokeStyle = "#FFD700";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(30, 65);
-    ctx.lineTo(width - 30, 65);
+    ctx.moveTo(30, 80);
+    ctx.lineTo(width - 30, 80);
     ctx.stroke();
 
     // Content
     ctx.fillStyle = "#ffffff";
-    ctx.font = "20px Arial";
+    ctx.font = "24px sans-serif";
     ctx.textAlign = "left";
     
-    const startY = 110;
-    const lineHeight = 40;
+    const startY = 130;
+    const lineHeight = 50;
     let currentY = startY;
 
     const items = [
@@ -81,9 +81,9 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
 
     // Footer
     ctx.fillStyle = "#888888";
-    ctx.font = "16px Arial";
+    ctx.font = "20px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("Cancelamento até 2h antes sem custo", width / 2, height - 25);
+    ctx.fillText("Cancelamento até 2h antes sem custo", width / 2, height - 35);
 
     // Convert to buffer and then to base64 data URL (works in Vercel)
     const buffer = canvas.toBuffer("image/png");
