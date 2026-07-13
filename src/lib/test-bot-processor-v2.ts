@@ -27,6 +27,7 @@ import { findCouponByCode } from "./coupons";
 import { format } from "date-fns";
 import { answerCustomerDoubt } from "./whatsapp-ai";
 import { generateSummaryCard, generateSummaryText } from "./summary-card";
+import { generatePixQrCode, generatePixPayload } from "./pix-qr";
 import type { FlowStage } from "./whatsapp-flow-types";
 import type { FlowContext } from "./whatsapp-flow-messages";
 
@@ -1240,13 +1241,53 @@ async function handlePaymentSelection(
   }
 
   session.paymentMethod = paymentMethods[input];
-  
+
+  // Se escolher PIX, enviar QR Code do banco de dados
+  if (paymentMethods[input] === "PIX") {
+    const ctx = await loadPaymentContext();
+    const totalValue = Number(session.quote ?? 0) + Number(session.upsellValue ?? 0) + Number(session.pickupDeliveryFee ?? 0) - Number(session.couponDiscount ?? 0);
+
+    try {
+      let pixQrUrl: string;
+
+      // Se tiver QR Code pré-gerado, usa ele. Caso contrário, gera um novo.
+      if (ctx.pixQrCodeImage) {
+        pixQrUrl = ctx.pixQrCodeImage;
+      } else {
+        pixQrUrl = await generatePixQrCode({
+          amount: totalValue,
+          description: `Agendamento ${session.selectedServiceName}`,
+          merchantName: ctx.pixHolder || ctx.businessName,
+          merchantCity: ctx.pixMerchantCity || ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
+          key: ctx.pixKey || "",
+        });
+      }
+
+      const pixPayload = generatePixPayload({
+        amount: totalValue,
+        description: `Agendamento ${session.selectedServiceName}`,
+        merchantName: ctx.pixHolder || ctx.businessName,
+        merchantCity: ctx.pixMerchantCity || ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
+        key: ctx.pixKey || "",
+      });
+
+      responses.push({ text: `💳 **Pagamento via PIX**\n\nEscaneie o QR Code abaixo para pagar:\n\nValor: R$ ${totalValue.toFixed(2).replace('.', ',')}` });
+      responses.push({ text: "", mediaUrl: pixQrUrl, mediaType: "image" });
+      responses.push({ text: `Ou copie e cole o código PIX:\n\`${pixPayload}\`` });
+      responses.push({ text: "📋 Após pagar, envie o comprovante ou digite 'pular' para confirmar sem comprovante." });
+    } catch (error) {
+      console.error("[handlePaymentSelection] Error generating PIX QR code:", error);
+      responses.push({ text: "❌ Erro ao gerar QR Code PIX. Tente outra forma de pagamento." });
+    }
+    return responses;
+  }
+
   // Generate payment simulation code (6-digit random)
   const simulationCode = Math.floor(100000 + Math.random() * 900000).toString();
   session.paymentSimulationCode = simulationCode;
   session.awaitingPaymentConfirmation = true;
   session.stage = "ETAPA8_PAYMENT_CONFIRM";
-  
+
   const methodText = paymentMethods[input];
   responses.push({
     text: `💳 **Pagamento via ${methodText}**\n\n📋 Código de simulação: *${simulationCode}*\n\nDigite o código para confirmar o pagamento (simulação).\n\nOu digite "pular" para confirmar sem simulação.`,
