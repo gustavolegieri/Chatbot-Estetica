@@ -1,5 +1,3 @@
-import { createCanvas, loadImage } from "@napi-rs/canvas";
-
 interface SummaryCardData {
   customerName: string;
   serviceName: string;
@@ -12,7 +10,7 @@ interface SummaryCardData {
 }
 
 /**
- * Gera imagem visual do resumo do agendamento usando canvas.
+ * Gera imagem visual do resumo do agendamento usando SVG (compatível com Vercel).
  */
 export async function generateSummaryCard(data: SummaryCardData): Promise<string> {
   try {
@@ -20,38 +18,16 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
     
     const width = 600;
     const height = 550;
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext("2d");
-
-    // Background gradient
-    const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, "#1a1a2e");
-    gradient.addColorStop(1, "#16213e");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
-
-    // Header
-    ctx.fillStyle = "#FFD700";
-    ctx.font = "bold 36px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("📋 RESUMO DO AGENDAMENTO", width / 2, 55);
-
-    // Line separator
-    ctx.strokeStyle = "#FFD700";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(30, 80);
-    ctx.lineTo(width - 30, 80);
-    ctx.stroke();
-
-    // Content
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "24px sans-serif";
-    ctx.textAlign = "left";
     
-    const startY = 130;
-    const lineHeight = 50;
-    let currentY = startY;
+    // Escape XML special characters
+    const escapeXml = (text: string) => {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    };
 
     const items = [
       { label: "👤 Cliente:", value: data.customerName },
@@ -63,34 +39,53 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
       { label: "💰 Total:", value: `R$ ${data.totalPrice.toFixed(2).replace('.', ',')}` },
     ];
 
-    items.forEach((item) => {
-      ctx.fillStyle = "#FFD700";
-      ctx.fillText(item.label, 40, currentY);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(item.value, 180, currentY);
-      currentY += lineHeight;
-    });
+    let contentY = 130;
+    const lineHeight = 50;
+    
+    let itemsSvg = items.map((item, index) => {
+      const y = contentY + (index * lineHeight);
+      return `
+        <text x="40" y="${y}" fill="#FFD700" font-family="Arial, sans-serif" font-size="24" font-weight="bold">${escapeXml(item.label)}</text>
+        <text x="180" y="${y}" fill="#ffffff" font-family="Arial, sans-serif" font-size="24">${escapeXml(item.value)}</text>
+      `;
+    }).join('');
 
+    let pickupSvg = '';
     if (data.pickupAddress) {
-      ctx.fillStyle = "#FFD700";
-      ctx.fillText("📍 Endereço:", 40, currentY);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(data.pickupAddress, 180, currentY);
-      currentY += lineHeight;
+      const pickupY = contentY + (items.length * lineHeight);
+      pickupSvg = `
+        <text x="40" y="${pickupY}" fill="#FFD700" font-family="Arial, sans-serif" font-size="24" font-weight="bold">📍 Endereço:</text>
+        <text x="180" y="${pickupY}" fill="#ffffff" font-family="Arial, sans-serif" font-size="24">${escapeXml(data.pickupAddress)}</text>
+      `;
     }
 
-    // Footer
-    ctx.fillStyle = "#888888";
-    ctx.font = "20px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("Cancelamento até 2h antes sem custo", width / 2, height - 35);
+    const svg = `
+      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+          </linearGradient>
+        </defs>
+        
+        <rect width="100%" height="100%" fill="url(#bg)" />
+        
+        <text x="300" y="55" fill="#FFD700" font-family="Arial, sans-serif" font-size="36" font-weight="bold" text-anchor="middle">📋 RESUMO DO AGENDAMENTO</text>
+        
+        <line x1="30" y1="80" x2="570" y2="80" stroke="#FFD700" stroke-width="2" />
+        
+        ${itemsSvg}
+        ${pickupSvg}
+        
+        <text x="300" y="${height - 35}" fill="#888888" font-family="Arial, sans-serif" font-size="20" text-anchor="middle">Cancelamento até 2h antes sem custo</text>
+      </svg>
+    `;
 
-    // Convert to buffer and then to base64 data URL (works in Vercel)
-    const buffer = canvas.toBuffer("image/png");
-    const base64 = buffer.toString("base64");
-    const dataUrl = `data:image/png;base64,${base64}`;
+    // Convert SVG to base64 data URL
+    const base64 = Buffer.from(svg).toString('base64');
+    const dataUrl = `data:image/svg+xml;base64,${base64}`;
     
-    console.log("[generateSummaryCard] Image generated as data URL, size:", buffer.length);
+    console.log("[generateSummaryCard] SVG generated as data URL, size:", base64.length);
     
     return dataUrl;
   } catch (error) {
