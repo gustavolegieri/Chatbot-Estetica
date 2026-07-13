@@ -596,16 +596,26 @@ async function createAppointment(flow: FlowState, phone: string) {
   const couponDiscount = Number(flow.couponDiscountApplied ?? 0);
   const finalValue = Math.max(0, baseValue + pickupFee - couponDiscount);
 
-  // Determinar status de pagamento baseado no tipo de PIX
+  // Determinar status de pagamento baseado no tipo de PIX e pagamentos parciais
   let paymentStatus = "PENDING";
   let paidAt = null;
   let transactionId = null;
 
-  if (flow.pixPaymentType === "now" && flow.receiptAmount) {
-    // PIX pago agora com comprovante validado
-    paymentStatus = "PAID";
-    paidAt = new Date();
-    transactionId = `RECEIPT-${Date.now()}`;
+  const totalPaid = flow.totalPaid ?? flow.receiptAmount ?? 0;
+
+  if (flow.pixPaymentType === "now" && totalPaid > 0) {
+    // PIX pago agora (completo ou parcial)
+    if (totalPaid >= finalValue) {
+      // Pagamento completo
+      paymentStatus = "PAID";
+      paidAt = new Date();
+      transactionId = `RECEIPT-${Date.now()}`;
+    } else {
+      // Pagamento parcial
+      paymentStatus = "PARTIAL";
+      paidAt = new Date();
+      transactionId = `PARTIAL-${Date.now()}`;
+    }
   } else if (flow.pixPaymentType === "delivery") {
     // PIX na entrega - mantém como pendente
     paymentStatus = "PENDING";
@@ -629,7 +639,14 @@ async function createAppointment(flow: FlowState, phone: string) {
           flow.needsReturn ? "Retorno desejado" : null,
           flow.upsellLabel ? `Upsell: ${flow.upsellLabel}` : null,
           flow.packageKey,
-          flow.receiptImageUrl ? `Comprovante: ${flow.receiptImageUrl}` : null,
+          flow.totalPaid && flow.totalPaid < finalValue
+            ? `Pagamento parcial: R$ ${flow.totalPaid.toFixed(2).replace('.', ',')} / R$ ${finalValue.toFixed(2).replace('.', ',')}`
+            : flow.receiptImageUrl
+            ? `Comprovante: ${flow.receiptImageUrl}`
+            : null,
+          flow.partialPayments && flow.partialPayments.length > 0
+            ? `Pagamentos: ${flow.partialPayments.map(p => `R$ ${p.amount.toFixed(2).replace('.', ',')}`).join(', ')}`
+            : null,
         ]
           .filter(Boolean)
           .join(" | "),
@@ -1504,6 +1521,15 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         flow.pixPaymentType = "now";
         flow.paymentMethod = "PIX (Pagar agora)";
         const totalValue = Math.max(0, Number(flow.quoteMin ?? 0) + Number(flow.pickupFee ?? 0) - Number(flow.couponDiscountApplied ?? 0));
+        const currentPaid = flow.totalPaid ?? 0;
+        const remainingValue = totalValue - currentPaid;
+
+        // Reset payment state if starting fresh
+        if (currentPaid === 0) {
+          flow.totalPaid = 0;
+          flow.partialPayments = [];
+        }
+
         flow.stage = "ETAPA8_RECEIPT_UPLOAD";
         await saveFlow(msg.phone, flow);
 
@@ -1516,7 +1542,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
             pixQrUrl = ctx.pixQrCodeImage;
           } else {
             pixQrUrl = await generatePixQrCode({
-              amount: totalValue,
+              amount: remainingValue,
               description: `Agendamento ${flow.serviceLabel}`,
               merchantName: ctx.pixHolder || ctx.businessName,
               merchantCity: ctx.pixMerchantCity || ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
@@ -1525,21 +1551,21 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
           }
 
           const pixPayload = generatePixPayload({
-            amount: totalValue,
+            amount: remainingValue,
             description: `Agendamento ${flow.serviceLabel}`,
             merchantName: ctx.pixHolder || ctx.businessName,
             merchantCity: ctx.pixMerchantCity || ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
             key: ctx.pixKey || "",
           });
 
-          await sendText({ number: msg.phone, text: `💳 **Pagamento via PIX**\n\nEscaneie o QR Code abaixo para pagar:\n\nValor: R$ ${totalValue.toFixed(2).replace('.', ',')}` });
+          await sendText({ number: msg.phone, text: `💳 **Pagamento via PIX**\n\nEscaneie o QR Code abaixo para pagar:\n\nValor: R$ ${remainingValue.toFixed(2).replace('.', ',')}` });
           await sendMedia({ number: msg.phone, mediaUrl: pixQrUrl, mediaType: "image" });
           await sendText({ number: msg.phone, text: `Ou copie e cole o código PIX:\n\`${pixPayload}\`` });
           await delay(1000);
-          await sendText({ number: msg.phone, text: etapa8ReceiptUpload(totalValue, prompts) });
+          await sendText({ number: msg.phone, text: etapa8ReceiptUpload(remainingValue, prompts) });
         } catch (error) {
           console.error("[ETAPA8_PIX_CHOICE] Error generating PIX QR code:", error);
-          await sendText({ number: msg.phone, text: etapa8ReceiptUpload(totalValue, prompts) });
+          await sendText({ number: msg.phone, text: etapa8ReceiptUpload(remainingValue, prompts) });
         }
         return;
       }
@@ -1565,17 +1591,19 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
 
     case "ETAPA8_RECEIPT_UPLOAD": {
       // Verificar se mensagem contém imagem
-      if (msg.text.match(/^(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp))/i) || 
-          msg.text.includes("image") || 
+      if (msg.text.match(/^(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp))/i) ||
+          msg.text.includes("image") ||
           msg.text.includes("media")) {
-        
+
         const imageUrl = msg.text;
         const totalValue = Math.max(0, Number(flow.quoteMin ?? 0) + Number(flow.pickupFee ?? 0) - Number(flow.couponDiscountApplied ?? 0));
-        
+        const currentPaid = flow.totalPaid ?? 0;
+        const remainingValue = totalValue - currentPaid;
+
         try {
           // Analisar comprovante usando IA
           const receiptAmount = await analyzeReceiptImage(imageUrl);
-          
+
           if (receiptAmount === null) {
             // Erro na leitura
             const attempts = flow.receiptValidationAttempts ?? 0;
@@ -1587,29 +1615,29 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
               await sendText({ number: msg.phone, text: `Não consegui ler o comprovante após várias tentativas. Vamos tentar outro método de pagamento.\n\n${etapa8Payment(!!ctx.pixKey, prompts)}` });
               return;
             }
-            
+
             flow.receiptValidationAttempts = (flow.receiptValidationAttempts ?? 0) + 1;
             await saveFlow(msg.phone, flow);
             await sendText({ number: msg.phone, text: etapa8ReceiptError(prompts) });
             return;
           }
-          
-          // Validar valor
-          if (validateReceiptAmount(receiptAmount, totalValue, 10)) {
+
+          // Validar valor contra o valor restante (não o total original)
+          if (validateReceiptAmount(receiptAmount, remainingValue, 10)) {
             // Valor correto - aprovar pagamento
             flow.receiptImageUrl = imageUrl;
             flow.receiptAmount = receiptAmount;
+            flow.totalPaid = currentPaid + receiptAmount;
             flow.receiptValidationAttempts = 0;
             flow.stage = "ETAPA14_REMINDER";
             await saveFlow(msg.phone, flow);
 
-            await sendText({ number: msg.phone, text: `✅ *Pagamento confirmado!*\n\nValor do comprovante: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\n\nSeu agendamento está garantido.` });
+            await sendText({ number: msg.phone, text: `✅ *Pagamento confirmado!*\n\nValor do comprovante: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\nTotal pago: R$ ${flow.totalPaid.toFixed(2).replace('.', ',')}\n\nSeu agendamento está garantido.` });
             await delay(1000);
             await sendText({ number: msg.phone, text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa` });
             return;
           } else {
             // Valor incorreto - verificar se é pagamento parcial
-            const currentPaid = flow.totalPaid ?? 0;
             const newTotalPaid = currentPaid + receiptAmount;
             const remaining = totalValue - newTotalPaid;
 
@@ -1652,9 +1680,9 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
 
               flow.receiptValidationAttempts = (flow.receiptValidationAttempts ?? 0) + 1;
               await saveFlow(msg.phone, flow);
-              await sendText({ number: msg.phone, text: etapa8ReceiptInvalid(totalValue, receiptAmount, prompts) });
+              await sendText({ number: msg.phone, text: etapa8ReceiptInvalid(remainingValue, receiptAmount, prompts) });
               await delay(1000);
-              await sendText({ number: msg.phone, text: etapa8ReceiptUpload(totalValue, prompts) });
+              await sendText({ number: msg.phone, text: etapa8ReceiptUpload(remainingValue, prompts) });
               return;
             }
           }
@@ -1668,19 +1696,20 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
             await sendText({ number: msg.phone, text: `Erro ao processar comprovante. Vamos tentar outro método de pagamento.\n\n${etapa8Payment(!!ctx.pixKey, prompts)}` });
             return;
           }
-          
+
           flow.receiptValidationAttempts = (flow.receiptValidationAttempts ?? 0) + 1;
           await saveFlow(msg.phone, flow);
           await sendText({ number: msg.phone, text: etapa8ReceiptError(prompts) });
           return;
         }
       }
-      
-      // Se não for imagem, pedir novamente
-      await sendText({ number: msg.phone, text: etapa8ReceiptUpload(
-        Math.max(0, Number(flow.quoteMin ?? 0) + Number(flow.pickupFee ?? 0) - Number(flow.couponDiscountApplied ?? 0)),
-        prompts
-      ) });
+
+      // Se não for imagem, pedir novamente com o valor restante correto
+      const totalValue = Math.max(0, Number(flow.quoteMin ?? 0) + Number(flow.pickupFee ?? 0) - Number(flow.couponDiscountApplied ?? 0));
+      const currentPaid = flow.totalPaid ?? 0;
+      const remainingValue = totalValue - currentPaid;
+
+      await sendText({ number: msg.phone, text: etapa8ReceiptUpload(remainingValue, prompts) });
       return;
     }
 

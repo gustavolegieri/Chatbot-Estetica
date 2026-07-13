@@ -1330,6 +1330,15 @@ async function handlePixChoice(
     session.pixPaymentType = "now";
     session.paymentMethod = "PIX (Pagar agora)";
     const totalValue = Number(session.quote ?? 0) + Number(session.upsellValue ?? 0) + Number(session.pickupDeliveryFee ?? 0) - Number(session.couponDiscount ?? 0);
+    const currentPaid = session.totalPaid ?? 0;
+    const remainingValue = totalValue - currentPaid;
+
+    // Reset payment state if starting fresh
+    if (currentPaid === 0) {
+      session.totalPaid = 0;
+      session.partialPayments = [];
+    }
+
     session.stage = "ETAPA8_RECEIPT_UPLOAD";
     session.awaitingReceiptUpload = true;
 
@@ -1342,7 +1351,7 @@ async function handlePixChoice(
         pixQrUrl = ctx.pixQrCodeImage;
       } else {
         pixQrUrl = await generatePixQrCode({
-          amount: totalValue,
+          amount: remainingValue,
           description: `Agendamento ${session.selectedServiceName}`,
           merchantName: ctx.pixHolder || ctx.businessName,
           merchantCity: ctx.pixMerchantCity || ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
@@ -1351,20 +1360,20 @@ async function handlePixChoice(
       }
 
       const pixPayload = generatePixPayload({
-        amount: totalValue,
+        amount: remainingValue,
         description: `Agendamento ${session.selectedServiceName}`,
         merchantName: ctx.pixHolder || ctx.businessName,
         merchantCity: ctx.pixMerchantCity || ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
         key: ctx.pixKey || "",
       });
 
-      responses.push({ text: `💳 **Pagamento via PIX**\n\nEscaneie o QR Code abaixo para pagar:\n\nValor: R$ ${totalValue.toFixed(2).replace('.', ',')}` });
+      responses.push({ text: `💳 **Pagamento via PIX**\n\nEscaneie o QR Code abaixo para pagar:\n\nValor: R$ ${remainingValue.toFixed(2).replace('.', ',')}` });
       responses.push({ text: "", mediaUrl: pixQrUrl, mediaType: "image" });
       responses.push({ text: `Ou copie e cole o código PIX:\n\`${pixPayload}\`` });
-      responses.push({ text: etapa8ReceiptUpload(totalValue, prompts) });
+      responses.push({ text: etapa8ReceiptUpload(remainingValue, prompts) });
     } catch (error) {
       console.error("[handlePixChoice] Error generating PIX QR code:", error);
-      responses.push({ text: etapa8ReceiptUpload(totalValue, prompts) });
+      responses.push({ text: etapa8ReceiptUpload(remainingValue, prompts) });
     }
     return responses;
   }
@@ -1422,23 +1431,26 @@ async function handleReceiptUpload(
         return responses;
       }
 
-      // Validar valor
-      if (validateReceiptAmount(receiptAmount, totalValue, 10)) {
+      // Validar valor contra o valor restante (não o total original)
+      const currentPaid = session.totalPaid ?? 0;
+      const remainingValue = totalValue - currentPaid;
+
+      if (validateReceiptAmount(receiptAmount, remainingValue, 10)) {
         // Valor correto - aprovar pagamento
         session.receiptImageUrl = imageUrl;
         session.receiptAmount = receiptAmount;
+        session.totalPaid = currentPaid + receiptAmount;
         session.receiptValidationAttempts = 0;
         session.awaitingReceiptUpload = false;
         session.stage = "ETAPA9_REMINDER";
 
-        responses.push({ text: `✅ *Pagamento confirmado!*\n\nValor do comprovante: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\n\nSeu agendamento está garantido.` });
+        responses.push({ text: `✅ *Pagamento confirmado!*\n\nValor do comprovante: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\nTotal pago: R$ ${session.totalPaid.toFixed(2).replace('.', ',')}\n\nSeu agendamento está garantido.` });
         responses.push({
           text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
         });
         return responses;
       } else {
         // Valor incorreto - verificar se é pagamento parcial
-        const currentPaid = session.totalPaid ?? 0;
         const newTotalPaid = currentPaid + receiptAmount;
         const remaining = totalValue - newTotalPaid;
 
@@ -1479,8 +1491,8 @@ async function handleReceiptUpload(
           }
 
           session.receiptValidationAttempts = (session.receiptValidationAttempts ?? 0) + 1;
-          responses.push({ text: etapa8ReceiptInvalid(totalValue, receiptAmount, prompts) });
-          responses.push({ text: etapa8ReceiptUpload(totalValue, prompts) });
+          responses.push({ text: etapa8ReceiptInvalid(remainingValue, receiptAmount, prompts) });
+          responses.push({ text: etapa8ReceiptUpload(remainingValue, prompts) });
           return responses;
         }
       }

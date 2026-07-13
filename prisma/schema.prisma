@@ -385,6 +385,7 @@ enum AppointmentStatus {
 
 enum PaymentStatus {
   PENDING
+  PARTIAL
   PAID
   FAILED
   REFUNDED
