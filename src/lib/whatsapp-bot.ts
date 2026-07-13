@@ -67,23 +67,31 @@ async function getOrCreateSession(phone: string, pushName?: string) {
 }
 
 async function handleMessage(msg: IncomingMessage) {
+  console.log("[WhatsApp Bot] 📱 Mensagem recebida:", { phone: msg.phone, text: msg.text, buttonId: msg.buttonId, listId: msg.listId, pushName: msg.pushName });
+
   if (!isValidPrivateRecipient(msg.phone)) {
-    console.warn("[WhatsApp Bot] Ignorado (não é chat privado):", msg.phone);
+    console.warn("[WhatsApp Bot] ⛔ Ignorado (não é chat privado):", msg.phone);
     return;
   }
 
   const settings = await prisma.settings.findUnique({ where: { id: "default" } });
   if (settings && settings.whatsappEnabled === false) {
-    console.warn("[WhatsApp Bot] whatsappEnabled=false nas configurações, mensagem ignorada");
+    console.warn("[WhatsApp Bot] ⛔ whatsappEnabled=false nas configurações, mensagem ignorada");
     return;
   }
+
+  console.log("[WhatsApp Bot] ✅ WhatsApp habilitado nas configurações");
 
   runAppointmentRemindersFromBot();
 
   const session = await getOrCreateSession(msg.phone, msg.pushName);
+  console.log("[WhatsApp Bot] 📦 Sessão criada/encontrada:", { sessionId: session.id, phone: session.phone, clientId: session.clientId });
+
   let flow = parseFlow(session.metadata);
   const flowRef = { current: flow };
   const lastInteractionAt = session.lastMessageAt ?? session.updatedAt;
+
+  console.log("[WhatsApp Bot] 🔄 Estado atual do fluxo:", { stage: flow.stage, welcomed: flow.welcomed, customerName: flow.customerName });
 
   await runWithMessageLogContext(
     {
@@ -124,16 +132,23 @@ async function handleMessage(msg: IncomingMessage) {
         where: { phone: normalizePhone(msg.phone) },
         select: { id: true },
       });
-      if (blocked) return;
-
-      if (await isBotPausedForPhone(msg.phone)) {
+      if (blocked) {
+        console.log("[WhatsApp Bot] ⛔ Número bloqueado:", msg.phone);
         return;
       }
+
+      if (await isBotPausedForPhone(msg.phone)) {
+        console.log("[WhatsApp Bot] ⛔ Bot pausado para este número:", msg.phone);
+        return;
+      }
+
+      console.log("[WhatsApp Bot] ✅ Número não bloqueado, bot não pausado");
 
 
       if (await tryHandleAppointmentConfirmation(msg.phone, msg.text, flowRef.current.stage)) return;
 
       if (settings && !getBusinessHoursStatus(settings).isOpen) {
+        console.log("[WhatsApp Bot] ⛔ Fora do horário de funcionamento");
         const name =
           resolveValidCustomerName(flowRef.current.customerName) ??
           resolveValidCustomerName(session.client?.name) ??
@@ -147,12 +162,17 @@ async function handleMessage(msg: IncomingMessage) {
         return;
       }
 
+      console.log("[WhatsApp Bot] ✅ Dentro do horário de funcionamento");
+
       const wasReset = await applyWelcomeRestartIfNeeded(
         msg.phone,
         lastInteractionAt,
         flowRef.current
       );
+      console.log("[WhatsApp Bot] 🔄 wasReset:", wasReset);
+
       if (wasReset) {
+        console.log("[WhatsApp Bot] 🔄 Sessão resetada, enviando boas-vindas");
         const refreshed = await prisma.whatsAppSession.findUnique({
           where: { phone: normalizePhone(msg.phone) },
           include: { client: true },
@@ -171,7 +191,10 @@ async function handleMessage(msg: IncomingMessage) {
       flowRef.current = parseFlow(sessionAfterReset?.metadata);
       flow = flowRef.current;
 
+      console.log("[WhatsApp Bot] 🔄 Estado após reset check:", { stage: flowRef.current.stage, welcomed: flowRef.current.welcomed });
+
       if (msg.text.trim().toLowerCase() === "menu") {
+        console.log("[WhatsApp Bot] 📋 Comando 'menu' detectado");
         const name =
           flowRef.current.customerName ?? session.client?.name ?? msg.pushName ?? "Cliente";
         await goToMainMenu(msg.phone, name);
@@ -179,10 +202,12 @@ async function handleMessage(msg: IncomingMessage) {
       }
 
       if (!flowRef.current.welcomed) {
+        console.log("[WhatsApp Bot] 🤖 Cliente não recebeu boas-vindas ainda, iniciando flow");
         await startFlow(msg);
         return;
       }
 
+      console.log("[WhatsApp Bot] 🔄 Processando flow numerado");
       await processNumberedFlow(msg, flowRef.current);
     }
   );

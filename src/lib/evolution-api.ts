@@ -15,7 +15,7 @@ import { isValidPrivateRecipient } from "./whatsapp-jid";
 import { getMessageLogContext } from "./whatsapp-message-context";
 import { logWhatsAppMessage } from "./whatsapp-message-log";
 
-const WASENDER_BASE = "https://wasenderapi.com/api";
+const WASENDER_BASE = process.env.WASENDER_BASE_URL || "https://wasenderapi.com/api";
 
 interface SendTextParams {
   number: string;
@@ -78,9 +78,14 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
   const apiKey = getApiKey();
 
   if (!apiKey) {
-    console.warn("[WasenderAPI] Não configurada - mensagem simulada:", body);
+    console.warn("[WasenderAPI] ❌ Não configurada - mensagem simulada:", body);
+    console.warn("[WasenderAPI] ⚠️ Configure WASENDER_API_KEY no .env");
     return { simulated: true };
   }
+
+  console.log("[WasenderAPI] 📤 Enviando mensagem para WasenderAPI:", body);
+  console.log("[WasenderAPI] 🔗 URL da API:", WASENDER_BASE);
+  console.log("[WasenderAPI] 🔑 API Key configurada:", apiKey ? "SIM" : "NÃO");
 
   const response = await fetch(`${WASENDER_BASE}/send-message`, {
     method: "POST",
@@ -91,23 +96,28 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
     body: JSON.stringify(body),
   });
 
+  console.log("[WasenderAPI] 📊 Status da resposta:", response.status, response.statusText);
+
   if (response.status === 429 && attempt <= 3) {
     let waitMs = 62_000;
     try {
       const json = await response.clone().json() as { retry_after?: number };
       if (json.retry_after) waitMs = (json.retry_after + 2) * 1000;
     } catch { /* ignora */ }
-    console.warn(`[WasenderAPI] Rate limit — aguardando ${waitMs / 1000}s (tentativa ${attempt}/3)`);
+    console.warn(`[WasenderAPI] ⏳ Rate limit — aguardando ${waitMs / 1000}s (tentativa ${attempt}/3)`);
     await new Promise((resolve) => setTimeout(resolve, waitMs));
     return wasenderFetch(body, attempt + 1);
   }
 
   if (!response.ok) {
     const text = await response.text();
+    console.error("[WasenderAPI] ❌ Erro na API:", response.status, "-", text);
     throw new Error(`WasenderAPI error: ${response.status} - ${text}`);
   }
 
-  return response.json();
+  const result = await response.json();
+  console.log("[WasenderAPI] ✅ Resposta da API:", result);
+  return result;
 }
 
 /** Envia mensagem de texto simples */
@@ -118,13 +128,18 @@ export async function sendText({
   sender = "BOT",
   flowStage,
 }: SendTextParams) {
+  console.log("[WasenderAPI] 📱 sendText chamado com:", { number, text: text.substring(0, 50) + "...", flowStage });
+
   if (!isValidPrivateRecipient(number)) {
-    console.warn("[WasenderAPI] Envio bloqueado (não é chat privado):", number);
+    console.warn("[WasenderAPI] ⛔ Envio bloqueado (não é chat privado):", number);
     return { blocked: true, reason: "not_private_recipient" };
   }
 
+  const whatsappNumber = phoneToWhatsApp(number);
+  console.log("[WasenderAPI] 📲 Número formatado para WhatsApp:", whatsappNumber);
+
   const result = await wasenderFetch({
-    to: phoneToWhatsApp(number),
+    to: whatsappNumber,
     text,
   });
 
