@@ -32,35 +32,18 @@ export async function sendWelcomeFlow(phone: string, rawName?: string | null) {
   const ctx = await loadWelcomeContext();
   const validName = resolveValidCustomerName(rawName);
 
-  if (validName) {
-    await prisma.whatsAppSession.update({
-      where: { phone: normalized },
-      data: {
-        metadata: {
-          stage: "ETAPA2_MAIN_MENU",
-          welcomed: true,
-          customerName: validName,
-        } as object,
-        step: WhatsAppSessionStep.IDLE,
-      },
-    });
-    await sendText({
-      number: normalized,
-      text: etapa2MainMenu(validName, buildMainMenu(wctx.categories, wctx.prompts), wctx.prompts),
-      flowStage: "ETAPA2_MAIN_MENU",
-    });
-  } else {
-    await prisma.whatsAppSession.update({
-      where: { phone: normalized },
-      data: {
-        metadata: { stage: "ETAPA1_AWAITING_NAME", welcomed: true } as object,
-        step: WhatsAppSessionStep.IDLE,
-      },
-    });
-    await sendText({
-      number: normalized,
-      text: etapa1Welcome(ctx, wctx.prompts),
-      flowStage: "ETAPA1_AWAITING_NAME",
-    });
-  }
+  // Sempre reinicia do zero após 30 minutos de inatividade
+  await prisma.whatsAppSession.update({
+    where: { phone: normalized },
+    data: {
+      metadata: { stage: "ETAPA1_AWAITING_NAME", welcomed: false } as object,
+      step: WhatsAppSessionStep.IDLE,
+    },
+  });
+  
+  await sendText({
+    number: normalized,
+    text: etapa1Welcome(ctx, wctx.prompts),
+    flowStage: "ETAPA1_AWAITING_NAME",
+  });
 }

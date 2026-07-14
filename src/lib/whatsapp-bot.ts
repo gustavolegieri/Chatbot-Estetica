@@ -168,34 +168,29 @@ const settings = await prisma.settings.findUnique({ where: { id: "default" } });
 
       console.log("[WhatsApp Bot] ✅ Dentro do horário de funcionamento");
 
-      const wasReset = await applyWelcomeRestartIfNeeded(
+      const resetResult = await applyWelcomeRestartIfNeeded(
         msg.phone,
         lastInteractionAt,
         flowRef.current
       );
-      console.log("[WhatsApp Bot] 🔄 wasReset:", wasReset);
+      console.log("[WhatsApp Bot] 🔄 resetResult:", resetResult);
 
-      if (wasReset) {
+      if (resetResult.shouldSendWelcome) {
         console.log("[WhatsApp Bot] 🔄 Sessão resetada, enviando boas-vindas");
-        const refreshed = await prisma.whatsAppSession.findUnique({
-          where: { phone: normalizePhone(msg.phone) },
-          include: { client: true },
-        });
-        const name =
-          resolveValidCustomerName(refreshed?.client?.name) ??
-          resolveValidCustomerName(msg.pushName);
-        await sendWelcomeFlow(msg.phone, name);
+        await sendWelcomeFlow(msg.phone);
         return;
       }
 
-      const sessionAfterReset = await prisma.whatsAppSession.findUnique({
-        where: { phone: normalizePhone(msg.phone) },
-        include: { client: true },
-      });
-      flowRef.current = parseFlow(sessionAfterReset?.metadata);
-      flow = flowRef.current;
-
-      console.log("[WhatsApp Bot] 🔄 Estado após reset check:", { stage: flowRef.current.stage, welcomed: flowRef.current.welcomed });
+      if (resetResult.wasReset) {
+        // Se foi resetado mas não precisa enviar boas-vindas, recarregar o estado
+        const sessionAfterReset = await prisma.whatsAppSession.findUnique({
+          where: { phone: normalizePhone(msg.phone) },
+          include: { client: true },
+        });
+        flowRef.current = parseFlow(sessionAfterReset?.metadata);
+        flow = flowRef.current;
+        console.log("[WhatsApp Bot] 🔄 Estado após reset check:", { stage: flowRef.current.stage, welcomed: flowRef.current.welcomed });
+      }
 
       if (msg.text.trim().toLowerCase() === "menu") {
         console.log("[WhatsApp Bot] 📋 Comando 'menu' detectado");

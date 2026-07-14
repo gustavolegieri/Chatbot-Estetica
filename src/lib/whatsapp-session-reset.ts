@@ -13,22 +13,15 @@ export async function isSessionExpired(lastInteractionAt: Date): Promise<boolean
 
 /** Estado limpo — sem veículo, serviço ou etapa anterior */
 export function buildFreshFlowState(customerName?: string): FlowState {
-  const valid = resolveValidCustomerName(customerName);
-  if (valid) {
-    return {
-      stage: "ETAPA2_MAIN_MENU",
-      welcomed: true,
-      customerName: valid,
-    };
-  }
+  // Sempre reinicia do zero após expiração de sessão (30 minutos)
   return {
     stage: "ETAPA1_AWAITING_NAME",
     welcomed: false,
   };
 }
 
-export async function saveFreshFlow(phone: string, customerName?: string) {
-  const fresh = buildFreshFlowState(customerName);
+export async function saveFreshFlow(phone: string) {
+  const fresh = buildFreshFlowState();
   await prisma.whatsAppSession.update({
     where: { phone: normalizePhone(phone) },
     data: {
@@ -41,7 +34,7 @@ export async function saveFreshFlow(phone: string, customerName?: string) {
 
 /** Marca que a próxima mensagem do cliente deve receber boas-vindas (ex.: após encerrar handoff). */
 export async function markPendingWelcomeRestart(phone: string, customerName?: string | null) {
-  const fresh = buildFreshFlowState(customerName ?? undefined);
+  const fresh = buildFreshFlowState();
   await prisma.whatsAppSession.update({
     where: { phone: normalizePhone(phone) },
     data: {
@@ -60,8 +53,10 @@ export function shouldRestartWithWelcome(
 }
 
 /**
- * Reinicia atendimentos parados há mais de X min e envia boas-vindas.
+ * Reinicia atendimentos parados há mais de X min (apenas estado interno).
+ * NÃO envia boas-vindas automaticamente - isso só acontece quando o cliente interage.
  * Chamar no cron a cada 5–10 min.
+ * Sempre reinicia do zero após 30 minutos de inatividade.
  */
 export async function resetAllExpiredSessions(): Promise<{ reset: number; checked: number }> {
   const sessionResetMs = await getSessionResetMs();
@@ -77,8 +72,7 @@ export async function resetAllExpiredSessions(): Promise<{ reset: number; checke
   let reset = 0;
   for (const session of sessions) {
     const meta = (session.metadata ?? {}) as unknown as FlowState;
-    const name = resolveValidCustomerName(meta.customerName) ?? resolveValidCustomerName(session.client?.name);
-    const fresh = buildFreshFlowState(name ?? undefined);
+    const fresh = buildFreshFlowState();
     const alreadyFresh =
       meta.stage === fresh.stage &&
       meta.welcomed === fresh.welcomed &&
@@ -89,7 +83,8 @@ export async function resetAllExpiredSessions(): Promise<{ reset: number; checke
 
     if (alreadyFresh) continue;
 
-    await sendWelcomeFlow(session.phone, name);
+    // Apenas reseta o estado interno, sem enviar mensagem
+    await saveFreshFlow(session.phone);
     reset++;
   }
 
@@ -99,29 +94,23 @@ export async function resetAllExpiredSessions(): Promise<{ reset: number; checke
 /**
  * Ao receber mensagem: reinicia se atendimento foi encerrado ou sessão expirou.
  * Usa lastInteractionAt *antes* de registrar a mensagem atual.
+ * Sempre reinicia do zero após 30 minutos de inatividade.
+ * Retorna true se deve enviar boas-vindas (caso contrário, apenas reseta estado).
  */
 export async function applyWelcomeRestartIfNeeded(
   phone: string,
   lastInteractionAt: Date,
   current: FlowState
-): Promise<boolean> {
+): Promise<{ shouldSendWelcome: boolean; wasReset: boolean }> {
   const expired = await isSessionExpired(lastInteractionAt);
-  if (!shouldRestartWithWelcome(lastInteractionAt, current, expired)) return false;
+  if (!shouldRestartWithWelcome(lastInteractionAt, current, expired)) {
+    return { shouldSendWelcome: false, wasReset: false };
+  }
 
-  const client = await prisma.client.findUnique({
-    where: { phone: normalizePhone(phone) },
-  });
-  const name =
-    resolveValidCustomerName(current.customerName) ?? resolveValidCustomerName(client?.name);
-  await saveFreshFlow(phone, name ?? undefined);
-  return true;
-}
-
-/** @deprecated Use applyWelcomeRestartIfNeeded */
-export async function applySessionResetIfExpired(
-  phone: string,
-  lastInteractionAt: Date,
-  current: FlowState
-): Promise<boolean> {
-  return applyWelcomeRestartIfNeeded(phone, lastInteractionAt, current);
+  // Sempre reinicia do zero, sem recuperar nome anterior
+  await saveFreshFlow(phone);
+  
+  // Se expirou por tempo, retorna true para enviar boas-vindas
+  // Se é por handoff pendente, também envia boas-vindas
+  return { shouldSendWelcome: true, wasReset: true };
 }

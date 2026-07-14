@@ -175,6 +175,8 @@ model Settings {
   reminder30minMin      Int            @default(30)
   reminder4hMin         Int            @default(240)
   sessionResetMin       Int            @default(30)
+  testModeEnabled       Boolean        @default(false)
+  testModePhone         String?
   businessHours         BusinessHour[]
 }
 

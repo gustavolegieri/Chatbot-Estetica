@@ -27,6 +27,8 @@ interface Settings {
   reminder4hMin: number;
   reminder30minMin: number;
   autoCancelMin: number;
+  testModeEnabled: boolean;
+  testModePhone: string | null;
 }
 
 const dayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -239,6 +241,51 @@ export default function ConfiguracoesPage() {
                   setSettings({ ...settings, autoCancelMin: parseInt(e.target.value, 10) || 10 })
                 }
               />
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <h2 className="mb-4 text-lg font-semibold">Modo de Teste</h2>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 rounded-lg bg-amber-50 p-4 text-amber-800">
+              <span className="text-sm">
+                ⚠️ Quando ativado, o bot só responderá mensagens do número de telefone configurado abaixo. Todas as outras mensagens serão ignoradas.
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="testModeEnabled"
+                checked={settings.testModeEnabled ?? false}
+                onChange={(e) => setSettings({ ...settings, testModeEnabled: e.target.checked })}
+              />
+              <label htmlFor="testModeEnabled" className="text-sm font-medium">
+                Ativar modo de teste
+              </label>
+            </div>
+            <div>
+              <label className="label">Telefone de teste (apenas números)</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="Ex: 5511999998888"
+                value={settings.testModePhone ?? ""}
+                onChange={(e) => {
+                  // Apenas números
+                  const value = e.target.value.replace(/\D/g, "");
+                  setSettings({ ...settings, testModePhone: value || null });
+                }}
+                disabled={!settings.testModeEnabled}
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Digite apenas os números do telefone (com código do país 55 + DDD, sem + ou traços). Exemplo: 5511999998888
+              </p>
+              {settings.testModePhone && settings.testModePhone.length >= 12 && (
+                <p className="mt-1 text-xs text-green-600">
+                  ✓ Formato para Wasender API: +{settings.testModePhone}
+                </p>
+              )}
             </div>
           </div>
         </div>

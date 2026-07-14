@@ -836,6 +836,32 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         ctx,
       });
 
+      const nameFromAi =
+        analysis?.intent === "name" && analysis.extractedName
+          ? analysis.extractedName.split(/\s+/)[0]
+          : null;
+      const nameFromInput = looksLikePersonName(input) ? input.split(/\s+/)[0] : null;
+      const name = (nameFromAi ?? nameFromInput ?? "").trim();
+
+      // Se o input já for um nome válido, usar diretamente sem pedir confirmação
+      if (isValidCustomerName(name)) {
+        await ensureClient(msg.phone, name);
+        const next: FlowState = {
+          stage: "ETAPA2_MAIN_MENU",
+          customerName: name,
+          welcomed: true,
+        };
+        if (serviceKey && serviceKey !== "indeciso") {
+          await saveFlow(msg.phone, next);
+          await activateService(msg, next, serviceKey, wctx);
+          return;
+        }
+        await saveFlow(msg.phone, next);
+        await sendText({ number: msg.phone, text: msgH.mainMenu(next, msg.pushName) });
+        return;
+      }
+
+      // Se não for um nome válido, verificar se é greeting/small_talk
       if (analysis?.intent === "greeting" || analysis?.intent === "small_talk") {
         const hint =
           msg.pushName && looksLikePersonName(msg.pushName) ? msg.pushName.split(/\s+/)[0] : null;
@@ -844,7 +870,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
           text:
             analysis.reply ??
             (hint
-              ? `Olá! 😊 Para começar, me confirma seu *nome*?\n_(Se for *${hint}*, pode mandar só o nome)_`
+              ? `Olá! 😊 Para começar, qual é o seu *nome*?\n_(Se for *${hint}*, pode mandar só o nome)_`
               : `Olá! 😊 Para começar, qual é o seu *nome*?\n_(Só o primeiro nome)_`),
         });
         return;
@@ -858,38 +884,15 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         return;
       }
 
-      const nameFromAi =
-        analysis?.intent === "name" && analysis.extractedName
-          ? analysis.extractedName.split(/\s+/)[0]
-          : null;
-      const nameFromInput = looksLikePersonName(input) ? input.split(/\s+/)[0] : null;
-      const name = (nameFromAi ?? nameFromInput ?? "").trim();
-
-      if (!isValidCustomerName(name)) {
-        const hint =
-          msg.pushName && looksLikePersonName(msg.pushName) ? msg.pushName.split(/\s+/)[0] : null;
-        await sendText({
-          number: msg.phone,
-          text: hint
-            ? `Não consegui identificar seu nome 😊 Pode me dizer como posso te chamar?\n_(Se for *${hint}*, pode mandar só o nome)_`
-            : `Não consegui identificar seu nome 😊 Pode me dizer como posso te chamar?`,
-        });
-        return;
-      }
-
-      await ensureClient(msg.phone, name);
-      const next: FlowState = {
-        stage: "ETAPA2_MAIN_MENU",
-        customerName: name,
-        welcomed: true,
-      };
-      if (serviceKey && serviceKey !== "indeciso") {
-        await saveFlow(msg.phone, next);
-        await activateService(msg, next, serviceKey, wctx);
-        return;
-      }
-      await saveFlow(msg.phone, next);
-      await sendText({ number: msg.phone, text: msgH.mainMenu(next, msg.pushName) });
+      // Se chegou aqui, o nome não é válido
+      const hint =
+        msg.pushName && looksLikePersonName(msg.pushName) ? msg.pushName.split(/\s+/)[0] : null;
+      await sendText({
+        number: msg.phone,
+        text: hint
+          ? `Não consegui identificar seu nome 😊 Pode me dizer como posso te chamar?\n_(Se for *${hint}*, pode mandar só o nome)_`
+          : `Não consegui identificar seu nome 😊 Pode me dizer como posso te chamar?`,
+      });
       return;
     }
 
@@ -2269,7 +2272,7 @@ async function confirmFinal(
 export async function startFlow(msg: IncomingMessage) {
   const ctx = await loadContext();
   const wctx = await loadWhatsAppCatalog();
-  await saveFlow(msg.phone, { stage: "ETAPA1_AWAITING_NAME", welcomed: true });
+  await saveFlow(msg.phone, { stage: "ETAPA1_AWAITING_NAME", welcomed: false });
   await sendText({ number: msg.phone, text: etapa1Welcome(ctx, wctx.prompts) });
 }
 

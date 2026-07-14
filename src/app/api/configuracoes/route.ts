@@ -29,6 +29,8 @@ const updateSchema = z.object({
   reminder4hMin: z.number().int().positive().optional(),
   reminder30minMin: z.number().int().positive().optional(),
   autoCancelMin: z.number().int().positive().optional(),
+  testModeEnabled: z.boolean().optional(),
+  testModePhone: z.string().optional().nullable(),
 });
 
 export async function GET() {

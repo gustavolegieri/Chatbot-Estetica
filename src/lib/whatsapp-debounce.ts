@@ -28,6 +28,9 @@ export function isProcessing(phone: string) {
 
 const PROCESSING_TIMEOUT_MS = 30_000; // segurança: limpa chave travada após 30s
 
+// Evita que respostas “travem” por causa de erro/timeout: se houver processamento ativo,
+// não enfileire novas mensagens do mesmo phone até liberar (reduz loops e repetição).
+
 export function setProcessing(phone: string, value: boolean) {
   const key = normalizePhone(phone);
   if (value) {
@@ -42,6 +45,7 @@ export function setProcessing(phone: string, value: boolean) {
 /**
  * Agrupa mensagens rápidas em uma só (anti-flood).
  * Responde uma única vez após ~2,8s sem novas mensagens.
+ * Usa a última mensagem recebida em vez de juntar com espaço.
  */
 export function enqueueWhatsAppMessage(
   msg: IncomingPayload,
@@ -52,7 +56,8 @@ export function enqueueWhatsAppMessage(
 
   if (existing) {
     clearTimeout(existing.timer);
-    existing.texts.push(msg.text);
+    // Substitui o texto anterior pelo novo (em vez de acumular)
+    existing.texts = [msg.text];
     if (msg.pushName) existing.pushName = msg.pushName;
     if (msg.buttonId) existing.buttonId = msg.buttonId;
     if (msg.listId) existing.listId = msg.listId;
@@ -74,7 +79,8 @@ export function enqueueWhatsAppMessage(
     pending.delete(key);
     if (processing.has(key)) return;
 
-    const mergedText = entry.texts.join(" ").trim();
+    // Usa apenas a última mensagem recebida
+    const mergedText = entry.texts[entry.texts.length - 1]?.trim() || "";
     if (!mergedText && !entry.buttonId && !entry.listId) return;
 
     processing.add(key);
