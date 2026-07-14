@@ -821,8 +821,8 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         await saveFlow(msg.phone, next);
         await sendText({ number: msg.phone, text: msgH.mainMenu(next, msg.pushName) });
       } else {
-        await saveFlow(msg.phone, { stage: "ETAPA1_AWAITING_NAME", welcomed: false });
         await sendText({ number: msg.phone, text: etapa1Welcome(ctx, prompts) });
+        await saveFlow(msg.phone, { stage: "ETAPA1_AWAITING_NAME", welcomed: true });
       }
       return;
     }
@@ -2272,8 +2272,8 @@ async function confirmFinal(
 export async function startFlow(msg: IncomingMessage) {
   const ctx = await loadContext();
   const wctx = await loadWhatsAppCatalog();
-  await saveFlow(msg.phone, { stage: "ETAPA1_AWAITING_NAME", welcomed: false });
   await sendText({ number: msg.phone, text: etapa1Welcome(ctx, wctx.prompts) });
+  await saveFlow(msg.phone, { stage: "ETAPA1_AWAITING_NAME", welcomed: true });
 }
 
 export async function goToMainMenu(phone: string, customerName: string) {

@@ -33,17 +33,17 @@ export async function sendWelcomeFlow(phone: string, rawName?: string | null) {
   const validName = resolveValidCustomerName(rawName);
 
   // Sempre reinicia do zero após 30 minutos de inatividade
-  await prisma.whatsAppSession.update({
-    where: { phone: normalized },
-    data: {
-      metadata: { stage: "ETAPA1_AWAITING_NAME", welcomed: false } as object,
-      step: WhatsAppSessionStep.IDLE,
-    },
-  });
-  
   await sendText({
     number: normalized,
     text: etapa1Welcome(ctx, wctx.prompts),
     flowStage: "ETAPA1_AWAITING_NAME",
+  });
+  
+  await prisma.whatsAppSession.update({
+    where: { phone: normalized },
+    data: {
+      metadata: { stage: "ETAPA1_AWAITING_NAME", welcomed: true } as object,
+      step: WhatsAppSessionStep.IDLE,
+    },
   });
 }
