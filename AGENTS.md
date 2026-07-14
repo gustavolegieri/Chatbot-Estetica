@@ -3,27 +3,43 @@
 ## Problemas de Conexão do Prisma
 
 ### Problema Original
-O pool de conexões do Prisma estava configurado com `connection_limit=1`, causando timeouts quando múltiplas requisições webhook chegavam simultaneamente:
+O pool de conexões do Prisma estava configurado com `connection_limit=1`, causando timeouts quando múltiplas requisições webhook chegavam simultaneamente, resultando em crashes da aplicação:
 
 ```
 Error [PrismaClientKnownRequestError]: 
 Timed out fetching a new connection from the connection pool. 
-(Current connection pool timeout: 10, connection limit: 1)
+(Current connection pool timeout: 10, connection limit: 10)
 ```
 
 ### Solução Aplicada
-1. **Aumentado pool de conexões em `src/lib/prisma.ts`:**
-   - Adicionado `connectionLimit: 10` na configuração do PrismaClient
-   - Isso permite lidar com requisições simultâneas em ambiente serverless (Vercel)
+1. **Aumentado pool de conexões em `src/lib/database-url.ts`:**
+   - Mudado de `connection_limit=10` para `connection_limit=50` (para alto volume)
+   - A função `repairDatabaseUrl` automaticamente ajusta o connection_limit
+   - Isso permite lidar com 200+ mensagens diárias em ambiente serverless (Vercel)
 
 2. **Atualizado `.env.example`:**
-   - Mudado de `connection_limit=1` para `connection_limit=10` na DATABASE_URL
+   - Mudado de `connection_limit=10` para `connection_limit=50` na DATABASE_URL
 
 ### Configuração Recomendada
-Para produção em Vercel/Supabase:
+Para produção em Vercel/Supabase com alto volume:
 ```
-DATABASE_URL=postgresql://postgres.SEU_REF:SENHA@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=10&sslmode=require
+DATABASE_URL=postgresql://postgres.SEU_REF:SENHA@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=50&sslmode=require
 ```
+
+## Otimizações para Alto Volume (200+ mensagens diárias)
+
+### Pool de Conexões
+- **Connection_limit:** Aumentado para 50 para suportar alta concorrência
+- **Debounce:** Reduzido de 2800ms para 1500ms para resposta mais rápida
+- **Timeout de processamento:** Reduzido de 30s para 15s para evitar travamentos
+
+### Cache de Deduplicação
+- **TTL:** Reduzido de 24h para 6h para menor uso de memória
+- **Limite de limpeza:** Aumentado de 10000 para 5000 entradas
+
+### Otimizações de Banco de Dados
+- **Upsert em vez de find + create:** Reduz queries no banco
+- **Reutilização de sessão:** Evita queries desnecessárias ao recarregar estado
 
 ## Processamento Duplicado de Webhook
 

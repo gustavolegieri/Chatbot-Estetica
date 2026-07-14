@@ -38,31 +38,27 @@ function parseFlow(raw: unknown): FlowState {
 async function getOrCreateSession(phone: string, pushName?: string) {
   const normalized = normalizePhone(phone);
 
-  let session = await prisma.whatsAppSession.findUnique({
+  // Otimizado para alto volume: usar upsert em vez de find + create
+  let client = await prisma.client.findUnique({ where: { phone: normalized } });
+  if (!client && pushName) {
+    const validName = resolveValidCustomerName(pushName);
+    if (validName) {
+      client = await prisma.client.create({
+        data: { name: validName, phone: normalized },
+      });
+    }
+  }
+
+  const session = await prisma.whatsAppSession.upsert({
     where: { phone: normalized },
+    create: {
+      phone: normalized,
+      clientId: client?.id,
+      metadata: { stage: "ETAPA1_AWAITING_NAME", welcomed: false } as object,
+    },
+    update: {},
     include: { client: true },
   });
-
-  if (!session) {
-    let client = await prisma.client.findUnique({ where: { phone: normalized } });
-    if (!client && pushName) {
-      const validName = resolveValidCustomerName(pushName);
-      if (validName) {
-        client = await prisma.client.create({
-          data: { name: validName, phone: normalized },
-        });
-      }
-    }
-
-    session = await prisma.whatsAppSession.create({
-      data: {
-        phone: normalized,
-        clientId: client?.id,
-        metadata: { stage: "ETAPA1_AWAITING_NAME", welcomed: false } as object,
-      },
-      include: { client: true },
-    });
-  }
 
   return session;
 }
@@ -177,7 +173,9 @@ const settings = await prisma.settings.findUnique({ where: { id: "default" } });
       }
 
       console.log("[WhatsApp Bot] ⏰ Verificando horário de funcionamento");
-      if (settings && !getBusinessHoursStatus(settings).isOpen) {
+      const businessStatus = settings ? getBusinessHoursStatus(settings) : { isOpen: true };
+      
+      if (settings && !businessStatus.isOpen) {
         console.log("[WhatsApp Bot] ⛔ Fora do horário de funcionamento");
         const name =
           resolveValidCustomerName(flowRef.current.customerName) ??
@@ -199,7 +197,6 @@ const settings = await prisma.settings.findUnique({ where: { id: "default" } });
         lastInteractionAt,
         flowRef.current
       );
-      console.log("[WhatsApp Bot] 🔄 resetResult:", resetResult);
 
       if (resetResult.shouldSendWelcome) {
         console.log("[WhatsApp Bot] 🔄 Sessão resetada, enviando boas-vindas");
@@ -209,15 +206,9 @@ const settings = await prisma.settings.findUnique({ where: { id: "default" } });
 
       if (resetResult.wasReset) {
         // Se foi resetado mas não precisa enviar boas-vindas, recarregar o estado
-        const sessionAfterReset = await prisma.whatsAppSession.findUnique({
-          where: { phone: normalizePhone(msg.phone) },
-          include: { client: true },
-        });
-        flowRef.current = parseFlow(sessionAfterReset?.metadata);
+        // Otimizado: usar a sessão já disponível em vez de buscar novamente
+        flowRef.current = parseFlow(session.metadata);
         flow = flowRef.current;
-        console.log("[WhatsApp Bot] 🔄 Estado após reset check:", { stage: flowRef.current.stage, welcomed: flowRef.current.welcomed });
-      } else {
-        console.log("[WhatsApp Bot] ℹ️ Sessão não resetada - tempo decorrido:", Date.now() - lastInteractionAt.getTime(), "ms");
       }
 
       if (msg.text.trim().toLowerCase() === "menu") {
@@ -236,7 +227,6 @@ const settings = await prisma.settings.findUnique({ where: { id: "default" } });
 
       console.log("[WhatsApp Bot] 🔄 Processando flow numerado - etapa:", flowRef.current.stage);
       await processNumberedFlow(msg, flowRef.current);
-      console.log("[WhatsApp Bot] ✅ Flow numerado processado com sucesso");
     }
   );
   console.log("[WhatsApp Bot] ✅ FIM DO PROCESSAMENTO");

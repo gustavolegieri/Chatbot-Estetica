@@ -66,9 +66,9 @@ function extractPhone(msgKey: Record<string, unknown>): string | null {
   return null;
 }
 
-// Cache simples para deduplicação de mensagens (24h TTL)
+// Cache simples para deduplicação de mensagens (6h TTL para alto volume)
 const processedMessageIds = new Map<string, number>();
-const DEDUPLICATION_TTL = 24 * 60 * 60 * 1000; // 24 horas
+const DEDUPLICATION_TTL = 6 * 60 * 60 * 1000; // 6 horas (reduzido de 24h para alto volume)
 
 function isMessageProcessed(messageId: string): boolean {
   const timestamp = processedMessageIds.get(messageId);
@@ -85,8 +85,8 @@ function isMessageProcessed(messageId: string): boolean {
 function markMessageAsProcessed(messageId: string): void {
   processedMessageIds.set(messageId, Date.now());
   
-  // Limpar entradas antigas periodicamente
-  if (processedMessageIds.size > 10000) {
+  // Limpar entradas antigas periodicamente (aumentado para 5000 para alto volume)
+  if (processedMessageIds.size > 5000) {
     const now = Date.now();
     for (const [id, timestamp] of processedMessageIds.entries()) {
       if (now - timestamp > DEDUPLICATION_TTL) {

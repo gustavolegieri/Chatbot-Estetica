@@ -1,6 +1,7 @@
 import { normalizePhone } from "./utils";
 
-const DEBOUNCE_MS = 2800;
+// Reduzido de 2800ms para 1500ms para melhor resposta em alto volume
+const DEBOUNCE_MS = 1500;
 
 interface PendingMessage {
   phone: string;
@@ -26,7 +27,7 @@ export function isProcessing(phone: string) {
   return processing.has(normalizePhone(phone));
 }
 
-const PROCESSING_TIMEOUT_MS = 30_000; // segurança: limpa chave travada após 30s
+const PROCESSING_TIMEOUT_MS = 15_000; // segurança: limpa chave travada após 15s (reduzido para alto volume)
 
 // Evita que respostas “travem” por causa de erro/timeout: se houver processamento ativo,
 // não enfileire novas mensagens do mesmo phone até liberar (reduz loops e repetição).

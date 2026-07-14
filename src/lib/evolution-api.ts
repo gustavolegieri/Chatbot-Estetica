@@ -92,8 +92,9 @@ function toAbsoluteMediaUrl(url: string): string {
 
 
 // Fila simples para mensagens que falharam por rate limit
-const messageQueue = new Map<string, Array<{ body: object; timestamp: number }>>();
-const QUEUE_MAX_AGE = 5 * 60 * 1000; // 5 minutos
+const messageQueue = new Map<string, Array<{ body: object; timestamp: number; attempts: number }>>();
+const QUEUE_MAX_AGE = 10 * 60 * 1000; // 10 minutos (aumentado para alto volume)
+const MAX_QUEUE_ATTEMPTS = 3; // Máximo de tentativas antes de descartar
 
 function addToQueue(phone: string, body: object) {
   const key = phone.replace(/\D/g, "");
@@ -101,7 +102,7 @@ function addToQueue(phone: string, body: object) {
     messageQueue.set(key, []);
   }
   const queue = messageQueue.get(key)!;
-  queue.push({ body, timestamp: Date.now() });
+  queue.push({ body, timestamp: Date.now(), attempts: 0 });
   
   // Limpar mensagens antigas
   const now = Date.now();
@@ -124,8 +125,13 @@ async function processQueue(phone: string) {
       await wasenderFetch(msg.body);
     } catch (err) {
       console.error("[WasenderAPI] ❌ Erro ao processar mensagem da fila:", err);
-      // Readicionar à fila se falhar
-      addToQueue(phone, msg.body);
+      // Readicionar à fila se falhar e não excedeu tentativas
+      if (msg.attempts < MAX_QUEUE_ATTEMPTS) {
+        msg.attempts++;
+        addToQueue(phone, msg.body);
+      } else {
+        console.warn("[WasenderAPI] ⚠️ Mensagem descartada após", MAX_QUEUE_ATTEMPTS, "tentativas");
+      }
     }
   }
 }
@@ -139,10 +145,6 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
     return { simulated: true };
   }
 
-  console.log("[WasenderAPI] 📤 Enviando mensagem para WasenderAPI:", body);
-  console.log("[WasenderAPI] 🔗 URL da API:", WASENDER_BASE);
-  console.log("[WasenderAPI] 🔑 API Key configurada:", apiKey ? "SIM" : "NÃO");
-
   const response = await fetch(`${WASENDER_BASE}/send-message`, {
     method: "POST",
     headers: {
@@ -152,13 +154,11 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
     body: JSON.stringify(body),
   });
 
-  console.log("[WasenderAPI] 📊 Status da resposta:", response.status, response.statusText);
-
   if (response.status === 429 && attempt <= 3) {
-    let waitMs = 62_000;
+    let waitMs = 30_000; // Reduzido de 62s para 30s para alta disponibilidade
     try {
       const json = await response.clone().json() as { retry_after?: number };
-      if (json.retry_after) waitMs = (json.retry_after + 2) * 1000;
+      if (json.retry_after) waitMs = Math.min(json.retry_after * 1000, 30_000); // Max 30s
     } catch { /* ignora */ }
     console.warn(`[WasenderAPI] ⏳ Rate limit — aguardando ${waitMs / 1000}s (tentativa ${attempt}/3)`);
     
@@ -186,12 +186,11 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
   }
 
   const result = await response.json();
-  console.log("[WasenderAPI] ✅ Resposta da API:", result);
   
   // Tentar processar fila após sucesso
   const phone = (body as any).to;
   if (phone) {
-    setTimeout(() => processQueue(phone), 1000);
+    setTimeout(() => processQueue(phone), 2000); // Aumentado para 2s para evitar rate limit
   }
   
   return result;
@@ -205,25 +204,18 @@ export async function sendText({
   sender = "BOT",
   flowStage,
 }: SendTextParams) {
-  console.log("[WasenderAPI] 📱 sendText chamado com:", { number, text: text.substring(0, 50) + "...", flowStage });
-
   if (!isValidPrivateRecipient(number)) {
     console.warn("[WasenderAPI] ⛔ Envio bloqueado (não é chat privado):", number);
     return { blocked: true, reason: "not_private_recipient" };
   }
 
   const whatsappNumber = toE164(number);
-  console.log("[WasenderAPI] 📲 Número formatado para WhatsApp (E.164):", whatsappNumber);
-  console.log("[WasenderAPI] 🔑 API Key configurada:", getApiKey() ? "SIM" : "NÃO");
-  console.log("[WasenderAPI] 🔗 URL da API:", WASENDER_BASE);
 
   try {
     const result = await wasenderFetch({
       to: whatsappNumber,
       text,
     });
-
-    console.log("[WasenderAPI] ✅ Resultado do envio:", result);
 
     if (!skipBotLog) {
       const ctx = getMessageLogContext();
