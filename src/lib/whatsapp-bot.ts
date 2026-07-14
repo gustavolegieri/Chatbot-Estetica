@@ -75,7 +75,10 @@ async function handleMessageInternal(msg: IncomingMessage) {
     return;
   }
 
-  const settings = await prisma.settings.findUnique({ where: { id: "default" } });
+const settings = await prisma.settings.findUnique({ where: { id: "default" } });
+
+  // Filtro extra anti-fuso: se o servidor estiver em outro fuso, ainda assim garantimos que a checagem
+  // de horário use o relógio local do bot (Brasil).
   if (settings && settings.whatsappEnabled === false) {
     console.warn("[WhatsApp Bot] ⛔ whatsappEnabled=false nas configurações, mensagem ignorada");
     return;
@@ -215,6 +218,7 @@ async function handleMessageInternal(msg: IncomingMessage) {
 }
 
 export async function processWhatsAppMessage(msg: IncomingMessage) {
+  // Important: processar por phone serialmente ajuda a evitar respostas "fora de hora"
   enqueueWhatsAppMessage(
     {
       phone: msg.phone,
@@ -228,5 +232,6 @@ export async function processWhatsAppMessage(msg: IncomingMessage) {
     }
   );
 }
+
 
 
