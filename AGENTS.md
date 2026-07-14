@@ -108,10 +108,10 @@ curl -X POST http://localhost:3000/api/admin/test-webhook \
 ```
 
 ### Mensagens de Teste Comuns
-- `"Oi"` ou `"Olá"` - Inicia o fluxo de boas-vindas
-- `"menu"` - Volta ao menu principal
-- `"1"`, `"2"`, etc. - Seleciona opções numeradas
-- `"agendar"` - Inicia fluxo de agendamento
+- &quot;Oi&quot; ou &quot;Olá&quot; - Inicia o fluxo de boas-vindas
+- &quot;menu&quot; - Volta ao menu principal
+- &quot;1&quot;, &quot;2&quot;, etc. - Seleciona opções numeradas
+- &quot;agendar&quot; - Inicia fluxo de agendamento
 
 ### Dicas
 - Use o modo de teste nas configurações para filtrar apenas seu número

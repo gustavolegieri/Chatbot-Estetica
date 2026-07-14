@@ -117,6 +117,13 @@ export function repairDatabaseUrl(raw?: string): string | undefined {
     if (!url.includes("sslmode=")) {
       url += url.includes("?") ? "&sslmode=require" : "?sslmode=require";
     }
+    // Garantir connection_limit maior para evitar timeouts em serverless
+    if (!url.includes("connection_limit=")) {
+      url += url.includes("?") ? "&connection_limit=10" : "?connection_limit=10";
+    } else {
+      // Atualizar connection_limit se existir e for menor que 10
+      url = url.replace(/connection_limit=\d+/g, "connection_limit=10");
+    }
   }
 
   return url;

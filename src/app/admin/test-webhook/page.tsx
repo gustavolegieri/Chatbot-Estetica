@@ -154,8 +154,8 @@ export default function TestWebhookPage() {
       <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h3 className="font-medium text-blue-800 mb-2">💡 Dicas de Teste</h3>
         <ul className="text-sm text-blue-700 space-y-1">
-          <li>• Use "menu" para voltar ao menu principal</li>
-          <li>• Use "Oi" ou "Olá" para iniciar o fluxo de boas-vindas</li>
+          <li>• Use &quot;menu&quot; para voltar ao menu principal</li>
+          <li>• Use &quot;Oi&quot; ou &quot;Olá&quot; para iniciar o fluxo de boas-vindas</li>
           <li>• Verifique os logs do servidor para ver o processamento detalhado</li>
           <li>• Use o modo de teste nas configurações para filtrar mensagens</li>
         </ul>
