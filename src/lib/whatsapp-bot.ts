@@ -243,6 +243,7 @@ const settings = await prisma.settings.findUnique({ where: { id: "default" } });
 }
 
 export async function processWhatsAppMessage(msg: IncomingMessage) {
+  console.log("[WhatsApp Bot] 📨 processWhatsAppMessage chamado:", { phone: msg.phone, text: msg.text });
   // Important: processar por phone serialmente ajuda a evitar respostas "fora de hora"
   enqueueWhatsAppMessage(
     {
@@ -253,6 +254,7 @@ export async function processWhatsAppMessage(msg: IncomingMessage) {
       listId: msg.listId,
     },
     async (merged) => {
+      console.log("[WhatsApp Bot] 📨 Executando handleMessageInternal:", merged);
       await handleMessageInternal(merged);
     }
   );

@@ -193,6 +193,7 @@ export async function POST(req: NextRequest) {
   console.log("[Webhook] processando — phone:", phone, "text:", text, "messageId:", messageId, "testModeEnabled:", settings?.testModeEnabled);
 
   try {
+    console.log("[Webhook] 🚀 Iniciando processamento da mensagem");
     await processWhatsAppMessage({
       phone,
       text: text || buttonId || listId || "",
