@@ -91,6 +91,45 @@ function toAbsoluteMediaUrl(url: string): string {
 }
 
 
+// Fila simples para mensagens que falharam por rate limit
+const messageQueue = new Map<string, Array<{ body: object; timestamp: number }>>();
+const QUEUE_MAX_AGE = 5 * 60 * 1000; // 5 minutos
+
+function addToQueue(phone: string, body: object) {
+  const key = phone.replace(/\D/g, "");
+  if (!messageQueue.has(key)) {
+    messageQueue.set(key, []);
+  }
+  const queue = messageQueue.get(key)!;
+  queue.push({ body, timestamp: Date.now() });
+  
+  // Limpar mensagens antigas
+  const now = Date.now();
+  const validMessages = queue.filter(msg => now - msg.timestamp < QUEUE_MAX_AGE);
+  messageQueue.set(key, validMessages);
+}
+
+async function processQueue(phone: string) {
+  const key = phone.replace(/\D/g, "");
+  const queue = messageQueue.get(key);
+  if (!queue || queue.length === 0) return;
+  
+  console.log("[WasenderAPI] 📤 Processando fila de mensagens para:", phone, "quantidade:", queue.length);
+  
+  const messages = [...queue];
+  messageQueue.set(key, []);
+  
+  for (const msg of messages) {
+    try {
+      await wasenderFetch(msg.body);
+    } catch (err) {
+      console.error("[WasenderAPI] ❌ Erro ao processar mensagem da fila:", err);
+      // Readicionar à fila se falhar
+      addToQueue(phone, msg.body);
+    }
+  }
+}
+
 async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
   const apiKey = getApiKey();
 
@@ -122,6 +161,15 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
       if (json.retry_after) waitMs = (json.retry_after + 2) * 1000;
     } catch { /* ignora */ }
     console.warn(`[WasenderAPI] ⏳ Rate limit — aguardando ${waitMs / 1000}s (tentativa ${attempt}/3)`);
+    
+    // Adicionar à fila em vez de bloquear
+    const phone = (body as any).to;
+    if (phone) {
+      addToQueue(phone, body);
+      console.log("[WasenderAPI] 📤 Mensagem adicionada à fila devido a rate limit");
+      return { queued: true, reason: "rate_limit" };
+    }
+    
     await new Promise((resolve) => setTimeout(resolve, waitMs));
     return wasenderFetch(body, attempt + 1);
   }
@@ -129,11 +177,23 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
   if (!response.ok) {
     const text = await response.text();
     console.error("[WasenderAPI] ❌ Erro na API:", response.status, "-", text);
+    // Não lançar erro em casos de rate limit ou erro temporário
+    if (response.status >= 500 || response.status === 429) {
+      console.warn("[WasenderAPI] ⚠️ Erro temporário, continuando fluxo");
+      return { error: true, status: response.status, message: text };
+    }
     throw new Error(`WasenderAPI error: ${response.status} - ${text}`);
   }
 
   const result = await response.json();
   console.log("[WasenderAPI] ✅ Resposta da API:", result);
+  
+  // Tentar processar fila após sucesso
+  const phone = (body as any).to;
+  if (phone) {
+    setTimeout(() => processQueue(phone), 1000);
+  }
+  
   return result;
 }
 
@@ -155,26 +215,32 @@ export async function sendText({
   const whatsappNumber = toE164(number);
   console.log("[WasenderAPI] 📲 Número formatado para WhatsApp (E.164):", whatsappNumber);
 
-  const result = await wasenderFetch({
-    to: whatsappNumber,
-    text,
-  });
+  try {
+    const result = await wasenderFetch({
+      to: whatsappNumber,
+      text,
+    });
 
-  if (!skipBotLog) {
-    const ctx = getMessageLogContext();
-    const msgSender: MessageSender = sender === "ADMIN" ? MessageSender.ADMIN : MessageSender.BOT;
-    await logWhatsAppMessage({
-      phone: number,
-      sessionId: ctx?.sessionId,
-      clientId: ctx?.clientId,
-      direction: MessageDirection.OUTBOUND,
-      sender: msgSender,
-      body: text,
-      flowStage: flowStage ?? ctx?.getStage(),
-    }).catch((err) => console.error("[WhatsApp Log] outbound:", err));
+    if (!skipBotLog) {
+      const ctx = getMessageLogContext();
+      const msgSender: MessageSender = sender === "ADMIN" ? MessageSender.ADMIN : MessageSender.BOT;
+      await logWhatsAppMessage({
+        phone: number,
+        sessionId: ctx?.sessionId,
+        clientId: ctx?.clientId,
+        direction: MessageDirection.OUTBOUND,
+        sender: msgSender,
+        body: text,
+        flowStage: flowStage ?? ctx?.getStage(),
+      }).catch((err) => console.error("[WhatsApp Log] outbound:", err));
+    }
+
+    return result;
+  } catch (err) {
+    console.error("[WasenderAPI] ❌ Erro ao enviar mensagem, mas continuando fluxo:", err);
+    // Não lançar erro para permitir que o fluxo continue
+    return { error: true, message: "Erro ao enviar mensagem, fluxo continuou" };
   }
-
-  return result;
 }
 
 /**
@@ -224,7 +290,12 @@ export async function sendMedia({
     payload.documentUrl = absoluteUrl;
   }
 
-  return wasenderFetch(payload);
+  try {
+    return await wasenderFetch(payload);
+  } catch (err) {
+    console.error("[WasenderAPI] ❌ Erro ao enviar mídia, mas continuando fluxo:", err);
+    return { error: true, message: "Erro ao enviar mídia, fluxo continuou" };
+  }
 }
 
 /**
@@ -249,10 +320,15 @@ export async function sendButtons({
   buttons.forEach((b, i) => lines.push(`${i + 1} — ${b.displayText}`));
   if (footer) lines.push("", `_${footer}_`);
 
-  return wasenderFetch({
-    to: toE164(number),
-    text: lines.join("\n"),
-  });
+  try {
+    return await wasenderFetch({
+      to: toE164(number),
+      text: lines.join("\n"),
+    });
+  } catch (err) {
+    console.error("[WasenderAPI] ❌ Erro ao enviar botões, mas continuando fluxo:", err);
+    return { error: true, message: "Erro ao enviar botões, fluxo continuou" };
+  }
 }
 
 /** Envia lista de opções como texto numerado */
@@ -287,8 +363,13 @@ export async function sendList({
     }
   }
 
-  return wasenderFetch({
-    to: toE164(number),
-    text: lines.join("\n"),
-  });
+  try {
+    return await wasenderFetch({
+      to: toE164(number),
+      text: lines.join("\n"),
+    });
+  } catch (err) {
+    console.error("[WasenderAPI] ❌ Erro ao enviar lista, mas continuando fluxo:", err);
+    return { error: true, message: "Erro ao enviar lista, fluxo continuou" };
+  }
 }
