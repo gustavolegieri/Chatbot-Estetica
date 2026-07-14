@@ -169,10 +169,18 @@ export async function POST(req: NextRequest) {
     console.log("[Webhook] Comparação de modo de teste:", {
       testPhone,
       normalizedPhone,
-      saoIguais: testPhone === normalizedPhone
+      saoIguais: testPhone === normalizedPhone,
+      testPhoneLength: testPhone?.length,
+      normalizedPhoneLength: normalizedPhone.length
     });
     
-    if (testPhone && normalizedPhone !== testPhone) {
+    // Se não há telefone de teste configurado, ignora todas as mensagens em modo de teste
+    if (!testPhone) {
+      console.log("[Webhook] Modo de teste ativado mas nenhum telefone configurado - todas as mensagens serão ignoradas");
+      return NextResponse.json({ ok: true });
+    }
+    
+    if (normalizedPhone !== testPhone) {
       console.log("[Webhook] Modo de teste ativado - mensagem ignorada de telefone não autorizado:", phone, "(esperado:", testPhone + ")");
       return NextResponse.json({ ok: true });
     }
@@ -193,6 +201,11 @@ export async function POST(req: NextRequest) {
 
   console.log("[Webhook] processando — phone:", phone, "text:", text, "messageId:", messageId, "testModeEnabled:", settings?.testModeEnabled);
 
+  // Marcar mensagem como processada ANTES de processar para evitar duplicatas
+  if (messageId) {
+    markMessageAsProcessed(messageId);
+  }
+
   try {
     console.log("[Webhook] 🚀 Iniciando processamento da mensagem");
     await processWhatsAppMessage({
@@ -203,14 +216,13 @@ export async function POST(req: NextRequest) {
       pushName: pushName || undefined,
     });
     
-    // Marcar mensagem como processada após sucesso
-    if (messageId) {
-      markMessageAsProcessed(messageId);
-    }
-    
     console.log("[Webhook] processamento concluído");
   } catch (err) {
     console.error("[Webhook] ERRO:", err);
+    // Em caso de erro, remover marcação para permitir retry
+    if (messageId) {
+      processedMessageIds.delete(messageId);
+    }
   }
 
   return NextResponse.json({ ok: true });

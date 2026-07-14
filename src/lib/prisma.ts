@@ -12,7 +12,12 @@ export const prisma =
   new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
     ...(databaseUrl
-      ? { datasources: { db: { url: databaseUrl } } }
+      ? { 
+          datasources: { db: { url: databaseUrl } },
+          // Aumentar pool de conexões para lidar com requisições simultâneas
+          // Em serverless (Vercel), isso é crucial para evitar timeouts
+          connectionLimit: 10,
+        }
       : {}),
   });
 
