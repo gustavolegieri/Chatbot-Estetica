@@ -36,6 +36,8 @@ const navItems = [
   { href: "/admin/teste", label: "Teste Bot", icon: TestTube },
   { href: "/admin/teste/avaliacao", label: "Avaliação Bot", icon: Star },
   { href: "/admin/test-webhook", label: "Testar Webhook", icon: Send },
+  { href: "/admin/testar-envio", label: "Testar Envio", icon: Send },
+  { href: "/admin/diagnostico-whatsapp", label: "Diagnóstico WhatsApp", icon: Wrench },
   { href: "/admin/painel-teste", label: "Painel Teste", icon: BarChart2 },
   { href: "/admin/notificacoes", label: "Notificações", icon: Bell },
   { href: "/admin/campanhas", label: "Campanhas", icon: Send },

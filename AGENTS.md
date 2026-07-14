@@ -107,6 +107,24 @@ curl -X POST http://localhost:3000/api/admin/test-webhook \
   }'
 ```
 
+### Testar Envio Direto (WasenderAPI)
+Acesse: `http://localhost:3000/admin/testar-envio`
+
+Esta interface permite testar o envio direto de mensagens via WasenderAPI:
+- Configure o número de telefone
+- Digite a mensagem desejada
+- Clique em "Enviar Mensagem de Teste"
+- Veja o resultado detalhado do envio
+
+### Diagnóstico WhatsApp
+Acesse: `http://localhost:3000/admin/diagnostico-whatsapp`
+
+Esta interface verifica a configuração do sistema WhatsApp:
+- Verifica se WASENDER_API_KEY está configurada
+- Testa conexão com a WasenderAPI
+- Verifica configurações do WhatsApp (habilitado/desabilitado)
+- Mostra instruções para configurar WasenderAPI
+
 ### Mensagens de Teste Comuns
 - &quot;Oi&quot; ou &quot;Olá&quot; - Inicia o fluxo de boas-vindas
 - &quot;menu&quot; - Volta ao menu principal
@@ -117,6 +135,16 @@ curl -X POST http://localhost:3000/api/admin/test-webhook \
 - Use o modo de teste nas configurações para filtrar apenas seu número
 - Verifique os logs do servidor para ver o processamento detalhado
 - Teste diferentes fluxos: agendamento, consulta, cancelamento
+- Use o diagnóstico para verificar se a API está configurada corretamente
+- Use o teste de envio direto para isolar problemas de envio
+
+### Solução de Problemas
+Se o bot não responde:
+1. **Verifique a configuração:** Use o diagnóstico em `/admin/diagnostico-whatsapp`
+2. **Teste envio direto:** Use `/admin/testar-envio` para testar a API diretamente
+3. **Verifique os logs:** Olhe os logs para ver se há erros de API
+4. **Configure a API Key:** Certifique-se de que WASENDER_API_KEY está configurada
+5. **Verifique o formato do número:** Deve ser DDI + DDD + número (ex: 5511944400696)
 
 ## Variáveis de Ambiente Importantes
 

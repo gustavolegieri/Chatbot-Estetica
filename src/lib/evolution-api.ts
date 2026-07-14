@@ -214,12 +214,16 @@ export async function sendText({
 
   const whatsappNumber = toE164(number);
   console.log("[WasenderAPI] 📲 Número formatado para WhatsApp (E.164):", whatsappNumber);
+  console.log("[WasenderAPI] 🔑 API Key configurada:", getApiKey() ? "SIM" : "NÃO");
+  console.log("[WasenderAPI] 🔗 URL da API:", WASENDER_BASE);
 
   try {
     const result = await wasenderFetch({
       to: whatsappNumber,
       text,
     });
+
+    console.log("[WasenderAPI] ✅ Resultado do envio:", result);
 
     if (!skipBotLog) {
       const ctx = getMessageLogContext();
