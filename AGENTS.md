@@ -83,6 +83,41 @@ Antes de fazer deploy em produção:
 - Logs do modo de teste mostram comparação de números
 - Logs do Prisma mostram erros de conexão se houver
 
+## Testando o Bot com Seu Próprio Número
+
+### Interface de Teste Web
+Acesse: `http://localhost:3000/admin/test-webhook`
+
+Esta interface permite simular mensagens recebidas do WhatsApp:
+- Configure o número de telefone (seu próprio número)
+- Digite a mensagem desejada
+- Opcionalmente, adicione buttonId, listId ou pushName
+- Clique em "Enviar Mensagem de Teste"
+
+### API Direta
+Você também pode usar a API diretamente:
+
+```bash
+curl -X POST http://localhost:3000/api/admin/test-webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phone": "5511972851072",
+    "text": "Oi",
+    "pushName": "Teste"
+  }'
+```
+
+### Mensagens de Teste Comuns
+- `"Oi"` ou `"Olá"` - Inicia o fluxo de boas-vindas
+- `"menu"` - Volta ao menu principal
+- `"1"`, `"2"`, etc. - Seleciona opções numeradas
+- `"agendar"` - Inicia fluxo de agendamento
+
+### Dicas
+- Use o modo de teste nas configurações para filtrar apenas seu número
+- Verifique os logs do servidor para ver o processamento detalhado
+- Teste diferentes fluxos: agendamento, consulta, cancelamento
+
 ## Variáveis de Ambiente Importantes
 
 ```bash
