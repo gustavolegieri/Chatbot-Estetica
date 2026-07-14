@@ -97,6 +97,7 @@ function markMessageAsProcessed(messageId: string): void {
 }
 
 export async function POST(req: NextRequest) {
+  console.log("[Webhook] 🚀🚀🚀 WEBHOOK POST RECEBIDO - INÍCIO ABSOLUTO 🚀🚀🚀");
   let rawBody: string;
   try {
     rawBody = await req.text();
