@@ -30,7 +30,7 @@ import { calculateDistance, calculatePickupFee } from "./maps";
 import { findCouponByCode } from "./coupons";
 import { format } from "date-fns";
 import { answerCustomerDoubt } from "./whatsapp-ai";
-import { generateSummaryCard, generateSummaryText } from "./summary-card";
+import { generateSummaryCard, generateSummaryText, SummaryCardData } from "./summary-card";
 import { generatePixQrCode, generatePixPayload } from "./pix-qr";
 import { analyzeReceiptImage, validateReceiptAmount } from "./receipt-analyzer";
 import type { FlowContext } from "./whatsapp-flow-messages";

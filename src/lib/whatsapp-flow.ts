@@ -76,6 +76,32 @@ import {
 } from "./whatsapp-vehicle-parse";
 import { FlowState } from "./whatsapp-flow-types";
 import {
+  normalizeYes,
+  normalizeNo,
+  shouldSkipCouponPrompt,
+  isFirstTimeCustomer,
+  applyFirstTimeDiscount,
+  buildPaymentOptionsText,
+  handleClientRecognition,
+  handleLoyaltyStep,
+  handleLogistics,
+  handlePixChoice,
+  handleReceiptUpload,
+  handleFinalConfirm,
+  handleSummaryConfirm,
+  handleRating,
+  handleServiceQuestion,
+  handleFAQ,
+  handleCancellationDetection,
+  handleDiscountResponse,
+  initFunnelTracking,
+  trackProgress,
+  trackFunnelAbandonment,
+  markFunnelComplete,
+  type FlowResponse,
+  type FlowResult,
+} from "./whatsapp-flow-core";
+import {
   analyzeWhatsAppMessage,
   answerCustomerDoubt,
   looksLikeQuestion,
@@ -86,9 +112,64 @@ import { requestHumanHandoff } from "./whatsapp-handoff";
 import { generatePixQrCode, generatePixPayload } from "./pix-qr";
 import { generateSummaryCard } from "./summary-card";
 import { analyzeReceiptImage, validateReceiptAmount } from "./receipt-analyzer";
+import { 
+  detectCancellationIntent, 
+  detectCancellationReason, 
+  calculateDiscount, 
+  generateDiscountOfferMessage, 
+  saveDiscountOffer, 
+  isDiscountOfferValid 
+} from "./cancellation-detector";
+import { 
+  startFunnel, 
+  trackFunnelProgress, 
+  trackAbandonment, 
+  completeFunnel 
+} from "./funnel-tracker";
 
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
+ * Adapta o resultado do core handler para o formato do WhatsApp flow
+ * Converte FlowResponse[] em chamadas de sendText/sendMedia e persiste o estado
+ */
+async function executeCoreHandler(
+  msg: IncomingMessage,
+  flow: FlowState,
+  handler: (state: FlowState, message: string, responses: FlowResponse[], ...args: any[]) => Promise<FlowResult>,
+  ...handlerArgs: any[]
+): Promise<void> {
+  const responses: FlowResponse[] = [];
+  const result = await handler(flow, msg.text, responses, ...handlerArgs);
+
+  // Persistir o novo estado
+  await saveFlow(msg.phone, result.nextState);
+
+  // Enviar as respostas
+  for (const response of result.responses) {
+    if (response.mediaUrl && response.mediaType) {
+      await sendMedia({
+        number: msg.phone,
+        mediaUrl: response.mediaUrl,
+        mediaType: response.mediaType,
+      });
+    }
+    if (response.text) {
+      await sendText({ number: msg.phone, text: response.text });
+      await delay(500); // Pequeno delay entre mensagens
+    }
+  }
+
+  // Rastreamento de funil se necessário
+  if (result.shouldTrackFunnel && result.funnelStage) {
+    try {
+      await trackFunnelProgress(msg.phone, msg.phone, result.funnelStage);
+    } catch (error) {
+      console.error("[executeCoreHandler] Error tracking funnel:", error);
+    }
+  }
+}
 
 function flowMsg(wctx: WhatsAppCatalogContext) {
   const { prompts, catalog } = wctx;
@@ -759,6 +840,90 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
   const lower = input.toLowerCase();
   const isShortMenuPick = num !== null && input.length <= 2;
 
+  // DETECÇÃO DE CANCELAMENTO (cross-cutting) - unificado com test-bot
+  // Rode antes do switch de etapas para interceptar intenções de cancelamento
+  if (detectCancellationIntent(input)) {
+    const reason = detectCancellationReason(input);
+    const originalPrice = flow.quoteMin ?? 100; // Valor estimado se não disponível
+    const offer = calculateDiscount(reason, originalPrice);
+
+    await sendText({
+      number: msg.phone,
+      text: generateDiscountOfferMessage(
+        clientDisplayName(flow, msg.pushName),
+        originalPrice,
+        offer
+      ),
+    });
+
+    // Salvar oferta no banco (usando campo discountOffer do schema)
+    try {
+      const session = await prisma.whatsAppSession.findUnique({
+        where: { phone: normalizePhone(msg.phone) }
+      });
+      
+      if (session) {
+        await prisma.whatsAppSession.update({
+          where: { phone: normalizePhone(msg.phone) },
+          data: {
+            metadata: {
+              ...(session.metadata as any),
+              discountOffer: {
+                originalPrice,
+                discountPercentage: offer.discountPercentage,
+                validUntil: new Date(Date.now() + offer.validForMinutes * 60 * 1000).toISOString(),
+                used: false,
+              },
+            },
+          },
+        });
+      }
+    } catch (error) {
+      console.error("[Cancellation Detector] Error saving discount offer:", error);
+    }
+
+    // Adicionar estado de espera de resposta de desconto
+    flow.awaitingDiscountResponse = true;
+    flow.discountOffer = offer;
+    flow.discountOriginalPrice = originalPrice;
+    await saveFlow(msg.phone, flow);
+    return;
+  }
+
+  // Resposta a oferta de desconto
+  if (flow.awaitingDiscountResponse) {
+    const normalizedInput = input.toLowerCase().trim();
+    if (normalizedInput === "1" || /sim|quero|aceito|aprovei/i.test(normalizedInput)) {
+      // Aceitar desconto
+      const offer = flow.discountOffer;
+      const discountedPrice = (flow.discountOriginalPrice || 100) * (1 - offer.discountPercentage / 100);
+      flow.quoteMin = discountedPrice;
+      flow.quoteMax = discountedPrice;
+      flow.couponDiscountApplied = discountedPrice;
+      flow.awaitingDiscountResponse = false;
+      flow.discountOffer = null;
+      
+      await saveFlow(msg.phone, flow);
+      await sendText({
+        number: msg.phone,
+        text: `✅ Ótimo! ${offer.discountReason}\n\nNovo valor: R$ ${discountedPrice.toFixed(2).replace('.', ',')}\n\nVamos continuar o agendamento com este valor especial!`,
+      });
+      return;
+    } else if (normalizedInput === "2" || /nao|não|cancelar|recusar/i.test(normalizedInput)) {
+      // Recusar desconto e voltar ao menu
+      flow.awaitingDiscountResponse = false;
+      flow.discountOffer = null;
+      flow.stage = "ETAPA2_MAIN_MENU";
+      
+      await saveFlow(msg.phone, flow);
+      await sendText({
+        number: msg.phone,
+        text: "Entendido. Sem problemas! \n\nVoltamos ao menu principal. O que você gostaria de fazer?",
+      });
+      return;
+    }
+  }
+
   // Small talk / confirmações neutras ("pera ai", "ok", "tá", "entendi") em stages intermediárias
   // → responde com lembrete gentil sem quebrar o estado atual
   if (
@@ -1214,21 +1379,33 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         return;
       }
 
-      // Check if first-time customer for bonus
-      if (!flow.firstTimeBonusApplied) {
+      // Check if first-time customer for bonus (unificado com test-bot)
+      if (!flow.firstTimeBonusApplied && !flow.couponCode) {
         try {
           const existingCustomer = await prisma.client.findUnique({
             where: { phone: msg.phone }
           });
-          
+
           if (!existingCustomer) {
             flow.isFirstTimeCustomer = true;
-            flow.firstTimeBonusDiscount = Math.round((flow.quoteMin ?? 0) * 0.1); // 10% discount
+
+            // Usar sistema de cupom como test-bot (mais robusto)
+            const coupon = await findCouponByCode("PRIMEIRA10");
+            if (coupon && coupon.active) {
+              flow.couponCode = "PRIMEIRA10";
+              flow.firstTimeBonusDiscount = coupon.type === "percent"
+                ? (flow.quoteMin ?? 0) * (Number(coupon.amount) / 100)
+                : Number(coupon.amount);
+            } else {
+              // Fallback para cálculo direto se cupom não existir
+              flow.firstTimeBonusDiscount = Math.round((flow.quoteMin ?? 0) * 0.1);
+            }
+
             flow.stage = "ETAPA5_FIRST_TIME_BONUS";
             await saveFlow(msg.phone, flow);
             await sendText({
               number: msg.phone,
-              text: `🎁 *Bônus! Primeira vez: 10% de desconto*\n\nÉ sua primeira vez aqui! Ganhou *10% de desconto* no primeiro serviço.\n\n💰 Desconto: R$ ${flow.firstTimeBonusDiscount.toFixed(2).replace('.', ',')}\n\n*1* ✅ Quero o desconto\n*2* ❌ Não, obrigado`,
+              text: `🎁 *Bônus! Primeira vez: 10% de desconto*\n\nÉ sua primeira vez aqui! Ganhou *10% de desconto* no primeiro serviço.\n\n💰 Desconto: R$ ${(flow.firstTimeBonusDiscount ?? 0).toFixed(2).replace('.', ',')}\n\n*1* ✅ Quero o desconto\n*2* ❌ Não, obrigado`,
             });
             return;
           } else {
@@ -1316,7 +1493,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         }
         return;
       }
-      
+
       if (num === 2 || /nao|não|n|no|nao quero/i.test(lower)) {
         flow.firstTimeBonusApplied = true;
         flow.firstTimeBonusDiscount = 0;
@@ -1470,11 +1647,11 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
 
     case "ETAPA9_COUPON": {
       if (shouldSkipCouponPrompt(input)) {
-        flow.stage = "ETAPA9_PICKUP";
+        flow.stage = "ETAPA9_LOYALTY"; // Novo fluxo: ir para loyalty antes de logistics
         await saveFlow(msg.phone, flow);
         await sendText({
           number: msg.phone,
-          text: `Quer que a gente venha buscar o carro? 🚗💨\n\n*1* Sim, quero o leva e traz\n*2* Não, eu levo até a loja`,
+          text: `🌟 *Pontos de Fidelidade*\n\nVocê tem ${flow.loyaltyPoints ?? 0} pontos disponíveis.\n100 pontos = R$ 10 de desconto!\n\nQuer usar seus pontos agora?\n\n*1* - Sim, usar pontos\n*2* - Não, guardar para depois`,
         });
         return;
       }
@@ -1489,11 +1666,11 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
 
       if (await applyCouponPhase(msg, flow, lower, ctx, wctx, num, input)) {
         if (!flow.couponError) {
-          flow.stage = "ETAPA9_PICKUP";
+          flow.stage = "ETAPA9_LOYALTY"; // Novo fluxo: ir para loyalty antes de logistics
           await saveFlow(msg.phone, flow);
           await sendText({
             number: msg.phone,
-            text: `Quer que a gente vá buscar o carro? 🚗💨\n\n*1* Sim, quero que a estética busque o carro\n*2* Não, eu levo até a estética`,
+            text: `🌟 *Pontos de Fidelidade*\n\nVocê tem ${flow.loyaltyPoints ?? 0} pontos disponíveis.\n100 pontos = R$ 10 de desconto!\n\nQuer usar seus pontos agora?\n\n*1* - Sim, usar pontos\n*2* - Não, guardar para depois`,
           });
         }
         return;
@@ -1506,138 +1683,47 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       return;
     }
 
-    case "ETAPA9_PICKUP": {
-      if (num === 1 || /sim|quero|yes|busca|entrega|levar|levem/i.test(lower)) {
-        flow.needsPickup = true;
-        flow.stage = "ETAPA9_PICKUP_ADDRESS";
+    case "ETAPA9_LOYALTY": {
+      await executeCoreHandler(msg, flow, handleLoyaltyStep);
+      return;
+    }
+
+    case "ETAPA10_BUDGET": {
+      // handleLoyaltyStep já mostra o orçamento e pede confirmação
+      // Esta etapa apenas captura a resposta do usuário após ver o orçamento
+      if (/(sim|s|1|yes|quero|agendar)/i.test(lower)) {
+        flow.stage = "ETAPA10_LOGISTICS";
         await saveFlow(msg.phone, flow);
         await sendText({
           number: msg.phone,
-          text: `Show! Me manda o endereço completo onde está o carro (rua, número, bairro, cidade).`,
+          text: `🚚 Como prefere?\n\n*1* - Deixe eu levo o carro até a estética\n*2* - A estética vai buscar o carro`,
         });
         return;
       }
 
-      if (num === 2 || /nao|não|na loja|vou levar|sem pickup|nao quero/i.test(lower)) {
-        flow.needsPickup = false;
-        flow.stage = "ETAPA9_RETURN_PREFERENCE";
+      if (/(nao|não|n|2|no|cancelar|alterar)/i.test(lower)) {
+        flow.stage = "ETAPA2_MAIN_MENU";
         await saveFlow(msg.phone, flow);
         await sendText({
           number: msg.phone,
-          text: `📍 Combinado! Você pode levar o carro até a loja quando puder.\n\nQuer que devolvamos o veículo até você após o serviço?\n\n*1* Sim\n*2* Não`,
+          text: `Sem problemas! ${msgH.mainMenu(flow, msg.pushName)}`,
         });
         return;
       }
 
       await sendText({
         number: msg.phone,
-        text: `Quer que a gente busque o carro? 🚗💨\n\n*1* Sim, quero o leva e traz\n*2* Não, eu levo até a loja`,
+        text: `Por favor, responda *sim* para agendar ou *não* para cancelar.`,
       });
       return;
     }
 
-    case "ETAPA9_PICKUP_ADDRESS": {
-      if (flow.pickupAddress && flow.pickupDistanceKm && flow.pickupFee) {
-        const confirmed = parseYesNo(input);
-        if (confirmed === true) {
-          flow.stage = "ETAPA9_RETURN_PREFERENCE";
-          await saveFlow(msg.phone, flow);
-          await sendText({
-            number: msg.phone,
-            text: `Perfeito! E quando o serviço terminar, como prefere?\n\n*1* Vocês devolvem o carro no mesmo endereço\n*2* Eu mesmo venho buscar o carro`,
-          });
-          return;
-        }
-        if (confirmed === false) {
-          flow.pickupAddress = undefined;
-          flow.pickupDistanceKm = undefined;
-          flow.pickupFee = undefined;
-          await saveFlow(msg.phone, flow);
-          await sendText({
-            number: msg.phone,
-            text: `Tudo bem. Me manda o endereço completo onde está o carro (rua, número, bairro, cidade).`,
-          });
-          return;
-        }
-      }
+    // ETAPA9_PICKUP, ETAPA9_PICKUP_ADDRESS, ETAPA9_RETURN_PREFERENCE removidos
+    // Agora são tratados unificados pelo handleLogistics (ETAPA10_LOGISTICS)
 
-      const address = input.trim();
-      if (!address) {
-        await sendText({
-          number: msg.phone,
-          text: `Me manda o endereço completo onde está o carro (rua, número, bairro, cidade).`,
-        });
-        return;
-      }
-
-      const attempts = flow.pickupAddressAttempts ?? 0;
-      if (attempts >= 2) {
-        const session = await prisma.whatsAppSession.findUnique({ where: { phone: normalizePhone(msg.phone) } });
-        if (session?.id) {
-          await requestHumanHandoff({
-            phone: msg.phone,
-            sessionId: session.id,
-            reason: "Falha ao localizar endereço para leva e traz",
-            clientName: clientDisplayName(flow, msg.pushName),
-          });
-        }
-        return;
-      }
-
-      const result = await calculateDistance(address);
-      if (!result) {
-        flow.pickupAddressAttempts = (flow.pickupAddressAttempts ?? 0) + 1;
-        await saveFlow(msg.phone, flow);
-        await sendText({
-          number: msg.phone,
-          text: `Não consegui localizar esse endereço com precisão. Envie rua, número, bairro e cidade para continuar.`,
-        });
-        return;
-      }
-
-      const settings = (await prisma.settings.findUnique({ where: { id: "default" } })) as any;
-      const feePerKm = Number(settings?.pickupFeePerKm ?? 2.5);
-      const feeBase = Number(settings?.pickupFeeBase ?? 0);
-      flow.pickupAddress = address;
-      flow.pickupDistanceKm = result.distanceKm;
-      flow.pickupFee = calculatePickupFee(result.distanceKm, feePerKm, feeBase);
-      flow.pickupAddressAttempts = 0;
-      await saveFlow(msg.phone, flow);
-      await sendText({
-        number: msg.phone,
-        text: `📍 Endereço confirmado! Distância até a loja: ${result.distanceKm.toFixed(2)} km\n🚗 Taxa de busca e entrega: R$ ${flow.pickupFee.toFixed(2)}\n\nConfirma esse endereço? (sim/não)`,
-      });
-      return;
-    }
-
-    case "ETAPA9_RETURN_PREFERENCE": {
-      if (num === 1 || /sim|quero|yes|devolv/i.test(lower)) {
-        flow.needsReturn = true;
-        const settings = (await prisma.settings.findUnique({ where: { id: "default" } })) as any;
-        const updatedFee = calculatePickupFee(
-          Number(flow.pickupDistanceKm ?? 0) * 2,
-          Number(settings?.pickupFeePerKm ?? 2.5),
-          Number(settings?.pickupFeeBase ?? 0)
-        );
-        flow.pickupFee = updatedFee;
-        flow.stage = "ETAPA8_PAYMENT";
-        await saveFlow(msg.phone, flow);
-        await sendText({ number: msg.phone, text: `Perfeito! A taxa de leva e traz foi ajustada para ida e volta.\n\n${etapa8Payment(!!ctx.pixKey, prompts)}` });
-        return;
-      }
-
-      if (num === 2 || /nao|não|nao quero|buscar|vou buscar/i.test(lower)) {
-        flow.needsReturn = false;
-        flow.stage = "ETAPA8_PAYMENT";
-        await saveFlow(msg.phone, flow);
-        await sendText({ number: msg.phone, text: etapa8Payment(!!ctx.pixKey, prompts) });
-        return;
-      }
-
-      await sendText({
-        number: msg.phone,
-        text: `Perfeito! E quando o serviço terminar, como prefere?\n\n*1* Vocês devolvem o carro no mesmo endereço\n*2* Eu mesmo venho buscar o carro`,
-      });
+    // NOVA ETAPA: Logística combinada (unificado com test-bot)
+    case "ETAPA10_LOGISTICS": {
+      await executeCoreHandler(msg, flow, handleLogistics);
       return;
     }
 
@@ -1676,200 +1762,13 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     }
 
     case "ETAPA8_PIX_CHOICE": {
-      if (num === 1 || /agora|pagar agora|imediato/i.test(lower)) {
-        // PIX agora - precisa enviar comprovante
-        flow.pixPaymentType = "now";
-        flow.paymentMethod = "PIX (Pagar agora)";
-        const totalValue = Math.max(0, Number(flow.quoteMin ?? 0) + Number(flow.pickupFee ?? 0) - Number(flow.couponDiscountApplied ?? 0));
-        const currentPaid = flow.totalPaid ?? 0;
-        const remainingValue = totalValue - currentPaid;
-
-        // Reset payment state if starting fresh
-        if (currentPaid === 0) {
-          flow.totalPaid = 0;
-          flow.partialPayments = [];
-        }
-
-        flow.stage = "ETAPA8_RECEIPT_UPLOAD";
-        await saveFlow(msg.phone, flow);
-
-        // Enviar QR Code e pedir comprovante
-        try {
-          let pixQrUrl: string;
-
-          // Se tiver QR Code pré-gerado, usa ele. Caso contrário, gera um novo.
-          if (ctx.pixQrCodeImage) {
-            pixQrUrl = ctx.pixQrCodeImage;
-          } else {
-            pixQrUrl = await generatePixQrCode({
-              amount: remainingValue,
-              description: `Agendamento ${flow.serviceLabel}`,
-              merchantName: ctx.pixHolder || ctx.businessName,
-              merchantCity: ctx.pixMerchantCity || ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
-              key: ctx.pixKey || "",
-            });
-          }
-
-          const pixPayload = generatePixPayload({
-            amount: remainingValue,
-            description: `Agendamento ${flow.serviceLabel}`,
-            merchantName: ctx.pixHolder || ctx.businessName,
-            merchantCity: ctx.pixMerchantCity || ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
-            key: ctx.pixKey || "",
-          });
-
-          await sendText({ number: msg.phone, text: `💳 **Pagamento via PIX**\n\nEscaneie o QR Code abaixo para pagar:\n\nValor: R$ ${remainingValue.toFixed(2).replace('.', ',')}` });
-          await sendMedia({ number: msg.phone, mediaUrl: pixQrUrl, mediaType: "image" });
-          await sendText({ number: msg.phone, text: `Ou copie e cole o código PIX:\n\`${pixPayload}\`` });
-          await delay(1000);
-          await sendText({ number: msg.phone, text: etapa8ReceiptUpload(remainingValue, prompts) });
-        } catch (error) {
-          console.error("[ETAPA8_PIX_CHOICE] Error generating PIX QR code:", error);
-          await sendText({ number: msg.phone, text: etapa8ReceiptUpload(remainingValue, prompts) });
-        }
-        return;
-      }
-
-      if (num === 2 || /entrega|pagar na entrega|depois/i.test(lower)) {
-        // PIX na entrega - não precisa comprovante agora
-        flow.pixPaymentType = "delivery";
-        flow.paymentMethod = "PIX (Pagar na entrega)";
-        flow.stage = "ETAPA14_REMINDER";
-        await saveFlow(msg.phone, flow);
-        await sendText({ number: msg.phone, text: `Perfeito! Você pagará via PIX no dia do serviço.\n\n${etapa8PixBlock(ctx, prompts)}` });
-        await delay(1000);
-        await sendText({ number: msg.phone, text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa` });
-        return;
-      }
-
-      await sendText({
-        number: msg.phone,
-        text: invalidMenu(etapa8PixChoice(prompts), prompts),
-      });
+      await executeCoreHandler(msg, flow, handlePixChoice);
       return;
     }
 
     case "ETAPA8_RECEIPT_UPLOAD": {
-      // Verificar se mensagem contém imagem
-      if (msg.text.match(/^(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp))/i) ||
-          msg.text.includes("image") ||
-          msg.text.includes("media")) {
-
-        const imageUrl = msg.text;
-        const totalValue = Math.max(0, Number(flow.quoteMin ?? 0) + Number(flow.pickupFee ?? 0) - Number(flow.couponDiscountApplied ?? 0));
-        const currentPaid = flow.totalPaid ?? 0;
-        const remainingValue = totalValue - currentPaid;
-
-        try {
-          // Analisar comprovante usando IA
-          const receiptAmount = await analyzeReceiptImage(imageUrl);
-
-          if (receiptAmount === null) {
-            // Erro na leitura
-            const attempts = flow.receiptValidationAttempts ?? 0;
-            if (attempts >= 2) {
-              // Muitas tentativas - voltar para métodos de pagamento
-              flow.stage = "ETAPA8_PAYMENT";
-              flow.receiptValidationAttempts = 0;
-              await saveFlow(msg.phone, flow);
-              await sendText({ number: msg.phone, text: `Não consegui ler o comprovante após várias tentativas. Vamos tentar outro método de pagamento.\n\n${etapa8Payment(!!ctx.pixKey, prompts)}` });
-              return;
-            }
-
-            flow.receiptValidationAttempts = (flow.receiptValidationAttempts ?? 0) + 1;
-            await saveFlow(msg.phone, flow);
-            await sendText({ number: msg.phone, text: etapa8ReceiptError(prompts) });
-            return;
-          }
-
-          // Validar valor contra o valor restante (não o total original)
-          if (validateReceiptAmount(receiptAmount, remainingValue, 10)) {
-            // Valor correto - aprovar pagamento
-            flow.receiptImageUrl = imageUrl;
-            flow.receiptAmount = receiptAmount;
-            flow.totalPaid = currentPaid + receiptAmount;
-            flow.receiptValidationAttempts = 0;
-            flow.stage = "ETAPA14_REMINDER";
-            await saveFlow(msg.phone, flow);
-
-            await sendText({ number: msg.phone, text: `✅ *Pagamento confirmado!*\n\nValor do comprovante: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\nTotal pago: R$ ${flow.totalPaid.toFixed(2).replace('.', ',')}\n\nSeu agendamento está garantido.` });
-            await delay(1000);
-            await sendText({ number: msg.phone, text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa` });
-            return;
-          } else {
-            // Valor incorreto - verificar se é pagamento parcial
-            const newTotalPaid = currentPaid + receiptAmount;
-            const remaining = totalValue - newTotalPaid;
-
-            if (receiptAmount > 0 && remaining > 0) {
-              // Pagamento parcial válido
-              flow.partialPayments = flow.partialPayments || [];
-              flow.partialPayments.push({ amount: receiptAmount, imageUrl });
-              flow.totalPaid = newTotalPaid;
-              flow.receiptValidationAttempts = 0;
-              await saveFlow(msg.phone, flow);
-
-              await sendText({ number: msg.phone, text: `💰 *Pagamento parcial registrado!*\n\nValor recebido: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\nTotal pago: R$ ${newTotalPaid.toFixed(2).replace('.', ',')}\n*Falta pagar: R$ ${remaining.toFixed(2).replace('.', ',')}*\n\nPor favor, envie o comprovante do valor restante de R$ ${remaining.toFixed(2).replace('.', ',')}.` });
-              await delay(1000);
-              await sendText({ number: msg.phone, text: etapa8ReceiptUpload(remaining, prompts) });
-              return;
-            } else if (receiptAmount > 0 && remaining <= 0) {
-              // Pagamento completo com comprovante maior (aceitar)
-              flow.receiptImageUrl = imageUrl;
-              flow.receiptAmount = newTotalPaid;
-              flow.totalPaid = newTotalPaid;
-              flow.receiptValidationAttempts = 0;
-              flow.stage = "ETAPA14_REMINDER";
-              await saveFlow(msg.phone, flow);
-
-              await sendText({ number: msg.phone, text: `✅ *Pagamento confirmado!*\n\nValor do comprovante: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\nTotal pago: R$ ${newTotalPaid.toFixed(2).replace('.', ',')}\n\nSeu agendamento está garantido.` });
-              await delay(1000);
-              await sendText({ number: msg.phone, text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa` });
-              return;
-            } else {
-              // Valor incorreto - pedir comprovante novamente com o valor correto
-              const attempts = flow.receiptValidationAttempts ?? 0;
-              if (attempts >= 2) {
-                // Muitas tentativas - voltar para métodos de pagamento
-                flow.stage = "ETAPA8_PAYMENT";
-                flow.receiptValidationAttempts = 0;
-                await saveFlow(msg.phone, flow);
-                await sendText({ number: msg.phone, text: `O valor do comprovante não confere após várias tentativas. Vamos tentar outro método de pagamento.\n\n${etapa8Payment(!!ctx.pixKey, prompts)}` });
-                return;
-              }
-
-              flow.receiptValidationAttempts = (flow.receiptValidationAttempts ?? 0) + 1;
-              await saveFlow(msg.phone, flow);
-              await sendText({ number: msg.phone, text: etapa8ReceiptInvalid(remainingValue, receiptAmount, prompts) });
-              await delay(1000);
-              await sendText({ number: msg.phone, text: etapa8ReceiptUpload(remainingValue, prompts) });
-              return;
-            }
-          }
-        } catch (error) {
-          console.error("[ETAPA8_RECEIPT_UPLOAD] Error analyzing receipt:", error);
-          const attempts = flow.receiptValidationAttempts ?? 0;
-          if (attempts >= 2) {
-            flow.stage = "ETAPA8_PAYMENT";
-            flow.receiptValidationAttempts = 0;
-            await saveFlow(msg.phone, flow);
-            await sendText({ number: msg.phone, text: `Erro ao processar comprovante. Vamos tentar outro método de pagamento.\n\n${etapa8Payment(!!ctx.pixKey, prompts)}` });
-            return;
-          }
-
-          flow.receiptValidationAttempts = (flow.receiptValidationAttempts ?? 0) + 1;
-          await saveFlow(msg.phone, flow);
-          await sendText({ number: msg.phone, text: etapa8ReceiptError(prompts) });
-          return;
-        }
-      }
-
-      // Se não for imagem, pedir novamente com o valor restante correto
-      const totalValue = Math.max(0, Number(flow.quoteMin ?? 0) + Number(flow.pickupFee ?? 0) - Number(flow.couponDiscountApplied ?? 0));
-      const currentPaid = flow.totalPaid ?? 0;
-      const remainingValue = totalValue - currentPaid;
-
-      await sendText({ number: msg.phone, text: etapa8ReceiptUpload(remainingValue, prompts) });
+      // Usar o core handler para processamento de comprovante
+      await executeCoreHandler(msg, flow, handleReceiptUpload, msg.phone);
       return;
     }
 
@@ -1955,20 +1854,68 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     }
 
     case "ETAPA15_SUMMARY_CONFIRM": {
-      if (/(sim|s|confirmo)/.test(lower)) {
-        flow.stage = "ETAPA16_CONFIRMATION";
+      await executeCoreHandler(msg, flow, handleSummaryConfirm);
+      return;
+    }
+
+    case "ETAPA16_CONFIRMATION": {
+      // Após confirmação final, criar o agendamento e direcionar para rating
+      const result = await createAppointment(flow, msg.phone);
+      const appointment = result?.appointment;
+
+      if (result?.conflict) {
+        const durationMin = flow.serviceDurationMin ?? 60;
+        const fresh = await generateAvailableSlots(flow.dayDate ?? "", durationMin);
+        flow.availableSlots = fresh;
+        flow.startTime = undefined;
+        flow.periodLabel = undefined;
+        flow.stage = "ETAPA7_TIME";
         await saveFlow(msg.phone, flow);
         await sendText({
           number: msg.phone,
-          text: `✅ *Agendamento confirmado!*\n\nSeu atendimento está reservado na Garagem do Ka.\n\n📍 Endereço: *Rua das Oficinas, 100 - São Paulo, SP*\n🕒 Horário: *Segunda a sábado, 08:00 às 18:00*\n\nCancelamentos com até 2h de antecedência sem custo.\n\nPosso te ajudar com mais alguma coisa? 😊`,
+          text: `Esse horário acabou de ser reservado 😔\n\n${etapa7Time(
+            flow.dayLabel ?? flow.dayDate ?? "este dia",
+            fresh,
+            formatDurationLabel(durationMin),
+            wctx.prompts
+          )}`,
         });
         return;
       }
-      if (/(nao|não|n)/.test(lower)) {
-        await sendText({ number: msg.phone, text: `Tudo bem 😊 O que gostaria de alterar?` });
-        return;
+
+      // Se houver cupom aplicado, registrar redemption vinculado ao agendamento
+      if (appointment?.id && flow.couponCode) {
+        try {
+          const client = await prisma.client.findUnique({
+            where: { phone: normalizePhone(msg.phone) },
+          });
+
+          if (client?.id) {
+            await redeemCoupon(flow.couponCode, client.id, appointment.id);
+          }
+        } catch (err) {
+          console.error('[Cupon] Falha ao registrar redemption:', err);
+        }
       }
-      await sendText({ number: msg.phone, text: `Responda *sim* ou *não* para confirmar.` });
+
+      // Enviar confirmação final
+      await sendText({
+        number: msg.phone,
+        text: `✅ *Agendamento confirmado!*\n\nSeu atendimento está reservado na Garagem do Ka.\n\n📍 Endereço: *Rua das Oficinas, 100 - São Paulo, SP*\n🕒 Horário: *Segunda a sábado, 08:00 às 18:00*\n\nCancelamentos com até 2h de antecedência sem custo.\n\nPosso te ajudar com mais alguma coisa? 😊`,
+      });
+
+      // Direcionar para rating
+      flow.stage = "ETAPA11_RATING";
+      await saveFlow(msg.phone, flow);
+      await sendText({
+        number: msg.phone,
+        text: `⭐ **Avaliação pós-serviço**\n\nGostou do atendimento? Avalie de 1 a 5!\n\n*1* - ⭐\n*2* - ⭐⭐\n*3* - ⭐⭐⭐\n*4* - ⭐⭐⭐⭐\n*5* - ⭐⭐⭐⭐⭐`,
+      });
+      return;
+    }
+
+    case "ETAPA11_RATING": {
+      await executeCoreHandler(msg, flow, handleRating, msg.phone);
       return;
     }
 
@@ -2035,11 +1982,6 @@ function menuForStage(flow: FlowState, wctx: WhatsAppCatalogContext, pushName?: 
     default:
       return `Digite *menu* para ver opções.`;
   }
-}
-
-function shouldSkipCouponPrompt(input: string): boolean {
-  const normalized = input.trim().toLowerCase();
-  return /^(2|nao|não|n|sem|pular|ignorar|nenhum|nao tenho|não tenho|sem cupom|sem desconto|nenhum cupom|nao tenho cupom|não tenho cupom)$/i.test(normalized);
 }
 
 function parseYesNo(input: string): boolean | null {

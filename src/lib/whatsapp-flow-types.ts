@@ -3,6 +3,7 @@ export const SESSION_RESET_MS = 30 * 60 * 1000;
 
 export type FlowStage =
   | "ETAPA1_AWAITING_NAME"
+  | "ETAPA2_CLIENT_RECOGNITION"  // NOVO: reconhecimento de cliente recorrente
   | "ETAPA2_MAIN_MENU"
   | "ETAPA2_SUB"
   | "ETAPA3_SERVICE_ACTION"
@@ -23,15 +24,21 @@ export type FlowStage =
   | "ETAPA8_PAYMENT_NO_PIX"
   | "ETAPA8_PAYMENT_CARD_TYPE"
   | "ETAPA8_PHOTO"
+  | "ETAPA8_PHOTO_UPLOAD"  // NOVO: upload de foto (unificado)
   | "ETAPA9_COUPON"
+  | "ETAPA9_LOYALTY"  // NOVO: pontos de fidelidade
   | "ETAPA9_PICKUP"
   | "ETAPA9_PICKUP_ADDRESS"
   | "ETAPA9_RETURN_PREFERENCE"
   | "ETAPA9_REMINDER"
   | "ETAPA10_BUDGET"
+  | "ETAPA10_LOGISTICS"  // NOVO: logística combinada (substitui ETAPA9_PICKUP*)
+  | "ETAPA10_CONFIRM"  // NOVO: confirmação final (unificado)
+  | "ETAPA11_RATING"  // NOVO: avaliação pós-atendimento
+  | "ETAPA11_SERVICE_QUESTION"  // NOVO: recomendação de serviço
   | "ETAPA14_REMINDER"
   | "ETAPA15_SUMMARY_CONFIRM"
-  | "ETAPA16_CONFIRMATION"
+  | "ETAPA16_CONFIRMATION"  // NOVO: confirmação final após resumo
   | "ETAPA10_FAQ"
   | "ETAPA8_PIX_CHOICE"
   | "ETAPA8_RECEIPT_UPLOAD"
@@ -108,6 +115,48 @@ export interface FlowState {
   isFirstTimeCustomer?: boolean;
   firstTimeBonusApplied?: boolean;
   firstTimeBonusDiscount?: number; // valor do desconto (R$)
+
+  // NOVOS CAMPOS DO TEST-BOT
+  // Tracking de inatividade
+  lastInteractionAt?: number;
+
+  // Foto do veículo
+  vehiclePhotoUrl?: string | null;
+
+  // Cliente recorrente e fidelidade
+  isReturningClient?: boolean;
+  savedVehicle?: string | null;
+  loyaltyPoints?: number;
+  loyaltyDiscountApplied?: number; // Valor do desconto aplicado via pontos (R$)
+
+  // Controle de fluxo
+  awaitingReceiptUpload?: boolean;
+  awaitingDiscountResponse?: boolean;
+  awaitingPickupAddress?: boolean;
+  awaitingReturnPreference?: boolean;
+  awaitingPhotoUpload?: boolean;
+  awaitingServiceRecommendation?: boolean;
+  serviceRecommendation?: string | null;
+  awaitingServiceQuestion?: boolean;
+
+  // Detecção de cancelamento
+  discountOriginalPrice?: number;
+  discountOffer?: {
+    originalPrice: number;
+    discountPercentage: number;
+    validUntil: string;
+    used: boolean;
+    discountReason?: string;
+  };
+
+  // Pagamento (campos adicionais do test-bot)
+  paymentGateway?: string;
+  transactionId?: string;
+  paidAt?: string; // ISO string para persistência
+  paymentSimulationCode?: string; // Apenas para test-bot
+
+  // Upsell (valor monetário)
+  upsellValue?: number;
 }
 
 

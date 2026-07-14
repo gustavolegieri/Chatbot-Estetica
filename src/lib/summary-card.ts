@@ -1,6 +1,6 @@
 import { renderLogo } from "./svg-utils";
 
-interface SummaryCardData {
+export interface SummaryCardData {
   customerName: string;
   serviceName: string;
   vehicle: string;
