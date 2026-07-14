@@ -386,10 +386,12 @@ async function loadContext(): Promise<FlowContext> {
 }
 
 async function saveFlow(phone: string, flow: FlowState) {
+  console.log("[WhatsApp Flow] 💾 Salvando estado do fluxo:", { phone, stage: flow.stage, welcomed: flow.welcomed });
   await prisma.whatsAppSession.update({
     where: { phone: normalizePhone(phone) },
     data: { metadata: flow as object },
   });
+  console.log("[WhatsApp Flow] ✅ Estado salvo com sucesso");
 }
 
 async function resolveDbService(serviceKey?: string, dbMatch?: string) {
@@ -2270,10 +2272,14 @@ async function confirmFinal(
 
 /** Primeira interação: sempre etapa 1 */
 export async function startFlow(msg: IncomingMessage) {
+  console.log("[WhatsApp Flow] 🚀 Iniciando flow de boas-vindas");
   const ctx = await loadContext();
   const wctx = await loadWhatsAppCatalog();
+  console.log("[WhatsApp Flow] 📤 Enviando mensagem de boas-vindas");
   await sendText({ number: msg.phone, text: etapa1Welcome(ctx, wctx.prompts) });
+  console.log("[WhatsApp Flow] 💾 Salvando estado com welcomed=true");
   await saveFlow(msg.phone, { stage: "ETAPA1_AWAITING_NAME", welcomed: true });
+  console.log("[WhatsApp Flow] ✅ Flow de boas-vindas concluído");
 }
 
 export async function goToMainMenu(phone: string, customerName: string) {

@@ -136,7 +136,9 @@ const settings = await prisma.settings.findUnique({ where: { id: "default" } });
         console.log("[WhatsApp Bot] 📝 Mensagem logada com sucesso");
       }
 
+      console.log("[WhatsApp Bot] 🔍 Verificando handoff humano");
       if (wantsHumanHandoff(inboundText)) {
+        console.log("[WhatsApp Bot] 🤝 Handoff humano solicitado");
         const name =
           flowRef.current.customerName ?? session.client?.name ?? msg.pushName;
         await requestHumanHandoff({
@@ -147,8 +149,10 @@ const settings = await prisma.settings.findUnique({ where: { id: "default" } });
         });
         return;
       }
+      console.log("[WhatsApp Bot] ✅ Sem handoff humano, continuando");
 
       // Bloqueio administrativo de números: evita respostas automáticas do bot
+      console.log("[WhatsApp Bot] 🔍 Verificando bloqueio do número");
       const blocked = await prisma.blockedPhone.findUnique({
         where: { phone: normalizePhone(msg.phone) },
         select: { id: true },
@@ -157,13 +161,14 @@ const settings = await prisma.settings.findUnique({ where: { id: "default" } });
         console.log("[WhatsApp Bot] ⛔ Número bloqueado:", msg.phone);
         return;
       }
+      console.log("[WhatsApp Bot] ✅ Número não bloqueado");
 
+      console.log("[WhatsApp Bot] 🔍 Verificando se bot está pausado");
       if (await isBotPausedForPhone(msg.phone)) {
         console.log("[WhatsApp Bot] ⛔ Bot pausado para este número:", msg.phone);
         return;
       }
-
-      console.log("[WhatsApp Bot] ✅ Número não bloqueado, bot não pausado, continuando");
+      console.log("[WhatsApp Bot] ✅ Bot não pausado, continuando");
 
       console.log("[WhatsApp Bot] 🔍 Verificando confirmação de agendamento");
       if (await tryHandleAppointmentConfirmation(msg.phone, msg.text, flowRef.current.stage)) {
