@@ -21,13 +21,50 @@ type HoursSettings = Pick<
 
 export function getBusinessHoursStatus(settings: HoursSettings, now = new Date()): BusinessHoursStatus {
   const workingDays = settings.workingDays.split(",").map(Number);
-  const dayOfWeek = now.getDay();
+
+  // Força timezone para manter consistência independentemente do fuso do servidor.
+  // (Requisito: Brasil)
+  const tz = "America/Sao_Paulo";
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    weekday: "short",
+  }).formatToParts(now);
+
+  const getPart = (type: string) => parts.find((p) => p.type === type)?.value;
+
+  // dayOfWeek: Intl retorna o nome do dia — convertemos para 0..6 do JS (domingo..sábado)
+  const weekdayShort = (getPart("weekday") ?? "") as string;
+  const map: Record<string, number> = {
+    Sun: 0,
+    Seg: 1,
+    Mon: 1,
+    Ter: 2,
+    Tue: 2,
+    Wed: 3,
+    Qua: 3,
+    Thu: 4,
+    Qui: 4,
+    Fri: 5,
+    Sex: 5,
+    Sat: 6,
+    Sab: 6,
+  };
+  const dayOfWeek = map[weekdayShort] ?? now.getDay();
 
   if (!workingDays.includes(dayOfWeek)) {
     return { isOpen: false, reason: "closed_day" };
   }
 
-  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const hour = Number(getPart("hour") ?? 0);
+  const minute = Number(getPart("minute") ?? 0);
+  const nowMin = hour * 60 + minute;
+
   const openMin = timeToMinutes(settings.businessHoursStart);
   const closeMin = timeToMinutes(settings.businessHoursEnd);
 
@@ -48,6 +85,7 @@ export function getBusinessHoursStatus(settings: HoursSettings, now = new Date()
 
   return { isOpen: true };
 }
+
 
 export function afterHoursMessage(
   settings: HoursSettings & Pick<Settings, "businessName">,
