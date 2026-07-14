@@ -77,6 +77,13 @@ async function handleMessageInternal(msg: IncomingMessage) {
 
 const settings = await prisma.settings.findUnique({ where: { id: "default" } });
 
+  console.log("[WhatsApp Bot] Configurações carregadas:", {
+    whatsappEnabled: settings?.whatsappEnabled,
+    testModeEnabled: settings?.testModeEnabled,
+    testModePhone: settings?.testModePhone,
+    botPaused: await (await import("./whatsapp-handoff")).isBotPausedForPhone(msg.phone)
+  });
+
   // Filtro extra anti-fuso: se o servidor estiver em outro fuso, ainda assim garantimos que a checagem
   // de horário use o relógio local do bot (Brasil).
   if (settings && settings.whatsappEnabled === false) {
@@ -95,7 +102,13 @@ const settings = await prisma.settings.findUnique({ where: { id: "default" } });
   const flowRef = { current: flow };
   const lastInteractionAt = session.lastMessageAt ?? session.updatedAt;
 
-  console.log("[WhatsApp Bot] 🔄 Estado atual do fluxo:", { stage: flow.stage, welcomed: flow.welcomed, customerName: flow.customerName });
+  console.log("[WhatsApp Bot] 🔄 Estado atual do fluxo:", { 
+    stage: flow.stage, 
+    welcomed: flow.welcomed, 
+    customerName: flow.customerName,
+    lastInteractionAt: lastInteractionAt.toISOString(),
+    updatedAt: session.updatedAt.toISOString()
+  });
 
   await runWithMessageLogContext(
     {
@@ -190,6 +203,8 @@ const settings = await prisma.settings.findUnique({ where: { id: "default" } });
         flowRef.current = parseFlow(sessionAfterReset?.metadata);
         flow = flowRef.current;
         console.log("[WhatsApp Bot] 🔄 Estado após reset check:", { stage: flowRef.current.stage, welcomed: flowRef.current.welcomed });
+      } else {
+        console.log("[WhatsApp Bot] ℹ️ Sessão não resetada - tempo decorrido:", Date.now() - lastInteractionAt.getTime(), "ms");
       }
 
       if (msg.text.trim().toLowerCase() === "menu") {

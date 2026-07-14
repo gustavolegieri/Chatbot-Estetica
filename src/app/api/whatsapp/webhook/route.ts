@@ -155,9 +155,21 @@ export async function POST(req: NextRequest) {
   const { prisma } = await import("@/lib/prisma");
   const settings = await prisma.settings.findUnique({ where: { id: "default" } });
   
+  console.log("[Webhook] Configurações de teste:", {
+    testModeEnabled: settings?.testModeEnabled,
+    testModePhone: settings?.testModePhone,
+    phoneExtraido: phone
+  });
+  
   if (settings?.testModeEnabled) {
     const testPhone = settings.testModePhone?.replace(/\D/g, ""); // Remove não-dígitos
     const normalizedPhone = phone.replace(/\D/g, "");
+    
+    console.log("[Webhook] Comparação de modo de teste:", {
+      testPhone,
+      normalizedPhone,
+      saoIguais: testPhone === normalizedPhone
+    });
     
     if (testPhone && normalizedPhone !== testPhone) {
       console.log("[Webhook] Modo de teste ativado - mensagem ignorada de telefone não autorizado:", phone, "(esperado:", testPhone + ")");
@@ -178,7 +190,7 @@ export async function POST(req: NextRequest) {
   const { buttonId, listId } = extractInteractive(msg);
   const pushName = (msg.pushName ?? msg.notifyName ?? "") as string;
 
-  console.log("[Webhook] processando — phone:", phone, "text:", text, "messageId:", messageId);
+  console.log("[Webhook] processando — phone:", phone, "text:", text, "messageId:", messageId, "testModeEnabled:", settings?.testModeEnabled);
 
   try {
     await processWhatsAppMessage({
