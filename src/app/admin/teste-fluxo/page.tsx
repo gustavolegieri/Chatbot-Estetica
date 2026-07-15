@@ -189,7 +189,7 @@ export default function TesteFluxoPage() {
               <h3 className="font-semibold text-yellow-800">Limite Diário da API</h3>
               <p className="text-sm text-yellow-700 mt-1">
                 A WasenderAPI tem um limite de 50 mensagens por dia no plano de teste. 
-                Se você recebeu erro "rate limit", pode ser que este limite tenha sido atingido.
+                Se você recebeu erro &quot;rate limit&quot;, pode ser que este limite tenha sido atingido.
                 As mensagens só serão enviadas novamente após o reset diário ou upgrade para plano pago.
               </p>
             </div>
