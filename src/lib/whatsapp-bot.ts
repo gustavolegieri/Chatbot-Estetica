@@ -40,7 +40,7 @@ async function saveFlow(phone: string, flow: FlowState) {
   console.log("[WhatsApp Bot] 💾 Salvando estado do fluxo:", { phone, stage: flow.stage, welcomed: flow.welcomed });
   await prisma.whatsAppSession.update({
     where: { phone: normalizePhone(phone) },
-    data: { metadata: flow },
+    data: { metadata: flow as any },
   });
 }
 

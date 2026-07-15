@@ -77,7 +77,7 @@ export async function uploadImageToCloudinary(
       throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
 
-    const result = await response.json();
+    const result = await response.json() as { secure_url: string };
     console.log('[Cloudinary] Upload realizado com sucesso via API REST');
     console.log('[Cloudinary] URL:', result.secure_url);
     
@@ -129,7 +129,7 @@ export async function uploadToImgur(imageBuffer: Buffer): Promise<UploadResult> 
       throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
 
-    const result = await response.json();
+    const result = await response.json() as { data: { link: string } };
     console.log('[Imgur] Upload realizado com sucesso');
     
     return {
@@ -177,7 +177,7 @@ export async function uploadToTelegraph(imageBuffer: Buffer): Promise<UploadResu
       throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
 
-    const result = await response.json();
+    const result = await response.json() as Array<{ src: string }>;
     console.log('[Telegraph] Upload realizado com sucesso');
     
     return {
@@ -229,7 +229,7 @@ export async function uploadToImgBB(imageBuffer: Buffer): Promise<UploadResult> 
       throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
 
-    const result = await response.json();
+    const result = await response.json() as { success: boolean; error?: { message?: string }; data: { url: string } };
     
     if (!result.success) {
       throw new Error(result.error?.message || 'Erro no upload ImgBB');
@@ -284,7 +284,7 @@ export async function uploadToFreeImage(imageBuffer: Buffer): Promise<UploadResu
       throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
 
-    const result = await response.json();
+    const result = await response.json() as { status_code: number; error?: { message?: string }; image: { url: string } };
     
     if (result.status_code !== 200) {
       throw new Error(result.error?.message || 'Erro no upload FreeImage');
@@ -341,7 +341,7 @@ export async function uploadToPostImages(imageBuffer: Buffer): Promise<UploadRes
       throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
 
-    const result = await response.json();
+    const result = await response.json() as { status: string; error?: string; url: string };
     
     if (result.status !== 'OK') {
       throw new Error(result.error || 'Erro no upload PostImages');
