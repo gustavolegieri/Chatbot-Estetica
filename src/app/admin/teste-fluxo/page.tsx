@@ -78,7 +78,11 @@ export default function TesteFluxoPage() {
       const result = await response.json();
 
       if (result.success) {
-        addLog(selectedStep, 'success', result.message || 'Etapa enviada com sucesso');
+        if (result.queued) {
+          addLog(selectedStep, 'pending', result.message || 'Etapa enfileirada devido a rate limit');
+        } else {
+          addLog(selectedStep, 'success', result.message || 'Etapa enviada com sucesso');
+        }
       } else if (result.dailyLimit) {
         addLog(selectedStep, 'error', result.message || 'Limite diário da API atingido');
       } else {
@@ -191,6 +195,20 @@ export default function TesteFluxoPage() {
                 A WasenderAPI tem um limite de 50 mensagens por dia no plano de teste. 
                 Se você recebeu erro &quot;rate limit&quot;, pode ser que este limite tenha sido atingido.
                 As mensagens só serão enviadas novamente após o reset diário ou upgrade para plano pago.
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        {/* Aviso sobre ordem de envio */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">ℹ️</span>
+            <div>
+              <h3 className="font-semibold text-blue-800">Ordem de Envio</h3>
+              <p className="text-sm text-blue-700 mt-1">
+                Mensagens enfileiradas devido a rate limit são enviadas com 35s de delay entre cada uma.
+                A API gratuita tem limitação de envio - mensagens podem não chegar na ordem exata se enviadas em sequência rápida.
               </p>
             </div>
           </div>

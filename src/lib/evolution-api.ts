@@ -104,9 +104,14 @@ function addToQueue(phone: string, body: object) {
   const queue = messageQueue.get(key)!;
   queue.push({ body, timestamp: Date.now(), attempts: 0 });
   
+  console.log("[WasenderAPI] 📥 Mensagem adicionada à fila - telefone:", phone, "tamanho da fila:", queue.length);
+  
   // Limpar mensagens antigas
   const now = Date.now();
   const validMessages = queue.filter(msg => now - msg.timestamp < QUEUE_MAX_AGE);
+  if (validMessages.length !== queue.length) {
+    console.log("[WasenderAPI] 🧹 Limadas", queue.length - validMessages.length, "mensagens antigas da fila");
+  }
   messageQueue.set(key, validMessages);
 }
 
@@ -129,6 +134,15 @@ async function processQueue(phone: string) {
       // Aguardar 35 segundos entre mensagens para respeitar rate limit da API gratuita
       await new Promise(resolve => setTimeout(resolve, 35000));
       const result = await wasenderFetch(msg.body);
+      
+      // Verificar se o resultado indica limite diário
+      if (result && typeof result === 'object' && 'error' in result && (result as any).isDailyLimit) {
+        console.error("[WasenderAPI] ❌ Limite diário atingido - interrompendo processamento da fila");
+        // Descartar todas as mensagens restantes da fila
+        console.warn("[WasenderAPI] ⚠️ Descartando", messages.length - 1, "mensagens restantes da fila");
+        return;
+      }
+      
       console.log("[WasenderAPI] ✅ Mensagem da fila enviada com sucesso");
     } catch (err) {
       console.error("[WasenderAPI] ❌ Erro ao processar mensagem da fila:", err);
@@ -218,7 +232,19 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
       responseText: text.substring(0, 200),
       payload: { to: phoneField, textLength: textField?.length }
     });
-    // Não lançar erro em casos de rate limit ou erro temporário
+    
+    // Verificar se é limite diário antes de tratar como erro temporário
+    if (response.status === 429) {
+      try {
+        const json = await response.clone().json();
+        if (json.message?.toLowerCase().includes("daily") || json.message?.toLowerCase().includes("trial cap")) {
+          console.error("[WasenderAPI] ❌ Limite diário atingido - não é erro temporário");
+          return { error: true, status: 429, message: json.message, isDailyLimit: true };
+        }
+      } catch { /* ignora */ }
+    }
+    
+    // Não lançar erro em casos de rate limit temporário ou erro temporário
     if (response.status >= 500 || response.status === 429) {
       console.warn("[WasenderAPI] ⚠️ Erro temporário, continuando fluxo");
       return { error: true, status: response.status, message: text };
@@ -236,6 +262,7 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
   // Tentar processar fila após sucesso - mas com delay maior para evitar rate limit
   const phone = (body as any).to;
   if (phone) {
+    console.log("[WasenderAPI] ⏰ Agendando processamento da fila em 35s para:", phone);
     setTimeout(() => processQueue(phone), 35000); // 35 segundos para respeitar rate limit da API gratuita
   }
   

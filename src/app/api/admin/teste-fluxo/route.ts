@@ -262,19 +262,47 @@ async function testIndividualStep(phone: string, stepId: string) {
       text
     });
     
+    // Verificar se houve erro (incluindo limite diário)
+    if (result && typeof result === 'object' && 'error' in result) {
+      const errorResult = result as any;
+      if (errorResult.status === 429) {
+        return NextResponse.json({ 
+          success: false, 
+          message: `Limite diário da API atingido (50 mensagens). Aguarde o reset diário ou faça upgrade para plano pago.`,
+          dailyLimit: true
+        });
+      }
+      return NextResponse.json({ 
+        success: false, 
+        message: `Erro ao enviar etapa: ${errorResult.message || 'Erro desconhecido'}`,
+        error: errorResult.message
+      });
+    }
+    
+    // Verificar se foi enfileirado (rate limit temporário)
     if (result && typeof result === 'object' && 'queued' in result) {
       return NextResponse.json({ 
         success: true, 
-        message: `Etapa "${step.name}" na fila de envio para ${phone} (rate limit da API - será enviada em até 30s)`,
+        message: `Etapa "${step.name}" na fila de envio para ${phone} (rate limit temporário - será enviada em até 30s)`,
         queued: true
       });
     }
     
-    if (result && typeof result === 'object' && 'error' in result && (result as any).status === 429) {
+    // Se foi bloqueado (não é chat privado)
+    if (result && typeof result === 'object' && 'blocked' in result) {
       return NextResponse.json({ 
         success: false, 
-        message: `Limite diário da API atingido (50 mensagens). Aguarde o reset diário ou faça upgrade para plano pago.`,
-        dailyLimit: true
+        message: `Envio bloqueado: ${(result as any).reason || 'Motivo desconhecido'}`,
+        blocked: true
+      });
+    }
+    
+    // Se foi simulado (API não configurada)
+    if (result && typeof result === 'object' && 'simulated' in result) {
+      return NextResponse.json({ 
+        success: false, 
+        message: `API não configurada - mensagem simulada`,
+        simulated: true
       });
     }
     
