@@ -202,11 +202,21 @@ async function testIndividualStep(phone: string, stepId: string) {
       const calendarImagePath = await generateCalendarImageOnlyForTest(null);
       const legend = generateCalendarLegend();
       
-      await sendMedia({
+      const result = await sendMedia({
         number: phone,
         mediaUrl: calendarImagePath,
         caption: legend
       });
+      
+      // Verificar se a mensagem foi colocada em fila devido a rate limit
+      if (result && typeof result === 'object' && 'queued' in result) {
+        return NextResponse.json({ 
+          success: true, 
+          message: `Calendário na fila de envio para ${phone} (rate limit da API - será enviado em até 30s)`,
+          type: 'calendar',
+          queued: true
+        });
+      }
       
       return NextResponse.json({ 
         success: true, 
@@ -270,10 +280,19 @@ async function testIndividualStep(phone: string, stepId: string) {
       text = `Teste de etapa: ${step.name}`;
     }
 
-    await sendText({
+    const result = await sendText({
       number: phone,
       text
     });
+    
+    // Verificar se a mensagem foi colocada em fila devido a rate limit
+    if (result && typeof result === 'object' && 'queued' in result) {
+      return NextResponse.json({ 
+        success: true, 
+        message: `Etapa "${step.name}" na fila de envio para ${phone} (rate limit da API - será enviada em até 30s)`,
+        queued: true
+      });
+    }
     
     return NextResponse.json({ 
       success: true, 
@@ -462,10 +481,15 @@ async function runSequence(sessionId: string, phone: string) {
       }
 
       if (text) {
-        await sendText({
+        const result = await sendText({
           number: phone,
           text
         });
+        
+        // Verificar se a mensagem foi colocada em fila devido a rate limit
+        if (result && typeof result === 'object' && 'queued' in result) {
+          console.log(`[Teste Fluxo] Etapa ${step.id} na fila (rate limit)`);
+        }
       }
 
       // Atualizar sessão
