@@ -145,6 +145,16 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
     return { simulated: true };
   }
 
+  // Log detalhado do payload enviado
+  const phoneField = (body as any).to;
+  const textField = (body as any).text;
+  console.log("[WasenderAPI] 📤 Enviando mensagem:", {
+    to: phoneField,
+    textLength: textField?.length || 0,
+    textPreview: textField?.substring(0, 50) || "",
+    hasMedia: !!(body as any).imageUrl || !!(body as any).videoUrl || !!(body as any).documentUrl
+  });
+
   const response = await fetch(`${WASENDER_BASE}/send-message`, {
     method: "POST",
     headers: {
@@ -176,7 +186,12 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
 
   if (!response.ok) {
     const text = await response.text();
-    console.error("[WasenderAPI] ❌ Erro na API:", response.status, "-", text);
+    console.error("[WasenderAPI] ❌ Erro na API:", {
+      status: response.status,
+      statusText: response.statusText,
+      responseText: text.substring(0, 200),
+      payload: { to: phoneField, textLength: textField?.length }
+    });
     // Não lançar erro em casos de rate limit ou erro temporário
     if (response.status >= 500 || response.status === 429) {
       console.warn("[WasenderAPI] ⚠️ Erro temporário, continuando fluxo");
@@ -186,6 +201,11 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
   }
 
   const result = await response.json();
+  console.log("[WasenderAPI] ✅ Resposta da API:", {
+    status: "success",
+    to: phoneField,
+    result: result
+  });
   
   // Tentar processar fila após sucesso
   const phone = (body as any).to;
