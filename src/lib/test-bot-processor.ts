@@ -8,20 +8,19 @@ import {
   normalizeNo,
   shouldSkipCouponPrompt,
   isFirstTimeCustomer,
-  applyFirstTimeDiscount as applyFirstTimeDiscountCore,
-  buildPaymentOptionsText,
-  handleLoyaltyStep,
-  handleLogistics,
-  handlePixChoice,
-  handleReceiptUpload,
-  handleCouponStep,
+  applyFirstTimeDiscount,
+  handleLoyaltyStep as handleLoyaltyStepCore,
+  handleLogistics as handleLogisticsCore,
+  handlePixChoice as handlePixChoiceCore,
+  handleReceiptUpload as handleReceiptUploadCore,
+  handleCouponStep as handleCouponStepCore,
   handleReminderStep as handleReminderStepCore,
-  handleFinalConfirm,
-  handleSummaryConfirm,
-  handleRating,
-  handleServiceQuestion,
-  handleFAQ,
-  handleCancellationDetection,
+  handleFinalConfirm as handleFinalConfirmCore,
+  handleSummaryConfirm as handleSummaryConfirmCore,
+  handleRating as handleRatingCore,
+  handleServiceQuestion as handleServiceQuestionCore,
+  handleFAQ as handleFAQCore,
+  handleCancellationDetection as handleCancellationDetectionCore,
   handleDiscountResponse,
   type FlowResponse,
   type FlowResult,
@@ -62,8 +61,6 @@ import { startFunnel, trackFunnelProgress, trackAbandonment, completeFunnel } fr
 import { generateAndSendReceipt } from "./receipt-generator";
 import { detectCancellationIntent, detectCancellationReason, calculateDiscount, generateDiscountOfferMessage, saveDiscountOffer, isDiscountOfferValid } from "./cancellation-detector";
 
-import type { FlowStage } from "./whatsapp-flow-types";
-
 // Analytics logging function
 async function logStageTransition(sessionId: string, stage: string, message: string) {
   try {
@@ -86,52 +83,6 @@ async function loadPaymentContext(): Promise<FlowContext> {
     pixMerchantCity: s?.pixMerchantCity ?? "Jundiai",
     pixQrCodeImage: s?.pixQrCodeImage ?? null,
   };
-}
-
-// First-time customer discount check
-async function isFirstTimeCustomer(phone: string): Promise<boolean> {
-  try {
-    const appointments = await prisma.appointment.count({
-      where: {
-        client: { phone },
-        status: { in: ["COMPLETED", "CONFIRMED"] },
-      },
-    });
-    return appointments === 0;
-  } catch (error) {
-    console.error("[isFirstTimeCustomer] Error:", error);
-    return false;
-  }
-}
-
-async function applyFirstTimeDiscount(session: TestSession, responses: TestResponse[]): Promise<void> {
-  if (session.couponCode) return; // Já tem cupom aplicado
-
-  const coupon = await findCouponByCode("PRIMEIRA10");
-  if (coupon && coupon.active) {
-    session.couponCode = "PRIMEIRA10";
-    session.couponDiscount = coupon.type === "percent" 
-      ? (session.quote || 0) * (Number(coupon.amount) / 100)
-      : Number(coupon.amount);
-    responses.push({ text: `🎁 *Bônus!* Primeira vez: 10% de desconto aplicado! (-R$ ${session.couponDiscount?.toFixed(2).replace('.', ',')})` });
-  }
-}
-
-// Natural response normalization
-function normalizeYes(input: string): boolean {
-  const yesPatterns = [
-    /^(sim|s|1|yes|quero|ok|vamos|confirmo|agendar|aceito|bora|tá|estou|de acordo|positivo)$/i,
-    /^(claro|certo|entendido|combina|boa|beleza|perfeito|sucesso)$/i,
-  ];
-  return yesPatterns.some(pattern => pattern.test(input));
-}
-
-function normalizeNo(input: string): boolean {
-  const noPatterns = [
-    /^(nao|não|n|2|no|cancelar|alterar|desistir|rejeito|negativo|nao quero|não quero|desculpe)$/i,
-    /^(ops|esqueci|melhor depois|talvez|mais tarde|ainda não|ainda nao)$/i,
-  ];
-  return noPatterns.some(pattern => pattern.test(input));
 }
 
 interface TestSession {
@@ -469,16 +420,16 @@ export async function processTestFlow({
       return handlePhotoUpload(message, session, responses);
 
     case "ETAPA9_COUPON":
-      return handleCouponStep(message, session, responses);
+      return handleCouponStepTest(message, session, responses);
 
     case "ETAPA9_LOYALTY":
-      return handleLoyaltyStep(message, session, responses);
+      return handleLoyaltyStepTest(message, session, responses);
 
     case "ETAPA10_BUDGET":
       return handleBudgetResponse(message, session, responses);
 
     case "ETAPA10_LOGISTICS":
-      return handleLogistics(message, session, responses);
+      return handleLogisticsTest(message, session, responses);
 
     case "ETAPA7_DAY":
       return handleDateSelection(message, session, responses);
@@ -487,22 +438,22 @@ export async function processTestFlow({
       return handleTimeSelection(message, session, responses);
 
     case "ETAPA9_REMINDER":
-      return handleReminderStep(message, session, responses);
+      return handleReminderStepTest(message, session, responses);
 
     case "ETAPA8_PAYMENT":
       return handlePaymentSelection(message, session, responses);
 
     case "ETAPA8_PIX_CHOICE":
-      return handlePixChoice(message, session, responses);
+      return handlePixChoiceTest(message, session, responses);
 
     case "ETAPA8_RECEIPT_UPLOAD":
-      return handleReceiptUpload(message, session, responses);
+      return handleReceiptUploadTest(message, session, responses);
 
     case "ETAPA10_CONFIRM":
-      return handleFinalConfirm(message, session, responses);
+      return handleFinalConfirmTest(message, session, responses);
 
     case "ETAPA11_RATING":
-      return handleRating(message, session, responses);
+      return handleRatingTest(message, session, responses);
 
     case "ETAPA10_FAQ":
       return handleFAQ(message, session, responses);
@@ -542,11 +493,6 @@ const buildMainMenu = (categories: Record<number, { title: string; keys: string[
 
 function buildWelcomeText(): string {
   return "👋 Olá! Sou o Teste Bot da Garagem do Ka. Vamos começar? Me diz como posso te chamar.";
-}
-
-export function shouldSkipCouponPrompt(input: string): boolean {
-  const normalized = input.trim().toLowerCase();
-  return /^(2|nao|não|n|sem|pular|ignorar|nenhum|nao tenho|não tenho|sem cupom|sem desconto|nenhum cupom|nao tenho cupom|não tenho cupom)$/i.test(normalized);
 }
 
 async function calculateBasePrice(session: TestSession): Promise<number> {
@@ -744,7 +690,13 @@ async function handleNameCollection(
   // Check if first-time customer and apply discount
   const isFirstTime = await isFirstTimeCustomer(sessionId); // For test-bot, use sessionId as phone proxy
   if (isFirstTime) {
-    await applyFirstTimeDiscount(session, responses);
+    const flowState = testSessionToFlowState(session);
+    const flowResponses: FlowResponse[] = [];
+    const updatedState = await applyFirstTimeDiscount(flowState, sessionId, flowResponses);
+    // Update session from the modified state
+    Object.assign(session, updateTestSessionFromFlowState(session, updatedState));
+    // Add new responses
+    responses.push(...flowResponsesToTestResponses(flowResponses));
   }
 
   // Simular cliente recorrente (para teste)
@@ -1069,66 +1021,38 @@ async function handleUpsell(
   return responses;
 }
 
-async function handleCouponStep(
+async function handleCouponStepTest(
   message: string,
   session: TestSession,
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
-  const input = message.trim();
-  const skip = shouldSkipCouponPrompt(input);
-
-  if (skip) {
-    session.stage = "ETAPA9_REMINDER";
-    responses.push({
-      text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
-    });
-    return responses;
-  }
-
-  if (/^(1|sim|s|yes|ok|prosseguir|tenho|com cupom)$/i.test(input)) {
-    session.stage = "ETAPA9_COUPON";
-    responses.push({ text: "💬 Me envie o código do cupom para validar.\n\nEx: *SAVE10*" });
-    return responses;
-  }
-
-  if (input) {
-    const code = input.toUpperCase();
-    const coupon = await findCouponByCode(code);
-    if (!coupon || !coupon.active) {
-      responses.push({ text: `⚠️ Cupom *${code}* não foi encontrado ou está inativo.` });
-      session.stage = "ETAPA9_COUPON";
-      return responses;
-    }
-
-    session.couponCode = code;
-    session.couponDiscount = Number(coupon.amount ?? 10);
-    responses.push({ text: `🎟️ Cupom *${code}* aplicado!` });
-  }
-
-  session.stage = "ETAPA9_REMINDER";
-  responses.push({
-    text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
-  });
+  const flowState = testSessionToFlowState(session);
+  const flowResponses: FlowResponse[] = [];
+  const result = await handleCouponStepCore(flowState, message, flowResponses);
+  
+  // Update session from the modified state
+  Object.assign(session, updateTestSessionFromFlowState(session, result.nextState));
+  
+  // Add new responses
+  responses.push(...flowResponsesToTestResponses(flowResponses));
   return responses;
 }
 
-async function handleLoyaltyStep(
+async function handleLoyaltyStepTest(
   message: string,
   session: TestSession,
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
-  const input = message.trim().toLowerCase();
-  const usePoints = /^(sim|s|1)$/i.test(input);
-
-  if (usePoints && session.loyaltyPoints && session.loyaltyPoints > 0) {
-    session.loyaltyPoints = 0;
-    responses.push({ text: "🌟 Desconto aplicado! " });
-  } else {
-    responses.push({ text: "Sem problemas! " });
-  }
-
-  session.stage = "ETAPA10_BUDGET";
-  return await handleShowBudget(session, responses);
+  const flowState = testSessionToFlowState(session);
+  const flowResponses: FlowResponse[] = [];
+  const result = await handleLoyaltyStepCore(flowState, message, flowResponses);
+  
+  // Update session from the modified state
+  Object.assign(session, updateTestSessionFromFlowState(session, result.nextState));
+  
+  // Add new responses
+  responses.push(...flowResponsesToTestResponses(flowResponses));
+  return responses;
 }
 
 async function handleShowBudget(session: TestSession, responses: TestResponse[]): Promise<TestResponse[]> {
@@ -1173,59 +1097,20 @@ async function handleBudgetResponse(
   return responses;
 }
 
-async function handleLogistics(
+async function handleLogisticsTest(
   message: string,
   session: TestSession,
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
-  const input = message.trim();
-  const choice = input.trim();
-  const wantsDelivery = choice === "2" || /^(busca|entrega|sim|delivery)$/i.test(input.toLowerCase());
-
-  if (session.awaitingPickupAddress) {
-    const address = input.trim();
-    if (!address) {
-      responses.push({ text: "📍 Me envie o endereço completo onde o carro está para calcular a taxa de busca." });
-      return responses;
-    }
-
-    session.pickupAddress = address;
-    const settings = (await prisma.settings.findUnique({ where: { id: "default" } })) as any;
-    const feePerKm = Number(settings?.pickupFeePerKm ?? 2.5);
-    const feeBase = Number(settings?.pickupFeeBase ?? 0);
-    const distance = await calculateDistance(address);
-    session.pickupDeliveryFee = distance ? calculatePickupFee(distance.distanceKm, feePerKm, feeBase) : 0;
-    session.awaitingPickupAddress = false;
-    session.awaitingReturnPreference = true;
-    responses.push({ text: `📍 Endereço salvo.\n💰 Taxa de busca (R$ ${feePerKm.toFixed(2)}/km × ${distance?.distanceKm ?? 0} km): R$ ${session.pickupDeliveryFee?.toFixed(2)}\n\nQuer que devolvamos o veículo até você após o serviço?\n\n*1* Sim\n*2* Não` });
-    return responses;
-  }
-
-  if (session.awaitingReturnPreference) {
-    const wantsReturn = /^(1|sim|s|quero|yes)$/i.test(input.toLowerCase());
-    session.needsReturn = wantsReturn;
-    session.awaitingReturnPreference = false;
-    session.stage = "ETAPA7_DAY";
-    responses.push({ text: wantsReturn ? "🔄 Devolução incluída no resumo." : "📍 Sem devolução, tudo certo." });
-    const calendarImagePath = await generateCalendarImageOnlyForTest(session.testDate || null);
-    responses.push({ text: generateCalendarLegend(), mediaUrl: calendarImagePath, mediaType: "image" });
-    return responses;
-  }
-
-  if (wantsDelivery) {
-    session.wantsPickupDelivery = true;
-    session.awaitingPickupAddress = true;
-    session.pickupDeliveryFee = 0;
-    responses.push({ text: "🚚 Ótimo! Me envie o endereço completo onde o carro está para calcular a taxa de busca." });
-    return responses;
-  }
-
-  session.wantsPickupDelivery = false;
-  session.pickupDeliveryFee = 0;
-  session.stage = "ETAPA7_DAY";
-  responses.push({ text: "📍 Combinado! Você pode levar o carro até a loja quando puder." });
-  const calendarImagePath = await generateCalendarImageOnlyForTest(session.testDate || null);
-  responses.push({ text: generateCalendarLegend(), mediaUrl: calendarImagePath, mediaType: "image" });
+  const flowState = testSessionToFlowState(session);
+  const flowResponses: FlowResponse[] = [];
+  const result = await handleLogisticsCore(flowState, message, flowResponses);
+  
+  // Update session from the modified state
+  Object.assign(session, updateTestSessionFromFlowState(session, result.nextState));
+  
+  // Add new responses
+  responses.push(...flowResponsesToTestResponses(flowResponses));
   return responses;
 }
 
@@ -1390,33 +1275,20 @@ async function handleTimeSelection(
   return responses;
 }
 
-async function handleReminderStep(
+async function handleReminderStepTest(
   message: string,
   session: TestSession,
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
-  const input = message.trim().toLowerCase();
-  const isYes = normalizeYes(input);
-  const isNo = normalizeNo(input);
+  const flowState = testSessionToFlowState(session);
+  const flowResponses: FlowResponse[] = [];
+  const result = await handleReminderStepCore(flowState, message, flowResponses);
   
-  console.log("[handleReminderStep] Input:", input, "isYes:", isYes, "isNo:", isNo);
+  // Update session from the modified state
+  Object.assign(session, updateTestSessionFromFlowState(session, result.nextState));
   
-  if (isYes) {
-    session.reminderPreference = "30min";
-    console.log("[handleReminderStep] Set reminderPreference to 30min");
-  } else if (isNo) {
-    session.reminderPreference = "none";
-    console.log("[handleReminderStep] Set reminderPreference to none");
-  } else {
-    responses.push({ text: "❌ Opção inválida. Por favor, escolha *1* para sim ou *2* para não." });
-    return responses;
-  }
-  
-  console.log("[handleReminderStep] reminderPreference after set:", session.reminderPreference);
-
-  // Após lembrete, vai para pagamento (não direto para confirmação)
-  session.stage = "ETAPA8_PAYMENT";
-  responses.push({ text: buildPaymentOptionsText() });
+  // Add new responses
+  responses.push(...flowResponsesToTestResponses(flowResponses));
   return responses;
 }
 
@@ -1461,274 +1333,71 @@ async function handlePaymentSelection(
   return responses;
 }
 
-async function handlePixChoice(
+async function handlePixChoiceTest(
   message: string,
   session: TestSession,
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
-  const input = message.trim().toLowerCase();
-  const prompts = await loadPromptMap();
-  const ctx = await loadPaymentContext();
-
-  if (input === "1" || /agora|pagar agora|imediato/i.test(input)) {
-    // PIX agora - precisa enviar comprovante
-    session.pixPaymentType = "now";
-    session.paymentMethod = "PIX (Pagar agora)";
-    const totalValue = Number(session.quote ?? 0) + Number(session.upsellValue ?? 0) + Number(session.pickupDeliveryFee ?? 0) - Number(session.couponDiscount ?? 0);
-    const currentPaid = session.totalPaid ?? 0;
-    const remainingValue = totalValue - currentPaid;
-
-    // Reset payment state if starting fresh
-    if (currentPaid === 0) {
-      session.totalPaid = 0;
-      session.partialPayments = [];
-    }
-
-    session.stage = "ETAPA8_RECEIPT_UPLOAD";
-    session.awaitingReceiptUpload = true;
-
-    // Enviar QR Code e pedir comprovante
-    try {
-      let pixQrUrl: string;
-
-      // Se tiver QR Code pré-gerado, usa ele. Caso contrário, gera um novo.
-      if (ctx.pixQrCodeImage) {
-        pixQrUrl = ctx.pixQrCodeImage;
-      } else {
-        pixQrUrl = await generatePixQrCode({
-          amount: remainingValue,
-          description: `Agendamento ${session.selectedServiceName}`,
-          merchantName: ctx.pixHolder || ctx.businessName,
-          merchantCity: ctx.pixMerchantCity || ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
-          key: ctx.pixKey || "",
-        });
-      }
-
-      const pixPayload = generatePixPayload({
-        amount: remainingValue,
-        description: `Agendamento ${session.selectedServiceName}`,
-        merchantName: ctx.pixHolder || ctx.businessName,
-        merchantCity: ctx.pixMerchantCity || ctx.address?.split(',').pop()?.trim() || "Sao Paulo",
-        key: ctx.pixKey || "",
-      });
-
-      responses.push({ text: `💳 **Pagamento via PIX**\n\nEscaneie o QR Code abaixo para pagar:\n\nValor: R$ ${remainingValue.toFixed(2).replace('.', ',')}` });
-      responses.push({ text: "", mediaUrl: pixQrUrl, mediaType: "image" });
-      responses.push({ text: `Ou copie e cole o código PIX:\n\`${pixPayload}\`` });
-      responses.push({ text: etapa8ReceiptUpload(remainingValue, prompts) });
-    } catch (error) {
-      console.error("[handlePixChoice] Error generating PIX QR code:", error);
-      responses.push({ text: etapa8ReceiptUpload(remainingValue, prompts) });
-    }
-    return responses;
-  }
-
-  if (input === "2" || /entrega|pagar na entrega|depois/i.test(input)) {
-    // PIX na entrega - não precisa comprovante agora
-    session.pixPaymentType = "delivery";
-    session.paymentMethod = "PIX (Pagar na entrega)";
-    session.stage = "ETAPA9_REMINDER";
-    responses.push({ text: "Perfeito! Você pagará via PIX no dia do serviço." });
-    responses.push({
-      text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
-    });
-    return responses;
-  }
-
-  responses.push({ text: "❌ Opção inválida. Escolha *1* para PIX agora ou *2* para PIX na entrega." });
+  const flowState = testSessionToFlowState(session);
+  const flowResponses: FlowResponse[] = [];
+  const result = await handlePixChoiceCore(flowState, message, flowResponses);
+  
+  // Update session from the modified state
+  Object.assign(session, updateTestSessionFromFlowState(session, result.nextState));
+  
+  // Add new responses
+  responses.push(...flowResponsesToTestResponses(flowResponses));
   return responses;
 }
 
-async function handleReceiptUpload(
+async function handleReceiptUploadTest(
   message: string,
   session: TestSession,
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
-  const prompts = await loadPromptMap();
-  const totalValue = Number(session.quote ?? 0) + Number(session.upsellValue ?? 0) + Number(session.pickupDeliveryFee ?? 0) - Number(session.couponDiscount ?? 0);
-
-  // Verificar se mensagem contém URL de imagem (simulado no test-bot)
-  if (message.match(/^(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp))/i) ||
-      message.includes("image") ||
-      message.includes("media") ||
-      message.includes("upload")) {
-
-    const imageUrl = message;
-
-    try {
-      // Analisar comprovante usando IA
-      const receiptAmount = await analyzeReceiptImage(imageUrl);
-
-      if (receiptAmount === null) {
-        // Erro na leitura
-        const attempts = session.receiptValidationAttempts ?? 0;
-        if (attempts >= 2) {
-          // Muitas tentativas - voltar para métodos de pagamento
-          session.stage = "ETAPA8_PAYMENT";
-          session.receiptValidationAttempts = 0;
-          session.awaitingReceiptUpload = false;
-          responses.push({ text: "Não consegui ler o comprovante após várias tentativas. Vamos tentar outro método de pagamento.\n\n" + buildPaymentOptionsText() });
-          return responses;
-        }
-
-        session.receiptValidationAttempts = (session.receiptValidationAttempts ?? 0) + 1;
-        responses.push({ text: etapa8ReceiptError(prompts) });
-        return responses;
-      }
-
-      // Validar valor contra o valor restante (não o total original)
-      const currentPaid = session.totalPaid ?? 0;
-      const remainingValue = totalValue - currentPaid;
-
-      if (validateReceiptAmount(receiptAmount, remainingValue, 10)) {
-        // Valor correto - aprovar pagamento
-        session.receiptImageUrl = imageUrl;
-        session.receiptAmount = receiptAmount;
-        session.totalPaid = currentPaid + receiptAmount;
-        session.receiptValidationAttempts = 0;
-        session.awaitingReceiptUpload = false;
-        session.stage = "ETAPA9_REMINDER";
-
-        // Gerar recibo digital
-        try {
-          const receiptResult = await generateAndSendReceipt(
-            "test-" + session.sessionId,
-            session.sessionId || ""
-          );
-          if (receiptResult) {
-            responses.push({
-              text: `📄 *Recibo gerado!*\n\n` + receiptResult.receiptText,
-            });
-          }
-        } catch (error) {
-          testBotLogger.error("Erro ao gerar recibo", error as Error, { sessionId: session.sessionId });
-        }
-
-        responses.push({ text: `✅ *Pagamento confirmado!*\n\nValor do comprovante: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\nTotal pago: R$ ${session.totalPaid.toFixed(2).replace('.', ',')}\n\nSeu agendamento está garantido.` });
-        responses.push({
-          text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
-        });
-        return responses;
-      } else {
-        // Valor incorreto - verificar se é pagamento parcial
-        const newTotalPaid = currentPaid + receiptAmount;
-        const remaining = totalValue - newTotalPaid;
-
-        if (receiptAmount > 0 && remaining > 0) {
-          // Pagamento parcial válido
-          session.partialPayments = session.partialPayments || [];
-          session.partialPayments.push({ amount: receiptAmount, imageUrl });
-          session.totalPaid = newTotalPaid;
-          session.receiptValidationAttempts = 0;
-
-          responses.push({ text: `💰 *Pagamento parcial registrado!*\n\nValor recebido: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\nTotal pago: R$ ${newTotalPaid.toFixed(2).replace('.', ',')}\n*Falta pagar: R$ ${remaining.toFixed(2).replace('.', ',')}*\n\nPor favor, envie o comprovante do valor restante de R$ ${remaining.toFixed(2).replace('.', ',')}.` });
-          responses.push({ text: etapa8ReceiptUpload(remaining, prompts) });
-          return responses;
-        } else if (receiptAmount > 0 && remaining <= 0) {
-          // Pagamento completo com comprovante maior (aceitar)
-          session.receiptImageUrl = imageUrl;
-          session.receiptAmount = newTotalPaid;
-          session.totalPaid = newTotalPaid;
-          session.receiptValidationAttempts = 0;
-          session.awaitingReceiptUpload = false;
-          session.stage = "ETAPA9_REMINDER";
-
-          // Gerar recibo digital
-          try {
-            const receiptResult = await generateAndSendReceipt(
-              "test-" + session.sessionId,
-              session.sessionId || ""
-            );
-            if (receiptResult) {
-              responses.push({
-                text: `📄 *Recibo gerado!*\n\n` + receiptResult.receiptText,
-              });
-            }
-          } catch (error) {
-            testBotLogger.error("Erro ao gerar recibo", error as Error, { sessionId: session.sessionId });
-          }
-
-          responses.push({ text: `✅ *Pagamento confirmado!*\n\nValor do comprovante: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\nTotal pago: R$ ${newTotalPaid.toFixed(2).replace('.', ',')}\n\nSeu agendamento está garantido.` });
-          responses.push({
-            text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
-          });
-          return responses;
-        } else {
-          // Valor incorreto
-          const attempts = session.receiptValidationAttempts ?? 0;
-          if (attempts >= 2) {
-            // Muitas tentativas - voltar para métodos de pagamento
-            session.stage = "ETAPA8_PAYMENT";
-            session.receiptValidationAttempts = 0;
-            session.awaitingReceiptUpload = false;
-            responses.push({ text: "O valor do comprovante não confere após várias tentativas. Vamos tentar outro método de pagamento.\n\n" + buildPaymentOptionsText() });
-            return responses;
-          }
-
-          session.receiptValidationAttempts = (session.receiptValidationAttempts ?? 0) + 1;
-          responses.push({ text: etapa8ReceiptInvalid(remainingValue, receiptAmount, prompts) });
-          responses.push({ text: etapa8ReceiptUpload(remainingValue, prompts) });
-          return responses;
-        }
-      }
-    } catch (error) {
-      console.error("[handleReceiptUpload] Error analyzing receipt:", error);
-      const attempts = session.receiptValidationAttempts ?? 0;
-      if (attempts >= 2) {
-        session.stage = "ETAPA8_PAYMENT";
-        session.receiptValidationAttempts = 0;
-        session.awaitingReceiptUpload = false;
-        responses.push({ text: "Erro ao processar comprovante. Vamos tentar outro método de pagamento.\n\n" + buildPaymentOptionsText() });
-        return responses;
-      }
-
-      session.receiptValidationAttempts = (session.receiptValidationAttempts ?? 0) + 1;
-      responses.push({ text: etapa8ReceiptError(prompts) });
-      return responses;
-    }
-  }
-
-  // Se não for imagem, pedir novamente
-  responses.push({ text: etapa8ReceiptUpload(totalValue, prompts) });
+  const flowState = testSessionToFlowState(session);
+  const flowResponses: FlowResponse[] = [];
+  const result = await handleReceiptUploadCore(flowState, message, flowResponses);
+  
+  // Update session from the modified state
+  Object.assign(session, updateTestSessionFromFlowState(session, result.nextState));
+  
+  // Add new responses
+  responses.push(...flowResponsesToTestResponses(flowResponses));
   return responses;
 }
 
-async function handleFinalConfirm(
+async function handleFinalConfirmTest(
   message: string,
   session: TestSession,
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
-  const input = message.trim().toLowerCase();
-  const isYes = /^(sim|s|1|yes|confirmo|agendar)$/i.test(input);
-  const isNo = /^(nao|não|n|2|no|alterar|cancelar)$/i.test(input);
-
-  if (isYes) {
-    session.stage = "ETAPA11_RATING";
-    responses.push({
-      text: `✅ *Tudo certo, ${session.customerName ?? "Cliente"}!*. 🎉\n\nSeu horário tá garantido — mal podemos esperar pra deixar seu carro brilhando. ✨\n\n📍 *Rua das Oficinas, 100 - SP*\n🕐 *Seg a Sáb, 08:00 às 18:00*\n\n📌 *Cancelamento até 2h antes sem custo.*\n📩 *Confirmação do agendamento será enviada 2h antes do horário.*\n\n─────────────────\n⭐ **Avaliação pós-serviço**\n\nGostou do atendimento? Avalie de 1 a 5!\n\n*1* - ⭐\n*2* - ⭐⭐\n*3* - ⭐⭐⭐\n*4* - ⭐⭐⭐⭐\n*5* - ⭐⭐⭐⭐⭐`,
-    });
-    return responses;
-  }
-
-  responses.push({ text: "Sem problemas! Alterar algo? " });
-  resetSessionForNewStart(session);
+  const flowState = testSessionToFlowState(session);
+  const flowResponses: FlowResponse[] = [];
+  const result = await handleFinalConfirmCore(flowState, message, flowResponses);
+  
+  // Update session from the modified state
+  Object.assign(session, updateTestSessionFromFlowState(session, result.nextState));
+  
+  // Add new responses
+  responses.push(...flowResponsesToTestResponses(flowResponses));
   return responses;
 }
 
-async function handleRating(
+async function handleRatingTest(
   message: string,
   session: TestSession,
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
-  const rating = parseInt(message.trim(), 10);
-  if (![1, 2, 3, 4, 5].includes(rating)) {
-    responses.push({ text: "Por favor, avalie com um número de 1 a 5." });
-    return responses;
-  }
-
-  recordTestBotRating(session.sessionId ?? "unknown", rating);
-  responses.push({ text: `🙏 Obrigado pela sua avaliação de ${rating} estrelas! Sua opinião ajuda a melhorar nosso serviço.` });
-  resetSessionForNewStart(session);
+  const flowState = testSessionToFlowState(session);
+  const flowResponses: FlowResponse[] = [];
+  const result = await handleRatingCore(flowState, message, flowResponses);
+  
+  // Update session from the modified state
+  Object.assign(session, updateTestSessionFromFlowState(session, result.nextState));
+  
+  // Add new responses
+  responses.push(...flowResponsesToTestResponses(flowResponses));
   return responses;
 }
 
