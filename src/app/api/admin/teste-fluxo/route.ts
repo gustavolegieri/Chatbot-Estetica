@@ -4,19 +4,41 @@ import { sendMedia } from '@/lib/evolution-api';
 import { generateCalendarImageOnly } from '@/lib/calendar-helper';
 import { generateSummaryCard } from '@/lib/summary-card';
 import { testFluxoStorage } from '@/lib/test-fluxo-storage';
+import { etapa1Welcome, etapa2MainMenu, etapa4Vehicle, etapa7Day, etapa7Time, etapa8Payment, etapa9Confirm, formatHours, type FlowContext } from '@/lib/whatsapp-flow-messages';
+import { loadWhatsAppCatalog, buildMainMenu } from '@/lib/whatsapp-service-catalog';
+import { prisma } from '@/lib/prisma';
+import { BRAND_DEFAULT } from '@/lib/whatsapp-catalog';
 
 const STEPS = [
-  { id: 'welcome', name: 'Boas-vindas', getText: () => '👋 Olá! Bem-vindo à Estética Automotiva!' },
-  { id: 'menu', name: 'Menu Principal', getText: () => '📋 *MENU PRINCIPAL*\n\n1️⃣ Agendar serviço\n2️⃣ Meus agendamentos\n3️⃣ Cancelar agendamento\n4️⃣ Falar com atendente' },
-  { id: 'service', name: 'Seleção de Serviço', getText: () => '🧽 *SERVIÇOS DISPONÍVEIS*\n\n1️⃣ Polimento Completo\n2️⃣ Lavagem Detalhada\n3️⃣ Higienização Interna\n4️⃣ Vitrofertilização' },
-  { id: 'vehicle', name: 'Seleção de Veículo', getText: () => '🚗 *SELECIONE O VEÍCULO*\n\n1️⃣ Sedan\n2️⃣ SUV\n3️⃣ Hatch\n4️⃣ Picape' },
-  { id: 'day', name: 'Seleção de Data', getText: () => '📅 *SELECIONE A DATA*\n\n1️⃣ Hoje\n2️⃣ Amanhã\n3️⃣ Próxima semana\n4️⃣ Outra data' },
-  { id: 'time', name: 'Seleção de Horário', getText: () => '⏰ *SELECIONE O HORÁRIO*\n\n1️⃣ 08:00\n2️⃣ 10:00\n3️⃣ 14:00\n4️⃣ 16:00' },
-  { id: 'logistics', name: 'Logística', getText: () => '🚚 *LOGÍSTICA*\n\n1️⃣ Leva e traz\n2️⃣ Busca no local\n3️⃣ Entrego no local' },
+  { id: 'welcome', name: 'Boas-vindas', type: 'welcome' },
+  { id: 'menu', name: 'Menu Principal', type: 'menu' },
+  { id: 'service', name: 'Seleção de Serviço', type: 'service' },
+  { id: 'vehicle', name: 'Seleção de Veículo', type: 'vehicle' },
+  { id: 'day', name: 'Seleção de Data', type: 'day' },
+  { id: 'time', name: 'Seleção de Horário', type: 'time' },
+  { id: 'logistics', name: 'Logística', type: 'logistics' },
   { id: 'calendar', name: 'Calendário', type: 'calendar' },
   { id: 'summary', name: 'Resumo', type: 'summary' },
-  { id: 'confirmation', name: 'Confirmação', getText: () => '✅ *AGENDAMENTO CONFIRMADO!*\n\nSeu agendamento foi realizado com sucesso. Você receberá um lembrete 24h antes.' },
+  { id: 'confirmation', name: 'Confirmação', type: 'confirmation' },
 ];
+
+async function loadContext(): Promise<FlowContext> {
+  const s = await prisma.settings.findUnique({ where: { id: "default" } });
+  return {
+    businessName: s?.businessName ?? BRAND_DEFAULT,
+    hours: formatHours(
+      s?.businessHoursStart ?? "08:00",
+      s?.businessHoursEnd ?? "18:00",
+      s?.workingDays ?? "1,2,3,4,5,6"
+    ),
+    address: s?.businessAddress ?? "",
+    pixKey: s?.pixKey ?? null,
+    pixHolder: s?.pixHolderName ?? null,
+    pixBank: s?.pixBank ?? null,
+    pixMerchantCity: s?.pixMerchantCity ?? "Jundiai",
+    pixQrCodeImage: s?.pixQrCodeImage ?? null,
+  };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,9 +70,42 @@ async function testIndividualStep(phone: string, stepId: string) {
   }
 
   try {
-    if (step.type === 'calendar') {
+    const ctx = await loadContext();
+    const wctx = await loadWhatsAppCatalog();
+
+    let text = '';
+
+    if (step.type === 'welcome') {
+      // Exatamente como no startFlow do whatsapp-flow.ts
+      text = etapa1Welcome(ctx, wctx.prompts);
+    } else if (step.type === 'menu') {
+      // Exatamente como no goToMainMenu do whatsapp-flow.ts
+      const customerName = 'Cliente Teste';
+      text = buildMainMenu(wctx.categories, wctx.prompts);
+    } else if (step.type === 'service') {
+      // Exatamente como o fluxo mostra os serviços
+      text = buildMainMenu(wctx.categories, wctx.prompts);
+    } else if (step.type === 'vehicle') {
+      // Exatamente como no fluxo oficial
+      text = etapa4Vehicle(false, wctx.prompts);
+    } else if (step.type === 'day') {
+      // Exatamente como no fluxo oficial
+      text = etapa7Day(wctx.prompts);
+    } else if (step.type === 'time') {
+      // Exatamente como no fluxo oficial
+      const slots = ['08:00', '10:00', '14:00', '16:00'];
+      text = etapa7Time('15/07/2026', slots, '2 horas', wctx.prompts);
+    } else if (step.type === 'logistics') {
+      // Exatamente como no fluxo oficial
+      text = etapa8Payment(true, wctx.prompts);
+    } else if (step.type === 'calendar') {
       // Testar envio de calendário
       const calendarResult = await generateCalendarImageOnly();
+      await sendMedia({
+        number: phone,
+        mediaUrl: calendarResult,
+        caption: '📅 Calendário de Disponibilidade (Teste)'
+      });
       return NextResponse.json({ 
         success: true, 
         message: `Calendário enviado para ${phone}`,
@@ -81,19 +136,34 @@ async function testIndividualStep(phone: string, stepId: string) {
         message: `Resumo enviado para ${phone}`,
         type: 'summary'
       });
+    } else if (step.type === 'confirmation') {
+      // Exatamente como no fluxo oficial
+      text = etapa9Confirm(
+        {
+          name: 'Cliente Teste',
+          vehicle: 'Toyota Corolla 2022',
+          services: 'Polimento Completo',
+          day: '15/07/2026',
+          time: '14:30',
+          payment: 'PIX',
+          value: '350.00',
+          address: 'Rua Teste, 123'
+        },
+        wctx.prompts
+      );
     } else {
-      // Testar envio de texto
-      const text = step.getText ? step.getText() : `Teste de etapa: ${step.name}`;
-      await sendText({
-        number: phone,
-        text
-      });
-      
-      return NextResponse.json({ 
-        success: true, 
-        message: `Etapa "${step.name}" enviada para ${phone}` 
-      });
+      text = `Teste de etapa: ${step.name}`;
     }
+
+    await sendText({
+      number: phone,
+      text
+    });
+    
+    return NextResponse.json({ 
+      success: true, 
+      message: `Etapa "${step.name}" enviada para ${phone}` 
+    });
   } catch (error) {
     console.error(`[Teste Fluxo] Erro ao enviar etapa ${stepId}:`, error);
     return NextResponse.json({ 
@@ -127,12 +197,44 @@ async function runSequence(sessionId: string, phone: string) {
   const session = testFluxoStorage.get(sessionId);
   if (!session) return;
 
+  const ctx = await loadContext();
+  const wctx = await loadWhatsAppCatalog();
+
   for (let i = 0; i < STEPS.length; i++) {
     const step = STEPS[i];
     
     try {
-      if (step.type === 'calendar') {
-        await generateCalendarImageOnly();
+      let text = '';
+
+      if (step.type === 'welcome') {
+        // Exatamente como no startFlow do whatsapp-flow.ts
+        text = etapa1Welcome(ctx, wctx.prompts);
+      } else if (step.type === 'menu') {
+        // Exatamente como no goToMainMenu do whatsapp-flow.ts
+        text = buildMainMenu(wctx.categories, wctx.prompts);
+      } else if (step.type === 'service') {
+        // Exatamente como o fluxo mostra os serviços
+        text = buildMainMenu(wctx.categories, wctx.prompts);
+      } else if (step.type === 'vehicle') {
+        // Exatamente como no fluxo oficial
+        text = etapa4Vehicle(false, wctx.prompts);
+      } else if (step.type === 'day') {
+        // Exatamente como no fluxo oficial
+        text = etapa7Day(wctx.prompts);
+      } else if (step.type === 'time') {
+        // Exatamente como no fluxo oficial
+        const slots = ['08:00', '10:00', '14:00', '16:00'];
+        text = etapa7Time('15/07/2026', slots, '2 horas', wctx.prompts);
+      } else if (step.type === 'logistics') {
+        // Exatamente como no fluxo oficial
+        text = etapa8Payment(true, wctx.prompts);
+      } else if (step.type === 'calendar') {
+        const calendarResult = await generateCalendarImageOnly();
+        await sendMedia({
+          number: phone,
+          mediaUrl: calendarResult,
+          caption: '📅 Calendário de Disponibilidade (Teste Sequência)'
+        });
       } else if (step.type === 'summary') {
         const summaryData = {
           customerName: "Cliente Teste",
@@ -151,8 +253,26 @@ async function runSequence(sessionId: string, phone: string) {
           mediaUrl: summaryUrl,
           caption: '📋 Resumo do Agendamento (Teste Sequência)'
         });
+      } else if (step.type === 'confirmation') {
+        // Exatamente como no fluxo oficial
+        text = etapa9Confirm(
+          {
+            name: 'Cliente Teste',
+            vehicle: 'Toyota Corolla 2022',
+            services: 'Polimento Completo',
+            day: '15/07/2026',
+            time: '14:30',
+            payment: 'PIX',
+            value: '350.00',
+            address: 'Rua Teste, 123'
+          },
+          wctx.prompts
+        );
       } else {
-        const text = step.getText ? step.getText() : `Teste de etapa: ${step.name}`;
+        text = `Teste de etapa: ${step.name}`;
+      }
+
+      if (text) {
         await sendText({
           number: phone,
           text
