@@ -1,6 +1,7 @@
 import { generateCalendarImage, getMonthOccupancy, buildDayListSections } from "./calendar-core";
-import { sendMedia, sendList } from "./evolution-api";
+import { sendMedia, sendList, sendText } from "./evolution-api";
 import { BRAND_DEFAULT } from "./whatsapp-catalog";
+import { convertAndUploadCalendar, savePngLocally } from "./calendar-converter";
 
 /**
  * Gera apenas a imagem do calendário (sem enviar).
@@ -55,27 +56,89 @@ export async function sendCalendarWithImageAndList({ number, prompts }: { number
   const year = today.getFullYear();
   const month = today.getMonth();
 
-  // 1. Gera e envia a IMAGEM do calendário
-  const imagePath = await generateCalendarImage(today);
-  await sendMedia({ number, mediaUrl: imagePath, caption: "📅 Calendário de disponibilidade" });
+  // 1. Gera o SVG do calendário
+  const svgDataUrl = await generateCalendarImage(today);
+  console.log("[Calendar] SVG gerado:", svgDataUrl.substring(0, 100) + "...");
 
-  // 2. Busca dados reais de ocupação
+  // 2. Extrai o SVG da data URL
+  const svgString = svgDataUrl.replace(/^data:image\/svg\+xml;base64,/, '');
+  const svgBuffer = Buffer.from(svgString, 'base64');
+  const svgContent = svgBuffer.toString('utf-8');
+
+  // 3. Tenta converter SVG para PNG e salvar no diretório público
+  let finalImageUrl = svgDataUrl; // Fallback para SVG
+  let imageType = "SVG";
+
+  try {
+    console.log("[Calendar] Tentando converter SVG para PNG e salvar no diretório público...");
+    
+    // Gerar nome de arquivo único baseado na data
+    const timestamp = Date.now();
+    const filename = `calendar-${year}-${String(month + 1).padStart(2, '0')}-${timestamp}.png`;
+    
+    const conversionResult = await convertAndUploadCalendar(svgContent, filename, {
+      width: 1080,  // Largura ideal para WhatsApp
+      quality: 90
+    });
+
+    if (conversionResult.success && conversionResult.url) {
+      finalImageUrl = conversionResult.url;
+      imageType = "PNG";
+      console.log("[Calendar] SVG convertido para PNG e salvo:", conversionResult.url);
+      console.log("[Calendar] Passos:", conversionResult.steps.join(', '));
+    } else {
+      console.log("[Calendar] Conversão falhou, usando SVG:", conversionResult.error);
+    }
+  } catch (err) {
+    console.log("[Calendar] Erro na conversão, usando SVG:", err);
+  }
+
+  // 4. Tenta enviar a IMAGEM do calendário
+  let imageSent = false;
+  try {
+    console.log("[Calendar] Enviando imagem como", imageType);
+    const result = await sendMedia({ 
+      number, 
+      mediaUrl: finalImageUrl, 
+      caption: "📅 Calendário de disponibilidade" 
+    });
+    console.log("[Calendar] Resultado do envio:", result);
+    
+    // Verifica se o envio foi bem-sucedido (não retornou erro)
+    if (result && !result.error) {
+      imageSent = true;
+      console.log("[Calendar] Imagem enviada com sucesso");
+    } else {
+      console.log("[Calendar] Falha ao enviar imagem, usando fallback de texto");
+    }
+  } catch (err) {
+    console.log("[Calendar] Erro ao enviar imagem, usando fallback de texto:", err);
+  }
+
+  // 5. Se a imagem falhou, envia apenas a legenda em texto
+  if (!imageSent) {
+    await sendText({
+      number,
+      text: generateCalendarLegend(),
+    });
+  }
+
+  // 6. Busca dados reais de ocupação
   const { occupancyMap } = await getMonthOccupancy(year, month);
 
-  // 3. Monta seções da List Message
+  // 7. Monta seções da List Message
   const sections = buildDayListSections(occupancyMap, month, year);
 
   if (sections.length === 0) {
     // Nenhum dia disponível
-    await sendMedia({
+    await sendText({
       number,
-      mediaUrl: imagePath,
-      caption: "Nenhum dia disponível neste mês. Tente novamente mais tarde.",
+      text: "Nenhum dia disponível neste mês. Tente novamente mais tarde.",
     });
     return;
   }
 
-  // 4. Envia a lista interativa
+  // 8. Envia a lista interativa
   const totalRows = sections.reduce((acc, s) => acc + s.rows.length, 0);
   if (totalRows === 0) return;
 

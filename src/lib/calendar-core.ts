@@ -360,6 +360,7 @@ const OCCUPANCY_LABELS: Record<string, string> = {
 /**
  * Generate a calendar SVG image with the clinic logo, month grid, and occupancy colors.
  * SVG is used to avoid font dependency issues on Vercel/Linux.
+ * Retorna SVG como data URL (compatível com WASender API paga).
  */
 export async function generateCalendarImage(date: Date, customToday?: Date): Promise<string> {
   const data = await getMonthOccupancy(date.getFullYear(), date.getMonth(), customToday);
@@ -369,6 +370,7 @@ export async function generateCalendarImage(date: Date, customToday?: Date): Pro
   
   // Return as data URL (SVG is natively supported by browsers and WhatsApp)
   const base64 = Buffer.from(svg).toString("base64");
+  console.log("[Calendar] SVG gerado, tamanho:", svg.length, "bytes, base64:", base64.length, "bytes");
   return `data:image/svg+xml;base64,${base64}`;
 }
 

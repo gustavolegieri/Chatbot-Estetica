@@ -167,20 +167,24 @@ export async function POST(req: NextRequest) {
     markMessageAsProcessed(messageId);
   }
 
-  // Processar em background e responder imediatamente
-  processWhatsAppMessage({
-    phone,
-    text: text || buttonId || listId || "",
-    buttonId,
-    listId,
-    pushName: pushName || undefined,
-  }).catch(err => {
-    console.error("[Webhook] ERRO no processamento background:", err);
+  try {
+    console.log("[Webhook] Iniciando processamento da mensagem");
+    await processWhatsAppMessage({
+      phone,
+      text: text || buttonId || listId || "",
+      buttonId,
+      listId,
+      pushName: pushName || undefined,
+    });
+    
+    console.log("[Webhook] processamento concluído");
+  } catch (err) {
+    console.error("[Webhook] ERRO:", err);
     // Em caso de erro, remover marcação para permitir retry
     if (messageId) {
       processedMessageIds.delete(messageId);
     }
-  });
+  }
 
   return NextResponse.json({ ok: true });
 }

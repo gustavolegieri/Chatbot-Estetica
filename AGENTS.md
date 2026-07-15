@@ -32,8 +32,13 @@ DATABASE_URL=postgresql://postgres.SEU_REF:SENHA@aws-1-us-east-1.pooler.supabase
 - **Connection_limit:** Aumentado para 50 para suportar alta concorrência
 - **Debounce:** Reduzido de 2800ms para 500ms para plano gratuito WASender API (1 msg/min)
 - **Timeout de processamento:** Reduzido de 30s para 15s para evitar travamentos
-- **Processamento assíncrono:** Webhook responde imediatamente e processa em background
+- **Processamento síncrono:** Webhook processa mensagem antes de responder (evita problemas com WASender API)
 - **Logs reduzidos:** Removidos logs excessivos para reduzir overhead no Vercel
+
+### Limitações da WASender API Gratuita
+- **Imagens em Data URL:** A API gratuita não suporta envio de imagens como data URLs (base64)
+- **Fallback de calendário:** Calendário é enviado como texto quando a imagem falha
+- **Rate limit:** 1 mensagem por minuto no plano gratuito
 
 ### Cache de Deduplicação
 - **TTL:** Reduzido de 24h para 6h para menor uso de memória

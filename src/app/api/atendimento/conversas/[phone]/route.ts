@@ -112,6 +112,8 @@ export async function PUT(
         handoffResolvedAt: new Date(),
         botPaused: false,
         handoffNote: body.note ?? waSession.handoffNote,
+        // Reiniciar fluxo para garantir que o bot funcione corretamente
+        metadata: { stage: "ETAPA1_AWAITING_NAME", welcomed: false, pendingWelcomeRestart: true } as object,
       },
     });
 

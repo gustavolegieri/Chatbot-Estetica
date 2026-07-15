@@ -242,11 +242,14 @@ export async function sendText({
 /**
  * Resolve caminho relativo de mídia para URL absoluta pública.
  * Usa NEXT_PUBLIC_APP_URL ou VERCEL_URL como base.
- * Data URLs (base64) são retornadas como estão.
+ * Data URLs (base64) podem não ser suportadas pela WASender API - mantém compatibilidade.
  */
-function resolveMediaUrl(url: string): string {
-  // Se já for data URL (base64), retorna como está
-  if (/^data:/i.test(url)) return url;
+function resolveMediaUrl(url: string): string | null {
+  // Se já for data URL (base64), tenta usar (pode funcionar no plano pago)
+  if (/^data:/i.test(url)) {
+    console.log("[WasenderAPI] Data URL detectada - tentando envio (pode não funcionar em plano gratuito)");
+    return url; // Tenta enviar mesmo assim (pode funcionar no plano pago)
+  }
   
   // Se já for URL absoluta (http/https), retorna como está
   if (/^https?:\/\//i.test(url)) return url;
@@ -258,6 +261,7 @@ function resolveMediaUrl(url: string): string {
 /**
  * Envia mídia (imagem/vídeo/documento) via WhatsApp usando WasenderAPI.
  * A API aceita URLs públicas de mídia — caminhos relativos são convertidos automaticamente.
+ * Data URLs podem funcionar no plano pago, mas não no gratuito.
  */
 export async function sendMedia({
   number,
@@ -272,6 +276,12 @@ export async function sendMedia({
   }
 
   const absoluteUrl = resolveMediaUrl(mediaUrl);
+
+  // Se resolveMediaUrl retornou null, retorna erro
+  if (!absoluteUrl) {
+    console.warn("[WasenderAPI] URL de mídia inválida");
+    return { error: true, message: "URL de mídia inválida" };
+  }
 
   const payload: Record<string, any> = {
     to: toE164(number),
