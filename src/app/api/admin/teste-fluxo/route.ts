@@ -461,7 +461,7 @@ async function runSequence(sessionId: string, phone: string) {
       testFluxoStorage.set(sessionId, session);
 
       if (i < STEPS.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 60000));
+        await new Promise(resolve => setTimeout(resolve, 35000)); // 35 segundos para respeitar rate limit da API gratuita
       }
     } catch (error) {
       console.error(`[Teste Fluxo] Erro na etapa ${step.id}:`, error);

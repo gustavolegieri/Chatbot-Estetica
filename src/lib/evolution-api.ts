@@ -122,6 +122,8 @@ async function processQueue(phone: string) {
   
   for (const msg of messages) {
     try {
+      // Aguardar 35 segundos entre mensagens para respeitar rate limit da API gratuita
+      await new Promise(resolve => setTimeout(resolve, 35000));
       await wasenderFetch(msg.body);
     } catch (err) {
       console.error("[WasenderAPI] ❌ Erro ao processar mensagem da fila:", err);
@@ -207,10 +209,10 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
     result: result
   });
   
-  // Tentar processar fila após sucesso
+  // Tentar processar fila após sucesso - mas com delay maior para evitar rate limit
   const phone = (body as any).to;
   if (phone) {
-    setTimeout(() => processQueue(phone), 2000); // Aumentado para 2s para evitar rate limit
+    setTimeout(() => processQueue(phone), 35000); // 35 segundos para respeitar rate limit da API gratuita
   }
   
   return result;
