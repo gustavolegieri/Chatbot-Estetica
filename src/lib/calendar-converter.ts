@@ -4,6 +4,7 @@
  */
 
 import sharp from 'sharp';
+import { uploadImageToCloudinary, uploadToImgur, uploadToTelegraph, uploadToImgBB, uploadToFreeImage, uploadToPostImages } from './image-upload';
 
 interface ConversionOptions {
   width?: number;
@@ -86,7 +87,7 @@ export async function convertSvgToPng(
 
 /**
  * Faz upload do buffer PNG para o diretório público local
- * e retorna a URL pública relativa
+ * e retorna a URL pública absoluta
  * @param pngBuffer - Buffer do PNG
  * @param filename - Nome do arquivo (opcional, será gerado automaticamente se não fornecido)
  * @returns URL pública da imagem ou erro
@@ -114,9 +115,16 @@ export async function uploadPngToStorage(pngBuffer: Buffer, filename?: string): 
     fs.writeFileSync(filePath, pngBuffer);
     console.log('[Upload] PNG salvo em:', filePath);
     
-    // Retornar URL pública relativa
-    const publicUrl = `/tmp/${safeFilename}`;
+    // Retornar URL pública absoluta usando a nova API endpoint
+    // Em produção, usa a URL do Vercel. Em desenvolvimento, usa localhost.
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const baseUrl = isDevelopment 
+      ? 'http://localhost:3000' 
+      : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+    
+    const publicUrl = `${baseUrl}/api/images/${safeFilename}`;
     console.log('[Upload] URL pública gerada:', publicUrl);
+    console.log('[Upload] Ambiente:', isDevelopment ? 'desenvolvimento' : 'produção');
     
     return {
       success: true,
@@ -135,7 +143,7 @@ export async function uploadPngToStorage(pngBuffer: Buffer, filename?: string): 
 
 
 /**
- * Processo completo: SVG → PNG → Upload local → URL pública
+ * Processo completo: SVG → PNG → Upload (Cloudinary ou local) → URL pública
  * @param svgString - String do SVG
  * @param filename - Nome do arquivo (opcional)
  * @param conversionOptions - Opções de conversão
@@ -145,7 +153,7 @@ export async function convertAndUploadCalendar(
   svgString: string,
   filename?: string,
   conversionOptions: ConversionOptions = {}
-): Promise<{ success: boolean; url?: string; steps: string[]; error?: string }> {
+): Promise<{ success: boolean; url?: string; steps: string[]; error?: string; fallbackText?: string }> {
   const steps: string[] = [];
 
   try {
@@ -164,25 +172,107 @@ export async function convertAndUploadCalendar(
     
     steps.push('✅ SVG convertido para PNG com sucesso');
 
-    // Passo 2: Fazer upload para diretório público
-    steps.push('Salvando PNG no diretório público...');
-    const uploadResult = await uploadPngToStorage(conversionResult.pngBuffer, filename);
+    // Passo 2: Tentar upload para Cloudinary (SDK oficial)
+    steps.push('Tentando upload para Cloudinary...');
+    const cloudinaryResult = await uploadImageToCloudinary(conversionResult.pngBuffer, filename);
     
-    if (!uploadResult.success || !uploadResult.url) {
-      steps.push('❌ Falha no upload da imagem');
+    if (cloudinaryResult.success && cloudinaryResult.url) {
+      steps.push('✅ Upload para Cloudinary realizado com sucesso');
       return {
-        success: false,
-        steps,
-        error: uploadResult.error || 'Falha no upload'
+        success: true,
+        url: cloudinaryResult.url,
+        steps
       };
     }
     
-    steps.push('✅ Upload realizado com sucesso');
+    steps.push('⚠️ Cloudinary não disponível, tentando PostImages...');
+
+    // Passo 3: Tentar PostImages como fallback
+    steps.push('Tentando upload para PostImages...');
+    const postImagesResult = await uploadToPostImages(conversionResult.pngBuffer);
+    
+    if (postImagesResult.success && postImagesResult.url) {
+      steps.push('✅ Upload para PostImages realizado com sucesso');
+      return {
+        success: true,
+        url: postImagesResult.url,
+        steps
+      };
+    }
+    
+    steps.push('⚠️ PostImages não disponível, tentando FreeImage...');
+
+    // Passo 4: Tentar FreeImage como fallback
+    steps.push('Tentando upload para FreeImage...');
+    const freeImageResult = await uploadToFreeImage(conversionResult.pngBuffer);
+    
+    if (freeImageResult.success && freeImageResult.url) {
+      steps.push('✅ Upload para FreeImage realizado com sucesso');
+      return {
+        success: true,
+        url: freeImageResult.url,
+        steps
+      };
+    }
+    
+    steps.push('⚠️ FreeImage não disponível, tentando ImgBB...');
+
+    // Passo 5: Tentar ImgBB como fallback
+    steps.push('Tentando upload para ImgBB...');
+    const imgbbResult = await uploadToImgBB(conversionResult.pngBuffer);
+    
+    if (imgbbResult.success && imgbbResult.url) {
+      steps.push('✅ Upload para ImgBB realizado com sucesso');
+      return {
+        success: true,
+        url: imgbbResult.url,
+        steps
+      };
+    }
+    
+    steps.push('⚠️ ImgBB não disponível, tentando Imgur...');
+
+    // Passo 6: Tentar Imgur como fallback
+    steps.push('Tentando upload para Imgur...');
+    const imgurResult = await uploadToImgur(conversionResult.pngBuffer);
+    
+    if (imgurResult.success && imgurResult.url) {
+      steps.push('✅ Upload para Imgur realizado com sucesso');
+      return {
+        success: true,
+        url: imgurResult.url,
+        steps
+      };
+    }
+    
+    steps.push('⚠️ Imgur não disponível, tentando Telegraph...');
+
+    // Passo 7: Tentar Telegraph como fallback
+    steps.push('Tentando upload para Telegraph...');
+    const telegraphResult = await uploadToTelegraph(conversionResult.pngBuffer);
+    
+    if (telegraphResult.success && telegraphResult.url) {
+      steps.push('✅ Upload para Telegraph realizado com sucesso');
+      return {
+        success: true,
+        url: telegraphResult.url,
+        steps
+      };
+    }
+    
+    steps.push('⚠️ Todos os serviços de upload falharam, usando fallback de texto');
+
+    // Passo 8: Fallback para texto quando todos os serviços falham
+    steps.push('Gerando calendário em formato de texto...');
+    
+    // Extrair informações básicas do calendário do SVG
+    const calendarText = extractCalendarTextFromSVG(svgString);
     
     return {
-      success: true,
-      url: uploadResult.url,
-      steps
+      success: false,
+      steps,
+      error: 'Todos os serviços de upload falharam',
+      fallbackText: calendarText
     };
 
   } catch (error) {
@@ -194,6 +284,34 @@ export async function convertAndUploadCalendar(
       steps,
       error: errorMessage
     };
+  }
+}
+
+/**
+ * Extrai informações básicas do calendário do SVG para fallback de texto
+ */
+function extractCalendarTextFromSVG(svgString: string): string {
+  try {
+    // Extrair mês e ano do SVG (simplificado)
+    const currentMonth = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const currentMonthCapitalized = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
+    
+    return `📅 CALENDÁRIO DE DISPONIBILIDADE
+
+🗓️ ${currentMonthCapitalized}
+
+⏰ HORÁRIOS DISPONÍVEIS:
+• Segunda a Sexta: 08:00 - 18:00
+• Sábado: 08:00 - 13:00
+• Domingo: Fechado
+
+📍 Para agendar, responda com:
+• Data desejada (ex: 15/07)
+• Ou selecione uma opção do menu
+
+⚠️ Sujeito a disponibilidade`;
+  } catch (error) {
+    return '📅 CALENDÁRIO DE DISPONIBILIDADE\n\nPara agendar, entre em contato conosco pelo menu de opções.';
   }
 }
 

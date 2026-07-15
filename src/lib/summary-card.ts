@@ -1,4 +1,6 @@
 import { renderLogo } from "./svg-utils";
+import sharp from 'sharp';
+import { uploadImageToCloudinary } from './image-upload';
 
 export interface SummaryCardData {
   customerName: string;
@@ -24,7 +26,7 @@ const ICONS = {
 };
 
 /**
- * Gera imagem visual do resumo do agendamento usando SVG (compatível com Vercel).
+ * Gera imagem visual do resumo do agendamento usando SVG e converte para PNG com upload no Cloudinary.
  * Segue regras técnicas estritas para evitar sobreposição e bugs de renderização.
  */
 export async function generateSummaryCard(data: SummaryCardData): Promise<string> {
@@ -204,13 +206,37 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
       </svg>
     `;
 
-    // Convert SVG to base64 data URL
-    const base64 = Buffer.from(svg).toString('base64');
-    const dataUrl = `data:image/svg+xml;base64,${base64}`;
+    // Converter SVG para PNG usando sharp
+    console.log("[generateSummaryCard] Convertendo SVG para PNG...");
+    const svgBuffer = Buffer.from(svg);
     
-    console.log("[generateSummaryCard] SVG generated with exact height:", totalHeight, "size:", base64.length);
+    const pngBuffer = await sharp(svgBuffer, {
+      density: 300
+    })
+    .png({
+      quality: 90,
+      compressionLevel: 6
+    })
+    .toBuffer();
     
-    return dataUrl;
+    console.log("[generateSummaryCard] PNG gerado, tamanho:", pngBuffer.length, "bytes");
+    
+    // Fazer upload para Cloudinary
+    console.log("[generateSummaryCard] Fazendo upload para Cloudinary...");
+    const timestamp = Date.now();
+    const filename = `summary-${data.customerName.replace(/\s+/g, '-')}-${timestamp}`;
+    
+    const uploadResult = await uploadImageToCloudinary(pngBuffer, filename, 'summaries');
+    
+    if (uploadResult.success && uploadResult.url) {
+      console.log("[generateSummaryCard] Upload realizado com sucesso:", uploadResult.url);
+      return uploadResult.url;
+    } else {
+      console.error("[generateSummaryCard] Falha no upload:", uploadResult.error);
+      // Fallback para placeholder
+      const text = `${data.customerName} - ${data.serviceName} - R$ ${data.totalPrice.toFixed(2)}`;
+      return `https://placehold.co/600x450/1a1a2e/FFD700?text=${encodeURIComponent(text)}`;
+    }
   } catch (error) {
     console.error("[generateSummaryCard] Error:", error);
     // Fallback to placeholder with actual data

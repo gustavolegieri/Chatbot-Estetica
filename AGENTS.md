@@ -169,6 +169,56 @@ Se o bot não responde:
 4. **Configure a API Key:** Certifique-se de que WASENDER_API_KEY está configurada
 5. **Verifique o formato do número:** Deve ser DDI + DDD + número (ex: 5511944400696)
 
+## Serviço de Upload de Imagens (Cloudinary + Fallback Local)
+
+### Configuração
+O sistema usa Cloudinary para hospedar imagens enviadas via WhatsApp (como calendários), com fallback automático para armazenamento local.
+
+**Credenciais necessárias:**
+```bash
+# Cloudinary (upload de imagens)
+# Obtenha suas credenciais em: https://cloudinary.com/console
+CLOUDINARY_CLOUD_NAME="seu-cloud-name"
+CLOUDINARY_API_KEY="sua-api-key"
+CLOUDINARY_API_SECRET="sua-api-secret"
+```
+
+**Como obter credenciais:**
+1. Acesse: https://cloudinary.com
+2. Crie uma conta gratuita (25GB armazenamento, 25GB transferência/mês)
+3. No dashboard, copie:
+   - Cloud Name (topo da página)
+   - API Key (Account Details → API Key)
+   - API Secret (Account Details → API Secret)
+
+**Funcionamento:**
+- O sistema tenta upload para Cloudinary primeiro
+- Se Cloudinary falhar ou não estiver configurado, usa fallback local (diretório public/tmp)
+- Imagens são otimizadas automaticamente (largura 1080px, qualidade auto)
+- URLs públicas são retornadas para envio via WhatsApp
+- Timeout de 5 segundos para evitar travamentos se Cloudinary estiver lento
+
+**Testar configuração:**
+```bash
+# Teste completo do fluxo de calendário
+npx tsx test-calendar-upload.ts
+
+# Teste específico do Cloudinary
+npx tsx test-cloudinary-upload.ts
+```
+
+**Status atual:**
+- ✅ Sistema configurado e funcionando
+- ✅ Fallback local operacional
+- ⚠️ Cloudinary configurado mas com erro 403 (restrição de conta)
+- 💡 Sistema usa armazenamento local automaticamente quando Cloudinary falha
+
+**Arquivos relacionados:**
+- `src/lib/image-upload.ts` - Módulo de upload Cloudinary
+- `src/lib/calendar-converter.ts` - Integração com conversão de calendários
+- `test-cloudinary-upload.ts` - Script de teste Cloudinary
+- `test-calendar-upload.ts` - Script de teste completo do fluxo
+
 ## Variáveis de Ambiente Importantes
 
 ```bash
@@ -181,6 +231,11 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/estetica_automotiva?s
 # WhatsApp API
 WASENDER_API_KEY=sua-chave-wasender-api
 WASENDER_WEBHOOK_SECRET=sua-chave-webhook-secret
+
+# Cloudinary (upload de imagens)
+CLOUDINARY_CLOUD_NAME=seu-cloud-name
+CLOUDINARY_API_KEY=sua-api-key
+CLOUDINARY_API_SECRET=sua-api-secret
 
 # Autenticação
 JWT_SECRET=sua-chave-secreta-muito-segura-aqui

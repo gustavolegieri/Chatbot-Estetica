@@ -86,6 +86,14 @@ export async function sendCalendarWithImageAndList({ number, prompts }: { number
       imageType = "PNG";
       console.log("[Calendar] SVG convertido para PNG e salvo:", conversionResult.url);
       console.log("[Calendar] Passos:", conversionResult.steps.join(', '));
+    } else if (conversionResult.fallbackText) {
+      // Se todos os serviços de upload falharam, usa o fallback de texto
+      console.log("[Calendar] Todos os serviços de upload falharam, usando texto:", conversionResult.error);
+      await sendText({
+        number,
+        text: conversionResult.fallbackText,
+      });
+      // Continua com o fluxo normal da lista
     } else {
       console.log("[Calendar] Conversão falhou, usando SVG:", conversionResult.error);
     }
