@@ -23,7 +23,7 @@ async function testImageUrl() {
     if (response.ok) {
       console.log("✅ Imagem acessível!");
       const buffer = await response.arrayBuffer();
-      console.log("Tamanho:", buffer.length, "bytes");
+      console.log("Tamanho:", buffer.byteLength, "bytes");
     } else {
       console.log("❌ Imagem não acessível");
       const text = await response.text();
