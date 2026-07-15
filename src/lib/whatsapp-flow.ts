@@ -3,7 +3,7 @@ import { addDays, format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { prisma } from "./prisma";
 import { sendText, sendMedia, sendList } from "./evolution-api";
-import { sendCalendarWithImageAndList, generateCalendarImageOnly, generateCalendarLegend } from "./calendar-helper";
+import { sendCalendarWithImageAndList, generateCalendarLegend } from "./calendar-helper";
 import {
   calculateEndTime,
   formatDurationLabel,
@@ -82,7 +82,6 @@ import {
   isFirstTimeCustomer,
   applyFirstTimeDiscount,
   buildPaymentOptionsText,
-  handleClientRecognition,
   handleLoyaltyStep,
   handleLogistics,
   handlePixChoice,
@@ -109,25 +108,6 @@ import {
   looksLikeQuestion,
 } from "./whatsapp-ai";
 import { canRedeem, findCouponByCode, redeemCoupon } from "./coupons";
-import { calculateDistance, calculatePickupFee } from "./maps";
-import { requestHumanHandoff } from "./whatsapp-handoff";
-import { generatePixQrCode, generatePixPayload } from "./pix-qr";
-import { generateSummaryCard } from "./summary-card";
-import { analyzeReceiptImage, validateReceiptAmount } from "./receipt-analyzer";
-import { 
-  detectCancellationIntent, 
-  detectCancellationReason, 
-  calculateDiscount, 
-  generateDiscountOfferMessage, 
-  saveDiscountOffer, 
-  isDiscountOfferValid 
-} from "./cancellation-detector";
-import { 
-  startFunnel, 
-  trackFunnelProgress, 
-  trackAbandonment, 
-  completeFunnel 
-} from "./funnel-tracker";
 
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -166,7 +146,7 @@ async function executeCoreHandler(
   // Rastreamento de funil se necessário
   if (result.shouldTrackFunnel && result.funnelStage) {
     try {
-      await trackFunnelProgress(msg.phone, msg.phone, result.funnelStage);
+      await trackProgress(msg.phone, result.funnelStage);
     } catch (error) {
       console.error("[executeCoreHandler] Error tracking funnel:", error);
     }
@@ -779,26 +759,6 @@ async function createAppointment(flow: FlowState, phone: string) {
   return { appointment, conflict: false };
 }
 
-function faqAnswer(text: string, flow: FlowState): string | null {
-  const t = text.toLowerCase();
-  if (/quanto tempo|demora|duração|duracao/.test(t)) {
-    return `⏱️ O tempo varia conforme o estado do veículo e o serviço. Estimativa: *${flow.estimatedTime ?? "na avaliação"}*.`;
-  }
-  if (/deixar o carro|ficar|buscar/.test(t)) {
-    return `Sim 😊 Muitos clientes deixam o veículo e retiram após o serviço.`;
-  }
-  if (/garantia/.test(t)) {
-    return `🛡️ Sim! Se algo não ficou como esperado, ajustamos para você.`;
-  }
-  if (/suv|pickup|van|grande|hilux|toro/.test(t)) {
-    return `Sim! Trabalhamos com veículos de todos os portes 🚗`;
-  }
-  if (/sábado|sabado/.test(t)) {
-    return `Atendemos aos sábados mediante agendamento.`;
-  }
-  return null;
-}
-
 async function sendQuote(msg: IncomingMessage, flow: FlowState, wctx: WhatsAppCatalogContext) {
   const vehicleText = vehicleDisplayFromFlow(flow);
   const key = flow.serviceKey ?? "lavagem_detalhada";
@@ -842,100 +802,21 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
   const lower = input.toLowerCase();
   const isShortMenuPick = num !== null && input.length <= 2;
 
-  // DETECÇÃO DE CANCELAMENTO (cross-cutting) - unificado com test-bot
+  // DETECÇÃO DE CANCELAMENTO (cross-cutting) - usando core handler unificado
   // Rode antes do switch de etapas para interceptar intenções de cancelamento
-  if (detectCancellationIntent(input)) {
-    const reason = detectCancellationReason(input);
-    const originalPrice = flow.quoteMin ?? 100; // Valor estimado se não disponível
-    const offer = calculateDiscount(reason, originalPrice);
-
-    await sendText({
-      number: msg.phone,
-      text: generateDiscountOfferMessage(
-        clientDisplayName(flow, msg.pushName),
-        originalPrice,
-        offer
-      ),
-    });
-
-    // Salvar oferta no banco (usando campo discountOffer do schema)
-    try {
-      const session = await prisma.whatsAppSession.findUnique({
-        where: { phone: normalizePhone(msg.phone) }
-      });
-      
-      if (session) {
-        await prisma.whatsAppSession.update({
-          where: { phone: normalizePhone(msg.phone) },
-          data: {
-            metadata: {
-              ...(session.metadata as any),
-              discountOffer: {
-                originalPrice,
-                discountPercentage: offer.discountPercentage,
-                validUntil: new Date(Date.now() + offer.validForMinutes * 60 * 1000).toISOString(),
-                used: false,
-              },
-            },
-          },
-        });
-      }
-    } catch (error) {
-      console.error("[Cancellation Detector] Error saving discount offer:", error);
-    }
-
-    // Adicionar estado de espera de resposta de desconto
-    flow.awaitingDiscountResponse = true;
-    flow.discountOffer = {
-      originalPrice,
-      discountPercentage: offer.discountPercentage,
-      validUntil: new Date(Date.now() + offer.validForMinutes * 60 * 1000).toISOString(),
-      used: false,
-      discountReason: offer.discountReason,
-    };
-    flow.discountOriginalPrice = originalPrice;
-    await saveFlow(msg.phone, flow);
+  if (flow.awaitingDiscountResponse) {
+    await executeCoreHandler(msg, flow, handleDiscountResponse, msg.phone);
     return;
   }
 
-  // Resposta a oferta de desconto
-  if (flow.awaitingDiscountResponse) {
-    const normalizedInput = input.toLowerCase().trim();
-    if (normalizedInput === "1" || /sim|quero|aceito|aprovei/i.test(normalizedInput)) {
-      // Aceitar desconto
-      const offer = flow.discountOffer;
-      if (!offer) {
-        // Se não tem oferta, voltar ao fluxo normal
-        flow.awaitingDiscountResponse = false;
-        await saveFlow(msg.phone, flow);
-        return;
-      }
-      const discountedPrice = (flow.discountOriginalPrice || 100) * (1 - offer.discountPercentage / 100);
-      flow.quoteMin = discountedPrice;
-      flow.quoteMax = discountedPrice;
-      flow.couponDiscountApplied = discountedPrice;
-      flow.awaitingDiscountResponse = false;
-      flow.discountOffer = undefined;
-      
-      await saveFlow(msg.phone, flow);
-      await sendText({
-        number: msg.phone,
-        text: `✅ Ótimo! ${offer.discountReason}\n\nNovo valor: R$ ${discountedPrice.toFixed(2).replace('.', ',')}\n\nVamos continuar o agendamento com este valor especial!`,
-      });
-      return;
-    } else if (normalizedInput === "2" || /nao|não|cancelar|recusar/i.test(normalizedInput)) {
-      // Recusar desconto e voltar ao menu
-      flow.awaitingDiscountResponse = false;
-      flow.discountOffer = undefined;
-      flow.stage = "ETAPA2_MAIN_MENU";
-      
-      await saveFlow(msg.phone, flow);
-      await sendText({
-        number: msg.phone,
-        text: "Entendido. Sem problemas! \n\nVoltamos ao menu principal. O que você gostaria de fazer?",
-      });
-      return;
+  const cancellationResult = await handleCancellationDetection(flow, input, [], msg.phone);
+  if (cancellationResult) {
+    await saveFlow(msg.phone, cancellationResult.nextState);
+    for (const response of cancellationResult.responses) {
+      await sendText({ number: msg.phone, text: response.text });
+      await delay(500);
     }
+    return;
   }
 
   // Small talk / confirmações neutras ("pera ai", "ok", "tá", "entendi") em stages intermediárias
@@ -1260,11 +1141,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         return;
       }
       if (wantsDoubt(input, num)) {
-        await saveFlow(msg.phone, { ...flow, stage: "ETAPA10_FAQ", returnStage: "ETAPA3_SERVICE_ACTION" });
-        await sendText({
-          number: msg.phone,
-          text: `Pode perguntar 😊 Ex: tempo do serviço, garantia, deixar o carro.\n\nDigite *voltar* para retornar.`,
-        });
+        await executeCoreHandler(msg, flow, handleServiceQuestion);
         return;
       }
       if (!wantsToSchedule(input, num)) {
@@ -1825,40 +1702,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     }
 
     case "ETAPA10_FAQ": {
-      if (lower === "voltar" && flow.returnStage) {
-        const restored: FlowState = { ...flow, stage: flow.returnStage };
-        delete restored.returnStage;
-        await saveFlow(msg.phone, restored);
-        if (restored.stage === "ETAPA3_SERVICE_ACTION" && restored.serviceKey) {
-          await sendText({
-            number: msg.phone,
-            text: flowMsg(wctx).detail(restored.serviceKey),
-          });
-        } else {
-          await sendText({
-            number: msg.phone,
-            text: etapa5Quote(
-              restored.customerName ?? "Cliente",
-              restored.vehicleRaw ?? "seu veículo",
-              restored.serviceLabel ?? "serviço",
-              restored.quoteMin ?? 0,
-              restored.quoteMax ?? 0,
-              restored.estimatedTime ?? "—",
-              undefined,
-              prompts
-            ),
-          });
-        }
-        return;
-      }
-      const ans =
-        (await answerCustomerDoubt({ question: input, flow, ctx, wctx })) ?? faqAnswer(input, flow);
-      await sendText({
-        number: msg.phone,
-        text: ans
-          ? `${ans}\n\n_(Digite *voltar* ou continue perguntando)_`
-          : `Entendi sua dúvida 😊 Nossa equipe pode detalhar isso na recepção.\n\n_(Digite *voltar* para seguir o agendamento)_`,
-      });
+      await executeCoreHandler(msg, flow, handleServiceQuestion);
       return;
     }
 

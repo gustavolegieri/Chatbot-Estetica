@@ -64,7 +64,7 @@ export interface FlowState {
   vehicleCollectStep?: "model" | "year" | "color" | "condition";
   vehicleConfirmed?: boolean;
   vehiclePhotoAttached?: boolean;
-  reminderEnabled?: boolean;
+  reminderEnabled?: boolean; // Se usuário quer receber lembrete
   quoteMin?: number;
   quoteMax?: number;
   estimatedTime?: string;

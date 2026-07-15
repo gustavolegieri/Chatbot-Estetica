@@ -2,7 +2,30 @@
 // Usa as MESMAS funções de validação, parsing e formatação do whatsapp-flow.ts
 // para garantir comportamento idêntico entre teste e produção
 
-import type { FlowState } from "./whatsapp-flow-types";
+import type { FlowState, FlowStage } from "./whatsapp-flow-types";
+import {
+  normalizeYes,
+  normalizeNo,
+  shouldSkipCouponPrompt,
+  isFirstTimeCustomer,
+  applyFirstTimeDiscount as applyFirstTimeDiscountCore,
+  buildPaymentOptionsText,
+  handleLoyaltyStep,
+  handleLogistics,
+  handlePixChoice,
+  handleReceiptUpload,
+  handleCouponStep,
+  handleReminderStep as handleReminderStepCore,
+  handleFinalConfirm,
+  handleSummaryConfirm,
+  handleRating,
+  handleServiceQuestion,
+  handleFAQ,
+  handleCancellationDetection,
+  handleDiscountResponse,
+  type FlowResponse,
+  type FlowResult,
+} from "./whatsapp-flow-core";
 import {
   isValidCustomerName,
   normalizeVehicleConditionValue,
@@ -178,6 +201,114 @@ interface TestSession {
   awaitingServiceQuestion?: boolean;
   testDate?: string | null;
   testHours?: string | null;
+}
+
+// Helper to convert TestSession to FlowState for core handlers
+function testSessionToFlowState(session: TestSession): FlowState {
+  return {
+    stage: session.stage as FlowStage,
+    customerName: session.customerName || undefined,
+    serviceKey: session.selectedService || undefined,
+    serviceLabel: session.selectedServiceName || undefined,
+    couponCode: session.couponCode || undefined,
+    couponDiscountApplied: session.couponDiscount || undefined,
+    loyaltyPoints: session.loyaltyPoints || 0,
+    vehicleModel: session.vehicle.model || undefined,
+    vehicleYear: session.vehicle.year?.toString() || undefined,
+    vehicleColor: session.vehicle.color || undefined,
+    vehicleCondition: session.vehicle.condition,
+    quoteMin: session.quote || undefined,
+    quoteMax: session.quote || undefined,
+    upsellLabel: session.upsellLabel || undefined,
+    upsellAccepted: session.upsellAccepted,
+    upsellValue: session.upsellValue || undefined,
+    dayLabel: session.selectedDay || undefined,
+    dayDate: session.selectedDateIso || undefined,
+    startTime: session.selectedTime || undefined,
+    availableSlots: session.availableSlots || undefined,
+    reminderEnabled: session.wantsReminder || undefined,
+    reminderPreference: session.reminderPreference as "30min" | "1hour" | "1day" | "none" || undefined,
+    needsPickup: session.wantsPickupDelivery || undefined,
+    pickupFee: session.pickupDeliveryFee || undefined,
+    pickupAddress: session.pickupAddress || undefined,
+    needsReturn: session.needsReturn || undefined,
+    paymentMethod: session.paymentMethod || undefined,
+    pixPaymentType: session.pixPaymentType || undefined,
+    receiptImageUrl: session.receiptImageUrl || undefined,
+    receiptAmount: session.receiptAmount || undefined,
+    receiptValidationAttempts: session.receiptValidationAttempts || undefined,
+    partialPayments: session.partialPayments || undefined,
+    totalPaid: session.totalPaid || undefined,
+    awaitingReceiptUpload: session.awaitingReceiptUpload || undefined,
+    awaitingDiscountResponse: session.awaitingDiscountResponse || undefined,
+    discountOffer: session.discountOffer || undefined,
+    discountOriginalPrice: session.discountOriginalPrice || undefined,
+    awaitingPickupAddress: session.awaitingPickupAddress || undefined,
+    awaitingReturnPreference: session.awaitingReturnPreference || undefined,
+    awaitingServiceQuestion: session.awaitingServiceQuestion || undefined,
+    serviceRecommendation: session.serviceRecommendation || undefined,
+    awaitingServiceRecommendation: session.awaitingServiceRecommendation || undefined,
+  };
+}
+
+// Helper to update TestSession from FlowState
+function updateTestSessionFromFlowState(session: TestSession, state: FlowState): TestSession {
+  return {
+    ...session,
+    stage: state.stage,
+    customerName: state.customerName || null,
+    selectedService: state.serviceKey || null,
+    selectedServiceName: state.serviceLabel || null,
+    couponCode: state.couponCode || null,
+    couponDiscount: state.couponDiscountApplied || null,
+    loyaltyPoints: state.loyaltyPoints || 0,
+    vehicle: {
+      ...session.vehicle,
+      model: state.vehicleModel || null,
+      year: state.vehicleYear ? parseInt(state.vehicleYear) : null,
+      color: state.vehicleColor || null,
+      condition: (state.vehicleCondition as any) || "normal",
+    },
+    quote: state.quoteMin || null,
+    upsellLabel: state.upsellLabel || undefined,
+    upsellAccepted: state.upsellAccepted,
+    upsellValue: state.upsellValue || undefined,
+    selectedDay: state.dayLabel || undefined,
+    selectedDateIso: state.dayDate || undefined,
+    selectedTime: state.startTime || undefined,
+    availableSlots: state.availableSlots || undefined,
+    wantsReminder: state.reminderEnabled,
+    reminderPreference: state.reminderPreference || null,
+    wantsPickupDelivery: state.needsPickup,
+    pickupDeliveryFee: state.pickupFee,
+    pickupAddress: state.pickupAddress || null,
+    needsReturn: state.needsReturn,
+    paymentMethod: state.paymentMethod || undefined,
+    pixPaymentType: state.pixPaymentType || undefined,
+    receiptImageUrl: state.receiptImageUrl || undefined,
+    receiptAmount: state.receiptAmount || undefined,
+    receiptValidationAttempts: state.receiptValidationAttempts || undefined,
+    partialPayments: state.partialPayments || undefined,
+    totalPaid: state.totalPaid || undefined,
+    awaitingReceiptUpload: state.awaitingReceiptUpload || undefined,
+    awaitingDiscountResponse: state.awaitingDiscountResponse || undefined,
+    discountOffer: state.discountOffer || undefined,
+    discountOriginalPrice: state.discountOriginalPrice || undefined,
+    awaitingPickupAddress: state.awaitingPickupAddress || undefined,
+    awaitingReturnPreference: state.awaitingReturnPreference || undefined,
+    awaitingServiceQuestion: state.awaitingServiceQuestion || undefined,
+    serviceRecommendation: state.serviceRecommendation || undefined,
+    awaitingServiceRecommendation: state.awaitingServiceRecommendation || undefined,
+  };
+}
+
+// Helper to convert FlowResponse[] to TestResponse[]
+function flowResponsesToTestResponses(flowResponses: FlowResponse[]): TestResponse[] {
+  return flowResponses.map(response => ({
+    text: response.text,
+    mediaUrl: response.mediaUrl,
+    mediaType: response.mediaType,
+  }));
 }
 
 interface TestResponse {

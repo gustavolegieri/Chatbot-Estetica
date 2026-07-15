@@ -538,7 +538,7 @@ export async function handleReminderStep(
   const num = parseInt(input, 10);
   
   let reminderEnabled = false;
-  let reminderPreference = "none";
+  let reminderPreference: "30min" | "1hour" | "1day" | "none" = "none";
   
   if (num === 1 || /sim|quero/i.test(input)) {
     reminderEnabled = true;

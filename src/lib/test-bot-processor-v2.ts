@@ -24,7 +24,7 @@ import { prisma } from "./prisma";
 import { buildAvailableSlotsForDay, parseTimeSelection } from "./appointments";
 import { calculateDistance, calculatePickupFee } from "./maps";
 import { findCouponByCode } from "./coupons";
-import { handleCouponStep, handleReminderStep, type FlowResponse, shouldSkipCouponPrompt, type FlowState } from "./whatsapp-flow-core";
+import { handleCouponStep, handleReminderStep as handleReminderStepCore, type FlowResponse, shouldSkipCouponPrompt, type FlowState } from "./whatsapp-flow-core";
 import { format } from "date-fns";
 import { answerCustomerDoubt } from "./whatsapp-ai";
 import { generateSummaryCard, generateSummaryText } from "./summary-card";
@@ -309,7 +309,7 @@ export async function processTestFlow({
     case "ETAPA9_REMINDER": {
       const flowState = testSessionToFlowState(session);
       const coreResponses: FlowResponse[] = [];
-      const result = await handleReminderStep(flowState, message, coreResponses, session.customerName || undefined);
+      const result = await handleReminderStepCore(flowState, message, coreResponses);
       
       // Update session from core result
       const updatedSession = updateTestSessionFromFlowState(session, result.nextState);
