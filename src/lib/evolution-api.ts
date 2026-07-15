@@ -113,7 +113,10 @@ function addToQueue(phone: string, body: object) {
 async function processQueue(phone: string) {
   const key = phone.replace(/\D/g, "");
   const queue = messageQueue.get(key);
-  if (!queue || queue.length === 0) return;
+  if (!queue || queue.length === 0) {
+    console.log("[WasenderAPI] 📭 Fila vazia para:", phone);
+    return;
+  }
   
   console.log("[WasenderAPI] 📤 Processando fila de mensagens para:", phone, "quantidade:", queue.length);
   
@@ -122,20 +125,25 @@ async function processQueue(phone: string) {
   
   for (const msg of messages) {
     try {
+      console.log("[WasenderAPI] 📤 Enviando mensagem da fila (tentativa", msg.attempts + 1, "/", MAX_QUEUE_ATTEMPTS + ")");
       // Aguardar 35 segundos entre mensagens para respeitar rate limit da API gratuita
       await new Promise(resolve => setTimeout(resolve, 35000));
-      await wasenderFetch(msg.body);
+      const result = await wasenderFetch(msg.body);
+      console.log("[WasenderAPI] ✅ Mensagem da fila enviada com sucesso");
     } catch (err) {
       console.error("[WasenderAPI] ❌ Erro ao processar mensagem da fila:", err);
       // Readicionar à fila se falhar e não excedeu tentativas
       if (msg.attempts < MAX_QUEUE_ATTEMPTS) {
         msg.attempts++;
         addToQueue(phone, msg.body);
+        console.log("[WasenderAPI] 🔄 Mensagem readicionada à fila (tentativa", msg.attempts, ")");
       } else {
         console.warn("[WasenderAPI] ⚠️ Mensagem descartada após", MAX_QUEUE_ATTEMPTS, "tentativas");
       }
     }
   }
+  
+  console.log("[WasenderAPI] ✅ Fila processada para:", phone);
 }
 
 async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
@@ -179,6 +187,8 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
     if (phone) {
       addToQueue(phone, body);
       console.log("[WasenderAPI] 📤 Mensagem adicionada à fila devido a rate limit");
+      // Processar fila automaticamente após o delay
+      setTimeout(() => processQueue(phone), waitMs);
       return { queued: true, reason: "rate_limit" };
     }
     
