@@ -30,6 +30,7 @@ import {
   etapa2MainMenu,
   etapa4AskYear,
   etapa4Vehicle,
+  etapa4VehicleConfirmation,
   etapa5Quote,
   etapa6Upsell,
   etapa7Day,
@@ -45,6 +46,7 @@ import {
   formatHours,
   indecisiveProblemPrompt,
   indecisiveVehiclePrompt,
+  packageActionText,
   invalidMenu,
   packageActionMenu,
   quotePitchForService,
@@ -1114,7 +1116,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       if (num === 2) {
         await sendText({
           number: msg.phone,
-          text: `📦 *Pacotes:* Brilho Total (R$550+) | Proteção Completa (R$900+) | Interior Premium (R$380+) | Full Detail (R$1400+)\n\n${packageActionMenu(prompts)}`,
+          text: packageActionText(prompts),
         });
         return;
       }
@@ -1198,7 +1200,12 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         await saveFlow(msg.phone, { ...flow, ...parsed, vehicleConfirmed: false });
         await sendText({
           number: msg.phone,
-          text: `🚘 *Confirmando os dados do veículo*\n\nModelo: *${parsed.vehicleModel || "—"}*\nAno: *${parsed.vehicleYear || "—"}*\nCor: *${parsed.vehicleColor || "—"}*\nEstado: *${parsed.vehicleCondition || "—"}*\n\nEstá certo? (sim/não)`,
+          text: etapa4VehicleConfirmation(
+            parsed.vehicleModel || "",
+            parsed.vehicleYear || "",
+            parsed.vehicleColor || "",
+            parsed.vehicleCondition || ""
+          ),
         });
         return;
       }

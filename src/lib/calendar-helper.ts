@@ -19,11 +19,47 @@ export async function generateCalendarImageOnly(date: Date = new Date()): Promis
 /**
  * Gera imagem do calendário com data customizada para testes.
  * Aceita string de data no formato YYYY-MM-DD.
+ * Converte SVG para PNG como no fluxo de produção para compatibilidade com WhatsApp.
  */
 export async function generateCalendarImageOnlyForTest(testDate: string | null): Promise<string> {
   const date = testDate ? new Date(testDate) : new Date();
   const customToday = testDate ? new Date(testDate) : undefined;
-  return await generateCalendarImage(date, customToday);
+  
+  // 1. Gera o SVG do calendário
+  const svgDataUrl = await generateCalendarImage(date, customToday);
+  console.log("[Calendar Test] SVG gerado:", svgDataUrl.substring(0, 100) + "...");
+
+  // 2. Extrai o SVG da data URL
+  const svgString = svgDataUrl.replace(/^data:image\/svg\+xml;base64,/, '');
+  const svgBuffer = Buffer.from(svgString, 'base64');
+  const svgContent = svgBuffer.toString('utf-8');
+
+  // 3. Tenta converter SVG para PNG como no fluxo de produção
+  try {
+    console.log("[Calendar Test] Tentando converter SVG para PNG...");
+    
+    // Gerar nome de arquivo único baseado na data
+    const timestamp = Date.now();
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const filename = `calendar-test-${year}-${String(month + 1).padStart(2, '0')}-${timestamp}.png`;
+    
+    const conversionResult = await convertAndUploadCalendar(svgContent, filename, {
+      width: 1080,  // Largura ideal para WhatsApp
+      quality: 90
+    });
+
+    if (conversionResult.success && conversionResult.url) {
+      console.log("[Calendar Test] SVG convertido para PNG:", conversionResult.url);
+      return conversionResult.url;
+    } else {
+      console.log("[Calendar Test] Conversão falhou, usando SVG:", conversionResult.error);
+      return svgDataUrl; // Fallback para SVG
+    }
+  } catch (err) {
+    console.log("[Calendar Test] Erro na conversão, usando SVG:", err);
+    return svgDataUrl; // Fallback para SVG
+  }
 }
 
 /**

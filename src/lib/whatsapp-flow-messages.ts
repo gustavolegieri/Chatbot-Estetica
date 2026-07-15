@@ -337,6 +337,10 @@ export function packageActionMenu(prompts?: PromptMap) {
   return renderPrompt(p(prompts), "package_action_menu", {});
 }
 
+export function packageActionText(prompts?: PromptMap) {
+  return `📦 *Pacotes:* Brilho Total (R$550+) | Proteção Completa (R$900+) | Interior Premium (R$380+) | Full Detail (R$1400+)\n\n${packageActionMenu(prompts)}`;
+}
+
 // ─────────────────────────────────────────────────────────────
 // ETAPA 4 — VEÍCULO
 // ─────────────────────────────────────────────────────────────
@@ -350,6 +354,10 @@ export function etapa4Vehicle(hasVehicle: boolean, prompts?: PromptMap) {
 
 export function etapa4AskYear(model: string, prompts?: PromptMap) {
   return renderPrompt(p(prompts), "etapa4_ask_year", { model });
+}
+
+export function etapa4VehicleConfirmation(model: string, year: string, color: string, condition: string) {
+  return `🚘 *Confirmando os dados do veículo*\n\nModelo: *${model || "—"}*\nAno: *${year || "—"}*\nCor: *${color || "—"}*\nEstado: *${condition || "—"}*\n\nEstá certo? (sim/não)`;
 }
 
 export function vehicleModelNotUnderstood(prompts?: PromptMap) {

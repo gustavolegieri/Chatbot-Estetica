@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendText } from '@/lib/evolution-api';
 import { sendMedia } from '@/lib/evolution-api';
-import { sendCalendarWithImageAndList } from '@/lib/calendar-helper';
-import { generateSummaryCard } from '@/lib/summary-card';
+import { generateCalendarImageOnlyForTest, generateCalendarLegend } from '@/lib/calendar-helper';
 import { testFluxoStorage } from '@/lib/test-fluxo-storage';
-import { etapa1Welcome, etapa2MainMenu, etapa4Vehicle, etapa4AskYear, etapa5Quote, etapa6Upsell, etapa7Day, etapa7Time, etapa8Payment, etapa8PixBlock, etapa9Confirm, serviceDetail, formatHours, type FlowContext } from '@/lib/whatsapp-flow-messages';
+import { etapa1Welcome, etapa2MainMenu, etapa4Vehicle, etapa4AskYear, etapa4VehicleConfirmation, etapa5Quote, etapa6Upsell, etapa7Day, etapa7Time, etapa8Payment, etapa8PixBlock, etapa8PixChoice, etapa9Confirm, serviceDetail, packageActionText, formatHours, type FlowContext } from '@/lib/whatsapp-flow-messages';
 import { loadWhatsAppCatalog, buildMainMenu } from '@/lib/whatsapp-service-catalog';
 import { prisma } from '@/lib/prisma';
 import { BRAND_DEFAULT } from '@/lib/whatsapp-catalog';
+import { handleLogistics, handleSummaryConfirm, handleFinalConfirm, buildBudgetSummaryText, type FlowState, type FlowResponse, type FlowResult } from '@/lib/whatsapp-flow-core';
 
 const STEPS = [
   { id: 'welcome', name: 'Boas-vindas', type: 'welcome', description: 'Mensagem inicial do bot' },
@@ -43,6 +43,34 @@ async function loadContext(): Promise<FlowContext> {
     pixBank: s?.pixBank ?? null,
     pixMerchantCity: s?.pixMerchantCity ?? "Jundiai",
     pixQrCodeImage: s?.pixQrCodeImage ?? null,
+  };
+}
+
+// Cria um FlowState simulado para teste, com dados de exemplo
+async function createTestFlowState(stage: string): Promise<FlowState> {
+  const wctx = await loadWhatsAppCatalog();
+  const firstService = Object.keys(wctx.catalog)[0];
+  
+  return {
+    stage: stage as any,
+    welcomed: true,
+    customerName: 'Cliente Teste',
+    serviceKey: firstService,
+    serviceLabel: 'Polimento Completo',
+    vehicleModel: 'Toyota Corolla',
+    vehicleYear: '2022',
+    vehicleColor: 'Branco',
+    dbServiceId: 'test-service-id',
+    quoteMin: 350.00,
+    quoteMax: 350.00,
+    dayDate: '2026-07-15',
+    startTime: '14:30',
+    paymentMethod: 'PIX',
+    pickupAddress: 'Rua Teste, 123',
+    pickupFee: 0,
+    needsPickup: false,
+    needsReturn: false,
+    vehicleConfirmed: true,
   };
 }
 
@@ -97,19 +125,14 @@ async function testIndividualStep(phone: string, stepId: string) {
         text = 'Nenhum serviço disponível no catálogo';
       }
     } else if (step.type === 'package') {
-      // Mostra pacotes
-      const packageItem = wctx.catalog['pacotes'];
-      if (packageItem) {
-        text = serviceDetail(packageItem, wctx.prompts);
-      } else {
-        text = 'Pacotes não disponíveis';
-      }
+      // Usar a função real do fluxo
+      text = packageActionText(wctx.prompts);
     } else if (step.type === 'vehicle') {
       // Exatamente como no fluxo oficial
       text = etapa4Vehicle(false, wctx.prompts);
     } else if (step.type === 'vehicle_confirm') {
-      // Solicita ano do veículo
-      text = etapa4AskYear('Toyota Corolla', wctx.prompts);
+      // Usar a função real de confirmação de veículo
+      text = etapa4VehicleConfirmation('Toyota Corolla', '2022', 'Branco', 'Excelente');
     } else if (step.type === 'quote') {
       // Exibe cotação
       const firstService = Object.values(wctx.catalog)[0];
@@ -141,37 +164,73 @@ async function testIndividualStep(phone: string, stepId: string) {
       // Exatamente como no fluxo oficial
       text = etapa8Payment(true, wctx.prompts);
     } else if (step.type === 'payment_pix') {
-      // Instrução de pagamento PIX
-      text = etapa8PixBlock(ctx, wctx.prompts);
+      // Instrução de pagamento PIX - usar ambas as funções reais
+      const pixBlock = etapa8PixBlock(ctx, wctx.prompts);
+      const pixChoice = etapa8PixChoice(wctx.prompts);
+      text = `${pixBlock}\n\n${pixChoice}`;
     } else if (step.type === 'logistics') {
-      // Opções de logística
-      text = `🚚 *LOGÍSTICA*\n\n1️⃣ Leva e traz\n2️⃣ Busca no local\n3️⃣ Entrego no local\n\n_Digite a opção desejada_`;
+      // Usar a função real do flow-core
+      const testState = await createTestFlowState('ETAPA10_LOGISTICS');
+      const responses: FlowResponse[] = [];
+      
+      // Simular seleção de "Leva e traz" (opção 1)
+      const result = await handleLogistics(testState, '1', responses);
+      
+      // Enviar todas as respostas geradas pela função real
+      for (const response of result.responses) {
+        if (response.mediaUrl) {
+          await sendMedia({
+            number: phone,
+            mediaUrl: response.mediaUrl,
+            caption: response.text
+          });
+        } else {
+          await sendText({
+            number: phone,
+            text: response.text
+          });
+        }
+      }
+      
+      return NextResponse.json({ 
+        success: true, 
+        message: `Logística enviada para ${phone} usando fluxo real`,
+        type: 'logistics'
+      });
     } else if (step.type === 'calendar') {
-      // Exatamente como no fluxo oficial
-      await sendCalendarWithImageAndList({ number: phone, prompts: wctx.prompts });
+      // Usar a função real de teste com conversão PNG
+      const calendarImagePath = await generateCalendarImageOnlyForTest(null);
+      const legend = generateCalendarLegend();
+      
+      await sendMedia({
+        number: phone,
+        mediaUrl: calendarImagePath,
+        caption: legend
+      });
+      
       return NextResponse.json({ 
         success: true, 
         message: `Calendário enviado para ${phone}`,
         type: 'calendar'
       });
     } else if (step.type === 'summary') {
-      // Testar envio de resumo
-      const summaryData = {
-        customerName: "Cliente Teste",
-        serviceName: "Polimento Completo",
-        vehicle: "Toyota Corolla 2022",
-        date: "15/07/2026",
-        time: "14:30",
-        paymentMethod: "PIX",
-        totalPrice: 350.00,
-        pickupAddress: "Rua Teste, 123"
-      };
+      // Usar a função real do fluxo para texto de resumo
+      const testState = await createTestFlowState('ETAPA15_SUMMARY_CONFIRM');
+      const serviceValue = testState.quoteMin || 350.00;
+      const pickupFee = testState.pickupFee || 0;
+      const summaryText = buildBudgetSummaryText({
+        serviceLabel: testState.serviceLabel,
+        serviceValue: serviceValue,
+        complementValue: 0,
+        couponDiscount: 0,
+        loyaltyDiscount: 0,
+        pickupFee: pickupFee,
+        totalValue: serviceValue + pickupFee
+      });
       
-      const summaryUrl = await generateSummaryCard(summaryData);
-      await sendMedia({
+      await sendText({
         number: phone,
-        mediaUrl: summaryUrl,
-        caption: '📋 Resumo do Agendamento (Teste)'
+        text: summaryText
       });
       
       return NextResponse.json({ 
@@ -180,20 +239,33 @@ async function testIndividualStep(phone: string, stepId: string) {
         type: 'summary'
       });
     } else if (step.type === 'confirmation') {
-      // Exatamente como no fluxo oficial
-      text = etapa9Confirm(
-        {
-          name: 'Cliente Teste',
-          vehicle: 'Toyota Corolla 2022',
-          services: 'Polimento Completo',
-          day: '15/07/2026',
-          time: '14:30',
-          payment: 'PIX',
-          value: '350.00',
-          address: 'Rua Teste, 123'
-        },
-        wctx.prompts
-      );
+      // Usar a função real de confirmação final
+      const testState = await createTestFlowState('ETAPA16_CONFIRMATION');
+      const responses: FlowResponse[] = [];
+      
+      const result = await handleFinalConfirm(testState, '1', responses);
+      
+      // Enviar todas as respostas geradas pela função real
+      for (const response of result.responses) {
+        if (response.mediaUrl) {
+          await sendMedia({
+            number: phone,
+            mediaUrl: response.mediaUrl,
+            caption: response.text
+          });
+        } else {
+          await sendText({
+            number: phone,
+            text: response.text
+          });
+        }
+      }
+      
+      return NextResponse.json({ 
+        success: true, 
+        message: `Confirmação enviada para ${phone} usando fluxo real`,
+        type: 'confirmation'
+      });
     } else {
       text = `Teste de etapa: ${step.name}`;
     }
@@ -264,19 +336,14 @@ async function runSequence(sessionId: string, phone: string) {
           text = 'Nenhum serviço disponível no catálogo';
         }
       } else if (step.type === 'package') {
-        // Mostra pacotes
-        const packageItem = wctx.catalog['pacotes'];
-        if (packageItem) {
-          text = serviceDetail(packageItem, wctx.prompts);
-        } else {
-          text = 'Pacotes não disponíveis';
-        }
+        // Usar a função real do fluxo
+        text = packageActionText(wctx.prompts);
       } else if (step.type === 'vehicle') {
         // Exatamente como no fluxo oficial
         text = etapa4Vehicle(false, wctx.prompts);
       } else if (step.type === 'vehicle_confirm') {
-        // Solicita ano do veículo
-        text = etapa4AskYear('Toyota Corolla', wctx.prompts);
+        // Usar a função real de confirmação de veículo
+        text = etapa4VehicleConfirmation('Toyota Corolla', '2022', 'Branco', 'Excelente');
       } else if (step.type === 'quote') {
         // Exibe cotação
         const firstService = Object.values(wctx.catalog)[0];
@@ -308,47 +375,88 @@ async function runSequence(sessionId: string, phone: string) {
         // Exatamente como no fluxo oficial
         text = etapa8Payment(true, wctx.prompts);
       } else if (step.type === 'payment_pix') {
-        // Instrução de pagamento PIX
-        text = etapa8PixBlock(ctx, wctx.prompts);
+        // Instrução de pagamento PIX - usar ambas as funções reais
+        const pixBlock = etapa8PixBlock(ctx, wctx.prompts);
+        const pixChoice = etapa8PixChoice(wctx.prompts);
+        text = `${pixBlock}\n\n${pixChoice}`;
       } else if (step.type === 'logistics') {
-        // Opções de logística
-        text = `🚚 *LOGÍSTICA*\n\n1️⃣ Leva e traz\n2️⃣ Busca no local\n3️⃣ Entrego no local\n\n_Digite a opção desejada_`;
-      } else if (step.type === 'calendar') {
-        // Exatamente como no fluxo oficial
-        await sendCalendarWithImageAndList({ number: phone, prompts: wctx.prompts });
-      } else if (step.type === 'summary') {
-        const summaryData = {
-          customerName: "Cliente Teste",
-          serviceName: "Polimento Completo",
-          vehicle: "Toyota Corolla 2022",
-          date: "15/07/2026",
-          time: "14:30",
-          paymentMethod: "PIX",
-          totalPrice: 350.00,
-          pickupAddress: "Rua Teste, 123"
-        };
+        // Usar a função real do flow-core
+        const testState = await createTestFlowState('ETAPA10_LOGISTICS');
+        const responses: FlowResponse[] = [];
         
-        const summaryUrl = await generateSummaryCard(summaryData);
+        // Simular seleção de "Leva e traz" (opção 1)
+        const result = await handleLogistics(testState, '1', responses);
+        
+        // Enviar todas as respostas geradas pela função real
+        for (const response of result.responses) {
+          if (response.mediaUrl) {
+            await sendMedia({
+              number: phone,
+              mediaUrl: response.mediaUrl,
+              caption: response.text
+            });
+          } else {
+            await sendText({
+              number: phone,
+              text: response.text
+            });
+          }
+        }
+        continue; // Pular o envio normal de texto abaixo
+      } else if (step.type === 'calendar') {
+        // Usar a função real de teste com conversão PNG
+        const calendarImagePath = await generateCalendarImageOnlyForTest(null);
+        const legend = generateCalendarLegend();
+        
         await sendMedia({
           number: phone,
-          mediaUrl: summaryUrl,
-          caption: '📋 Resumo do Agendamento (Teste Sequência)'
+          mediaUrl: calendarImagePath,
+          caption: legend
         });
+        continue; // Pular o envio normal de texto abaixo
+      } else if (step.type === 'summary') {
+        // Usar a função real do fluxo para texto de resumo
+        const testState = await createTestFlowState('ETAPA15_SUMMARY_CONFIRM');
+        const serviceValue = testState.quoteMin || 350.00;
+        const pickupFee = testState.pickupFee || 0;
+        const summaryText = buildBudgetSummaryText({
+          serviceLabel: testState.serviceLabel,
+          serviceValue: serviceValue,
+          complementValue: 0,
+          couponDiscount: 0,
+          loyaltyDiscount: 0,
+          pickupFee: pickupFee,
+          totalValue: serviceValue + pickupFee
+        });
+        
+        await sendText({
+          number: phone,
+          text: summaryText
+        });
+        continue; // Pular o envio normal de texto abaixo
       } else if (step.type === 'confirmation') {
-        // Exatamente como no fluxo oficial
-        text = etapa9Confirm(
-          {
-            name: 'Cliente Teste',
-            vehicle: 'Toyota Corolla 2022',
-            services: 'Polimento Completo',
-            day: '15/07/2026',
-            time: '14:30',
-            payment: 'PIX',
-            value: '350.00',
-            address: 'Rua Teste, 123'
-          },
-          wctx.prompts
-        );
+        // Usar a função real de confirmação final
+        const testState = await createTestFlowState('ETAPA16_CONFIRMATION');
+        const responses: FlowResponse[] = [];
+        
+        const result = await handleFinalConfirm(testState, '1', responses);
+        
+        // Enviar todas as respostas geradas pela função real
+        for (const response of result.responses) {
+          if (response.mediaUrl) {
+            await sendMedia({
+              number: phone,
+              mediaUrl: response.mediaUrl,
+              caption: response.text
+            });
+          } else {
+            await sendText({
+              number: phone,
+              text: response.text
+            });
+          }
+        }
+        continue; // Pular o envio normal de texto abaixo
       } else {
         text = `Teste de etapa: ${step.name}`;
       }
