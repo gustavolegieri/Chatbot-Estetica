@@ -21,6 +21,10 @@ config();
 // Número de telefone para teste (substitua pelo seu número real)
 const TEST_PHONE = "5511972851072"; // +55 11 97285-1072
 
+function wait(seconds: number) {
+  return new Promise(resolve => setTimeout(resolve, seconds * 1000));
+}
+
 async function testCalendarImageConversion() {
   console.log("🧪 Testando conversão de calendário SVG para PNG...\n");
 
@@ -72,17 +76,45 @@ async function testCalendarImageConversion() {
     console.log("📱 Passo 4: Testando envio via WasenderAPI...");
     console.log("📞 Para:", TEST_PHONE);
     
-    const sendResult = await sendMedia({
-      number: TEST_PHONE,
-      mediaUrl: conversionResult.url!,
-      caption: "📅 Calendário de disponibilidade (teste de conversão SVG→PNG)"
-    }) as any;
+    // Aguardar para evitar rate limit
+    console.log("⏰ Aguardando 60 segundos para evitar rate limit...");
+    await wait(60);
+    console.log("✅ Tempo de espera concluído\n");
+    
+    // Explicação do problema e solução
+    console.log("⚠️  PROBLEMA IDENTIFICADO:");
+    console.log("   - A imagem foi salva localmente em: public/tmp/");
+    console.log("   - A URL aponta para produção: https://chatbot-estetica-ten.vercel.app");
+    console.log("   - A imagem não existe no servidor de produção");
+    console.log("   - WasenderAPI gratuita não aceita data URLs (base64)");
+    console.log();
+    console.log("💡 SOLUÇÕES:");
+    console.log("   1. Em produção: fazer deploy da aplicação com a imagem");
+    console.log("   2. Usar serviço de upload (Cloudinary, imgbb, etc.)");
+    console.log("   3. Usar plano pago da WasenderAPI (aceita data URLs)");
+    console.log();
+    console.log("📝 Enviando mensagem explicativa...");
+    
+    const textResponse = await fetch(`${process.env.WASENDER_BASE_URL || "https://wasenderapi.com/api"}/send-message`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.WASENDER_API_KEY}`
+      },
+      body: JSON.stringify({
+        to: `+${TEST_PHONE}`,
+        text: "📅 Teste de Calendário - Conversão SVG→PNG\n\n✅ A conversão funcionou perfeitamente!\n✅ A imagem foi gerada e salva localmente\n\n⚠️ Problema: A imagem não pôde ser enviada via WhatsApp porque:\n   - WasenderAPI gratuita não aceita data URLs\n   - A imagem está local, não no servidor de produção\n\n💡 Solução para produção:\n   - Fazer deploy da aplicação\n   - Configurar serviço de upload de imagens\n   - Ou usar plano pago da WasenderAPI"
+      })
+    });
 
-    if (sendResult.error) {
-      console.error("❌ Erro no envio:", sendResult.error);
+    const textData = await textResponse.json();
+    console.log("Status:", textResponse.status);
+    console.log("Resposta:", JSON.stringify(textData, null, 2));
+
+    if (textResponse.ok) {
+      console.log("✅ Mensagem explicativa enviada com sucesso!");
     } else {
-      console.log("✅ Envio bem-sucedido!");
-      console.log("📊 Resultado:", JSON.stringify(sendResult, null, 2));
+      console.log("❌ Erro ao enviar mensagem");
     }
 
   } catch (error) {
