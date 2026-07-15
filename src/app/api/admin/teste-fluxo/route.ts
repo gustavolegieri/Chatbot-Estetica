@@ -1,25 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendText } from '@/lib/evolution-api';
 import { sendMedia } from '@/lib/evolution-api';
-import { generateCalendarImageOnly } from '@/lib/calendar-helper';
+import { sendCalendarWithImageAndList } from '@/lib/calendar-helper';
 import { generateSummaryCard } from '@/lib/summary-card';
 import { testFluxoStorage } from '@/lib/test-fluxo-storage';
-import { etapa1Welcome, etapa2MainMenu, etapa4Vehicle, etapa7Day, etapa7Time, etapa8Payment, etapa9Confirm, formatHours, type FlowContext } from '@/lib/whatsapp-flow-messages';
+import { etapa1Welcome, etapa2MainMenu, etapa4Vehicle, etapa4AskYear, etapa5Quote, etapa6Upsell, etapa7Day, etapa7Time, etapa8Payment, etapa8PixBlock, etapa9Confirm, serviceDetail, formatHours, type FlowContext } from '@/lib/whatsapp-flow-messages';
 import { loadWhatsAppCatalog, buildMainMenu } from '@/lib/whatsapp-service-catalog';
 import { prisma } from '@/lib/prisma';
 import { BRAND_DEFAULT } from '@/lib/whatsapp-catalog';
 
 const STEPS = [
-  { id: 'welcome', name: 'Boas-vindas', type: 'welcome' },
-  { id: 'menu', name: 'Menu Principal', type: 'menu' },
-  { id: 'service', name: 'Seleção de Serviço', type: 'service' },
-  { id: 'vehicle', name: 'Seleção de Veículo', type: 'vehicle' },
-  { id: 'day', name: 'Seleção de Data', type: 'day' },
-  { id: 'time', name: 'Seleção de Horário', type: 'time' },
-  { id: 'logistics', name: 'Logística', type: 'logistics' },
-  { id: 'calendar', name: 'Calendário', type: 'calendar' },
-  { id: 'summary', name: 'Resumo', type: 'summary' },
-  { id: 'confirmation', name: 'Confirmação', type: 'confirmation' },
+  { id: 'welcome', name: 'Boas-vindas', type: 'welcome', description: 'Mensagem inicial do bot' },
+  { id: 'menu', name: 'Menu Principal', type: 'menu', description: 'Exibe opções principais do sistema' },
+  { id: 'service_detail', name: 'Detalhe de Serviço', type: 'service_detail', description: 'Mostra detalhes de um serviço específico' },
+  { id: 'package', name: 'Pacotes', type: 'package', description: 'Mostra pacotes disponíveis' },
+  { id: 'vehicle', name: 'Seleção de Veículo', type: 'vehicle', description: 'Solicita informações do veículo' },
+  { id: 'vehicle_confirm', name: 'Confirmação Veículo', type: 'vehicle_confirm', description: 'Confirma os dados do veículo' },
+  { id: 'quote', name: 'Cotação', type: 'quote', description: 'Exibe preço estimado' },
+  { id: 'upsell', name: 'Upsell', type: 'upsell', description: 'Oferece serviços complementares' },
+  { id: 'day', name: 'Seleção de Data', type: 'day', description: 'Solicita data do agendamento' },
+  { id: 'time', name: 'Seleção de Horário', type: 'time', description: 'Solicita horário do agendamento' },
+  { id: 'payment', name: 'Formas de Pagamento', type: 'payment', description: 'Exibe opções de pagamento' },
+  { id: 'payment_pix', name: 'Pagamento PIX', type: 'payment_pix', description: 'Instruções de pagamento PIX' },
+  { id: 'logistics', name: 'Logística', type: 'logistics', description: 'Opções de entrega/retirada' },
+  { id: 'calendar', name: 'Calendário', type: 'calendar', description: 'Envia imagem do calendário' },
+  { id: 'summary', name: 'Resumo', type: 'summary', description: 'Resumo do agendamento' },
+  { id: 'confirmation', name: 'Confirmação', type: 'confirmation', description: 'Confirmação final do agendamento' },
 ];
 
 async function loadContext(): Promise<FlowContext> {
@@ -82,12 +88,48 @@ async function testIndividualStep(phone: string, stepId: string) {
       // Exatamente como no goToMainMenu do whatsapp-flow.ts
       const customerName = 'Cliente Teste';
       text = buildMainMenu(wctx.categories, wctx.prompts);
-    } else if (step.type === 'service') {
-      // Exatamente como o fluxo mostra os serviços
-      text = buildMainMenu(wctx.categories, wctx.prompts);
+    } else if (step.type === 'service_detail') {
+      // Mostra detalhe de um serviço específico
+      const firstService = Object.values(wctx.catalog)[0];
+      if (firstService) {
+        text = serviceDetail(firstService, wctx.prompts);
+      } else {
+        text = 'Nenhum serviço disponível no catálogo';
+      }
+    } else if (step.type === 'package') {
+      // Mostra pacotes
+      const packageItem = wctx.catalog['pacotes'];
+      if (packageItem) {
+        text = serviceDetail(packageItem, wctx.prompts);
+      } else {
+        text = 'Pacotes não disponíveis';
+      }
     } else if (step.type === 'vehicle') {
       // Exatamente como no fluxo oficial
       text = etapa4Vehicle(false, wctx.prompts);
+    } else if (step.type === 'vehicle_confirm') {
+      // Solicita ano do veículo
+      text = etapa4AskYear('Toyota Corolla', wctx.prompts);
+    } else if (step.type === 'quote') {
+      // Exibe cotação
+      const firstService = Object.values(wctx.catalog)[0];
+      if (firstService) {
+        text = etapa5Quote(
+          'Cliente Teste',
+          'Toyota Corolla 2022',
+          firstService.label,
+          firstService.hatchMin || 500,
+          firstService.hatchMax || 700,
+          firstService.time || '2 horas',
+          firstService.pitch || '',
+          wctx.prompts
+        );
+      } else {
+        text = 'Não foi possível gerar cotação';
+      }
+    } else if (step.type === 'upsell') {
+      // Oferece upsell
+      text = etapa6Upsell('Polimento', 'Vitrificação', 'Proteção extra para sua pintura', wctx.prompts);
     } else if (step.type === 'day') {
       // Exatamente como no fluxo oficial
       text = etapa7Day(wctx.prompts);
@@ -95,17 +137,18 @@ async function testIndividualStep(phone: string, stepId: string) {
       // Exatamente como no fluxo oficial
       const slots = ['08:00', '10:00', '14:00', '16:00'];
       text = etapa7Time('15/07/2026', slots, '2 horas', wctx.prompts);
-    } else if (step.type === 'logistics') {
+    } else if (step.type === 'payment') {
       // Exatamente como no fluxo oficial
       text = etapa8Payment(true, wctx.prompts);
+    } else if (step.type === 'payment_pix') {
+      // Instrução de pagamento PIX
+      text = etapa8PixBlock(ctx, wctx.prompts);
+    } else if (step.type === 'logistics') {
+      // Opções de logística
+      text = `🚚 *LOGÍSTICA*\n\n1️⃣ Leva e traz\n2️⃣ Busca no local\n3️⃣ Entrego no local\n\n_Digite a opção desejada_`;
     } else if (step.type === 'calendar') {
-      // Testar envio de calendário
-      const calendarResult = await generateCalendarImageOnly();
-      await sendMedia({
-        number: phone,
-        mediaUrl: calendarResult,
-        caption: '📅 Calendário de Disponibilidade (Teste)'
-      });
+      // Exatamente como no fluxo oficial
+      await sendCalendarWithImageAndList({ number: phone, prompts: wctx.prompts });
       return NextResponse.json({ 
         success: true, 
         message: `Calendário enviado para ${phone}`,
@@ -212,12 +255,48 @@ async function runSequence(sessionId: string, phone: string) {
       } else if (step.type === 'menu') {
         // Exatamente como no goToMainMenu do whatsapp-flow.ts
         text = buildMainMenu(wctx.categories, wctx.prompts);
-      } else if (step.type === 'service') {
-        // Exatamente como o fluxo mostra os serviços
-        text = buildMainMenu(wctx.categories, wctx.prompts);
+      } else if (step.type === 'service_detail') {
+        // Mostra detalhe de um serviço específico
+        const firstService = Object.values(wctx.catalog)[0];
+        if (firstService) {
+          text = serviceDetail(firstService, wctx.prompts);
+        } else {
+          text = 'Nenhum serviço disponível no catálogo';
+        }
+      } else if (step.type === 'package') {
+        // Mostra pacotes
+        const packageItem = wctx.catalog['pacotes'];
+        if (packageItem) {
+          text = serviceDetail(packageItem, wctx.prompts);
+        } else {
+          text = 'Pacotes não disponíveis';
+        }
       } else if (step.type === 'vehicle') {
         // Exatamente como no fluxo oficial
         text = etapa4Vehicle(false, wctx.prompts);
+      } else if (step.type === 'vehicle_confirm') {
+        // Solicita ano do veículo
+        text = etapa4AskYear('Toyota Corolla', wctx.prompts);
+      } else if (step.type === 'quote') {
+        // Exibe cotação
+        const firstService = Object.values(wctx.catalog)[0];
+        if (firstService) {
+          text = etapa5Quote(
+            'Cliente Teste',
+            'Toyota Corolla 2022',
+            firstService.label,
+            firstService.hatchMin || 500,
+            firstService.hatchMax || 700,
+            firstService.time || '2 horas',
+            firstService.pitch || '',
+            wctx.prompts
+          );
+        } else {
+          text = 'Não foi possível gerar cotação';
+        }
+      } else if (step.type === 'upsell') {
+        // Oferece upsell
+        text = etapa6Upsell('Polimento', 'Vitrificação', 'Proteção extra para sua pintura', wctx.prompts);
       } else if (step.type === 'day') {
         // Exatamente como no fluxo oficial
         text = etapa7Day(wctx.prompts);
@@ -225,16 +304,18 @@ async function runSequence(sessionId: string, phone: string) {
         // Exatamente como no fluxo oficial
         const slots = ['08:00', '10:00', '14:00', '16:00'];
         text = etapa7Time('15/07/2026', slots, '2 horas', wctx.prompts);
-      } else if (step.type === 'logistics') {
+      } else if (step.type === 'payment') {
         // Exatamente como no fluxo oficial
         text = etapa8Payment(true, wctx.prompts);
+      } else if (step.type === 'payment_pix') {
+        // Instrução de pagamento PIX
+        text = etapa8PixBlock(ctx, wctx.prompts);
+      } else if (step.type === 'logistics') {
+        // Opções de logística
+        text = `🚚 *LOGÍSTICA*\n\n1️⃣ Leva e traz\n2️⃣ Busca no local\n3️⃣ Entrego no local\n\n_Digite a opção desejada_`;
       } else if (step.type === 'calendar') {
-        const calendarResult = await generateCalendarImageOnly();
-        await sendMedia({
-          number: phone,
-          mediaUrl: calendarResult,
-          caption: '📅 Calendário de Disponibilidade (Teste Sequência)'
-        });
+        // Exatamente como no fluxo oficial
+        await sendCalendarWithImageAndList({ number: phone, prompts: wctx.prompts });
       } else if (step.type === 'summary') {
         const summaryData = {
           customerName: "Cliente Teste",

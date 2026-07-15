@@ -20,15 +20,21 @@ export default function TesteFluxoPage() {
 
   const steps = [
     { id: 'welcome', name: 'Boas-vindas', description: 'Mensagem inicial do bot', icon: '👋' },
-    { id: 'menu', name: 'Menu Principal', description: 'Exibe opções principais', icon: '📋' },
-    { id: 'service', name: 'Seleção de Serviço', description: 'Lista de serviços disponíveis', icon: '🧽' },
-    { id: 'vehicle', name: 'Seleção de Veículo', description: 'Escolha do veículo', icon: '🚗' },
-    { id: 'day', name: 'Seleção de Data', description: 'Escolha da data do agendamento', icon: '📅' },
-    { id: 'time', name: 'Seleção de Horário', description: 'Escolha do horário', icon: '⏰' },
-    { id: 'logistics', name: 'Logística', description: 'Leva e traz / busca no local', icon: '🚚' },
-    { id: 'calendar', name: 'Calendário', description: 'Envio de imagem do calendário', icon: '📆' },
+    { id: 'menu', name: 'Menu Principal', description: 'Exibe opções principais do sistema', icon: '📋' },
+    { id: 'service_detail', name: 'Detalhe de Serviço', description: 'Mostra detalhes de um serviço específico', icon: '🧽' },
+    { id: 'package', name: 'Pacotes', description: 'Mostra pacotes disponíveis', icon: '📦' },
+    { id: 'vehicle', name: 'Seleção de Veículo', description: 'Solicita informações do veículo', icon: '🚗' },
+    { id: 'vehicle_confirm', name: 'Confirmação Veículo', description: 'Confirma os dados do veículo', icon: '✅' },
+    { id: 'quote', name: 'Cotação', description: 'Exibe preço estimado', icon: '💰' },
+    { id: 'upsell', name: 'Upsell', description: 'Oferece serviços complementares', icon: '⭐' },
+    { id: 'day', name: 'Seleção de Data', description: 'Solicita data do agendamento', icon: '📅' },
+    { id: 'time', name: 'Seleção de Horário', description: 'Solicita horário do agendamento', icon: '⏰' },
+    { id: 'payment', name: 'Formas de Pagamento', description: 'Exibe opções de pagamento', icon: '💳' },
+    { id: 'payment_pix', name: 'Pagamento PIX', description: 'Instruções de pagamento PIX', icon: '📱' },
+    { id: 'logistics', name: 'Logística', description: 'Opções de entrega/retirada', icon: '🚚' },
+    { id: 'calendar', name: 'Calendário', description: 'Envia imagem do calendário', icon: '📆' },
     { id: 'summary', name: 'Resumo', description: 'Resumo do agendamento', icon: '📝' },
-    { id: 'confirmation', name: 'Confirmação', description: 'Confirmação do agendamento', icon: '✅' },
+    { id: 'confirmation', name: 'Confirmação', description: 'Confirmação final do agendamento', icon: '✅' },
   ];
 
   const addLog = (step: string, status: 'success' | 'error' | 'pending', message: string) => {
