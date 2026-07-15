@@ -87,6 +87,8 @@ import {
   handleLogistics,
   handlePixChoice,
   handleReceiptUpload,
+  handleCouponStep,
+  handleReminderStep,
   handleFinalConfirm,
   handleSummaryConfirm,
   handleRating,
@@ -884,7 +886,13 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
 
     // Adicionar estado de espera de resposta de desconto
     flow.awaitingDiscountResponse = true;
-    flow.discountOffer = offer;
+    flow.discountOffer = {
+      originalPrice,
+      discountPercentage: offer.discountPercentage,
+      validUntil: new Date(Date.now() + offer.validForMinutes * 60 * 1000).toISOString(),
+      used: false,
+      discountReason: offer.discountReason,
+    };
     flow.discountOriginalPrice = originalPrice;
     await saveFlow(msg.phone, flow);
     return;
@@ -896,12 +904,18 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     if (normalizedInput === "1" || /sim|quero|aceito|aprovei/i.test(normalizedInput)) {
       // Aceitar desconto
       const offer = flow.discountOffer;
+      if (!offer) {
+        // Se não tem oferta, voltar ao fluxo normal
+        flow.awaitingDiscountResponse = false;
+        await saveFlow(msg.phone, flow);
+        return;
+      }
       const discountedPrice = (flow.discountOriginalPrice || 100) * (1 - offer.discountPercentage / 100);
       flow.quoteMin = discountedPrice;
       flow.quoteMax = discountedPrice;
       flow.couponDiscountApplied = discountedPrice;
       flow.awaitingDiscountResponse = false;
-      flow.discountOffer = null;
+      flow.discountOffer = undefined;
       
       await saveFlow(msg.phone, flow);
       await sendText({
@@ -912,7 +926,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     } else if (normalizedInput === "2" || /nao|não|cancelar|recusar/i.test(normalizedInput)) {
       // Recusar desconto e voltar ao menu
       flow.awaitingDiscountResponse = false;
-      flow.discountOffer = null;
+      flow.discountOffer = undefined;
       flow.stage = "ETAPA2_MAIN_MENU";
       
       await saveFlow(msg.phone, flow);
@@ -1646,40 +1660,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     }
 
     case "ETAPA9_COUPON": {
-      if (shouldSkipCouponPrompt(input)) {
-        flow.stage = "ETAPA9_LOYALTY"; // Novo fluxo: ir para loyalty antes de logistics
-        await saveFlow(msg.phone, flow);
-        await sendText({
-          number: msg.phone,
-          text: `🌟 *Pontos de Fidelidade*\n\nVocê tem ${flow.loyaltyPoints ?? 0} pontos disponíveis.\n100 pontos = R$ 10 de desconto!\n\nQuer usar seus pontos agora?\n\n*1* - Sim, usar pontos\n*2* - Não, guardar para depois`,
-        });
-        return;
-      }
-
-      if (/^(1|sim|s|yes|tenho|com cupom)$/i.test(lower)) {
-        await sendText({
-          number: msg.phone,
-          text: `Perfeito 😊 Me envie o *código do cupom* (ex: *AA*).`,
-        });
-        return;
-      }
-
-      if (await applyCouponPhase(msg, flow, lower, ctx, wctx, num, input)) {
-        if (!flow.couponError) {
-          flow.stage = "ETAPA9_LOYALTY"; // Novo fluxo: ir para loyalty antes de logistics
-          await saveFlow(msg.phone, flow);
-          await sendText({
-            number: msg.phone,
-            text: `🌟 *Pontos de Fidelidade*\n\nVocê tem ${flow.loyaltyPoints ?? 0} pontos disponíveis.\n100 pontos = R$ 10 de desconto!\n\nQuer usar seus pontos agora?\n\n*1* - Sim, usar pontos\n*2* - Não, guardar para depois`,
-          });
-        }
-        return;
-      }
-
-      await sendText({
-        number: msg.phone,
-        text: `Você tem um cupom de desconto?\n\nSe sim, me envie o código agora.\nSe não, responda *não* para seguir para o leva e traz.`,
-      });
+      await executeCoreHandler(msg, flow, handleCouponStep, msg.phone);
       return;
     }
 
@@ -1773,83 +1754,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     }
 
     case "ETAPA14_REMINDER": {
-      if (num === 1 || /sim|quero/i.test(lower)) {
-        flow.reminderEnabled = true;
-        flow.reminderPreference = "30min"; // 30min default
-      } else if (num === 2 || /nao|não|não precisa|não quero/i.test(lower)) {
-        flow.reminderEnabled = false;
-        flow.reminderPreference = "none";
-      } else {
-        await sendText({ number: msg.phone, text: `Responda *1* para sim ou *2* para não.` });
-        return;
-      }
-      flow.stage = "ETAPA15_SUMMARY_CONFIRM";
-      await saveFlow(msg.phone, flow);
-      const totalValue = Math.max(0, Number(flow.quoteMin ?? 0) + Number(flow.pickupFee ?? 0) - Number(flow.couponDiscountApplied ?? 0));
-      const paymentMethod = flow.paymentMethod || "—";
-      const reminderText = flow.reminderEnabled ? "sim" : "não";
-      const pickupText = flow.needsPickup ? "sim" : "não";
-      const customerName = clientDisplayName(flow, msg.pushName);
-      const serviceName = flow.serviceLabel ?? "—";
-      const vehicle = vehicleDisplayFromFlow(flow) || "—";
-      const date = flow.dayLabel ?? flow.dayDate ?? "—";
-      const time = flow.startTime ?? "—";
-      const couponCode = flow.couponCode?.toUpperCase() ?? "nenhum";
-      const address = flow.pickupAddress ?? "—";
-      
-      // Generate summary card image
-      let summaryCardUrl = "";
-      try {
-        summaryCardUrl = await generateSummaryCard({
-          customerName: customerName,
-          serviceName: serviceName,
-          vehicle: vehicle,
-          date: date,
-          time: time,
-          paymentMethod: paymentMethod,
-          totalPrice: totalValue,
-          pickupAddress: address !== "—" ? address : undefined,
-        });
-      } catch (error) {
-        console.error("[ETAPA14_REMINDER] Error generating summary card:", error);
-      }
-      
-      // Send text first (same as test-bot)
-      const reminderTextFinal = flow.reminderPreference === "none" ? "não" : flow.reminderPreference || "—";
-      const upsellLabel = flow.upsellLabel ? `✨ + ${flow.upsellLabel}` : "";
-      const needsReturn = flow.needsReturn ? "🔄 Devolução: sim" : "";
-      
-      const summaryLines = [
-        "━━━━━━━━━━━━━━━",
-        "📋 **RESUMO DO AGENDAMENTO**",
-        `👤 ${customerName}`,
-        `🧽 *${serviceName}*`,
-        upsellLabel,
-        `🚘 ${vehicle}`,
-        `📅 ${date}`,
-        `⏰ ${time}`,
-        `🚚 Leva e traz: ${pickupText}`,
-        address !== "—" ? `📍 Endereço: ${address}` : "",
-        needsReturn,
-        `💳 ${paymentMethod}`,
-        `🔔 Lembrete: ${reminderTextFinal}`,
-        `💰 **R$ ${totalValue.toFixed(2).replace(".", ",")}**`,
-        "━━━━━━━━━━━━━━━",
-        "",
-        "⏱️ Cancelamento até 2h antes sem custo.",
-        "",
-        "✅ Confirma? (sim/não)",
-      ];
-      
-      await sendText({
-        number: msg.phone,
-        text: summaryLines.filter(Boolean).join("\n"),
-      });
-      
-      // Send image after text (same as test-bot)
-      if (summaryCardUrl) {
-        await sendMedia({ number: msg.phone, mediaUrl: summaryCardUrl, mediaType: "image" });
-      }
+      await executeCoreHandler(msg, flow, handleReminderStep, msg.pushName);
       return;
     }
 

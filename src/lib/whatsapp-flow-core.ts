@@ -7,8 +7,9 @@
  */
 
 import type { FlowState, FlowStage } from "./whatsapp-flow-types";
-import { findCouponByCode } from "./coupons";
+import { findCouponByCode, canRedeem } from "./coupons";
 import { calculateDistance, calculatePickupFee } from "./maps";
+import { normalizePhone } from "./utils";
 import { answerCustomerDoubt } from "./whatsapp-ai";
 import { loadWhatsAppCatalog } from "./whatsapp-service-catalog";
 import { loadPromptMap } from "./bot-prompts";
@@ -27,6 +28,10 @@ import { recordTestBotRating } from "./test-bot-evaluation-store";
 import { generateSummaryCard, generateSummaryText, SummaryCardData } from "./summary-card";
 import { format } from "date-fns";
 import { vehicleDisplayFromFlow } from "./whatsapp-vehicle-parse";
+import { resolveValidCustomerName } from "./customer-name";
+
+// Re-export FlowState for use in other modules
+export type { FlowState, FlowStage };
 
 // Interfaces para as funções compartilhadas
 export interface FlowResponse {
@@ -356,6 +361,265 @@ export async function handleLoyaltyStep(
   });
   responses.push({ text: "Quer agendar? (sim/não)" });
 
+  return { responses, nextState: newState };
+}
+
+/**
+ * Helper para parsear código de cupom do texto
+ */
+function parseCouponCodeFromText(text: string): string | null {
+  const t = text.trim();
+  if (!t) return null;
+
+  // Exemplos: "cupom AA", "código AA", "tenho o AA", "usar AA", "AA"
+  const m = t.match(/(?:cupom|c[oó]digo|c[oó]digo do|usar|tenho o|tenho um)\s*:?\s*([a-z0-9_-]{2,30})/i);
+  if (m?.[1]) return m[1].toLowerCase();
+
+  // Se o usuário mandar algo que parece só o código (ex: "aa")
+  if (/^[a-z0-9_-]{2,30}$/i.test(t)) return t.toLowerCase();
+
+  return null;
+}
+
+/**
+ * Helper para aplicar cupom ao valor do orçamento
+ */
+function applyCouponToFlowValue(params: {
+  coupon: any;
+  flow: FlowState;
+}): { flow: FlowState; discountApplied: number } {
+  const { coupon, flow } = params;
+  const baseMin = flow.quoteMin ?? 0;
+  const baseMax = flow.quoteMax ?? 0;
+  if (baseMin <= 0 && baseMax <= 0) {
+    return { flow, discountApplied: 0 };
+  }
+
+  let newMin = baseMin;
+  let newMax = baseMax;
+
+  if (coupon.type === 'percent') {
+    const pct = coupon.amount ?? 0;
+    newMin = baseMin * (1 - pct / 100);
+    newMax = baseMax * (1 - pct / 100);
+  } else {
+    const fixed = coupon.amount ?? 0;
+    newMin = baseMin - fixed;
+    newMax = baseMax - fixed;
+  }
+
+  const clampMoney = (v: number) => {
+    if (!Number.isFinite(v)) return 0;
+    return Math.max(0, Math.round(v * 100) / 100);
+  };
+
+  newMin = clampMoney(newMin);
+  newMax = clampMoney(newMax);
+
+  const discountApplied = clampMoney((baseMin + baseMax) / 2 - (newMin + newMax) / 2);
+
+  return {
+    flow: {
+      ...flow,
+      quoteMin: newMin,
+      quoteMax: newMax,
+      couponDiscountApplied: discountApplied,
+    },
+    discountApplied,
+  };
+}
+
+/**
+ * Handler para etapa de cupom
+ */
+export async function handleCouponStep(
+  state: FlowState,
+  message: string,
+  responses: FlowResponse[],
+  phone?: string
+): Promise<FlowResult> {
+  const input = message.trim();
+  const skip = shouldSkipCouponPrompt(input);
+
+  if (skip) {
+    const newState: FlowState = {
+      ...state,
+      stage: "ETAPA9_LOYALTY",
+    };
+    responses.push({
+      text: `🌟 *Pontos de Fidelidade*\n\nVocê tem ${state.loyaltyPoints ?? 0} pontos disponíveis.\n100 pontos = R$ 10 de desconto!\n\nQuer usar seus pontos agora?\n\n*1* - Sim, usar pontos\n*2* - Não, guardar para depois`,
+    });
+    return { responses, nextState: newState };
+  }
+
+  if (/^(1|sim|s|yes|tenho|com cupom)$/i.test(input)) {
+    responses.push({ text: "Perfeito 😊 Me envie o *código do cupom* (ex: *AA*)." });
+    return { responses, nextState: state };
+  }
+
+  const code = parseCouponCodeFromText(input);
+  if (!code) {
+    // Se usuário só perguntar "tenho cupom?", não tem código ainda
+    if (/\b(cupom|c[oó]digo|desconto)\b/i.test(input) && !state.couponCode) {
+      responses.push({ text: "Perfeito 😊 Me envie o *código do cupom* (ex: *AA*)." });
+    }
+    return { responses, nextState: state };
+  }
+
+  // Cliente precisa existir para validação de limite por cliente
+  if (!phone) {
+    responses.push({ text: "Erro: telefone não fornecido para validação de cupom." });
+    return { responses, nextState: state };
+  }
+
+  const clientId = await prisma.client.findUnique({ where: { phone: normalizePhone(phone) } }).then((c) => c?.id);
+  if (!clientId) {
+    responses.push({ text: "Antes de usar cupom, confirme seu *nome* 😊" });
+    return { responses, nextState: state };
+  }
+
+  const coupon = await findCouponByCode(code);
+  if (!coupon || !coupon.active) {
+    const newState: FlowState = {
+      ...state,
+      couponError: 'invalid_or_inactive',
+      couponCode: code,
+    };
+    responses.push({ text: "Cupom inválido ou inativo 😔" });
+    return { responses, nextState: newState };
+  }
+
+  // Validar regras (datas/limites/por cliente)
+  const check = await canRedeem(coupon.id, clientId);
+  if (!check.ok) {
+    const newState: FlowState = {
+      ...state,
+      couponError: check.reason,
+      couponCode: code,
+    };
+    responses.push({ text: `Não foi possível aplicar o cupom: ${check.reason}.` });
+    return { responses, nextState: newState };
+  }
+
+  const applied = applyCouponToFlowValue({ coupon, flow: state });
+  const newState: FlowState = {
+    ...applied.flow,
+    couponId: coupon.id,
+    couponCode: code,
+    couponError: undefined,
+    stage: "ETAPA9_LOYALTY",
+  };
+
+  const formattedCouponCode = code.toUpperCase();
+  const formattedDiscount = applied.discountApplied > 0 ? `*R$ ${applied.discountApplied.toFixed(2).replace(".", ",")}*` : "*sem valor fixo*";
+  const finalValue = Math.max(0, (newState.quoteMin ?? 0));
+  const formattedFinalValue = `*R$ ${finalValue.toFixed(2).replace(".", ",")}*`;
+
+  responses.push({
+    text: `✅ Cupom *${formattedCouponCode}* aplicado com sucesso!\n\n🎁 ${formattedCouponCode}\n💸 Desconto aplicado: ${formattedDiscount}\n💰 Valor final do agendamento: ${formattedFinalValue}`
+  });
+  responses.push({
+    text: `🌟 *Pontos de Fidelidade*\n\nVocê tem ${state.loyaltyPoints ?? 0} pontos disponíveis.\n100 pontos = R$ 10 de desconto!\n\nQuer usar seus pontos agora?\n\n*1* - Sim, usar pontos\n*2* - Não, guardar para depois`,
+  });
+
+  return { responses, nextState: newState };
+}
+
+/**
+ * Handler para etapa de lembrete (ETAPA14_REMINDER)
+ */
+export async function handleReminderStep(
+  state: FlowState,
+  message: string,
+  responses: FlowResponse[],
+  pushName?: string
+): Promise<FlowResult> {
+  const input = message.trim().toLowerCase();
+  const num = parseInt(input, 10);
+  
+  let reminderEnabled = false;
+  let reminderPreference = "none";
+  
+  if (num === 1 || /sim|quero/i.test(input)) {
+    reminderEnabled = true;
+    reminderPreference = "30min"; // 30min default
+  } else if (num === 2 || /nao|não|não precisa|não quero/i.test(input)) {
+    reminderEnabled = false;
+    reminderPreference = "none";
+  } else {
+    responses.push({ text: "Responda *1* para sim ou *2* para não." });
+    return { responses, nextState: state };
+  }
+  
+  const newState: FlowState = {
+    ...state,
+    reminderEnabled,
+    reminderPreference,
+    stage: "ETAPA15_SUMMARY_CONFIRM",
+  };
+  
+  const totalValue = Math.max(0, Number(state.quoteMin ?? 0) + Number(state.pickupFee ?? 0) - Number(state.couponDiscountApplied ?? 0));
+  const paymentMethod = state.paymentMethod || "—";
+  const reminderText = reminderEnabled ? "sim" : "não";
+  const pickupText = state.needsPickup ? "sim" : "não";
+  const customerName = resolveValidCustomerName(state.customerName) ?? resolveValidCustomerName(pushName) ?? "Cliente";
+  const serviceName = state.serviceLabel ?? "—";
+  const vehicle = vehicleDisplayFromFlow(state) || "—";
+  const date = state.dayLabel ?? state.dayDate ?? "—";
+  const time = state.startTime ?? "—";
+  const address = state.pickupAddress ?? "—";
+  
+  // Generate summary card image
+  let summaryCardUrl = "";
+  try {
+    summaryCardUrl = await generateSummaryCard({
+      customerName: customerName,
+      serviceName: serviceName,
+      vehicle: vehicle,
+      date: date,
+      time: time,
+      paymentMethod: paymentMethod,
+      totalPrice: totalValue,
+      pickupAddress: address !== "—" ? address : undefined,
+    });
+  } catch (error) {
+    console.error("[handleReminderStep] Error generating summary card:", error);
+  }
+  
+  // Send text first
+  const reminderTextFinal = reminderPreference === "none" ? "não" : reminderPreference || "—";
+  const upsellLabel = state.upsellLabel ? `✨ + ${state.upsellLabel}` : "";
+  const needsReturn = state.needsReturn ? "🔄 Devolução: sim" : "";
+  
+  const summaryLines = [
+    "━━━━━━━━━━━━━━━",
+    "📋 **RESUMO DO AGENDAMENTO**",
+    `👤 ${customerName}`,
+    `🧽 *${serviceName}*`,
+    upsellLabel,
+    `🚘 ${vehicle}`,
+    `📅 ${date}`,
+    `⏰ ${time}`,
+    `🚚 Leva e traz: ${pickupText}`,
+    address !== "—" ? `📍 Endereço: ${address}` : "",
+    needsReturn,
+    `💳 ${paymentMethod}`,
+    `🔔 Lembrete: ${reminderTextFinal}`,
+    `💰 **R$ ${totalValue.toFixed(2).replace(".", ",")}**`,
+    "━━━━━━━━━━━━━━━",
+    "",
+    "⏱️ Cancelamento até 2h antes sem custo.",
+    "",
+    "✅ Confirma? (sim/não)",
+  ];
+  
+  responses.push({ text: summaryLines.filter(Boolean).join("\n") });
+  
+  // Send image after text
+  if (summaryCardUrl) {
+    responses.push({ text: "", mediaUrl: summaryCardUrl, mediaType: "image" });
+  }
+  
   return { responses, nextState: newState };
 }
 

@@ -137,10 +137,8 @@ export interface FlowState {
   awaitingPhotoUpload?: boolean;
   awaitingServiceRecommendation?: boolean;
   serviceRecommendation?: string | null;
-  awaitingServiceQuestion?: boolean;
 
-  // Detecção de cancelamento
-  discountOriginalPrice?: number;
+  // Oferta de desconto (cancelamento)
   discountOffer?: {
     originalPrice: number;
     discountPercentage: number;
@@ -148,6 +146,8 @@ export interface FlowState {
     used: boolean;
     discountReason?: string;
   };
+  discountOriginalPrice?: number;
+  awaitingServiceQuestion?: boolean;
 
   // Pagamento (campos adicionais do test-bot)
   paymentGateway?: string;

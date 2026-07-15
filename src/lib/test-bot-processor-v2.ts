@@ -2,7 +2,7 @@
 // Usa as MESMAS funções de validação, parsing e formatação do whatsapp-flow.ts
 // para garantir comportamento idêntico entre teste e produção
 
-import type { FlowState } from "./whatsapp-flow-types";
+
 import {
   isValidCustomerName,
   normalizeVehicleConditionValue,
@@ -24,6 +24,7 @@ import { prisma } from "./prisma";
 import { buildAvailableSlotsForDay, parseTimeSelection } from "./appointments";
 import { calculateDistance, calculatePickupFee } from "./maps";
 import { findCouponByCode } from "./coupons";
+import { handleCouponStep, handleReminderStep, type FlowResponse, shouldSkipCouponPrompt, type FlowState } from "./whatsapp-flow-core";
 import { format } from "date-fns";
 import { answerCustomerDoubt } from "./whatsapp-ai";
 import { generateSummaryCard, generateSummaryText } from "./summary-card";
@@ -31,6 +32,44 @@ import { generatePixQrCode, generatePixPayload } from "./pix-qr";
 import { validateReceiptAmount } from "./receipt-analyzer";
 import type { FlowStage } from "./whatsapp-flow-types";
 import type { FlowContext } from "./whatsapp-flow-messages";
+
+// Helper to convert TestSession to FlowState for core handlers
+function testSessionToFlowState(session: TestSession): FlowState {
+  return {
+    stage: session.stage as any,
+    customerName: session.customerName || undefined,
+    serviceKey: session.selectedService || undefined,
+    serviceLabel: session.selectedServiceName || undefined,
+    couponCode: session.couponCode || undefined,
+    couponDiscountApplied: session.couponDiscount || undefined,
+    loyaltyPoints: 0, // Not tracked in test session
+    vehicleModel: session.vehicle.model || undefined,
+    vehicleYear: session.vehicle.year?.toString() || undefined,
+    vehicleColor: session.vehicle.color || undefined,
+    vehicleCondition: session.vehicle.condition,
+    // Add other fields as needed
+  };
+}
+
+// Helper to update TestSession from FlowState
+function updateTestSessionFromFlowState(session: TestSession, state: FlowState): TestSession {
+  return {
+    ...session,
+    stage: state.stage,
+    customerName: state.customerName || null,
+    selectedService: state.serviceKey || null,
+    selectedServiceName: state.serviceLabel || null,
+    couponCode: state.couponCode || null,
+    couponDiscount: state.couponDiscountApplied || null,
+    vehicle: {
+      ...session.vehicle,
+      model: state.vehicleModel || null,
+      year: state.vehicleYear ? parseInt(state.vehicleYear) : null,
+      color: state.vehicleColor || null,
+      condition: (state.vehicleCondition as any) || "normal",
+    },
+  };
+}
 
 // Analytics logging function
 async function logStageTransition(sessionId: string, stage: string, message: string) {
@@ -231,8 +270,26 @@ export async function processTestFlow({
     case "ETAPA8_PHOTO_UPLOAD":
       return handlePhotoUpload(message, session, responses);
 
-    case "ETAPA9_COUPON":
-      return handleCouponStep(message, session, responses);
+    case "ETAPA9_COUPON": {
+      const flowState = testSessionToFlowState(session);
+      const coreResponses: FlowResponse[] = [];
+      const result = await handleCouponStep(flowState, message, coreResponses, "test-" + session.sessionId);
+      
+      // Update session from core result
+      const updatedSession = updateTestSessionFromFlowState(session, result.nextState);
+      Object.assign(session, updatedSession);
+      
+      // Convert core responses to test responses
+      for (const response of result.responses) {
+        responses.push({
+          text: response.text,
+          mediaUrl: response.mediaUrl,
+          mediaType: response.mediaType,
+        });
+      }
+      
+      return responses;
+    }
 
     case "ETAPA9_LOYALTY":
       return handleLoyaltyStep(message, session, responses);
@@ -249,8 +306,26 @@ export async function processTestFlow({
     case "ETAPA7_TIME":
       return handleTimeSelection(message, session, responses);
 
-    case "ETAPA9_REMINDER":
-      return handleReminderStep(message, session, responses);
+    case "ETAPA9_REMINDER": {
+      const flowState = testSessionToFlowState(session);
+      const coreResponses: FlowResponse[] = [];
+      const result = await handleReminderStep(flowState, message, coreResponses, session.customerName || undefined);
+      
+      // Update session from core result
+      const updatedSession = updateTestSessionFromFlowState(session, result.nextState);
+      Object.assign(session, updatedSession);
+      
+      // Convert core responses to test responses
+      for (const response of result.responses) {
+        responses.push({
+          text: response.text,
+          mediaUrl: response.mediaUrl,
+          mediaType: response.mediaType,
+        });
+      }
+      
+      return responses;
+    }
 
     case "ETAPA8_PAYMENT":
       return handlePaymentSelection(message, session, responses);
@@ -305,11 +380,6 @@ const buildMainMenu = (categories: Record<number, { title: string; keys: string[
 
 function buildWelcomeText(): string {
   return "👋 Olá! Sou o Teste Bot da Garagem do Ka. Vamos começar? Me diz como posso te chamar.";
-}
-
-export function shouldSkipCouponPrompt(input: string): boolean {
-  const normalized = input.trim().toLowerCase();
-  return /^(2|nao|não|n|sem|pular|ignorar|nenhum|nao tenho|não tenho|sem cupom|sem desconto|nenhum cupom|nao tenho cupom|não tenho cupom)$/i.test(normalized);
 }
 
 async function calculateBasePrice(session: TestSession): Promise<number> {
@@ -888,49 +958,6 @@ async function handleUpsell(
   session.stage = "ETAPA10_LOGISTICS";
   responses.push({
     text: "🚚 Como prefere?\n\n*1* - Deixe eu levo o carro até a estética\n*2* - A estética vai buscar o carro"
-  });
-  return responses;
-}
-
-async function handleCouponStep(
-  message: string,
-  session: TestSession,
-  responses: TestResponse[]
-): Promise<TestResponse[]> {
-  const input = message.trim();
-  const skip = shouldSkipCouponPrompt(input);
-
-  if (skip) {
-    session.stage = "ETAPA9_REMINDER";
-    responses.push({
-      text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
-    });
-    return responses;
-  }
-
-  if (/^(1|sim|s|yes|ok|prosseguir|tenho|com cupom)$/i.test(input)) {
-    session.stage = "ETAPA9_COUPON";
-    responses.push({ text: "💬 Me envie o código do cupom para validar.\n\nEx: *SAVE10*" });
-    return responses;
-  }
-
-  if (input) {
-    const code = input.toUpperCase();
-    const coupon = await findCouponByCode(code);
-    if (!coupon || !coupon.active) {
-      responses.push({ text: `⚠️ Cupom *${code}* não foi encontrado ou está inativo.` });
-      session.stage = "ETAPA9_COUPON";
-      return responses;
-    }
-
-    session.couponCode = code;
-    session.couponDiscount = Number(coupon.amount ?? 10);
-    responses.push({ text: `🎟️ Cupom *${code}* aplicado!` });
-  }
-
-  session.stage = "ETAPA9_REMINDER";
-  responses.push({
-    text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
   });
   return responses;
 }
