@@ -3,7 +3,6 @@ export const SESSION_RESET_MS = 30 * 60 * 1000;
 
 export type FlowStage =
   | "ETAPA1_AWAITING_NAME"
-  | "ETAPA2_CLIENT_RECOGNITION"  // NOVO: reconhecimento de cliente recorrente
   | "ETAPA2_MAIN_MENU"
   | "ETAPA2_SUB"
   | "ETAPA3_SERVICE_ACTION"
@@ -15,33 +14,25 @@ export type FlowStage =
   | "ETAPA5_QUOTE"
   | "ETAPA5_FIRST_TIME_BONUS"
   | "ETAPA6_UPSELL"
-  | "ETAPA3_UPSELL"
-  | "ETAPA7_PERIOD"
   | "ETAPA7_DAY"
   | "ETAPA7_TIME"
-  | "ETAPA7_CUSTOM_DAY"
-  | "ETAPA8_PAYMENT"
-  | "ETAPA8_PAYMENT_NO_PIX"
-  | "ETAPA8_PAYMENT_CARD_TYPE"
-  | "ETAPA8_PHOTO"
-  | "ETAPA8_PHOTO_UPLOAD"  // NOVO: upload de foto (unificado)
+  | "ETAPA7_PERIOD" // LEGACY: mantido para compatibilidade
+  | "ETAPA7_CUSTOM_DAY" // LEGACY: mantido para compatibilidade
   | "ETAPA9_COUPON"
-  | "ETAPA9_LOYALTY"  // NOVO: pontos de fidelidade
-  | "ETAPA9_PICKUP"
-  | "ETAPA9_PICKUP_ADDRESS"
-  | "ETAPA9_RETURN_PREFERENCE"
-  | "ETAPA9_REMINDER"
+  | "ETAPA9_LOYALTY"
+  | "ETAPA9_REMINDER" // LEGACY: mantido para compatibilidade
   | "ETAPA10_BUDGET"
-  | "ETAPA10_LOGISTICS"  // NOVO: logística combinada (substitui ETAPA9_PICKUP*)
-  | "ETAPA10_CONFIRM"  // NOVO: confirmação final (unificado)
-  | "ETAPA11_RATING"  // NOVO: avaliação pós-atendimento
-  | "ETAPA11_SERVICE_QUESTION"  // NOVO: recomendação de serviço
-  | "ETAPA14_REMINDER"
-  | "ETAPA15_SUMMARY_CONFIRM"
-  | "ETAPA16_CONFIRMATION"  // NOVO: confirmação final após resumo
-  | "ETAPA10_FAQ"
+  | "ETAPA10_LOGISTICS"
+  | "ETAPA8_PAYMENT"
+  | "ETAPA8_PAYMENT_NO_PIX" // LEGACY: mantido para compatibilidade
+  | "ETAPA8_PAYMENT_CARD_TYPE"
   | "ETAPA8_PIX_CHOICE"
   | "ETAPA8_RECEIPT_UPLOAD"
+  | "ETAPA14_REMINDER"
+  | "ETAPA15_SUMMARY_CONFIRM"
+  | "ETAPA16_CONFIRMATION"
+  | "ETAPA10_FAQ"
+  | "ETAPA11_SERVICE_QUESTION" // LEGACY: mantido para compatibilidade
   | "STALE_RETURN";
 
 export interface FlowState {
@@ -63,21 +54,20 @@ export interface FlowState {
   /** Coleta em duas etapas: modelo → ano */
   vehicleCollectStep?: "model" | "year" | "color" | "condition";
   vehicleConfirmed?: boolean;
-  vehiclePhotoAttached?: boolean;
-  reminderEnabled?: boolean; // Se usuário quer receber lembrete
+  reminderEnabled?: boolean;
   quoteMin?: number;
   quoteMax?: number;
   estimatedTime?: string;
   upsellLabel?: string;
   upsellAccepted?: boolean;
   upsellOffered?: boolean;
-  period?: "manha" | "tarde";
-  periodLabel?: string;
+  upsellValue?: number;
   availableSlots?: string[];
   serviceDurationMin?: number;
   dayLabel?: string;
   dayDate?: string;
   startTime?: string;
+  periodLabel?: string; // Para compatibilidade com código existente
   paymentMethod?: string;
   undecidedIssue?: number;
   returnStage?: FlowStage;
@@ -89,7 +79,7 @@ export interface FlowState {
   // Cupom
   couponCode?: string;
   couponId?: string;
-  couponDiscountApplied?: number; // valor descontado (R$)
+  couponDiscountApplied?: number;
   couponError?: string;
 
   // Leva e traz
@@ -104,37 +94,32 @@ export interface FlowState {
   reminderPreference?: "30min" | "1hour" | "1day" | "none";
 
   // Comprovante de pagamento
-  pixPaymentType?: "now" | "delivery"; // PIX agora ou na entrega
+  pixPaymentType?: "now" | "delivery";
   receiptImageUrl?: string;
   receiptAmount?: number;
   receiptValidationAttempts?: number;
-  partialPayments?: Array<{ amount: number; imageUrl: string }>; // Rastrear pagamentos parciais
-  totalPaid?: number; // Total já pago
+  partialPayments?: Array<{ amount: number; imageUrl: string }>;
+  totalPaid?: number;
 
   // Bônus de primeira compra
   isFirstTimeCustomer?: boolean;
   firstTimeBonusApplied?: boolean;
-  firstTimeBonusDiscount?: number; // valor do desconto (R$)
+  firstTimeBonusDiscount?: number;
 
-  // NOVOS CAMPOS DO TEST-BOT
   // Tracking de inatividade
   lastInteractionAt?: number;
-
-  // Foto do veículo
-  vehiclePhotoUrl?: string | null;
 
   // Cliente recorrente e fidelidade
   isReturningClient?: boolean;
   savedVehicle?: string | null;
   loyaltyPoints?: number;
-  loyaltyDiscountApplied?: number; // Valor do desconto aplicado via pontos (R$)
+  loyaltyDiscountApplied?: number;
 
   // Controle de fluxo
   awaitingReceiptUpload?: boolean;
   awaitingDiscountResponse?: boolean;
   awaitingPickupAddress?: boolean;
   awaitingReturnPreference?: boolean;
-  awaitingPhotoUpload?: boolean;
   awaitingServiceRecommendation?: boolean;
   serviceRecommendation?: string | null;
 
@@ -149,14 +134,11 @@ export interface FlowState {
   discountOriginalPrice?: number;
   awaitingServiceQuestion?: boolean;
 
-  // Pagamento (campos adicionais do test-bot)
+  // Pagamento
   paymentGateway?: string;
   transactionId?: string;
-  paidAt?: string; // ISO string para persistência
-  paymentSimulationCode?: string; // Apenas para test-bot
-
-  // Upsell (valor monetário)
-  upsellValue?: number;
+  paidAt?: string;
+  paymentSimulationCode?: string;
 }
 
 

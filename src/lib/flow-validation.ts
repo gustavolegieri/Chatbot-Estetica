@@ -37,14 +37,10 @@ export function buildVehicleCollectionPrompt(data: VehicleCollectionData): strin
     "",
     data.model ? `Modelo: ${data.model}` : "📌 Modelo: (ainda não informado)",
     data.year ? `Ano: ${data.year}` : "📅 Ano: (ainda não informado)",
-    data.color ? `Cor: ${data.color}` : "🎨 Cor: (ainda não informado)",
-    data.condition ? `Estado: ${data.condition}` : "🔧 Estado: (ainda não informado)",
     "",
     "Envie os dados que faltam, por exemplo:",
     "Modelo: Honda Civic",
     "Ano: 2020",
-    "Cor: Preto",
-    "Estado: Bom estado",
   ];
 
   return lines.join("\n");

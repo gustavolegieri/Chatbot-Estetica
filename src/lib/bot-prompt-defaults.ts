@@ -471,4 +471,122 @@ Foi um prazer cuidar do seu veículo. Esperamos você em breve!`,
     category: "categorias",
     content: "Ajuda na escolha",
   },
+  {
+    key: "etapa9_coupon",
+    label: "Cupom de desconto",
+    category: "fluxo",
+    content: `Você tem um cupom de desconto?
+
+Se sim, me envie o código agora.
+Se não, responda *não* para seguir para os pontos de fidelidade.`,
+  },
+  {
+    key: "etapa9_loyalty",
+    label: "Pontos de fidelidade",
+    category: "fluxo",
+    hint: "{points}, {discountValue}",
+    content: `Você tem *{points}* pontos de fidelidade! 🎁
+
+Pode usar para ganhar *{discountValue}* de desconto.
+
+*1* ✅ Usar pontos
+*2* ❌ Não usar pontos`,
+  },
+  {
+    key: "etapa10_budget",
+    label: "Confirmação de orçamento",
+    category: "fluxo",
+    hint: "{value}",
+    content: `━━━━━━━━━━━━━━━
+📋 **Seu orçamento**
+━━━━━━━━━━━━━━━
+💰 **Valor total: {value}**
+━━━━━━━━━━━━━━━
+
+Vamos confirmar o agendamento?
+
+*1* ✅ Sim, confirmar
+*2* ❌ Não, voltar ao menu`,
+  },
+  {
+    key: "etapa10_logistics",
+    label: "Logística - escolha",
+    category: "fluxo",
+    content: `🚚 Como prefere?
+
+*1* - Deixe eu levo o carro até a estética
+*2* - A estética vai buscar o carro`,
+  },
+  {
+    key: "etapa10_logistics_client_leads",
+    label: "Logística - cliente leva",
+    category: "fluxo",
+    content: `📍 Combinado! Você pode levar o carro até a loja quando puder.`,
+  },
+  {
+    key: "etapa10_logistics_pickup_address",
+    label: "Logística - endereço pickup",
+    category: "fluxo",
+    content: `🚚 Ótimo! Me envie o endereço completo onde o carro está para calcular a taxa de busca.`,
+  },
+  {
+    key: "etapa10_logistics_return_preference",
+    label: "Logística - preferência entrega",
+    category: "fluxo",
+    content: `Perfeito! E quando o serviço terminar, como prefere?
+
+*1* Vocês devolvem o carro no mesmo endereço
+*2* Eu mesmo venho buscar o carro`,
+  },
+  {
+    key: "etapa10_logistics_with_return",
+    label: "Logística - com devolução",
+    category: "fluxo",
+    content: `🔄 Devolução incluída no resumo.`,
+  },
+  {
+    key: "etapa10_logistics_without_return",
+    label: "Logística - sem devolução",
+    category: "fluxo",
+    content: `📍 Sem devolução, tudo certo.`,
+  },
+  {
+    key: "etapa15_summary_confirm",
+    label: "Resumo e confirmação",
+    category: "fluxo",
+    hint: "{name}, {service}, {vehicle}, {day}, {time}, {pickup}, {address}, {payment}, {reminder}, {value}",
+    content: `━━━━━━━━━━━━━━━
+📋 **RESUMO DO AGENDAMENTO**
+👤 {name}
+🧧 *{service}*
+🚘 {vehicle}
+📅 {day}
+⏰ {time}
+🚚 Leva e traz: {pickup}
+📍 Endereço: {address}
+💳 {payment}
+🔔 Lembrete: {reminder}
+💰 **{value}**
+━━━━━━━━━━━━━━━
+
+⏱️ Cancelamento até 2h antes sem custo.
+
+✅ Confirma? (sim/não)`,
+  },
+  {
+    key: "etapa16_confirmation",
+    label: "Confirmação final",
+    category: "fluxo",
+    hint: "{address}, {hours}",
+    content: `✅ *Agendamento confirmado!*
+
+Seu atendimento está reservado.
+
+📍 Endereço: *{address}*
+🕒 Horário: *{hours}*
+
+Cancelamentos com até 2h de antecedência sem custo.
+
+Posso te ajudar com mais alguma coisa? 😊`,
+  },
 ];

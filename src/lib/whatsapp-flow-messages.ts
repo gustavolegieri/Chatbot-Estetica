@@ -356,8 +356,8 @@ export function etapa4AskYear(model: string, prompts?: PromptMap) {
   return renderPrompt(p(prompts), "etapa4_ask_year", { model });
 }
 
-export function etapa4VehicleConfirmation(model: string, year: string, color: string, condition: string) {
-  return `🚘 *Confirmando os dados do veículo*\n\nModelo: *${model || "—"}*\nAno: *${year || "—"}*\nCor: *${color || "—"}*\nEstado: *${condition || "—"}*\n\nEstá certo? (sim/não)`;
+export function etapa4VehicleConfirmation(model: string, year: string) {
+  return `🚘 *Confirmando os dados do veículo*\n\nModelo: *${model || "—"}*\nAno: *${year || "—"}*\n\nEstá certo? (sim/não)`;
 }
 
 export function vehicleModelNotUnderstood(prompts?: PromptMap) {
@@ -481,7 +481,108 @@ export function etapa8ReceiptError(prompts?: PromptMap) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// ETAPA 9 — CONFIRMAÇÃO FINAL DO AGENDAMENTO
+// ETAPA 9 — CUPOM DE DESCONTO
+// ─────────────────────────────────────────────────────────────
+
+export function etapa9Coupon(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa9_coupon", {});
+}
+
+// ─────────────────────────────────────────────────────────────
+// ETAPA 9 — PONTOS DE FIDELIDADE
+// ─────────────────────────────────────────────────────────────
+
+export function etapa9Loyalty(points: number, discountValue: number, prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa9_loyalty", {
+    points: points.toString(),
+    discountValue: `R$ ${discountValue.toFixed(2).replace(".", ",")}`,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// ETAPA 10 — ORÇAMENTO E CONFIRMAÇÃO
+// ─────────────────────────────────────────────────────────────
+
+export function etapa10Budget(value: string, prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa10_budget", {
+    value,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// ETAPA 10 — LOGÍSTICA
+// ─────────────────────────────────────────────────────────────
+
+export function etapa10Logistics(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa10_logistics", {});
+}
+
+export function etapa10LogisticsClientLeads(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa10_logistics_client_leads", {});
+}
+
+export function etapa10LogisticsPickupAddress(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa10_logistics_pickup_address", {});
+}
+
+export function etapa10LogisticsReturnPreference(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa10_logistics_return_preference", {});
+}
+
+export function etapa10LogisticsWithReturn(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa10_logistics_with_return", {});
+}
+
+export function etapa10LogisticsWithoutReturn(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa10_logistics_without_return", {});
+}
+
+// ─────────────────────────────────────────────────────────────
+// ETAPA 15 — RESUMO E CONFIRMAÇÃO
+// ─────────────────────────────────────────────────────────────
+
+export function etapa15SummaryConfirm(
+  data: {
+    name: string;
+    service: string;
+    vehicle: string;
+    day: string;
+    time: string;
+    pickup: string;
+    address: string;
+    payment: string;
+    reminder: string;
+    value: string;
+  },
+  prompts?: PromptMap
+) {
+  return renderPrompt(p(prompts), "etapa15_summary_confirm", {
+    name: data.name,
+    service: data.service,
+    vehicle: data.vehicle,
+    day: data.day,
+    time: data.time,
+    pickup: data.pickup,
+    address: data.address,
+    payment: data.payment,
+    reminder: data.reminder,
+    value: data.value,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// ETAPA 16 — CONFIRMAÇÃO FINAL
+// ─────────────────────────────────────────────────────────────
+
+export function etapa16Confirmation(address: string, hours: string, prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "etapa16_confirmation", {
+    address,
+    hours,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// ETAPA 9 — CONFIRMAÇÃO FINAL DO AGENDAMENTO (LEGACY)
 // ─────────────────────────────────────────────────────────────
 
 export function etapa9Confirm(

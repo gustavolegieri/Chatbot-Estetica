@@ -43,6 +43,12 @@ import {
   etapa8ReceiptInvalid,
   etapa8ReceiptError,
   etapa9Confirm,
+  etapa9Coupon,
+  etapa9Loyalty,
+  etapa10Budget,
+  etapa10Logistics,
+  etapa15SummaryConfirm,
+  etapa16Confirmation,
   formatHours,
   indecisiveProblemPrompt,
   indecisiveVehiclePrompt,
@@ -1176,50 +1182,15 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       // Verificar se é uma negação (somente "não", "nao", "n" ou "2" exatos)
       if (/^(nao|não|n|2)$/i.test(confirmAnswer)) {
         await sendText({ number: msg.phone, text: buildVehicleCollectionPrompt({
-          model: flow.vehicleModel ?? null,
-          year: flow.vehicleYear ?? null,
-          color: flow.vehicleColor ?? null,
-          condition: flow.vehicleCondition ?? null,
+          model: null,
+          year: null,
+          color: null,
+          condition: null,
         }) });
         return;
       }
 
-      // Se não for confirmação/negação, verificar se é dados do veículo
-      if (isValidVehicle(input)) {
-        const parsed = storeVehicle(flow, input);
-        if (!parsed.vehicleModel || !parsed.vehicleYear || !parsed.vehicleColor || !parsed.vehicleCondition) {
-          await sendText({ number: msg.phone, text: buildVehicleCollectionPrompt({
-            model: parsed.vehicleModel ?? null,
-            year: parsed.vehicleYear ?? null,
-            color: parsed.vehicleColor ?? null,
-            condition: parsed.vehicleCondition ?? null,
-          }) });
-          return;
-        }
-        flow.vehicleConfirmed = false;
-        await saveFlow(msg.phone, { ...flow, ...parsed, vehicleConfirmed: false });
-        await sendText({
-          number: msg.phone,
-          text: etapa4VehicleConfirmation(
-            parsed.vehicleModel || "",
-            parsed.vehicleYear || "",
-            parsed.vehicleColor || "",
-            parsed.vehicleCondition || ""
-          ),
-        });
-        return;
-      }
-
-      // Se chegou aqui e não é confirmação/negação/dados do veículo, pedir para responder corretamente
-      if (flow.vehicleModel && flow.vehicleYear && flow.vehicleColor && flow.vehicleCondition) {
-        await sendText({
-          number: msg.phone,
-          text: `Por favor, responda apenas *sim* ou *não* para confirmar os dados do veículo.`,
-        });
-        return;
-      }
-
-      // Coleta progressiva dos dados do veículo
+      // Coleta progressiva dos dados do veículo (modelo → ano → cor → estado)
       const step = flow.vehicleCollectStep ?? "model";
 
       if (step === "model") {
@@ -1237,24 +1208,76 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         return;
       }
 
-      const year = parseYearFromText(input);
-      if (!year) {
-        await sendText({ number: msg.phone, text: vehicleYearNotUnderstood() });
+      if (step === "year") {
+        const year = parseYearFromText(input);
+        if (!year) {
+          await sendText({ number: msg.phone, text: vehicleYearNotUnderstood() });
+          return;
+        }
+        await saveFlow(msg.phone, {
+          ...flow,
+          vehicleYear: year,
+          vehicleCollectStep: "color",
+        });
+        await sendText({
+          number: msg.phone,
+          text: `Anotado: ${flow.vehicleModel} ${year} 👍\n\nQual a cor do veículo?`,
+        });
         return;
       }
-      const combined = `${flow.vehicleModel} ${year}`;
-      if (!isValidVehicle(combined)) {
-        await sendText({ number: msg.phone, text: vehicleNotUnderstood(prompts) });
+
+      if (step === "color") {
+        const color = input.trim();
+        if (!color || color.length < 2) {
+          await sendText({
+            number: msg.phone,
+            text: `Não entendi a cor 😊 Pode me dizer novamente? (ex: branco, prata, preto, azul)`,
+          });
+          return;
+        }
+        await saveFlow(msg.phone, {
+          ...flow,
+          vehicleColor: color,
+          vehicleCollectStep: "condition",
+        });
+        await sendText({
+          number: msg.phone,
+          text: `Anotado: ${flow.vehicleModel} ${flow.vehicleYear} ${color} 👍\n\nQual o estado geral do veículo? (excelente/bom/normal/ruim)`,
+        });
         return;
       }
-      await sendText({ number: msg.phone, text: buildVehicleCollectionPrompt({
-        model: flow.vehicleModel ?? null,
-        year,
-        color: flow.vehicleColor ?? null,
-        condition: flow.vehicleCondition ?? null,
-      }) });
+
+      if (step === "condition") {
+        const condition = normalizeConditionValue(input);
+        await saveFlow(msg.phone, {
+          ...flow,
+          vehicleCondition: condition,
+          vehicleCollectStep: undefined,
+        });
+
+        // Mostrar confirmação com todos os dados (modelo, ano, cor, estado)
+        await sendText({
+          number: msg.phone,
+          text: `🚘 *Confirmando os dados do veículo*\n\nModelo: *${flow.vehicleModel || ""}*\nAno: *${flow.vehicleYear || ""}*\nCor: *${flow.vehicleColor || ""}*\nEstado: *${flow.vehicleCondition || ""}*\n\nEstá certo? (sim/não)`,
+        });
+        return;
+      }
+
+      // Fallback para coleta de modelo (se step estiver indefinido)
+      const model = parseModelFromText(input);
+      if (!model) {
+        await sendText({ number: msg.phone, text: vehicleModelNotUnderstood(prompts) });
+        return;
+      }
+      await saveFlow(msg.phone, {
+        ...flow,
+        vehicleModel: model,
+        vehicleCollectStep: "year",
+      });
+      await sendText({ number: msg.phone, text: etapa4AskYear(model) });
       return;
     }
+
 
     case "ETAPA5_QUOTE": {
       if (wantsOtherServices(input, num)) {
@@ -1538,7 +1561,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       await saveFlow(msg.phone, flow);
       await sendText({
         number: msg.phone,
-        text: `Você tem um cupom de desconto?\n\nSe sim, me envie o código agora.\nSe não, responda *não* para seguir para o pagamento.`,
+        text: etapa9Coupon(prompts),
       });
       return;
     }
@@ -1561,7 +1584,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         await saveFlow(msg.phone, flow);
         await sendText({
           number: msg.phone,
-          text: `🚚 Como prefere?\n\n*1* - Deixe eu levo o carro até a estética\n*2* - A estética vai buscar o carro`,
+          text: etapa10Logistics(prompts),
         });
         return;
       }
@@ -1578,7 +1601,9 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
 
       await sendText({
         number: msg.phone,
-        text: `Por favor, responda *sim* para agendar ou *não* para cancelar.`,
+        text: invalidMenu(
+          `*1* ✅ Sim, confirmar\n*2* ❌ Não, voltar ao menu`
+        ),
       });
       return;
     }
@@ -1648,7 +1673,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     }
 
     case "ETAPA16_CONFIRMATION": {
-      // Após confirmação final, criar o agendamento e direcionar para rating
+      // Após confirmação final, criar o agendamento
       const result = await createAppointment(flow, msg.phone);
       const appointment = result?.appointment;
 
@@ -1687,24 +1712,16 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         }
       }
 
-      // Enviar confirmação final
+      // Enviar confirmação final usando o template oficial
       await sendText({
         number: msg.phone,
-        text: `✅ *Agendamento confirmado!*\n\nSeu atendimento está reservado na Garagem do Ka.\n\n📍 Endereço: *Rua das Oficinas, 100 - São Paulo, SP*\n🕒 Horário: *Segunda a sábado, 08:00 às 18:00*\n\nCancelamentos com até 2h de antecedência sem custo.\n\nPosso te ajudar com mais alguma coisa? 😊`,
+        text: etapa16Confirmation(ctx.address, ctx.hours, prompts),
       });
 
-      // Direcionar para rating
-      flow.stage = "ETAPA11_RATING";
+      // Reset to initial state
+      flow.stage = "ETAPA1_AWAITING_NAME";
+      flow.customerName = undefined;
       await saveFlow(msg.phone, flow);
-      await sendText({
-        number: msg.phone,
-        text: `⭐ **Avaliação pós-serviço**\n\nGostou do atendimento? Avalie de 1 a 5!\n\n*1* - ⭐\n*2* - ⭐⭐\n*3* - ⭐⭐⭐\n*4* - ⭐⭐⭐⭐\n*5* - ⭐⭐⭐⭐⭐`,
-      });
-      return;
-    }
-
-    case "ETAPA11_RATING": {
-      await executeCoreHandler(msg, flow, handleRating, msg.phone);
       return;
     }
 
@@ -1880,13 +1897,18 @@ async function handlePayment(
   }
 
   // Se PIX for selecionado e tiver chave PIX configurada, mostrar escolha de pagamento
+  // Atualizado para seguir especificação: "💸 Como você prefere pagar via PIX?\n\n1 PIX (Pagar agora)\n2 PIX (Pagar na entrega)"
   if (!isNoPix && num === 1 && ctx.pixKey) {
     flow.stage = "ETAPA8_PIX_CHOICE";
     await saveFlow(msg.phone, flow);
-    await sendText({ number: msg.phone, text: etapa8PixChoice(prompts) });
+    await sendText({
+      number: msg.phone,
+      text: `💸 Como você prefere pagar via PIX?\n\n1 PIX (Pagar agora)\n2 PIX (Pagar na entrega)`,
+    });
     return;
   }
 
+  // Dinheiro vai direto para lembrete
   flow.stage = "ETAPA14_REMINDER";
   await saveFlow(msg.phone, flow);
   await sendText({ number: msg.phone, text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa` });

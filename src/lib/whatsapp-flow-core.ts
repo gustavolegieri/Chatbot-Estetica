@@ -29,6 +29,7 @@ import { generateSummaryCard, generateSummaryText, SummaryCardData } from "./sum
 import { format } from "date-fns";
 import { vehicleDisplayFromFlow } from "./whatsapp-vehicle-parse";
 import { resolveValidCustomerName } from "./customer-name";
+import { formatHours } from "./whatsapp-flow-messages";
 
 // Re-export FlowState for use in other modules
 export type { FlowState, FlowStage };
@@ -328,38 +329,29 @@ export async function handleLoyaltyStep(
 
   let loyaltyDiscount = 0;
   if (usePoints && state.loyaltyPoints && state.loyaltyPoints > 0) {
-    loyaltyDiscount = state.loyaltyPoints >= 100 ? 10 : 0;
-    responses.push({ text: "🌟 Desconto aplicado!" });
+    loyaltyDiscount = Math.floor(state.loyaltyPoints / 100) * 10; // 100 pontos = R$ 10
+    responses.push({ text: "✅ Desconto aplicado!" });
   } else {
     responses.push({ text: "Sem problemas!" });
   }
 
   const newState: FlowState = {
     ...state,
-    loyaltyPoints: usePoints ? 0 : state.loyaltyPoints,
-    loyaltyDiscountApplied: loyaltyDiscount, // Persistir o desconto para uso posterior
+    loyaltyPoints: usePoints ? (state.loyaltyPoints ?? 0) % 100 : state.loyaltyPoints, // Remove apenas os pontos usados
+    loyaltyDiscountApplied: loyaltyDiscount,
     stage: "ETAPA10_BUDGET",
   };
 
-  // Mostrar orçamento
+  // Mostrar orçamento conforme ETAPA10_BUDGET
   const baseQuote = Number(state.quoteMin ?? 0);
   const complementValue = Number(state.upsellValue ?? 0);
   const couponDiscount = Number(state.couponDiscountApplied ?? 0);
   const pickupFee = Number(state.pickupFee ?? 0);
-  const totalValue = baseQuote + complementValue + pickupFee - couponDiscount - loyaltyDiscount;
+  const totalValue = Math.max(0, baseQuote + complementValue + pickupFee - couponDiscount - loyaltyDiscount);
 
   responses.push({
-    text: buildBudgetSummaryText({
-      serviceLabel: state.serviceLabel || "Serviço premium",
-      serviceValue: baseQuote,
-      complementValue,
-      couponDiscount,
-      loyaltyDiscount,
-      pickupFee,
-      totalValue,
-    }),
+    text: `━━━━━━━━━━━━━━━\n📋 **Seu orçamento**\n━━━━━━━━━━━━━━━\n💰 **Valor total: R$ ${totalValue.toFixed(2).replace(".", ",")}**\n━━━━━━━━━━━━━━━\n\nVamos confirmar o agendamento?\n\n*1* ✅ Sim, confirmar\n*2* ❌ Não, voltar ao menu`,
   });
-  responses.push({ text: "Quer agendar? (sim/não)" });
 
   return { responses, nextState: newState };
 }
@@ -446,8 +438,10 @@ export async function handleCouponStep(
       ...state,
       stage: "ETAPA9_LOYALTY",
     };
+    const loyaltyPoints = state.loyaltyPoints ?? 0;
+    const discountValue = Math.floor(loyaltyPoints / 100) * 10; // 100 pontos = R$ 10
     responses.push({
-      text: `🌟 *Pontos de Fidelidade*\n\nVocê tem ${state.loyaltyPoints ?? 0} pontos disponíveis.\n100 pontos = R$ 10 de desconto!\n\nQuer usar seus pontos agora?\n\n*1* - Sim, usar pontos\n*2* - Não, guardar para depois`,
+      text: `Você tem *${loyaltyPoints}* pontos de fidelidade! 🎁\n\nPode usar para ganhar *R$ ${discountValue.toFixed(2).replace(".", ",")}* de desconto.\n\n*1* ✅ Usar pontos\n*2* ❌ Não usar pontos`,
     });
     return { responses, nextState: newState };
   }
@@ -516,10 +510,13 @@ export async function handleCouponStep(
   const formattedFinalValue = `*R$ ${finalValue.toFixed(2).replace(".", ",")}*`;
 
   responses.push({
-    text: `✅ Cupom *${formattedCouponCode}* aplicado com sucesso!\n\n🎁 ${formattedCouponCode}\n💸 Desconto aplicado: ${formattedDiscount}\n💰 Valor final do agendamento: ${formattedFinalValue}`
+    text: `✅ Cupom *${formattedCouponCode}* aplicado com sucesso!`
   });
+
+  const loyaltyPoints = state.loyaltyPoints ?? 0;
+  const discountValue = Math.floor(loyaltyPoints / 100) * 10; // 100 pontos = R$ 10
   responses.push({
-    text: `🌟 *Pontos de Fidelidade*\n\nVocê tem ${state.loyaltyPoints ?? 0} pontos disponíveis.\n100 pontos = R$ 10 de desconto!\n\nQuer usar seus pontos agora?\n\n*1* - Sim, usar pontos\n*2* - Não, guardar para depois`,
+    text: `Você tem *${loyaltyPoints}* pontos de fidelidade! 🎁\n\nPode usar para ganhar *R$ ${discountValue.toFixed(2).replace(".", ",")}* de desconto.\n\n*1* ✅ Usar pontos\n*2* ❌ Não usar pontos`,
   });
 
   return { responses, nextState: newState };
@@ -558,10 +555,17 @@ export async function handleReminderStep(
     stage: "ETAPA15_SUMMARY_CONFIRM",
   };
   
-  const totalValue = Math.max(0, Number(state.quoteMin ?? 0) + Number(state.pickupFee ?? 0) - Number(state.couponDiscountApplied ?? 0));
+  // Calculate total value with all discounts
+  const baseQuote = Number(state.quoteMin ?? 0);
+  const complementValue = Number(state.upsellValue ?? 0);
+  const couponDiscount = Number(state.couponDiscountApplied ?? 0);
+  const loyaltyDiscount = Number(state.loyaltyDiscountApplied ?? 0);
+  const pickupFee = Number(state.pickupFee ?? 0);
+  const totalValue = Math.max(0, baseQuote + complementValue + pickupFee - couponDiscount - loyaltyDiscount);
+  
   const paymentMethod = state.paymentMethod || "—";
-  const reminderText = reminderEnabled ? "sim" : "não";
-  const pickupText = state.needsPickup ? "sim" : "não";
+  const reminderText = reminderEnabled ? "Sim" : "Não";
+  const pickupText = state.needsPickup ? "Sim" : "Não";
   const customerName = resolveValidCustomerName(state.customerName) ?? resolveValidCustomerName(pushName) ?? "Cliente";
   const serviceName = state.serviceLabel ?? "—";
   const vehicle = vehicleDisplayFromFlow(state) || "—";
@@ -587,7 +591,6 @@ export async function handleReminderStep(
   }
   
   // Send text first
-  const reminderTextFinal = reminderPreference === "none" ? "não" : reminderPreference || "—";
   const upsellLabel = state.upsellLabel ? `✨ + ${state.upsellLabel}` : "";
   const needsReturn = state.needsReturn ? "🔄 Devolução: sim" : "";
   
@@ -595,7 +598,7 @@ export async function handleReminderStep(
     "━━━━━━━━━━━━━━━",
     "📋 **RESUMO DO AGENDAMENTO**",
     `👤 ${customerName}`,
-    `🧽 *${serviceName}*`,
+    `🧧 *${serviceName}*`,
     upsellLabel,
     `🚘 ${vehicle}`,
     `📅 ${date}`,
@@ -604,7 +607,7 @@ export async function handleReminderStep(
     address !== "—" ? `📍 Endereço: ${address}` : "",
     needsReturn,
     `💳 ${paymentMethod}`,
-    `🔔 Lembrete: ${reminderTextFinal}`,
+    `🔔 Lembrete: ${reminderText}`,
     `💰 **R$ ${totalValue.toFixed(2).replace(".", ",")}**`,
     "━━━━━━━━━━━━━━━",
     "",
@@ -625,10 +628,7 @@ export async function handleReminderStep(
 
 /**
  * Handler para logística (pickup/leva-e-traz)
- * NOTA: Esta função NÃO inclui a etapa de cupom (ETAPA9_COUPON).
- * A ordem no fluxo atual é: ETAPA9_LOYALTY -> ETAPA10_BUDGET -> ETAPA10_LOGISTICS -> ETAPA7_DAY
- * O cupom foi movido para ser tratado no orçamento (ETAPA10_BUDGET) em vez de antes da logística.
- * Isso é uma mudança proposital em relação à produção original para simplificar o fluxo.
+ * NOTA: Esta função segue o fluxo oficial: ETAPA10_BUDGET -> ETAPA10_LOGISTICS -> ETAPA8_PAYMENT
  */
 export async function handleLogistics(
   state: FlowState,
@@ -641,7 +641,7 @@ export async function handleLogistics(
   if (state.awaitingPickupAddress) {
     const address = input.trim();
     if (!address) {
-      responses.push({ text: "📍 Me envie o endereço completo onde o carro está para calcular a taxa de busca." });
+      responses.push({ text: "🚚 Ótimo! Me envie o endereço completo onde o carro está para calcular a taxa de busca." });
       return { responses, nextState: state };
     }
 
@@ -654,13 +654,14 @@ export async function handleLogistics(
     const newState: FlowState = {
       ...state,
       pickupAddress: address,
+      pickupDistanceKm: distance?.distanceKm,
       pickupFee,
       awaitingPickupAddress: false,
       awaitingReturnPreference: true,
     };
 
     responses.push({ 
-      text: `📍 Endereço salvo.\n💰 Taxa de busca (R$ ${feePerKm.toFixed(2)}/km × ${distance?.distanceKm ?? 0} km): R$ ${pickupFee.toFixed(2)}\n\nQuer que devolvamos o veículo até você após o serviço?\n\n*1* Sim\n*2* Não` 
+      text: `Perfeito! E quando o serviço terminar, como prefere?\n\n*1* Vocês devolvem o carro no mesmo endereço\n*2* Eu mesmo venho buscar o carro` 
     });
 
     return { responses, nextState: newState };
@@ -672,14 +673,11 @@ export async function handleLogistics(
       ...state,
       needsReturn: wantsReturn,
       awaitingReturnPreference: false,
-      stage: "ETAPA7_DAY",
+      stage: "ETAPA8_PAYMENT",
     };
 
+    // Updated messages to match specification
     responses.push({ text: wantsReturn ? "🔄 Devolução incluída no resumo." : "📍 Sem devolução, tudo certo." });
-    
-    // Enviar calendário
-    const calendarImagePath = await generateCalendarImageOnlyForTest(null);
-    responses.push({ text: generateCalendarLegend(), mediaUrl: calendarImagePath, mediaType: "image" });
 
     return { responses, nextState: newState };
   }
@@ -691,6 +689,7 @@ export async function handleLogistics(
       awaitingPickupAddress: true,
       pickupFee: 0,
     };
+    // Updated message to match specification
     responses.push({ text: "🚚 Ótimo! Me envie o endereço completo onde o carro está para calcular a taxa de busca." });
     return { responses, nextState: newState };
   }
@@ -699,12 +698,11 @@ export async function handleLogistics(
     ...state,
     needsPickup: false,
     pickupFee: 0,
-    stage: "ETAPA7_DAY",
+    stage: "ETAPA8_PAYMENT",
   };
 
+  // Updated message to match specification
   responses.push({ text: "📍 Combinado! Você pode levar o carro até a loja quando puder." });
-  const calendarImagePath = await generateCalendarImageOnlyForTest(null);
-  responses.push({ text: generateCalendarLegend(), mediaUrl: calendarImagePath, mediaType: "image" });
 
   return { responses, nextState: newState };
 }
@@ -799,7 +797,7 @@ export async function handlePixChoice(
       ...state,
       pixPaymentType: "delivery",
       paymentMethod: "PIX (Pagar na entrega)",
-      stage: "ETAPA9_REMINDER",
+      stage: "ETAPA14_REMINDER",
     };
 
     responses.push({ text: "Perfeito! Você pagará via PIX no dia do serviço." });
@@ -870,7 +868,7 @@ export async function handleReceiptUpload(
           totalPaid: currentPaid + receiptAmount,
           receiptValidationAttempts: 0,
           awaitingReceiptUpload: false,
-          stage: "ETAPA9_REMINDER",
+          stage: "ETAPA14_REMINDER",
         };
 
         // Gerar recibo digital
@@ -919,7 +917,7 @@ export async function handleReceiptUpload(
             totalPaid: newTotalPaid,
             receiptValidationAttempts: 0,
             awaitingReceiptUpload: false,
-            stage: "ETAPA9_REMINDER",
+            stage: "ETAPA14_REMINDER",
           };
 
           // Gerar recibo
@@ -1011,8 +1009,17 @@ export async function handleSummaryConfirm(
       stage: "ETAPA16_CONFIRMATION",
     };
 
+    // Get business info for final confirmation
+    const settings = await prisma.settings.findUnique({ where: { id: "default" } });
+    const address = settings?.businessAddress ?? "Rua das Oficinas, 100 - São Paulo, SP";
+    const hours = formatHours(
+      settings?.businessHoursStart ?? "08:00",
+      settings?.businessHoursEnd ?? "18:00",
+      settings?.workingDays ?? "1,2,3,4,5,6"
+    );
+
     responses.push({
-      text: `✅ *Tudo certo, ${state.customerName ?? "Cliente"}!*. 🎉\n\nSeu horário tá garantido — mal podemos esperar pra deixar seu carro brilhando. ✨\n\n📍 *Rua das Oficinas, 100 - SP*\n🕐 *Seg a Sáb, 08:00 às 18:00*\n\n📌 *Cancelamento até 2h antes sem custo.*\n📩 *Confirmação do agendamento será enviada 2h antes do horário.*\n\n─────────────────\n⭐ **Avaliação pós-serviço**\n\nGostou do atendimento? Avalie de 1 a 5!\n\n*1* - ⭐\n*2* - ⭐⭐\n*3* - ⭐⭐⭐\n*4* - ⭐⭐⭐⭐\n*5* - ⭐⭐⭐⭐⭐`,
+      text: `✅ *Agendamento confirmado!*\n\nSeu atendimento está reservado.\n\n📍 Endereço: *${address}*\n🕒 Horário: *${hours}*\n\nCancelamentos com até 2h de antecedência sem custo.\n\nPosso te ajudar com mais alguma coisa? 😊`,
     });
 
     return { responses, nextState: newState };
@@ -1217,7 +1224,7 @@ export async function handleServiceQuestion(
       const newState: FlowState = {
         ...state,
         awaitingServiceQuestion: false,
-        stage: "ETAPA11_SERVICE_QUESTION",
+        stage: "ETAPA10_FAQ",
       };
       
       return { responses, nextState: newState };

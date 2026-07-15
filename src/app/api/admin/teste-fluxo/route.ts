@@ -4,28 +4,35 @@ import { sendMedia } from '@/lib/evolution-api';
 import { generateCalendarImageOnlyForTest, generateCalendarLegend } from '@/lib/calendar-helper';
 import { testFluxoStorage } from '@/lib/test-fluxo-storage';
 import { etapa1Welcome, etapa2MainMenu, etapa4Vehicle, etapa4AskYear, etapa4VehicleConfirmation, etapa5Quote, etapa6Upsell, etapa7Day, etapa7Time, etapa8Payment, etapa8PixBlock, etapa8PixChoice, etapa9Confirm, serviceDetail, packageActionText, formatHours, type FlowContext } from '@/lib/whatsapp-flow-messages';
-import { loadWhatsAppCatalog, buildMainMenu } from '@/lib/whatsapp-service-catalog';
+import { loadWhatsAppCatalog, buildMainMenu, subMenuForCategoryCtx } from '@/lib/whatsapp-service-catalog';
 import { prisma } from '@/lib/prisma';
 import { BRAND_DEFAULT } from '@/lib/whatsapp-catalog';
 import { handleLogistics, handleSummaryConfirm, handleFinalConfirm, buildBudgetSummaryText, type FlowState, type FlowResponse, type FlowResult } from '@/lib/whatsapp-flow-core';
 
 const STEPS = [
-  { id: 'welcome', name: 'Boas-vindas', type: 'welcome', description: 'Mensagem inicial do bot' },
-  { id: 'menu', name: 'Menu Principal', type: 'menu', description: 'Exibe opções principais do sistema' },
-  { id: 'service_detail', name: 'Detalhe de Serviço', type: 'service_detail', description: 'Mostra detalhes de um serviço específico' },
-  { id: 'package', name: 'Pacotes', type: 'package', description: 'Mostra pacotes disponíveis' },
-  { id: 'vehicle', name: 'Seleção de Veículo', type: 'vehicle', description: 'Solicita informações do veículo' },
-  { id: 'vehicle_confirm', name: 'Confirmação Veículo', type: 'vehicle_confirm', description: 'Confirma os dados do veículo' },
-  { id: 'quote', name: 'Cotação', type: 'quote', description: 'Exibe preço estimado' },
-  { id: 'upsell', name: 'Upsell', type: 'upsell', description: 'Oferece serviços complementares' },
-  { id: 'day', name: 'Seleção de Data', type: 'day', description: 'Solicita data do agendamento' },
-  { id: 'time', name: 'Seleção de Horário', type: 'time', description: 'Solicita horário do agendamento' },
-  { id: 'payment', name: 'Formas de Pagamento', type: 'payment', description: 'Exibe opções de pagamento' },
-  { id: 'payment_pix', name: 'Pagamento PIX', type: 'payment_pix', description: 'Instruções de pagamento PIX' },
-  { id: 'logistics', name: 'Logística', type: 'logistics', description: 'Opções de entrega/retirada' },
-  { id: 'calendar', name: 'Calendário', type: 'calendar', description: 'Envia imagem do calendário' },
-  { id: 'summary', name: 'Resumo', type: 'summary', description: 'Resumo do agendamento' },
-  { id: 'confirmation', name: 'Confirmação', type: 'confirmation', description: 'Confirmação final do agendamento' },
+  { id: 'welcome', name: '1. Boas-Vindas', type: 'welcome', description: 'Mensagem inicial com informações da empresa' },
+  { id: 'name_collection', name: '2. Coleta de Nome', type: 'name_collection', description: 'Solicita nome do cliente' },
+  { id: 'main_menu', name: '3. Menu Principal', type: 'main_menu', description: 'Exibe categorias de serviços' },
+  { id: 'submenu', name: '4. Submenu', type: 'submenu', description: 'Mostra serviços de uma categoria' },
+  { id: 'undecided_vehicle', name: '5. Cliente Indeciso - Veículo', type: 'undecided_vehicle', description: 'Pede modelo do veículo para clientes indecisos' },
+  { id: 'undecided_problem', name: '6. Cliente Indeciso - Problema', type: 'undecided_problem', description: 'Identifica problema e recomenda serviço' },
+  { id: 'package_action', name: '7. Ações com Pacotes', type: 'package_action', description: 'Opções após selecionar pacote' },
+  { id: 'service_action', name: '8. Ações Após Serviço', type: 'service_action', description: 'Opções após selecionar serviço' },
+  { id: 'vehicle_collection', name: '9. Coleta de Veículo', type: 'vehicle_collection', description: 'Coleta modelo, ano, cor e estado' },
+  { id: 'quote', name: '10. Orçamento', type: 'quote', description: 'Exibe preço estimado do serviço' },
+  { id: 'first_time_bonus', name: '11. Bônus Primeira Vez', type: 'first_time_bonus', description: 'Oferece desconto de 10% para novos clientes' },
+  { id: 'upsell', name: '12. Upsell', type: 'upsell', description: 'Oferece serviços complementares' },
+  { id: 'day_selection', name: '13. Escolha de Dia', type: 'day_selection', description: 'Envia calendário para seleção de data' },
+  { id: 'time_selection', name: '14. Escolha de Horário', type: 'time_selection', description: 'Exibe horários disponíveis' },
+  { id: 'coupon', name: '15. Cupom', type: 'coupon', description: 'Solicita código de cupom de desconto' },
+  { id: 'loyalty', name: '16. Pontos de Fidelidade', type: 'loyalty', description: 'Opções para usar pontos de fidelidade' },
+  { id: 'budget_confirmation', name: '17. Confirmação de Orçamento', type: 'budget_confirmation', description: 'Confirma valor total antes de prosseguir' },
+  { id: 'logistics', name: '18. Logística', type: 'logistics', description: 'Opções de entrega/retirada do veículo' },
+  { id: 'payment', name: '19. Pagamento', type: 'payment', description: 'Exibe formas de pagamento disponíveis' },
+  { id: 'pix_choice', name: '20. Escolha PIX', type: 'pix_choice', description: 'Opções de pagamento PIX (agora/entrega)' },
+  { id: 'receipt_upload', name: '21. Comprovante', type: 'receipt_upload', description: 'Solicita upload de comprovante de pagamento' },
+  { id: 'reminder', name: '22. Lembrete', type: 'reminder', description: 'Configura lembrete do agendamento' },
+  { id: 'summary_confirmation', name: '23. Resumo e Confirmação', type: 'summary_confirmation', description: 'Resumo completo e confirmação final' },
 ];
 
 async function loadContext(): Promise<FlowContext> {
@@ -60,6 +67,7 @@ async function createTestFlowState(stage: string): Promise<FlowState> {
     vehicleModel: 'Toyota Corolla',
     vehicleYear: '2022',
     vehicleColor: 'Branco',
+    vehicleCondition: 'bom',
     dbServiceId: 'test-service-id',
     quoteMin: 350.00,
     quoteMax: 350.00,
@@ -110,36 +118,45 @@ async function testIndividualStep(phone: string, stepId: string) {
     let text = '';
 
     if (step.type === 'welcome') {
-      // Exatamente como no startFlow do whatsapp-flow.ts
+      // 1. BOAS-VINDAS
       text = etapa1Welcome(ctx, wctx.prompts);
-    } else if (step.type === 'menu') {
-      // Exatamente como no goToMainMenu do whatsapp-flow.ts
-      const customerName = 'Cliente Teste';
+    } else if (step.type === 'name_collection') {
+      // 2. COLETA DE NOME
+      text = 'Olá! 😊 Para começar, qual é o seu nome?';
+    } else if (step.type === 'main_menu') {
+      // 3. MENU PRINCIPAL
       text = buildMainMenu(wctx.categories, wctx.prompts);
-    } else if (step.type === 'service_detail') {
-      // Mostra detalhe de um serviço específico
+    } else if (step.type === 'submenu') {
+      // 4. SUBMENU
+      const firstCategory = Object.keys(wctx.categories)[0];
+      text = subMenuForCategoryCtx(1, wctx);
+    } else if (step.type === 'undecided_vehicle') {
+      // 5. CLIENTE INDECISO - VEÍCULO
+      text = 'Qual é o modelo do seu veículo? 🚗\n\n_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_';
+    } else if (step.type === 'undecided_problem') {
+      // 6. CLIENTE INDECISO - PROBLEMA
+      text = 'Perfeito 🚗\n\nO que está acontecendo?\n\n1 🎨 Pintura opaca, riscada ou sem brilho\n2 🪑 Interior com cheiro ruim ou muito sujo\n3 🛡️ Quero proteger um carro novo ou recém-comprado\n4 ✨ Quero um cuidado geral completo\n5 🔧 Outro problema';
+    } else if (step.type === 'package_action') {
+      // 7. AÇÕES COM PACOTES
+      text = packageActionText(wctx.prompts);
+    } else if (step.type === 'service_action') {
+      // 8. AÇÕES APÓS SERVIÇO
       const firstService = Object.values(wctx.catalog)[0];
       if (firstService) {
         text = serviceDetail(firstService, wctx.prompts);
       } else {
         text = 'Nenhum serviço disponível no catálogo';
       }
-    } else if (step.type === 'package') {
-      // Usar a função real do fluxo
-      text = packageActionText(wctx.prompts);
-    } else if (step.type === 'vehicle') {
-      // Exatamente como no fluxo oficial
-      text = etapa4Vehicle(false, wctx.prompts);
-    } else if (step.type === 'vehicle_confirm') {
-      // Usar a função real de confirmação de veículo
-      text = etapa4VehicleConfirmation('Toyota Corolla', '2022', 'Branco', 'Excelente');
+    } else if (step.type === 'vehicle_collection') {
+      // 9. COLETA DE VEÍCULO
+      text = 'Qual é o modelo do seu veículo? 🚗\n\n_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_';
     } else if (step.type === 'quote') {
-      // Exibe cotação
+      // 10. ORÇAMENTO
       const firstService = Object.values(wctx.catalog)[0];
       if (firstService) {
         text = etapa5Quote(
           'Cliente Teste',
-          'Toyota Corolla 2022',
+          'Toyota Corolla 2022 Branco',
           firstService.label,
           firstService.hatchMin || 500,
           firstService.hatchMax || 700,
@@ -150,33 +167,35 @@ async function testIndividualStep(phone: string, stepId: string) {
       } else {
         text = 'Não foi possível gerar cotação';
       }
+    } else if (step.type === 'first_time_bonus') {
+      // 11. BÔNUS PRIMEIRA VEZ
+      text = '🎁 Bônus! Primeira vez: 10% de desconto\n\nÉ sua primeira vez aqui! Ganhou 10% de desconto no primeiro serviço.\n\n💰 Desconto: R$ 35,00\n\n1 ✅ Quero o desconto\n2 ❌ Não, obrigado';
     } else if (step.type === 'upsell') {
-      // Oferece upsell
-      text = etapa6Upsell('Polimento', 'Vitrificação', 'Proteção extra para sua pintura', wctx.prompts);
-    } else if (step.type === 'day') {
-      // Exatamente como no fluxo oficial
+      // 12. UPSELL
+      text = '✨ Que tal adicionar Vitrificação Cerâmica?\n\n💰 R$ 150,00 a mais\n\n1 - Sim, incluir\n2 - Não, obrigado';
+    } else if (step.type === 'day_selection') {
+      // 13. ESCOLHA DE DIA
       text = etapa7Day(wctx.prompts);
-    } else if (step.type === 'time') {
-      // Exatamente como no fluxo oficial
+    } else if (step.type === 'time_selection') {
+      // 14. ESCOLHA DE HORÁRIO
       const slots = ['08:00', '10:00', '14:00', '16:00'];
       text = etapa7Time('15/07/2026', slots, '2 horas', wctx.prompts);
-    } else if (step.type === 'payment') {
-      // Exatamente como no fluxo oficial
-      text = etapa8Payment(true, wctx.prompts);
-    } else if (step.type === 'payment_pix') {
-      // Instrução de pagamento PIX - usar ambas as funções reais
-      const pixBlock = etapa8PixBlock(ctx, wctx.prompts);
-      const pixChoice = etapa8PixChoice(wctx.prompts);
-      text = `${pixBlock}\n\n${pixChoice}`;
+    } else if (step.type === 'coupon') {
+      // 15. CUPOM
+      text = 'Perfeito 😊 Me envie o código do cupom (ex: AA).';
+    } else if (step.type === 'loyalty') {
+      // 16. PONTOS DE FIDELIDADE
+      text = '🌟 Você tem 100 pontos de fidelidade!\n\nDeseja usar seus pontos para desconto?\n\n1 - Sim, usar pontos\n2 - Não, guardar pontos';
+    } else if (step.type === 'budget_confirmation') {
+      // 17. CONFIRMAÇÃO DE ORÇAMENTO
+      text = '🚚 Como prefere?\n\n1 - Deixe eu levo o carro até a estética\n2 - A estética vai buscar o carro';
     } else if (step.type === 'logistics') {
-      // Usar a função real do flow-core
+      // 18. LOGÍSTICA
       const testState = await createTestFlowState('ETAPA10_LOGISTICS');
       const responses: FlowResponse[] = [];
       
-      // Simular seleção de "Leva e traz" (opção 1)
       const result = await handleLogistics(testState, '1', responses);
       
-      // Enviar todas as respostas geradas pela função real
       for (const response of result.responses) {
         if (response.mediaUrl) {
           await sendMedia({
@@ -197,34 +216,20 @@ async function testIndividualStep(phone: string, stepId: string) {
         message: `Logística enviada para ${phone} usando fluxo real`,
         type: 'logistics'
       });
-    } else if (step.type === 'calendar') {
-      // Usar a função real de teste com conversão PNG
-      const calendarImagePath = await generateCalendarImageOnlyForTest(null);
-      const legend = generateCalendarLegend();
-      
-      const result = await sendMedia({
-        number: phone,
-        mediaUrl: calendarImagePath,
-        caption: legend
-      });
-      
-      // Verificar se a mensagem foi colocada em fila devido a rate limit
-      if (result && typeof result === 'object' && 'queued' in result) {
-        return NextResponse.json({ 
-          success: true, 
-          message: `Calendário na fila de envio para ${phone} (rate limit da API - será enviado em até 30s)`,
-          type: 'calendar',
-          queued: true
-        });
-      }
-      
-      return NextResponse.json({ 
-        success: true, 
-        message: `Calendário enviado para ${phone}`,
-        type: 'calendar'
-      });
-    } else if (step.type === 'summary') {
-      // Usar a função real do fluxo para texto de resumo
+    } else if (step.type === 'payment') {
+      // 19. PAGAMENTO
+      text = etapa8Payment(true, wctx.prompts);
+    } else if (step.type === 'pix_choice') {
+      // 20. ESCOLHA PIX
+      text = '💸 Como você prefere pagar via PIX?\n\n1 PIX (Pagar agora)\n2 PIX (Pagar na entrega)';
+    } else if (step.type === 'receipt_upload') {
+      // 21. COMPROVANTE
+      text = 'Por favor, envie o comprovante de pagamento para confirmarmos seu agendamento.';
+    } else if (step.type === 'reminder') {
+      // 22. LEMBRETE
+      text = '🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa';
+    } else if (step.type === 'summary_confirmation') {
+      // 23. RESUMO E CONFIRMAÇÃO
       const testState = await createTestFlowState('ETAPA15_SUMMARY_CONFIRM');
       const serviceValue = testState.quoteMin || 350.00;
       const pickupFee = testState.pickupFee || 0;
@@ -248,34 +253,6 @@ async function testIndividualStep(phone: string, stepId: string) {
         message: `Resumo enviado para ${phone}`,
         type: 'summary'
       });
-    } else if (step.type === 'confirmation') {
-      // Usar a função real de confirmação final
-      const testState = await createTestFlowState('ETAPA16_CONFIRMATION');
-      const responses: FlowResponse[] = [];
-      
-      const result = await handleFinalConfirm(testState, '1', responses);
-      
-      // Enviar todas as respostas geradas pela função real
-      for (const response of result.responses) {
-        if (response.mediaUrl) {
-          await sendMedia({
-            number: phone,
-            mediaUrl: response.mediaUrl,
-            caption: response.text
-          });
-        } else {
-          await sendText({
-            number: phone,
-            text: response.text
-          });
-        }
-      }
-      
-      return NextResponse.json({ 
-        success: true, 
-        message: `Confirmação enviada para ${phone} usando fluxo real`,
-        type: 'confirmation'
-      });
     } else {
       text = `Teste de etapa: ${step.name}`;
     }
@@ -285,7 +262,6 @@ async function testIndividualStep(phone: string, stepId: string) {
       text
     });
     
-    // Verificar se a mensagem foi colocada em fila devido a rate limit
     if (result && typeof result === 'object' && 'queued' in result) {
       return NextResponse.json({ 
         success: true, 
@@ -341,35 +317,44 @@ async function runSequence(sessionId: string, phone: string) {
       let text = '';
 
       if (step.type === 'welcome') {
-        // Exatamente como no startFlow do whatsapp-flow.ts
+        // 1. BOAS-VINDAS
         text = etapa1Welcome(ctx, wctx.prompts);
-      } else if (step.type === 'menu') {
-        // Exatamente como no goToMainMenu do whatsapp-flow.ts
+      } else if (step.type === 'name_collection') {
+        // 2. COLETA DE NOME
+        text = 'Olá! 😊 Para começar, qual é o seu nome?';
+      } else if (step.type === 'main_menu') {
+        // 3. MENU PRINCIPAL
         text = buildMainMenu(wctx.categories, wctx.prompts);
-      } else if (step.type === 'service_detail') {
-        // Mostra detalhe de um serviço específico
+      } else if (step.type === 'submenu') {
+        // 4. SUBMENU
+        text = subMenuForCategoryCtx(1, wctx);
+      } else if (step.type === 'undecided_vehicle') {
+        // 5. CLIENTE INDECISO - VEÍCULO
+        text = 'Qual é o modelo do seu veículo? 🚗\n\n_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_';
+      } else if (step.type === 'undecided_problem') {
+        // 6. CLIENTE INDECISO - PROBLEMA
+        text = 'Perfeito 🚗\n\nO que está acontecendo?\n\n1 🎨 Pintura opaca, riscada ou sem brilho\n2 🪑 Interior com cheiro ruim ou muito sujo\n3 🛡️ Quero proteger um carro novo ou recém-comprado\n4 ✨ Quero um cuidado geral completo\n5 🔧 Outro problema';
+      } else if (step.type === 'package_action') {
+        // 7. AÇÕES COM PACOTES
+        text = packageActionText(wctx.prompts);
+      } else if (step.type === 'service_action') {
+        // 8. AÇÕES APÓS SERVIÇO
         const firstService = Object.values(wctx.catalog)[0];
         if (firstService) {
           text = serviceDetail(firstService, wctx.prompts);
         } else {
           text = 'Nenhum serviço disponível no catálogo';
         }
-      } else if (step.type === 'package') {
-        // Usar a função real do fluxo
-        text = packageActionText(wctx.prompts);
-      } else if (step.type === 'vehicle') {
-        // Exatamente como no fluxo oficial
-        text = etapa4Vehicle(false, wctx.prompts);
-      } else if (step.type === 'vehicle_confirm') {
-        // Usar a função real de confirmação de veículo
-        text = etapa4VehicleConfirmation('Toyota Corolla', '2022', 'Branco', 'Excelente');
+      } else if (step.type === 'vehicle_collection') {
+        // 9. COLETA DE VEÍCULO
+        text = 'Qual é o modelo do seu veículo? 🚗\n\n_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_';
       } else if (step.type === 'quote') {
-        // Exibe cotação
+        // 10. ORÇAMENTO
         const firstService = Object.values(wctx.catalog)[0];
         if (firstService) {
           text = etapa5Quote(
             'Cliente Teste',
-            'Toyota Corolla 2022',
+            'Toyota Corolla 2022 Branco',
             firstService.label,
             firstService.hatchMin || 500,
             firstService.hatchMax || 700,
@@ -380,33 +365,35 @@ async function runSequence(sessionId: string, phone: string) {
         } else {
           text = 'Não foi possível gerar cotação';
         }
+      } else if (step.type === 'first_time_bonus') {
+        // 11. BÔNUS PRIMEIRA VEZ
+        text = '🎁 Bônus! Primeira vez: 10% de desconto\n\nÉ sua primeira vez aqui! Ganhou 10% de desconto no primeiro serviço.\n\n💰 Desconto: R$ 35,00\n\n1 ✅ Quero o desconto\n2 ❌ Não, obrigado';
       } else if (step.type === 'upsell') {
-        // Oferece upsell
-        text = etapa6Upsell('Polimento', 'Vitrificação', 'Proteção extra para sua pintura', wctx.prompts);
-      } else if (step.type === 'day') {
-        // Exatamente como no fluxo oficial
+        // 12. UPSELL
+        text = '✨ Que tal adicionar Vitrificação Cerâmica?\n\n💰 R$ 150,00 a mais\n\n1 - Sim, incluir\n2 - Não, obrigado';
+      } else if (step.type === 'day_selection') {
+        // 13. ESCOLHA DE DIA
         text = etapa7Day(wctx.prompts);
-      } else if (step.type === 'time') {
-        // Exatamente como no fluxo oficial
+      } else if (step.type === 'time_selection') {
+        // 14. ESCOLHA DE HORÁRIO
         const slots = ['08:00', '10:00', '14:00', '16:00'];
         text = etapa7Time('15/07/2026', slots, '2 horas', wctx.prompts);
-      } else if (step.type === 'payment') {
-        // Exatamente como no fluxo oficial
-        text = etapa8Payment(true, wctx.prompts);
-      } else if (step.type === 'payment_pix') {
-        // Instrução de pagamento PIX - usar ambas as funções reais
-        const pixBlock = etapa8PixBlock(ctx, wctx.prompts);
-        const pixChoice = etapa8PixChoice(wctx.prompts);
-        text = `${pixBlock}\n\n${pixChoice}`;
+      } else if (step.type === 'coupon') {
+        // 15. CUPOM
+        text = 'Perfeito 😊 Me envie o código do cupom (ex: AA).';
+      } else if (step.type === 'loyalty') {
+        // 16. PONTOS DE FIDELIDADE
+        text = '🌟 Você tem 100 pontos de fidelidade!\n\nDeseja usar seus pontos para desconto?\n\n1 - Sim, usar pontos\n2 - Não, guardar pontos';
+      } else if (step.type === 'budget_confirmation') {
+        // 17. CONFIRMAÇÃO DE ORÇAMENTO
+        text = '🚚 Como prefere?\n\n1 - Deixe eu levo o carro até a estética\n2 - A estética vai buscar o carro';
       } else if (step.type === 'logistics') {
-        // Usar a função real do flow-core
+        // 18. LOGÍSTICA
         const testState = await createTestFlowState('ETAPA10_LOGISTICS');
         const responses: FlowResponse[] = [];
         
-        // Simular seleção de "Leva e traz" (opção 1)
         const result = await handleLogistics(testState, '1', responses);
         
-        // Enviar todas as respostas geradas pela função real
         for (const response of result.responses) {
           if (response.mediaUrl) {
             await sendMedia({
@@ -421,20 +408,21 @@ async function runSequence(sessionId: string, phone: string) {
             });
           }
         }
-        continue; // Pular o envio normal de texto abaixo
-      } else if (step.type === 'calendar') {
-        // Usar a função real de teste com conversão PNG
-        const calendarImagePath = await generateCalendarImageOnlyForTest(null);
-        const legend = generateCalendarLegend();
-        
-        await sendMedia({
-          number: phone,
-          mediaUrl: calendarImagePath,
-          caption: legend
-        });
-        continue; // Pular o envio normal de texto abaixo
-      } else if (step.type === 'summary') {
-        // Usar a função real do fluxo para texto de resumo
+        continue;
+      } else if (step.type === 'payment') {
+        // 19. PAGAMENTO
+        text = etapa8Payment(true, wctx.prompts);
+      } else if (step.type === 'pix_choice') {
+        // 20. ESCOLHA PIX
+        text = '💸 Como você prefere pagar via PIX?\n\n1 PIX (Pagar agora)\n2 PIX (Pagar na entrega)';
+      } else if (step.type === 'receipt_upload') {
+        // 21. COMPROVANTE
+        text = 'Por favor, envie o comprovante de pagamento para confirmarmos seu agendamento.';
+      } else if (step.type === 'reminder') {
+        // 22. LEMBRETE
+        text = '🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa';
+      } else if (step.type === 'summary_confirmation') {
+        // 23. RESUMO E CONFIRMAÇÃO
         const testState = await createTestFlowState('ETAPA15_SUMMARY_CONFIRM');
         const serviceValue = testState.quoteMin || 350.00;
         const pickupFee = testState.pickupFee || 0;
@@ -452,30 +440,7 @@ async function runSequence(sessionId: string, phone: string) {
           number: phone,
           text: summaryText
         });
-        continue; // Pular o envio normal de texto abaixo
-      } else if (step.type === 'confirmation') {
-        // Usar a função real de confirmação final
-        const testState = await createTestFlowState('ETAPA16_CONFIRMATION');
-        const responses: FlowResponse[] = [];
-        
-        const result = await handleFinalConfirm(testState, '1', responses);
-        
-        // Enviar todas as respostas geradas pela função real
-        for (const response of result.responses) {
-          if (response.mediaUrl) {
-            await sendMedia({
-              number: phone,
-              mediaUrl: response.mediaUrl,
-              caption: response.text
-            });
-          } else {
-            await sendText({
-              number: phone,
-              text: response.text
-            });
-          }
-        }
-        continue; // Pular o envio normal de texto abaixo
+        continue;
       } else {
         text = `Teste de etapa: ${step.name}`;
       }
@@ -486,27 +451,23 @@ async function runSequence(sessionId: string, phone: string) {
           text
         });
         
-        // Verificar se a mensagem foi colocada em fila devido a rate limit
         if (result && typeof result === 'object' && 'queued' in result) {
           console.log(`[Teste Fluxo] Etapa ${step.id} na fila (rate limit)`);
         }
       }
 
-      // Atualizar sessão
       session.currentStep = i + 1;
       session.currentStepName = step.name;
       testFluxoStorage.set(sessionId, session);
 
-      // Aguardar 1 minuto (rate limit) - exceto na última etapa
       if (i < STEPS.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 60000)); // 1 minuto
+        await new Promise(resolve => setTimeout(resolve, 60000));
       }
     } catch (error) {
       console.error(`[Teste Fluxo] Erro na etapa ${step.id}:`, error);
     }
   }
 
-  // Marcar como concluído
   session.completed = true;
   testFluxoStorage.set(sessionId, session);
 }
