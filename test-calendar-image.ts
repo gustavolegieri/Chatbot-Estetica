@@ -76,7 +76,7 @@ async function testCalendarImageConversion() {
       number: TEST_PHONE,
       mediaUrl: conversionResult.url!,
       caption: "📅 Calendário de disponibilidade (teste de conversão SVG→PNG)"
-    });
+    }) as any;
 
     if (sendResult.error) {
       console.error("❌ Erro no envio:", sendResult.error);

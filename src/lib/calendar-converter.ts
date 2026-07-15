@@ -47,7 +47,7 @@ export async function convertSvgToPng(
     });
 
     // Configurar redimensionamento
-    const resizeOptions: sharp.ResizeOptions = {
+    const resizeOptions: any = {
       width: width,
       fit: 'inside',
       withoutEnlargement: true

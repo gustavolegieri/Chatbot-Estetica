@@ -105,7 +105,10 @@ export async function sendCalendarWithImageAndList({ number, prompts }: { number
     console.log("[Calendar] Resultado do envio:", result);
     
     // Verifica se o envio foi bem-sucedido (não retornou erro)
-    if (result && !result.error) {
+    const hasError = result && typeof result === 'object' && 'error' in result;
+    const isBlocked = result && typeof result === 'object' && 'blocked' in result;
+    
+    if (result && !hasError && !isBlocked) {
       imageSent = true;
       console.log("[Calendar] Imagem enviada com sucesso");
     } else {
