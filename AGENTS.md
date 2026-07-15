@@ -250,3 +250,38 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 2. **Supabase:** Use sempre o pooler (porta 6543) com `pgbouncer=true`
 3. **Cold starts:** O timeout de segurança de 30s no debouncing evita travamentos
 4. **Logs:** Mantenha logs detalhados em desenvolvimento para debug
+
+## Limite Diário da WasenderAPI vs Rate Limit Temporário
+
+### Problema
+A WasenderAPI retorna erro 429 em duas situações diferentes:
+1. **Rate limit temporário:** Muitas requisições em curto período (deve aguardar e retry)
+2. **Limite diário:** Atingiu 50 mensagens do plano de teste (não adianta retry)
+
+O código anterior tratava todos os erros 429 como rate limit temporário, enfileirando mensagens que nunca seriam enviadas quando era o limite diário.
+
+### Solução Aplicada
+1. **Atualizado `src/lib/evolution-api.ts`:**
+   - Detecta quando o erro 429 é devido a limite diário (verifica se a mensagem contém "daily" ou "trial cap")
+   - Quando é limite diário, retorna erro imediatamente sem enfileirar
+   - Quando é rate limit temporário, continua enfileirando como antes
+
+2. **Atualizado `src/app/api/admin/teste-fluxo/route.ts`:**
+   - Detecta quando o retorno indica limite diário
+   - Retorna mensagem específica informando sobre o limite de 50 mensagens
+
+3. **Atualizado `src/app/admin/teste-fluxo/page.tsx`:**
+   - Adiciona aviso visível sobre limite diário da API
+   - Trata erros de limite diário especificamente nos logs
+
+4. **Atualizado `src/app/api/admin/diagnostico/test-connection/route.ts`:**
+   - Detecta limite diário durante diagnóstico
+   - Retorna status específico para limite diário
+
+5. **Atualizado `src/app/admin/diagnostico-whatsapp/page.tsx`:**
+   - Mostra status específico do limite diário nos resultados do diagnóstico
+
+### Como Verificar
+- Use o diagnóstico em `/admin/diagnostico-whatsapp` para verificar o status da API
+- Se mostrar "Limite diário pode ter sido atingido", aguarde o reset diário ou faça upgrade
+- A página de teste de fluxo agora mostra aviso sobre o limite de 50 mensagens/dia

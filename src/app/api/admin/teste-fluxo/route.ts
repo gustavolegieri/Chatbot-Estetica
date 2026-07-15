@@ -270,6 +270,14 @@ async function testIndividualStep(phone: string, stepId: string) {
       });
     }
     
+    if (result && typeof result === 'object' && 'error' in result && (result as any).status === 429) {
+      return NextResponse.json({ 
+        success: false, 
+        message: `Limite diário da API atingido (50 mensagens). Aguarde o reset diário ou faça upgrade para plano pago.`,
+        dailyLimit: true
+      });
+    }
+    
     return NextResponse.json({ 
       success: true, 
       message: `Etapa "${step.name}" enviada para ${phone}` 

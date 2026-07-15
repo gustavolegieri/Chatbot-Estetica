@@ -49,6 +49,23 @@ export default function DiagnosticoWhatsAppPage() {
           message: testData.success ? "Conexão estabelecida" : "Falha na conexão",
           details: testData.message || testData.error
         }]);
+
+        // 3. Verificar limite diário se houver erro 429
+        if (!testData.success && testData.status === 429) {
+          setResults(prev => [...prev, {
+            name: "Limite Diário da API",
+            status: "warning",
+            message: "Limite diário pode ter sido atingido",
+            details: "A WasenderAPI tem limite de 50 mensagens/dia no plano de teste. Faça upgrade ou aguarde o reset diário."
+          }]);
+        } else if (testData.success) {
+          setResults(prev => [...prev, {
+            name: "Limite Diário da API",
+            status: "success",
+            message: "API disponível",
+            details: "Limite diário: 50 mensagens (plano de teste)"
+          }]);
+        }
       }
 
       // 3. Verificar configurações do WhatsApp

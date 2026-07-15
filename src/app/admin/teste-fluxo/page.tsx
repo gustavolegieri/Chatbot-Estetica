@@ -79,6 +79,8 @@ export default function TesteFluxoPage() {
 
       if (result.success) {
         addLog(selectedStep, 'success', result.message || 'Etapa enviada com sucesso');
+      } else if (result.dailyLimit) {
+        addLog(selectedStep, 'error', result.message || 'Limite diário da API atingido');
       } else {
         addLog(selectedStep, 'error', result.error || 'Erro ao enviar etapa');
       }
@@ -178,6 +180,21 @@ export default function TesteFluxoPage() {
       {/* Configurações */}
       <div className="bg-white p-6 rounded-lg shadow mb-6">
         <h2 className="text-xl font-bold mb-4">Configurações</h2>
+        
+        {/* Aviso sobre limite diário da API */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">⚠️</span>
+            <div>
+              <h3 className="font-semibold text-yellow-800">Limite Diário da API</h3>
+              <p className="text-sm text-yellow-700 mt-1">
+                A WasenderAPI tem um limite de 50 mensagens por dia no plano de teste. 
+                Se você recebeu erro "rate limit", pode ser que este limite tenha sido atingido.
+                As mensagens só serão enviadas novamente após o reset diário ou upgrade para plano pago.
+              </p>
+            </div>
+          </div>
+        </div>
         
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Número de Teste</label>

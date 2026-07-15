@@ -176,10 +176,24 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
 
   if (response.status === 429 && attempt <= 3) {
     let waitMs = 30_000; // Reduzido de 62s para 30s para alta disponibilidade
+    let isDailyLimit = false;
+    
     try {
-      const json = await response.clone().json() as { retry_after?: number };
+      const json = await response.clone().json() as { retry_after?: number; message?: string };
       if (json.retry_after) waitMs = Math.min(json.retry_after * 1000, 30_000); // Max 30s
+      
+      // Verificar se é limite diário (não deve enfileirar)
+      if (json.message?.toLowerCase().includes("daily") || json.message?.toLowerCase().includes("trial cap")) {
+        isDailyLimit = true;
+      }
     } catch { /* ignora */ }
+    
+    if (isDailyLimit) {
+      console.error("[WasenderAPI] ❌ Limite diário da API atingido - mensagens não serão enfileiradas");
+      console.error("[WasenderAPI] 💡 Faça upgrade para plano pago ou aguarde o reset diário");
+      return { error: true, status: 429, message: "Limite diário da API atingido" };
+    }
+    
     console.warn(`[WasenderAPI] ⏳ Rate limit — aguardando ${waitMs / 1000}s (tentativa ${attempt}/3)`);
     
     // Adicionar à fila em vez de bloquear
