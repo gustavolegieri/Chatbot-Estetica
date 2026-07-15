@@ -30,8 +30,10 @@ DATABASE_URL=postgresql://postgres.SEU_REF:SENHA@aws-1-us-east-1.pooler.supabase
 
 ### Pool de Conexões
 - **Connection_limit:** Aumentado para 50 para suportar alta concorrência
-- **Debounce:** Reduzido de 2800ms para 1500ms para resposta mais rápida
+- **Debounce:** Reduzido de 2800ms para 500ms para plano gratuito WASender API (1 msg/min)
 - **Timeout de processamento:** Reduzido de 30s para 15s para evitar travamentos
+- **Processamento assíncrono:** Webhook responde imediatamente e processa em background
+- **Logs reduzidos:** Removidos logs excessivos para reduzir overhead no Vercel
 
 ### Cache de Deduplicação
 - **TTL:** Reduzido de 24h para 6h para menor uso de memória

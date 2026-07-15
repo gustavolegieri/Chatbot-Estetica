@@ -97,7 +97,6 @@ function markMessageAsProcessed(messageId: string): void {
 }
 
 export async function POST(req: NextRequest) {
-  console.log("[Webhook] 🚀🚀🚀 WEBHOOK POST RECEBIDO - INÍCIO ABSOLUTO 🚀🚀🚀");
   let rawBody: string;
   try {
     rawBody = await req.text();
@@ -152,42 +151,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // Verificar modo de teste
-  const { prisma } = await import("@/lib/prisma");
-  const settings = await prisma.settings.findUnique({ where: { id: "default" } });
-  
-  console.log("[Webhook] Configurações de teste:", {
-    testModeEnabled: settings?.testModeEnabled,
-    testModePhone: settings?.testModePhone,
-    phoneExtraido: phone
-  });
-  
-  if (settings?.testModeEnabled) {
-    const testPhone = settings.testModePhone?.replace(/\D/g, ""); // Remove não-dígitos
-    const normalizedPhone = phone.replace(/\D/g, "");
-    
-    console.log("[Webhook] Comparação de modo de teste:", {
-      testPhone,
-      normalizedPhone,
-      saoIguais: testPhone === normalizedPhone,
-      testPhoneLength: testPhone?.length,
-      normalizedPhoneLength: normalizedPhone.length
-    });
-    
-    // Se não há telefone de teste configurado, ignora todas as mensagens em modo de teste
-    if (!testPhone) {
-      console.log("[Webhook] Modo de teste ativado mas nenhum telefone configurado - todas as mensagens serão ignoradas");
-      return NextResponse.json({ ok: true });
-    }
-    
-    if (normalizedPhone !== testPhone) {
-      console.log("[Webhook] Modo de teste ativado - mensagem ignorada de telefone não autorizado:", phone, "(esperado:", testPhone + ")");
-      return NextResponse.json({ ok: true });
-    }
-    
-    console.log("[Webhook] Modo de teste - mensagem autorizada de telefone de teste:", phone);
-  }
-
   // Deduplicação baseada em ID da mensagem
   const messageId = msgKey.id as string | undefined;
   if (messageId && isMessageProcessed(messageId)) {
@@ -199,31 +162,25 @@ export async function POST(req: NextRequest) {
   const { buttonId, listId } = extractInteractive(msg);
   const pushName = (msg.pushName ?? msg.notifyName ?? "") as string;
 
-  console.log("[Webhook] processando — phone:", phone, "text:", text, "messageId:", messageId, "testModeEnabled:", settings?.testModeEnabled);
-
   // Marcar mensagem como processada ANTES de processar para evitar duplicatas
   if (messageId) {
     markMessageAsProcessed(messageId);
   }
 
-  try {
-    console.log("[Webhook] 🚀 Iniciando processamento da mensagem");
-    await processWhatsAppMessage({
-      phone,
-      text: text || buttonId || listId || "",
-      buttonId,
-      listId,
-      pushName: pushName || undefined,
-    });
-    
-    console.log("[Webhook] processamento concluído");
-  } catch (err) {
-    console.error("[Webhook] ERRO:", err);
+  // Processar em background e responder imediatamente
+  processWhatsAppMessage({
+    phone,
+    text: text || buttonId || listId || "",
+    buttonId,
+    listId,
+    pushName: pushName || undefined,
+  }).catch(err => {
+    console.error("[Webhook] ERRO no processamento background:", err);
     // Em caso de erro, remover marcação para permitir retry
     if (messageId) {
       processedMessageIds.delete(messageId);
     }
-  }
+  });
 
   return NextResponse.json({ ok: true });
 }

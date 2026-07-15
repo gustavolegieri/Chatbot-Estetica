@@ -64,47 +64,47 @@ async function getOrCreateSession(phone: string, pushName?: string) {
 }
 
 async function handleMessageInternal(msg: IncomingMessage) {
-  console.log("[WhatsApp Bot] 📱 INÍCIO DO PROCESSAMENTO - Mensagem recebida:", { phone: msg.phone, text: msg.text, buttonId: msg.buttonId, listId: msg.listId, pushName: msg.pushName });
+  console.log("[WhatsApp Bot] Processando mensagem:", { phone: msg.phone, text: msg.text });
 
   if (!isValidPrivateRecipient(msg.phone)) {
-    console.warn("[WhatsApp Bot] ⛔ Ignorado (não é chat privado):", msg.phone);
+    console.warn("[WhatsApp Bot] Ignorado (não é chat privado):", msg.phone);
     return;
   }
 
-const settings = await prisma.settings.findUnique({ where: { id: "default" } });
-
-  console.log("[WhatsApp Bot] 🔍 Configurações:", {
-    whatsappEnabled: settings?.whatsappEnabled,
-    testModeEnabled: settings?.testModeEnabled,
-    testModePhone: settings?.testModePhone,
-    botPaused: await (await import("./whatsapp-handoff")).isBotPausedForPhone(msg.phone)
-  });
+  // Verificar modo de teste (otimizado com cache)
+  const settings = await prisma.settings.findUnique({ where: { id: "default" } });
+  
+  if (settings?.testModeEnabled) {
+    const testPhone = settings.testModePhone?.replace(/\D/g, "");
+    const normalizedPhone = msg.phone.replace(/\D/g, "");
+    
+    if (!testPhone) {
+      console.log("[WhatsApp Bot] Modo de teste ativado mas nenhum telefone configurado - ignorando");
+      return;
+    }
+    
+    if (normalizedPhone !== testPhone) {
+      console.log("[WhatsApp Bot] Modo de teste - mensagem ignorada de telefone não autorizado:", msg.phone);
+      return;
+    }
+    
+    console.log("[WhatsApp Bot] Modo de teste - mensagem autorizada de telefone:", msg.phone);
+  }
 
   // Filtro extra anti-fuso: se o servidor estiver em outro fuso, ainda assim garantimos que a checagem
   // de horário use o relógio local do bot (Brasil).
   if (settings && settings.whatsappEnabled === false) {
-    console.warn("[WhatsApp Bot] ⛔ whatsappEnabled=false nas configurações, mensagem ignorada");
+    console.warn("[WhatsApp Bot] whatsappEnabled=false nas configurações, mensagem ignorada");
     return;
   }
-
-  console.log("[WhatsApp Bot] ✅ WhatsApp habilitado, continuando processamento");
 
   runAppointmentRemindersFromBot();
 
   const session = await getOrCreateSession(msg.phone, msg.pushName);
-  console.log("[WhatsApp Bot] 📦 Sessão:", { sessionId: session.id, phone: session.phone, clientId: session.clientId });
 
   let flow = parseFlow(session.metadata);
   const flowRef = { current: flow };
   const lastInteractionAt = session.lastMessageAt ?? session.updatedAt;
-
-  console.log("[WhatsApp Bot] 📊 Estado do fluxo:", { 
-    stage: flow.stage, 
-    welcomed: flow.welcomed, 
-    customerName: flow.customerName,
-    lastInteractionAt: lastInteractionAt.toISOString(),
-    updatedAt: session.updatedAt.toISOString()
-  });
 
   await runWithMessageLogContext(
     {
@@ -114,10 +114,7 @@ const settings = await prisma.settings.findUnique({ where: { id: "default" } });
       getStage: () => flowRef.current.stage,
     },
     async () => {
-      console.log("[WhatsApp Bot] 📝 Iniciando processamento do contexto");
-      
       const inboundText = msg.text.trim() || msg.buttonId || msg.listId || "";
-      console.log("[WhatsApp Bot] 📝 Texto processado:", inboundText);
 
       if (inboundText) {
         await logWhatsAppMessage({
@@ -129,12 +126,9 @@ const settings = await prisma.settings.findUnique({ where: { id: "default" } });
           body: inboundText,
           flowStage: flowRef.current.stage,
         });
-        console.log("[WhatsApp Bot] 📝 Mensagem logada com sucesso");
       }
 
-      console.log("[WhatsApp Bot] 🔍 Verificando handoff humano");
       if (wantsHumanHandoff(inboundText)) {
-        console.log("[WhatsApp Bot] 🤝 Handoff humano solicitado");
         const name =
           flowRef.current.customerName ?? session.client?.name ?? msg.pushName;
         await requestHumanHandoff({
@@ -145,38 +139,29 @@ const settings = await prisma.settings.findUnique({ where: { id: "default" } });
         });
         return;
       }
-      console.log("[WhatsApp Bot] ✅ Sem handoff humano, continuando");
 
       // Bloqueio administrativo de números: evita respostas automáticas do bot
-      console.log("[WhatsApp Bot] 🔍 Verificando bloqueio do número");
       const blocked = await prisma.blockedPhone.findUnique({
         where: { phone: normalizePhone(msg.phone) },
         select: { id: true },
       });
       if (blocked) {
-        console.log("[WhatsApp Bot] ⛔ Número bloqueado:", msg.phone);
+        console.log("[WhatsApp Bot] Número bloqueado:", msg.phone);
         return;
       }
-      console.log("[WhatsApp Bot] ✅ Número não bloqueado");
 
-      console.log("[WhatsApp Bot] 🔍 Verificando se bot está pausado");
       if (await isBotPausedForPhone(msg.phone)) {
-        console.log("[WhatsApp Bot] ⛔ Bot pausado para este número:", msg.phone);
+        console.log("[WhatsApp Bot] Bot pausado para este número:", msg.phone);
         return;
       }
-      console.log("[WhatsApp Bot] ✅ Bot não pausado, continuando");
 
-      console.log("[WhatsApp Bot] 🔍 Verificando confirmação de agendamento");
       if (await tryHandleAppointmentConfirmation(msg.phone, msg.text, flowRef.current.stage)) {
-        console.log("[WhatsApp Bot] 📅 Confirmação de agendamento processada");
         return;
       }
 
-      console.log("[WhatsApp Bot] ⏰ Verificando horário de funcionamento");
       const businessStatus = settings ? getBusinessHoursStatus(settings) : { isOpen: true };
       
       if (settings && !businessStatus.isOpen) {
-        console.log("[WhatsApp Bot] ⛔ Fora do horário de funcionamento");
         const name =
           resolveValidCustomerName(flowRef.current.customerName) ??
           resolveValidCustomerName(session.client?.name) ??
@@ -190,8 +175,6 @@ const settings = await prisma.settings.findUnique({ where: { id: "default" } });
         return;
       }
 
-      console.log("[WhatsApp Bot] ✅ Dentro do horário de funcionamento");
-
       const resetResult = await applyWelcomeRestartIfNeeded(
         msg.phone,
         lastInteractionAt,
@@ -199,7 +182,6 @@ const settings = await prisma.settings.findUnique({ where: { id: "default" } });
       );
 
       if (resetResult.shouldSendWelcome) {
-        console.log("[WhatsApp Bot] 🔄 Sessão resetada, enviando boas-vindas");
         await sendWelcomeFlow(msg.phone);
         return;
       }
@@ -212,7 +194,6 @@ const settings = await prisma.settings.findUnique({ where: { id: "default" } });
       }
 
       if (msg.text.trim().toLowerCase() === "menu") {
-        console.log("[WhatsApp Bot] 📋 Comando 'menu' detectado");
         const name =
           flowRef.current.customerName ?? session.client?.name ?? msg.pushName ?? "Cliente";
         await goToMainMenu(msg.phone, name);
@@ -220,20 +201,16 @@ const settings = await prisma.settings.findUnique({ where: { id: "default" } });
       }
 
       if (!flowRef.current.welcomed) {
-        console.log("[WhatsApp Bot] 🤖 Cliente não recebeu boas-vindas ainda, iniciando flow");
         await startFlow(msg);
         return;
       }
 
-      console.log("[WhatsApp Bot] 🔄 Processando flow numerado - etapa:", flowRef.current.stage);
       await processNumberedFlow(msg, flowRef.current);
     }
   );
-  console.log("[WhatsApp Bot] ✅ FIM DO PROCESSAMENTO");
 }
 
 export async function processWhatsAppMessage(msg: IncomingMessage) {
-  console.log("[WhatsApp Bot] 📨 processWhatsAppMessage chamado:", { phone: msg.phone, text: msg.text });
   // Important: processar por phone serialmente ajuda a evitar respostas "fora de hora"
   enqueueWhatsAppMessage(
     {
@@ -244,7 +221,6 @@ export async function processWhatsAppMessage(msg: IncomingMessage) {
       listId: msg.listId,
     },
     async (merged) => {
-      console.log("[WhatsApp Bot] 📨 Executando handleMessageInternal:", merged);
       await handleMessageInternal(merged);
     }
   );
