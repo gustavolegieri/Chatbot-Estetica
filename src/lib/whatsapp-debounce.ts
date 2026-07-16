@@ -112,8 +112,6 @@ export function enqueueWhatsAppMessage(
     }
   };
   
-  entry.timer = setTimeout(processMessage, DEBOUNCE_MS);
-  
   // Se waitUntil estiver disponível (Vercel), usa para garantir execução após resposta
   if (waitUntil) {
     const promise = new Promise<void>((resolve) => {
@@ -123,5 +121,8 @@ export function enqueueWhatsAppMessage(
       }, DEBOUNCE_MS);
     });
     waitUntil(promise);
+  } else {
+    // Sem waitUntil: cria timer normal (ambiente local/dev)
+    entry.timer = setTimeout(processMessage, DEBOUNCE_MS);
   }
 }

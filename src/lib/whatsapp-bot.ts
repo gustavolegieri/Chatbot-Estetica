@@ -73,7 +73,8 @@ async function getOrCreateSession(phone: string, pushName?: string) {
 }
 
 async function handleMessageInternal(msg: IncomingMessage) {
-  console.log("[WhatsApp Bot] Processando mensagem:", { phone: msg.phone, text: msg.text });
+  const callId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  console.log(`[WhatsApp Bot] [${callId}] Processando mensagem:`, { phone: msg.phone, text: msg.text });
 
   if (!isValidPrivateRecipient(msg.phone)) {
     console.warn("[WhatsApp Bot] Ignorado (não é chat privado):", msg.phone);

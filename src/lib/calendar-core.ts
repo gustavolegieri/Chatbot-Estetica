@@ -414,7 +414,11 @@ async function generateCalendarSVGInternal(data: CalendarData): Promise<string> 
   const canvasW = padding * 2 + gridWidth;
   const canvasH = padding + logoHeight + 30 + headerMonthHeight + 16 + weekdayHeaderHeight + rows * cellSize + (rows - 1) * cellGap + 20 + legendHeight + padding;
 
-  let svg = `<svg width="${canvasW}" height="${canvasH}" xmlns="http://www.w3.org/2000/svg">`;
+  // Fonte moderna com melhor suporte a Unicode/acentuação
+  const fontFamily = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif";
+
+  let svg = `<?xml version="1.0" encoding="UTF-8"?>`;
+  svg += `<svg width="${canvasW}" height="${canvasH}" xmlns="http://www.w3.org/2000/svg">`;
   
   // Background
   svg += `<rect width="100%" height="100%" fill="#0d0d0d"/>`;
@@ -428,18 +432,18 @@ async function generateCalendarSVGInternal(data: CalendarData): Promise<string> 
   currentY += logoHeight + 10;
   
   // Brand text
-  svg += `<text x="${canvasW/2}" y="${currentY + 20}" text-anchor="middle" fill="#c9a24b" font-family="Arial, sans-serif" font-weight="bold" font-size="16">Garagem do Ka</text>`;
+  svg += `<text x="${canvasW/2}" y="${currentY + 20}" text-anchor="middle" fill="#c9a24b" font-family="${fontFamily}" font-weight="bold" font-size="16">Garagem do Ka</text>`;
   
   currentY += 30;
   
   // Month title
-  svg += `<text x="${canvasW/2}" y="${currentY + 20}" text-anchor="middle" fill="#c9a24b" font-family="Arial, sans-serif" font-weight="bold" font-size="24">Calendário do ${data.monthLabel}</text>`;
+  svg += `<text x="${canvasW/2}" y="${currentY + 20}" text-anchor="middle" fill="#c9a24b" font-family="${fontFamily}" font-weight="bold" font-size="24">Calendário do ${data.monthLabel}</text>`;
   
   currentY += headerMonthHeight + 16;
   
   // Weekday headers
   const weekdayShort = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
-  svg += `<g font-family="Arial, sans-serif" font-weight="bold" font-size="13" fill="#e5c07b" text-anchor="middle">`;
+  svg += `<g font-family="${fontFamily}" font-weight="bold" font-size="13" fill="#e5c07b" text-anchor="middle">`;
   for (let c = 0; c < cols; c++) {
     const x = padding + c * (cellSize + cellGap) + cellSize / 2;
     svg += `<text x="${x}" y="${currentY + 20}">${weekdayShort[c]}</text>`;
@@ -473,7 +477,7 @@ async function generateCalendarSVGInternal(data: CalendarData): Promise<string> 
         }
         
         const textColor = dayInfo.occupancy === "past" ? "#6b7280" : "#ffffff";
-        svg += `<text x="${x + cellSize/2}" y="${y + cellSize/2 + 7}" text-anchor="middle" fill="${textColor}" font-family="Arial, sans-serif" font-weight="bold" font-size="19">${dayInfo.day}</text>`;
+        svg += `<text x="${x + cellSize/2}" y="${y + cellSize/2 + 7}" text-anchor="middle" fill="${textColor}" font-family="${fontFamily}" font-weight="bold" font-size="19">${dayInfo.day}</text>`;
         
         dayCount++;
       }
@@ -498,7 +502,7 @@ async function generateCalendarSVGInternal(data: CalendarData): Promise<string> 
     const lx = padding + i * legendSpacing + legendSpacing / 2 - 40;
     
     svg += `<rect x="${lx}" y="${currentY}" width="14" height="14" fill="${item.color}" rx="2"/>`;
-    svg += `<text x="${lx + 20}" y="${currentY + 12}" fill="#e5c07b" font-family="Arial, sans-serif" font-weight="bold" font-size="13">${item.label}</text>`;
+    svg += `<text x="${lx + 20}" y="${currentY + 12}" fill="#e5c07b" font-family="${fontFamily}" font-weight="bold" font-size="13">${item.label}</text>`;
   }
   
   svg += `</svg>`;
