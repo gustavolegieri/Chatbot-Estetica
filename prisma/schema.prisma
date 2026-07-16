@@ -321,6 +321,7 @@ model WhatsAppSession {
   discountOffer        Json?               @default("{}")
   funnelSteps          Json?               @default("{}")
   lastStage            String?
+  processingLockedAt   DateTime?
   stageTransitions     StageTransition[]
   messages             WhatsAppMessage[]
   client               Client?             @relation(fields: [clientId], references: [id])
@@ -328,6 +329,7 @@ model WhatsAppSession {
   @@index([handoffStatus])
   @@index([lastMessageAt])
   @@index([updatedAt])
+  @@index([processingLockedAt])
 }
 
 model WhatsAppMessage {

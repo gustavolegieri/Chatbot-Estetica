@@ -1,7 +1,9 @@
 import { normalizePhone } from "./utils";
+import { prisma } from "./prisma";
 
 // Reduzido para 500ms para plano gratuito WASender API (1 msg/minuto)
 const DEBOUNCE_MS = 500;
+const LOCK_TIMEOUT_MS = 15_000;
 
 interface PendingMessage {
   phone: string;
@@ -22,25 +24,58 @@ interface IncomingPayload {
 
 // Estado em memória para debounce (aceitável pois é apenas para agrupar mensagens rápidas)
 const pending = new Map<string, PendingMessage>();
-const processing = new Set<string>();
 
-export function isProcessing(phone: string) {
-  return processing.has(normalizePhone(phone));
+/**
+ * Tenta adquirir lock distribuído no banco para evitar processamento paralelo
+ * entre diferentes instâncias serverless.
+ * 
+ * @returns true se o lock foi adquirido, false se já estava em uso
+ */
+async function acquireLock(phone: string): Promise<boolean> {
+  const normalized = normalizePhone(phone);
+  const now = new Date();
+  const staleThreshold = new Date(now.getTime() - LOCK_TIMEOUT_MS);
+
+  try {
+    const result = await prisma.whatsAppSession.updateMany({
+      where: {
+        phone: normalized,
+        OR: [
+          { processingLockedAt: null },
+          { processingLockedAt: { lt: staleThreshold } },
+        ],
+      },
+      data: { processingLockedAt: now },
+    });
+
+    if (result.count === 0) {
+      console.log("[Lock] Mensagem ignorada — outra instância já está processando", normalized);
+      return false;
+    }
+
+    console.log("[Lock] Lock adquirido com sucesso para", normalized);
+    return true;
+  } catch (error) {
+    console.error("[Lock] Erro ao adquirir lock:", error);
+    // Em caso de erro, permitimos o processamento para não bloquear
+    return true;
+  }
 }
 
-const PROCESSING_TIMEOUT_MS = 15_000; // segurança: limpa chave travada após 15s (reduzido para alto volume)
+/**
+ * Libera o lock distribuído no banco.
+ */
+async function releaseLock(phone: string): Promise<void> {
+  const normalized = normalizePhone(phone);
 
-// Evita que respostas "travem" por causa de erro/timeout: se houver processamento ativo,
-// não enfileire novas mensagens do mesmo phone até liberar (reduz loops e repetição).
-
-export function setProcessing(phone: string, value: boolean) {
-  const key = normalizePhone(phone);
-  if (value) {
-    processing.add(key);
-    // Garante que a chave seja removida mesmo se o finally não executar (cold start / crash)
-    setTimeout(() => processing.delete(key), PROCESSING_TIMEOUT_MS);
-  } else {
-    processing.delete(key);
+  try {
+    await prisma.whatsAppSession.update({
+      where: { phone: normalized },
+      data: { processingLockedAt: null },
+    });
+    console.log("[Lock] Lock liberado para", normalized);
+  } catch (error) {
+    console.error("[Lock] Erro ao liberar lock:", error);
   }
 }
 
@@ -85,9 +120,6 @@ export function enqueueWhatsAppMessage(
   // Função que processa a mensagem após o debounce
   const processMessage = async () => {
     pending.delete(key);
-    if (processing.has(key)) {
-      return;
-    }
 
     // Usa apenas a última mensagem recebida
     const mergedText = entry.texts[entry.texts.length - 1]?.trim() || "";
@@ -95,9 +127,12 @@ export function enqueueWhatsAppMessage(
       return;
     }
 
-    processing.add(key);
-    // Segurança: remove a chave após 30s caso o finally não execute (Vercel cold start)
-    const safetyTimer = setTimeout(() => processing.delete(key), PROCESSING_TIMEOUT_MS);
+    // Tenta adquirir lock distribuído antes de processar
+    const lockAcquired = await acquireLock(entry.phone);
+    if (!lockAcquired) {
+      return; // Outra instância já está processando
+    }
+
     try {
       await handler({
         phone: entry.phone,
@@ -107,8 +142,8 @@ export function enqueueWhatsAppMessage(
         listId: entry.listId,
       });
     } finally {
-      clearTimeout(safetyTimer);
-      processing.delete(key);
+      // Sempre libera o lock, mesmo em caso de erro
+      await releaseLock(entry.phone);
     }
   };
   
