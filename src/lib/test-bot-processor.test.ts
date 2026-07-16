@@ -4,8 +4,8 @@ import {
   buildBudgetSummaryText,
   buildPaymentOptionsText,
   normalizeConditionValue,
-  shouldSkipCouponPrompt,
 } from "./test-bot-processor";
+import { shouldSkipCouponPrompt } from "./whatsapp-flow-core";
 
 test("normalizeConditionValue handles damaged and poor condition descriptions", () => {
   assert.equal(normalizeConditionValue("ruim"), "ruim");
