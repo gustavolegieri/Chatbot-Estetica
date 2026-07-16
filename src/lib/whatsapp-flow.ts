@@ -121,6 +121,18 @@ import { canRedeem, findCouponByCode, redeemCoupon } from "./coupons";
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
+ * Wrapper para sendText que suporta modo de teste
+ */
+async function sendTextWrapper(msg: IncomingMessage, text: string) {
+  if (msg.testMode?.sendTextCallback) {
+    await msg.testMode.sendTextCallback(text);
+  } else {
+    await sendText({ number: msg.phone, text });
+    await delay(500);
+  }
+}
+
+/**
  * Adapta o resultado do core handler para o formato do WhatsApp flow
  * Converte FlowResponse[] em chamadas de sendText/sendMedia e persiste o estado
  */
@@ -133,26 +145,35 @@ async function executeCoreHandler(
   const responses: FlowResponse[] = [];
   const result = await handler(flow, msg.text, responses, ...handlerArgs);
 
-  // Persistir o novo estado
-  await saveFlow(msg.phone, result.nextState);
+  // Persistir o novo estado (apenas se não estiver em modo de teste)
+  await saveFlow(msg.phone, result.nextState, !!msg.testMode);
 
   // Enviar as respostas
   for (const response of result.responses) {
     if (response.mediaUrl && response.mediaType) {
-      await sendMedia({
-        number: msg.phone,
-        mediaUrl: response.mediaUrl,
-        mediaType: response.mediaType,
-      });
+      if (msg.testMode?.sendTextCallback) {
+        // Em modo de teste, ignora mídia por enquanto
+        await msg.testMode.sendTextCallback(`[MÍDIA: ${response.mediaType}] ${response.text || ""}`);
+      } else {
+        await sendMedia({
+          number: msg.phone,
+          mediaUrl: response.mediaUrl,
+          mediaType: response.mediaType,
+        });
+      }
     }
     if (response.text) {
-      await sendText({ number: msg.phone, text: response.text });
-      await delay(500); // Pequeno delay entre mensagens
+      if (msg.testMode?.sendTextCallback) {
+        await msg.testMode.sendTextCallback(response.text);
+      } else {
+        await sendText({ number: msg.phone, text: response.text });
+        await delay(500); // Pequeno delay entre mensagens
+      }
     }
   }
 
-  // Rastreamento de funil se necessário
-  if (result.shouldTrackFunnel && result.funnelStage) {
+  // Rastreamento de funil se necessário (apenas se não estiver em modo de teste)
+  if (!msg.testMode && result.shouldTrackFunnel && result.funnelStage) {
     try {
       await trackProgress(msg.phone, result.funnelStage);
     } catch (error) {
@@ -199,6 +220,10 @@ interface IncomingMessage {
   phone: string;
   text: string;
   pushName?: string;
+  testMode?: {
+    sendTextCallback?: (text: string) => Promise<void>;
+    useRealAI?: boolean;
+  };
 }
 
 function parseFlow(raw: unknown): FlowState {
@@ -456,7 +481,11 @@ async function loadContext(): Promise<FlowContext> {
   };
 }
 
-async function saveFlow(phone: string, flow: FlowState) {
+async function saveFlow(phone: string, flow: FlowState, skipDb = false) {
+  if (skipDb) {
+    console.log("[WhatsApp Flow] 💾 Salvando estado do fluxo (modo de teste - sem persistência):", { phone, stage: flow.stage, welcomed: flow.welcomed });
+    return;
+  }
   console.log("[WhatsApp Flow] 💾 Salvando estado do fluxo:", { phone, stage: flow.stage, welcomed: flow.welcomed });
   await prisma.whatsAppSession.update({
     where: { phone: normalizePhone(phone) },
@@ -2011,9 +2040,9 @@ export async function startFlow(msg: IncomingMessage) {
   const ctx = await loadContext();
   const wctx = await loadWhatsAppCatalog();
   console.log("[WhatsApp Flow] 📤 Enviando mensagem de boas-vindas");
-  await sendText({ number: msg.phone, text: etapa1Welcome(ctx, wctx.prompts) });
+  await sendTextWrapper(msg, etapa1Welcome(ctx, wctx.prompts));
   console.log("[WhatsApp Flow] 💾 Salvando estado com welcomed=true");
-  await saveFlow(msg.phone, { stage: "ETAPA1_AWAITING_NAME", welcomed: true });
+  await saveFlow(msg.phone, { stage: "ETAPA1_AWAITING_NAME", welcomed: true }, !!msg.testMode);
   console.log("[WhatsApp Flow] ✅ Flow de boas-vindas concluído");
 }
 
