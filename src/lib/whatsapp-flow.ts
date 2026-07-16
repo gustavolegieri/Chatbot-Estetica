@@ -146,7 +146,7 @@ async function executeCoreHandler(
   const result = await handler(flow, msg.text, responses, ...handlerArgs);
 
   // Persistir o novo estado (apenas se não estiver em modo de teste)
-  await saveFlow(msg.phone, result.nextState, !!msg.testMode);
+  await saveFlow(msg.phone, result.nextState, msg.testMode?.skipDb);
 
   // Enviar as respostas
   for (const response of result.responses) {

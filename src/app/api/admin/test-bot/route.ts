@@ -114,7 +114,8 @@ export async function POST(req: NextRequest) {
           sendTextCallback: async (text: string) => {
             botResponses.push(text);
           },
-          useRealAI
+          useRealAI,
+          skipDb: true
         }
       };
 
