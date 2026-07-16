@@ -28,11 +28,11 @@ model Client {
   vehiclePlate      String?
   vehicleModel      String?
   notes             String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
   address           String?
   addressLat        Decimal?           @db.Decimal(10, 7)
   addressLng        Decimal?           @db.Decimal(10, 7)
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
   appointments      Appointment[]
   couponRedemptions CouponRedemption[]
   whatsappMessages  WhatsAppMessage[]
@@ -40,39 +40,38 @@ model Client {
 }
 
 model Service {
-  id               String            @id @default(cuid())
-  name             String
-  description      String?
-  price            Decimal           @db.Decimal(10, 2)
-  durationMin      Int               @default(60)
-  active           Boolean           @default(true)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  catalogKey       String?           @unique
-  categoryNum      Int?
-  menuOrder        Int               @default(0)
-  priceHatchMax    Decimal?          @db.Decimal(10, 2)
-  priceHatchMin    Decimal?          @db.Decimal(10, 2)
-  priceSuvMax      Decimal?          @db.Decimal(10, 2)
-  priceSuvMin      Decimal?          @db.Decimal(10, 2)
-  showInWhatsApp   Boolean           @default(true)
-  timeEstimate     String?
-  upsellBenefit    String?
-  upsellServiceId  String?
-  whatsappDetail   String?
-  whatsappPitch    String?
-  whatsappShort    String?
-  // Upsell inteligente por tipo de veículo
-  upsellForHatchback Boolean          @default(false)
-  upsellForSedan   Boolean          @default(false)
-  upsellForSuv     Boolean          @default(false)
-  upsellForPickup  Boolean          @default(false)
-  upsellDiscount   Decimal?          @db.Decimal(10, 2) // Desconto ao aceitar upsell
-  appointments     Appointment[]
-  financialRecords FinancialRecord[]
-  upsellService    Service?          @relation("ServiceUpsell", fields: [upsellServiceId], references: [id])
-  upsellFor        Service[]         @relation("ServiceUpsell")
-  media            ServiceMedia[]
+  id                 String            @id @default(cuid())
+  name               String
+  description        String?
+  price              Decimal           @db.Decimal(10, 2)
+  durationMin        Int               @default(60)
+  active             Boolean           @default(true)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  catalogKey         String?           @unique
+  categoryNum        Int?
+  menuOrder          Int               @default(0)
+  priceHatchMax      Decimal?          @db.Decimal(10, 2)
+  priceHatchMin      Decimal?          @db.Decimal(10, 2)
+  priceSuvMax        Decimal?          @db.Decimal(10, 2)
+  priceSuvMin        Decimal?          @db.Decimal(10, 2)
+  showInWhatsApp     Boolean           @default(true)
+  timeEstimate       String?
+  upsellBenefit      String?
+  upsellServiceId    String?
+  whatsappDetail     String?
+  whatsappPitch      String?
+  whatsappShort      String?
+  upsellDiscount     Decimal?          @db.Decimal(10, 2)
+  upsellForHatchback Boolean           @default(false)
+  upsellForPickup    Boolean           @default(false)
+  upsellForSedan     Boolean           @default(false)
+  upsellForSuv       Boolean           @default(false)
+  appointments       Appointment[]
+  financialRecords   FinancialRecord[]
+  upsellService      Service?          @relation("ServiceUpsell", fields: [upsellServiceId], references: [id])
+  upsellFor          Service[]         @relation("ServiceUpsell")
+  media              ServiceMedia[]
 }
 
 model Appointment {
@@ -87,32 +86,31 @@ model Appointment {
   source                String            @default("admin")
   reminderSentAt        DateTime?
   reminder4hSentAt      DateTime?
-  reminder30minSentAt  DateTime?
-  reminder1hSentAt      DateTime?
-  reminder1daySentAt    DateTime?
   confirmWarningSentAt  DateTime?
   clientConfirmedAt     DateTime?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  couponDiscount        Decimal?          @db.Decimal(10, 2)
+  couponId              String?
+  finalPrice            Decimal?          @db.Decimal(10, 2)
   needsPickup           Boolean           @default(false)
   needsReturn           Boolean           @default(false)
   pickupAddress         String?
   pickupDistanceKm      Decimal?          @db.Decimal(6, 2)
   pickupFee             Decimal?          @db.Decimal(10, 2)
-  couponId              String?
-  couponDiscount        Decimal?          @db.Decimal(10, 2)
-  finalPrice            Decimal?          @db.Decimal(10, 2)
-  // Payment fields (simulated)
-  paymentStatus         PaymentStatus     @default(PENDING)
-  paymentGateway        PaymentGateway    @default(CASH)
-  paymentMethod         String? // "PIX", "CARTAO", "DINHEIRO"
-  transactionId         String?
   paidAt                DateTime?
-  paymentSimulationCode String? // Código para simular pagamento no test-bot
-  reminderPreference    String? // "30min", "1hour", "1day", "none"
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
+  paymentGateway        PaymentGateway    @default(CASH)
+  paymentMethod         String?
+  paymentSimulationCode String?
+  paymentStatus         PaymentStatus     @default(PENDING)
+  transactionId         String?
+  reminder1daySentAt    DateTime?
+  reminder1hSentAt      DateTime?
+  reminder30minSentAt   DateTime?
+  reminderPreference    String?
   client                Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  service               Service           @relation(fields: [serviceId], references: [id])
   coupon                Coupon?           @relation(fields: [couponId], references: [id])
+  service               Service           @relation(fields: [serviceId], references: [id])
   financialRecords      FinancialRecord[]
 
   @@index([date])
@@ -146,13 +144,6 @@ model Settings {
   businessName          String         @default("Estética Automotiva")
   businessPhone         String?
   businessAddress       String?
-  storeAddress          String         @default("Rua Professor Benedito Loureiro de Lima, 146, Jardim Esplanada, Jundiaí, SP")
-  storeLat              Decimal?       @db.Decimal(10, 7)
-  storeLng              Decimal?       @db.Decimal(10, 7)
-  pickupDeliveryEnabled Boolean        @default(true)
-  pickupFeePerKm        Decimal        @default(2.50) @db.Decimal(10, 2)
-  pickupFeeBase         Decimal        @default(0) @db.Decimal(10, 2)
-  pickupMaxDistanceKm   Int?
   businessHoursStart    String         @default("08:00")
   businessHoursEnd      String         @default("18:00")
   slotDurationMin       Int            @default(60)
@@ -165,8 +156,6 @@ model Settings {
   pixKey                String?
   pixHolderName         String?
   pixBank               String?
-  pixMerchantCity       String? @default("Jundiai")
-  pixQrCodeImage        String?
   updatedAt             DateTime       @updatedAt
   autoCancelMin         Int            @default(10)
   followupIdleMin       Int            @default(10)
@@ -175,6 +164,15 @@ model Settings {
   reminder30minMin      Int            @default(30)
   reminder4hMin         Int            @default(240)
   sessionResetMin       Int            @default(30)
+  pickupDeliveryEnabled Boolean        @default(true)
+  pickupFeeBase         Decimal        @default(0) @db.Decimal(10, 2)
+  pickupFeePerKm        Decimal        @default(2.50) @db.Decimal(10, 2)
+  pickupMaxDistanceKm   Int?
+  storeAddress          String         @default("Rua Professor Benedito Loureiro de Lima, 146, Jardim Esplanada, Jundiaí, SP")
+  storeLat              Decimal?       @db.Decimal(10, 7)
+  storeLng              Decimal?       @db.Decimal(10, 7)
+  pixMerchantCity       String?        @default("Jundiai")
+  pixQrCodeImage        String?
   testModeEnabled       Boolean        @default(false)
   testModePhone         String?
   businessHours         BusinessHour[]
@@ -182,14 +180,14 @@ model Settings {
 
 model BusinessHour {
   id         String   @id @default(cuid())
-  dayOfWeek  Int // 0 = Sunday, 1 = Monday, etc.
-  openTime   String // "08:00"
-  closeTime  String // "18:00"
+  dayOfWeek  Int
+  openTime   String
+  closeTime  String
   isOpen     Boolean  @default(true)
   settingsId String   @default("default")
-  settings   Settings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  settings   Settings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
 
   @@unique([settingsId, dayOfWeek])
 }
@@ -226,8 +224,8 @@ model Coupon {
   active           Boolean            @default(true)
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
-  redemptions      CouponRedemption[]
   appointments     Appointment[]
+  redemptions      CouponRedemption[]
 }
 
 model CouponRedemption {
@@ -316,20 +314,16 @@ model WhatsAppSession {
   handoffStatus        HandoffStatus       @default(NONE)
   lastMessageAt        DateTime?
   lastMessagePreview   String?
-  
-  // Funil de conversão
-  abandonmentStage     String?
-  abandonmentReason    String?
-  abandonmentAt        DateTime?
-  lastStage            String?
-  funnelSteps          Json?               @default("{}") // Rastrear passos no funil
-  
-  // Sistema de desconto
-  discountOffer        Json?               @default("{}") // Oferta de desconto para cancelamento
   unreadCount          Int                 @default(0)
+  abandonmentAt        DateTime?
+  abandonmentReason    String?
+  abandonmentStage     String?
+  discountOffer        Json?               @default("{}")
+  funnelSteps          Json?               @default("{}")
+  lastStage            String?
+  stageTransitions     StageTransition[]
   messages             WhatsAppMessage[]
   client               Client?             @relation(fields: [clientId], references: [id])
-  stageTransitions     StageTransition[]
 
   @@index([handoffStatus])
   @@index([lastMessageAt])
@@ -345,8 +339,8 @@ model WhatsAppMessage {
   sender            MessageSender
   body              String
   flowStage         String?
-  wasenderMessageId String?          @unique // Deduplicação de mensagens recebidas do webhook
   createdAt         DateTime         @default(now())
+  wasenderMessageId String?          @unique
   client            Client?          @relation(fields: [clientId], references: [id])
   session           WhatsAppSession? @relation(fields: [sessionId], references: [id])
 
@@ -389,6 +383,37 @@ model CampaignQueue {
   @@index([status])
 }
 
+model StageTransition {
+  id              String          @id @default(cuid())
+  sessionId       String
+  stage           String
+  message         String
+  timestamp       DateTime        @default(now())
+  completed       Boolean         @default(false)
+  whatsappSession WhatsAppSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([timestamp])
+}
+
+model OutboundMessageQueue {
+  id           String    @id @default(cuid())
+  phone        String
+  body         Json
+  attempts     Int       @default(0)
+  maxAttempts  Int       @default(3)
+  scheduledFor DateTime  @default(now())
+  processedAt  DateTime?
+  error        String?
+  isDailyLimit Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([phone])
+  @@index([scheduledFor])
+  @@index([processedAt])
+}
+
 enum UserRole {
   ADMIN
   OPERATOR
@@ -405,10 +430,10 @@ enum AppointmentStatus {
 
 enum PaymentStatus {
   PENDING
-  PARTIAL
   PAID
   FAILED
   REFUNDED
+  PARTIAL
 }
 
 enum PaymentGateway {
@@ -438,13 +463,13 @@ enum WhatsAppSessionStep {
   CHOOSING_SERVICE
   CHOOSING_DATE
   CHOOSING_TIME
+  CONFIRMING
+  RESCHEDULING
+  CANCELLING
   ASKING_COUPON
   ASKING_PICKUP
   ASKING_PICKUP_ADDRESS
   ASKING_RETURN_PREFERENCE
-  CONFIRMING
-  RESCHEDULING
-  CANCELLING
 }
 
 enum MessageDirection {
@@ -477,35 +502,4 @@ enum QueueStatus {
   SENDING
   SENT
   FAILED
-}
-
-model StageTransition {
-  id              String          @id @default(cuid())
-  sessionId       String
-  stage           String
-  message         String
-  timestamp       DateTime        @default(now())
-  completed       Boolean         @default(false)
-  whatsappSession WhatsAppSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@index([sessionId])
-  @@index([timestamp])
-}
-
-model OutboundMessageQueue {
-  id              String   @id @default(cuid())
-  phone           String
-  body            Json     // Payload completo para WasenderAPI
-  attempts        Int      @default(0)
-  maxAttempts     Int      @default(3)
-  scheduledFor    DateTime @default(now())
-  processedAt     DateTime?
-  error           String?
-  isDailyLimit    Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([phone])
-  @@index([scheduledFor])
-  @@index([processedAt])
 }

@@ -72,6 +72,10 @@ function extractPhone(msgKey: Record<string, unknown>): string | null {
   return null;
 }
 
+// Timestamp de corte para ignorar mensagens antigas (deploy atual)
+// Definido como agora para evitar processar mensagens acumuladas
+const DEPLOY_TIMESTAMP = new Date(); // Timestamp atual do deploy
+
 // Deduplicação persistida no banco de dados (Prisma)
 // Substitui o Map em memória que não funciona em serverless
 async function isMessageProcessed(messageId: string): Promise<boolean> {
@@ -86,6 +90,26 @@ async function isMessageProcessed(messageId: string): Promise<boolean> {
     console.error("[Webhook] Erro ao verificar mensagem processada:", error);
     return false;
   }
+}
+
+// Verifica se a mensagem é muito antiga (antes do deploy atual)
+function isMessageTooOld(messageTimestamp?: number | string): boolean {
+  if (!messageTimestamp) return false;
+  
+  try {
+    const msgTime = new Date(typeof messageTimestamp === 'string' ? parseInt(messageTimestamp) : messageTimestamp);
+    // Ignorar mensagens mais de 5 minutos antes do deploy
+    const cutoffTime = new Date(DEPLOY_TIMESTAMP.getTime() - 5 * 60 * 1000);
+    
+    if (msgTime < cutoffTime) {
+      console.log("[Webhook] Mensagem muito antiga ignorada:", msgTime.toISOString(), "(cutoff:", cutoffTime.toISOString() + ")");
+      return true;
+    }
+  } catch (error) {
+    console.error("[Webhook] Erro ao verificar timestamp da mensagem:", error);
+  }
+  
+  return false;
 }
 
 async function markMessageAsProcessed(
@@ -181,6 +205,13 @@ export async function POST(req: NextRequest) {
   }
   
   console.log("[Webhook] Telefone extraído:", phone);
+
+  // Verificar se a mensagem é muito antiga (antes do deploy atual)
+  const messageTimestamp = msgKey.timestamp as number | string | undefined;
+  if (isMessageTooOld(messageTimestamp)) {
+    console.log("[Webhook] Ignorando mensagem antiga antes do deploy");
+    return NextResponse.json({ ok: true });
+  }
 
   // Deduplicação baseada em ID da mensagem (persistida no banco)
   const messageId = msgKey.id as string | undefined;
