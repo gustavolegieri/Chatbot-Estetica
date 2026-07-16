@@ -57,7 +57,9 @@ export async function POST(req: NextRequest) {
       try {
         console.log(`[Cron] Processando mensagem ${msg.id} (tentativa ${msg.attempts + 1}/${msg.maxAttempts})`);
         
-        const result = await wasenderFetch(msg.body as any);
+        // Converter o JSON de volta para objeto para enviar à API
+        const body = typeof msg.body === 'string' ? JSON.parse(msg.body) : msg.body;
+        const result = await wasenderFetch(body);
         
         // Marcar como processada
         await prisma.outboundMessageQueue.update({

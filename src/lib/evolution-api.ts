@@ -100,10 +100,13 @@ async function addToQueue(phone: string, body: object, isDailyLimit: boolean = f
     const phoneDigits = phone.replace(/\D/g, "");
     const scheduledFor = new Date(Date.now() + 35000); // 35 segundos no futuro
     
+    // Serializar o body como JSONValue para garantir compatibilidade com Prisma Json
+    const bodyJson = JSON.parse(JSON.stringify(body));
+    
     await prisma.outboundMessageQueue.create({
       data: {
         phone: phoneDigits,
-        body: body as any,
+        body: bodyJson,
         attempts: 0,
         maxAttempts: 3,
         scheduledFor,
