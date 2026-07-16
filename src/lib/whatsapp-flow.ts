@@ -223,6 +223,7 @@ interface IncomingMessage {
   testMode?: {
     sendTextCallback?: (text: string) => Promise<void>;
     useRealAI?: boolean;
+    skipDb?: boolean;
   };
 }
 
