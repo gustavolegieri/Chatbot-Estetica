@@ -215,6 +215,7 @@ export async function POST(req: NextRequest) {
 
   // Deduplicação baseada em ID da mensagem (persistida no banco)
   const messageId = msgKey.id as string | undefined;
+  console.log("[Webhook] messageId recebido:", messageId, "tipo:", typeof messageId);
   if (messageId && await isMessageProcessed(messageId)) {
     console.log("[Webhook] mensagem duplicada ignorada — messageId:", messageId);
     return NextResponse.json({ ok: true });
@@ -249,7 +250,10 @@ export async function POST(req: NextRequest) {
 
   // Marcar mensagem como processada ANTES de processar para evitar duplicatas
   if (messageId) {
+    console.log("[Webhook] Marcando mensagem como processada:", messageId);
     await markMessageAsProcessed(messageId, phone, text || buttonId || listId || "", sessionId || undefined, clientId || undefined);
+  } else {
+    console.log("[Webhook] AVISO: messageId não disponível, deduplicação pode não funcionar");
   }
 
   try {

@@ -74,7 +74,7 @@ export function enqueueWhatsAppMessage(
       pushName: msg.pushName,
       buttonId: msg.buttonId,
       listId: msg.listId,
-      timer: setTimeout(() => { /* substituído abaixo */ }, 0),
+      timer: setTimeout(() => { /* substituído abaixo */ }, DEBOUNCE_MS),
     });
   }
 

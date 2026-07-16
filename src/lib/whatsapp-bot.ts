@@ -247,6 +247,7 @@ async function handleMessageInternal(msg: IncomingMessage) {
 }
 
 export async function processWhatsAppMessage(msg: IncomingMessage, waitUntil?: (promise: Promise<unknown>) => void) {
+  console.log("[WhatsApp Bot] processWhatsAppMessage chamado:", { phone: msg.phone, text: msg.text });
   // Important: processar por phone serialmente ajuda a evitar respostas "fora de hora"
   enqueueWhatsAppMessage(
     {
@@ -257,6 +258,7 @@ export async function processWhatsAppMessage(msg: IncomingMessage, waitUntil?: (
       listId: msg.listId,
     },
     async (merged) => {
+      console.log("[WhatsApp Bot] handleMessageInternal sendo chamado via debounce:", { phone: merged.phone, text: merged.text });
       await handleMessageInternal(merged);
     },
     waitUntil // Passa waitUntil para garantir execução do debounce em serverless
