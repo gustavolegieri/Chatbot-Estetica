@@ -117,6 +117,7 @@ export async function POST(req: NextRequest) {
   }
 
   const event = payload.event as string | undefined;
+  console.log("[Webhook] Evento recebido:", event);
 
   const isMessageEvent =
     event === "messages.received" ||
@@ -125,6 +126,7 @@ export async function POST(req: NextRequest) {
     !event;
 
   if (!isMessageEvent) {
+    console.log("[Webhook] Evento ignorado (não é mensagem):", event);
     return NextResponse.json({ ok: true });
   }
 
@@ -135,13 +137,16 @@ export async function POST(req: NextRequest) {
   const msg = msgRaw as Record<string, unknown>;
 
   const msgKey = (msg.key ?? {}) as Record<string, unknown>;
+  console.log("[Webhook] Message key:", JSON.stringify(msgKey));
 
   if (msgKey.fromMe === true) {
+    console.log("[Webhook] Mensagem do próprio bot, ignorando");
     return NextResponse.json({ ok: true });
   }
 
   const remoteJid = (msgKey.remoteJid ?? "") as string;
   if (remoteJid.includes("@g.us") || remoteJid.includes("@broadcast")) {
+    console.log("[Webhook] Mensagem de grupo/broadcast, ignorando:", remoteJid);
     return NextResponse.json({ ok: true });
   }
 
@@ -150,6 +155,8 @@ export async function POST(req: NextRequest) {
     console.warn("[Webhook] phone inválido, key:", JSON.stringify(msgKey));
     return NextResponse.json({ ok: true });
   }
+  
+  console.log("[Webhook] Telefone extraído:", phone);
 
   // Deduplicação baseada em ID da mensagem
   const messageId = msgKey.id as string | undefined;
@@ -161,6 +168,13 @@ export async function POST(req: NextRequest) {
   const text = extractText(msg);
   const { buttonId, listId } = extractInteractive(msg);
   const pushName = (msg.pushName ?? msg.notifyName ?? "") as string;
+
+  console.log("[Webhook] Conteúdo da mensagem:", {
+    text: text?.substring(0, 50),
+    buttonId,
+    listId,
+    pushName
+  });
 
   // Marcar mensagem como processada ANTES de processar para evitar duplicatas
   if (messageId) {

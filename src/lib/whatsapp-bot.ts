@@ -83,6 +83,12 @@ async function handleMessageInternal(msg: IncomingMessage) {
   // Verificar modo de teste (otimizado com cache)
   const settings = await prisma.settings.findUnique({ where: { id: "default" } });
   
+  console.log("[WhatsApp Bot] Configurações carregadas:", {
+    whatsappEnabled: settings?.whatsappEnabled,
+    testModeEnabled: settings?.testModeEnabled,
+    testModePhone: settings?.testModePhone
+  });
+  
   if (settings?.testModeEnabled) {
     const testPhone = settings.testModePhone?.replace(/\D/g, "");
     const normalizedPhone = msg.phone.replace(/\D/g, "");
@@ -106,6 +112,8 @@ async function handleMessageInternal(msg: IncomingMessage) {
     console.warn("[WhatsApp Bot] whatsappEnabled=false nas configurações, mensagem ignorada");
     return;
   }
+  
+  console.log("[WhatsApp Bot] Bot habilitado, processando mensagem de:", msg.phone);
 
   runAppointmentRemindersFromBot();
 

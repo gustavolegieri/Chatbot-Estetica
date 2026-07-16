@@ -1171,8 +1171,8 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       // Verificar se é uma resposta de confirmação (sim/não) - usar match mais estrito
       const confirmAnswer = input.toLowerCase().trim();
       
-      // Verificar se é uma confirmação (somente "sim", "s", "confirmo" ou "1" exatos)
-      if (/^(sim|s|confirmo|1)$/i.test(confirmAnswer)) {
+      // Verificar se é uma confirmação (somente "sim", "s", "confirmo" - NÃO aceitar "1" aqui)
+      if (/^(sim|s|confirmo)$/i.test(confirmAnswer)) {
         flow.vehicleConfirmed = true;
         await saveFlow(msg.phone, flow);
         await sendQuote(msg, flow, wctx);

@@ -289,6 +289,7 @@ export async function convertAndUploadCalendar(
 
 /**
  * Extrai informações básicas do calendário do SVG para fallback de texto
+ * Preserva a legenda de 3 cores e formatação rica
  */
 function extractCalendarTextFromSVG(svgString: string): string {
   try {
@@ -296,22 +297,26 @@ function extractCalendarTextFromSVG(svgString: string): string {
     const currentMonth = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
     const currentMonthCapitalized = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
     
-    return `📅 CALENDÁRIO DE DISPONIBILIDADE
+    return `📅 *Calendário de disponibilidade*
 
-🗓️ ${currentMonthCapitalized}
+🗓️ *${currentMonthCapitalized}*
+
+✅ Legenda:
+🟢 Mais disponível  🟡 Médio  🔴 Mais movimentado
+🚫 Domingos: fechado
+📍 Hoje: destacado em azul
+
+💬 *Digite o número do dia* (ex: 16)
+🔙 *0* para voltar ao menu
 
 ⏰ HORÁRIOS DISPONÍVEIS:
 • Segunda a Sexta: 08:00 - 18:00
 • Sábado: 08:00 - 13:00
 • Domingo: Fechado
 
-📍 Para agendar, responda com:
-• Data desejada (ex: 15/07)
-• Ou selecione uma opção do menu
-
 ⚠️ Sujeito a disponibilidade`;
   } catch (error) {
-    return '📅 CALENDÁRIO DE DISPONIBILIDADE\n\nPara agendar, entre em contato conosco pelo menu de opções.';
+    return '📅 *Calendário de disponibilidade*\n\n✅ Legenda:\n🟢 Mais disponível  🟡 Médio  🔴 Mais movimentado\n\nPara agendar, entre em contato conosco pelo menu de opções.';
   }
 }
 

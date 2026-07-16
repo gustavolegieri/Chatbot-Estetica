@@ -184,35 +184,47 @@ async function registerSystemFonts(canvasMod: any): Promise<string> {
   const fs = await import("fs");
   const https = await import("https");
   
+  console.log("[Calendar] Registrando fontes do sistema...");
+  
   try {
     // Try Windows Arial
     const arialPath = "C:\\Windows\\Fonts\\arial.ttf";
     if (fs.existsSync(arialPath)) {
       canvasMod.registerFont(arialPath, { family: "Arial" });
+      console.log("[Calendar] Fonte Arial registrada (Windows)");
       return "Arial";
     }
-  } catch {}
+  } catch (err) {
+    console.log("[Calendar] Arial não disponível:", err);
+  }
   
   try {
     // Try macOS Helvetica
     const helveticaPath = "/System/Library/Fonts/Helvetica.ttc";
     if (fs.existsSync(helveticaPath)) {
       canvasMod.registerFont(helveticaPath, { family: "Helvetica" });
+      console.log("[Calendar] Fonte Helvetica registrada (macOS)");
       return "Helvetica";
     }
-  } catch {}
+  } catch (err) {
+    console.log("[Calendar] Helvetica não disponível:", err);
+  }
   
   try {
     // Try Linux DejaVu
     const dejavuPath = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
     if (fs.existsSync(dejavuPath)) {
       canvasMod.registerFont(dejavuPath, { family: "DejaVu Sans" });
+      console.log("[Calendar] Fonte DejaVu Sans registrada (Linux)");
       return "DejaVu Sans";
     }
-  } catch {}
+  } catch (err) {
+    console.log("[Calendar] DejaVu Sans não disponível:", err);
+  }
   
   // Fallback: Download font from Google Fonts for Vercel/Linux
   try {
+    console.log("[Calendar] Tentando baixar fonte do Google Fonts...");
     const fontBuffer = await downloadFont();
     if (fontBuffer) {
       const path = await import("path");
@@ -220,22 +232,34 @@ async function registerSystemFonts(canvasMod: any): Promise<string> {
       const fontPath = path.join(os.tmpdir(), "inter.ttf");
       fs.writeFileSync(fontPath, fontBuffer);
       canvasMod.registerFont(fontPath, { family: "Inter" });
+      console.log("[Calendar] Fonte Inter baixada e registrada (Google Fonts)");
       return "Inter";
     }
-  } catch {}
+  } catch (err) {
+    console.log("[Calendar] Download de fonte falhou:", err);
+  }
   
+  console.log("[Calendar] Nenhuma fonte encontrada, usando sans-serif padrão");
   return "sans-serif";
 }
 
 async function downloadFont(): Promise<Buffer | null> {
   try {
     // Use fetch instead of https module for better compatibility
-    const url = "https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hjp-Ek-_EeA.woff2";
+    // Usar uma fonte mais leve e compatível: Open Sans Regular
+    const url = "https://fonts.gstatic.com/s/opensans/v40/memSYaGs126MiZpBA-UvWbX2vVnXBbObj2OVZyOOSr4dVJWUgsjZ0B4gaVQUwaEQbjBqQ.woff2";
+    console.log("[Calendar] Baixando fonte do Google Fonts:", url);
     const response = await fetch(url);
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.log("[Calendar] Falha no download da fonte - status:", response.status);
+      return null;
+    }
     const arrayBuffer = await response.arrayBuffer();
-    return Buffer.from(arrayBuffer);
-  } catch {
+    const buffer = Buffer.from(arrayBuffer);
+    console.log("[Calendar] Fonte baixada com sucesso - tamanho:", buffer.length, "bytes");
+    return buffer;
+  } catch (err) {
+    console.log("[Calendar] Erro no download da fonte:", err);
     return null;
   }
 }

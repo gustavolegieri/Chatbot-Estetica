@@ -69,12 +69,17 @@ export async function generateCalendarImageOnlyForTest(testDate: string | null):
 export function generateCalendarLegend(): string {
   return [
     "",
-    "✅ Dias disponíveis:",
-    "🟢 Mais vazio  🟡 Médio  🔴 Mais movimentado",
+    "📅 *Escolha o dia*",
+    "",
+    "Toque na lista acima para ver os dias disponíveis ou",
+    "digite o número do dia desejado (ex: 16 para dia 16).",
+    "",
+    "✅ Legenda:",
+    "🟢 Mais disponível  🟡 Médio  🔴 Mais movimentado",
     "🚫 Domingos: fechado",
     "📍 Hoje: destacado em azul",
     "",
-    "💬 *Digite o número do dia* (ex: 15)",
+    "💬 *Digite o número do dia* (ex: 16)",
     "🔙 *0* para voltar ao menu",
   ].join("\n");
 }
@@ -140,13 +145,14 @@ export async function sendCalendarWithImageAndList({ number, prompts }: { number
   // 4. Tenta enviar a IMAGEM do calendário
   let imageSent = false;
   try {
-    console.log("[Calendar] Enviando imagem como", imageType);
+    console.log("[Calendar] Enviando imagem como", imageType, "para", number);
+    console.log("[Calendar] URL da imagem:", finalImageUrl.substring(0, 100) + "...");
     const result = await sendMedia({ 
       number, 
       mediaUrl: finalImageUrl, 
       caption: "📅 Calendário de disponibilidade" 
     });
-    console.log("[Calendar] Resultado do envio:", result);
+    console.log("[Calendar] Resultado do envio:", JSON.stringify(result));
     
     // Verifica se o envio foi bem-sucedido (não retornou erro)
     const hasError = result && typeof result === 'object' && 'error' in result;
@@ -154,12 +160,17 @@ export async function sendCalendarWithImageAndList({ number, prompts }: { number
     
     if (result && !hasError && !isBlocked) {
       imageSent = true;
-      console.log("[Calendar] Imagem enviada com sucesso");
+      console.log("[Calendar] ✅ Imagem enviada com sucesso");
     } else {
-      console.log("[Calendar] Falha ao enviar imagem, usando fallback de texto");
+      console.log("[Calendar] ❌ Falha ao enviar imagem - hasError:", hasError, "isBlocked:", isBlocked);
+      if (hasError) {
+        console.log("[Calendar] Detalhes do erro:", (result as any).error);
+      }
     }
   } catch (err) {
-    console.log("[Calendar] Erro ao enviar imagem, usando fallback de texto:", err);
+    console.log("[Calendar] ❌ Erro ao enviar imagem, usando fallback de texto:", err);
+    console.log("[Calendar] Tipo do erro:", (err as Error).name);
+    console.log("[Calendar] Mensagem do erro:", (err as Error).message);
   }
 
   // 5. Se a imagem falhou, envia apenas a legenda em texto
