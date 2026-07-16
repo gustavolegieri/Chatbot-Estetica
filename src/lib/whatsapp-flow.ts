@@ -584,7 +584,11 @@ async function proceedToTimeSelection(
   });
 }
 
-async function ensureClient(phone: string, name: string) {
+async function ensureClient(phone: string, name: string, skipDb = false) {
+  if (skipDb) {
+    console.log("[WhatsApp Flow] 👤 Criando cliente (modo de teste - sem persistência):", { phone, name });
+    return;
+  }
   const normalized = normalizePhone(phone);
   const validName = resolveValidCustomerName(name) ?? name;
   let client = await prisma.client.findUnique({ where: { phone: normalized } });
@@ -945,7 +949,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
 
       // Se o input já for um nome válido, usar diretamente sem pedir confirmação
       if (isValidCustomerName(name)) {
-        await ensureClient(msg.phone, name);
+        await ensureClient(msg.phone, name, msg.testMode?.skipDb);
         const next: FlowState = {
           stage: "ETAPA2_MAIN_MENU",
           customerName: name,
