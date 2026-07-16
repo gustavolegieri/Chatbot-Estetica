@@ -66,7 +66,12 @@ export function getBusinessHoursStatus(settings: HoursSettings, now = new Date()
   const nowMin = hour * 60 + minute;
 
   const openMin = timeToMinutes(settings.businessHoursStart);
-  const closeMin = timeToMinutes(settings.businessHoursEnd);
+  let closeMin = timeToMinutes(settings.businessHoursEnd);
+  
+  // Se o horário de fechamento for 00:00, tratar como 24:00 (fim do dia)
+  if (closeMin === 0) {
+    closeMin = 24 * 60; // 24:00 em minutos
+  }
 
   if (nowMin < openMin) {
     return { isOpen: false, reason: "before_open" };
@@ -94,9 +99,13 @@ export function afterHoursMessage(
 ): string {
   const brand = settings.businessName || BRAND_DEFAULT;
   const name = clientName ? `, *${clientName}*` : "";
+  
+  // Se o horário de fechamento for 00:00, mostrar como 24:00 na mensagem
+  const displayEndTime = settings.businessHoursEnd === "00:00" ? "24:00" : settings.businessHoursEnd;
+  
   const hours = formatHours(
     settings.businessHoursStart,
-    settings.businessHoursEnd,
+    displayEndTime,
     settings.workingDays
   );
 
@@ -104,7 +113,7 @@ export function afterHoursMessage(
 
   let emoji = "🌙";
   let headline = "Estamos fechados no momento";
-  let detail = `Nosso expediente hoje encerrou às *${settings.businessHoursEnd}*.`;
+  let detail = `Nosso expediente hoje encerrou às *${displayEndTime}*.`;
 
   switch (reason) {
     case "before_open":
@@ -128,7 +137,7 @@ export function afterHoursMessage(
     case "after_close":
       emoji = "🌙";
       headline = "Já encerramos por hoje";
-      detail = `Nosso expediente hoje foi até *${settings.businessHoursEnd}*.`;
+      detail = `Nosso expediente hoje foi até *${displayEndTime}*.`;
       break;
   }
 

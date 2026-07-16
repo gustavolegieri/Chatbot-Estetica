@@ -285,3 +285,97 @@ O código anterior tratava todos os erros 429 como rate limit temporário, enfil
 - Use o diagnóstico em `/admin/diagnostico-whatsapp` para verificar o status da API
 - Se mostrar "Limite diário pode ter sido atingido", aguarde o reset diário ou faça upgrade
 - A página de teste de fluxo agora mostra aviso sobre o limite de 50 mensagens/dia
+
+## Correção de Mensagens Duplicadas em Ambiente Serverless
+
+### Problema Original
+Em ambiente serverless (Vercel), três mecanismos de controle de estado usavam `Map`/`Set` em memória + `setTimeout`:
+1. `processedMessageIds` (dedup de mensagens recebidas)
+2. `messageQueue` (fila de retry por rate-limit)
+3. `pending`/`processing` (debounce anti-flood)
+
+Em funções serverless, memória não é compartilhada entre invocações e `setTimeout`s não têm garantia de execução após a resposta HTTP, causando:
+- Mensagens recebidas processadas múltiplas vezes
+- Mensagens da fila de retry reenviadas inconsistentemente
+- Respostas duplicadas do bot
+
+### Soluções Implementadas
+
+#### 1. Deduplicação Persistida no Banco (ProcessedMessageIds)
+- **Status:** ✅ Já implementado
+- **Campo:** `wasenderMessageId` com `@unique` em `WhatsAppMessage` (schema linha 348)
+- **Implementação:** `src/app/api/whatsapp/webhook/route.ts` (linhas 72-116)
+- **Funcionamento:**
+  - Webhook cria registro com `wasenderMessageId` único
+  - Erro P2002 (unique constraint) indica mensagem duplicada
+  - Atômico mesmo entre instâncias diferentes do serverless
+
+#### 2. Fila Persistente com Vercel Cron (Rate-Limit)
+- **Status:** ✅ Implementado
+- **Tabela:** `OutboundMessageQueue` (schema linhas 495-511)
+- **Implementação:**
+  - `src/lib/evolution-api.ts` - Função `addToQueue()` (linhas 98-118)
+  - `src/app/api/cron/process-message-queue/route.ts` - Rota do cron job
+  - `vercel.json` - Configuração do cron (executa a cada 1 minuto)
+- **Funcionamento:**
+  - Mensagens com rate limit são persistidas no banco
+  - Cron job processa fila periodicamente (1 em 1 minuto)
+  - Remove `setTimeout` in-process que não funciona em serverless
+  - Limpeza automática de mensagens antigas (24h)
+
+#### 3. Debounce com waitUntil() (Anti-Flood)
+- **Status:** ✅ Implementado
+- **Implementação:** `src/lib/whatsapp-debounce.ts` (linhas 55-127)
+- **Funcionamento:**
+  - Usa `waitUntil()` do Next.js para garantir execução após resposta HTTP
+  - Mantém função viva até o timer de 500ms disparar
+  - Aceita parâmetro opcional `waitUntil` para compatibilidade
+  - Webhook passa `req.waitUntil` quando disponível
+
+### Configuração Vercel Cron
+Adicione ao `.env`:
+```bash
+# Segredo para proteger rota do cron (opcional mas recomendado)
+CRON_SECRET="gere-uma-chave-aleatoria"
+```
+
+O cron job é configurado automaticamente via `vercel.json`:
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron/process-message-queue",
+      "schedule": "*/1 * * * *"
+    }
+  ]
+}
+```
+
+### Teste Manual do Cron Job
+```bash
+# Testar rota do cron manualmente
+curl -X GET http://localhost:3000/api/cron/process-message-queue \
+  -H "Authorization: Bearer YOUR_CRON_SECRET"
+```
+
+### Correção de Horário de Fechamento 00:00
+- **Problema:** Quando configurado como 00:00, o sistema considerava qualquer horário >= 0 como fechado
+- **Solução:** `src/lib/business-hours.ts` (linhas 71-74, 104)
+- **Funcionamento:**
+  - Horário 00:00 é tratado como 24:00 (fim do dia)
+  - Mensagens mostram "24:00" em vez de "00:00"
+  - Lógica: `if (closeMin === 0) closeMin = 24 * 60;`
+
+### Verificação de Funcionamento
+Para testar sob múltiplas instâncias concorrentes:
+1. Teste webhook com modo de teste ativado
+2. Envie múltiplas mensagens simultâneas para o mesmo telefone
+3. Verifique logs para confirmar deduplicação funcionando
+4. Monitore tabela `OutboundMessageQueue` para ver fila sendo processada
+5. Verifique cron job logs na Vercel
+
+### Monitoramento
+- Logs do webhook mostram processo de deduplicação
+- Logs do cron job mostram processamento da fila
+- Logs do Prisma mostram erros de conexão se houver
+- Dashboard da Vercel mostra execução do cron job

@@ -20,6 +20,7 @@ interface IncomingPayload {
   listId?: string;
 }
 
+// Estado em memória para debounce (aceitável pois é apenas para agrupar mensagens rápidas)
 const pending = new Map<string, PendingMessage>();
 const processing = new Set<string>();
 
@@ -29,7 +30,7 @@ export function isProcessing(phone: string) {
 
 const PROCESSING_TIMEOUT_MS = 15_000; // segurança: limpa chave travada após 15s (reduzido para alto volume)
 
-// Evita que respostas “travem” por causa de erro/timeout: se houver processamento ativo,
+// Evita que respostas "travem" por causa de erro/timeout: se houver processamento ativo,
 // não enfileire novas mensagens do mesmo phone até liberar (reduz loops e repetição).
 
 export function setProcessing(phone: string, value: boolean) {
@@ -45,12 +46,16 @@ export function setProcessing(phone: string, value: boolean) {
 
 /**
  * Agrupa mensagens rápidas em uma só (anti-flood).
- * Responde uma única vez após ~2,8s sem novas mensagens.
+ * Responde uma única vez após 500ms sem novas mensagens.
  * Usa a última mensagem recebida em vez de juntar com espaço.
+ * 
+ * SERVERLESS COMPATIBLE: Usa waitUntil() para garantir execução do timer
+ * mesmo após a resposta HTTP ser enviada (Vercel específico).
  */
 export function enqueueWhatsAppMessage(
   msg: IncomingPayload,
-  handler: (merged: IncomingPayload) => Promise<void>
+  handler: (merged: IncomingPayload) => Promise<void>,
+  waitUntil?: (promise: Promise<unknown>) => void
 ) {
   const key = normalizePhone(msg.phone);
   const existing = pending.get(key);
@@ -76,7 +81,9 @@ export function enqueueWhatsAppMessage(
   // Sempre cancela o timer anterior (seja o dummy ou um real) antes de definir o novo
   const entry = pending.get(key)!;
   clearTimeout(entry.timer);
-  entry.timer = setTimeout(async () => {
+  
+  // Função que processa a mensagem após o debounce
+  const processMessage = async () => {
     pending.delete(key);
     if (processing.has(key)) {
       return;
@@ -103,5 +110,18 @@ export function enqueueWhatsAppMessage(
       clearTimeout(safetyTimer);
       processing.delete(key);
     }
-  }, DEBOUNCE_MS);
+  };
+  
+  entry.timer = setTimeout(processMessage, DEBOUNCE_MS);
+  
+  // Se waitUntil estiver disponível (Vercel), usa para garantir execução após resposta
+  if (waitUntil) {
+    const promise = new Promise<void>((resolve) => {
+      entry.timer = setTimeout(async () => {
+        await processMessage();
+        resolve();
+      }, DEBOUNCE_MS);
+    });
+    waitUntil(promise);
+  }
 }

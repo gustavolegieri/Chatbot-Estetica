@@ -337,22 +337,24 @@ model WhatsAppSession {
 }
 
 model WhatsAppMessage {
-  id        String           @id @default(cuid())
-  sessionId String?
-  phone     String
-  clientId  String?
-  direction MessageDirection
-  sender    MessageSender
-  body      String
-  flowStage String?
-  createdAt DateTime         @default(now())
-  client    Client?          @relation(fields: [clientId], references: [id])
-  session   WhatsAppSession? @relation(fields: [sessionId], references: [id])
+  id                String           @id @default(cuid())
+  sessionId         String?
+  phone             String
+  clientId          String?
+  direction         MessageDirection
+  sender            MessageSender
+  body              String
+  flowStage         String?
+  wasenderMessageId String?          @unique // Deduplicação de mensagens recebidas do webhook
+  createdAt         DateTime         @default(now())
+  client            Client?          @relation(fields: [clientId], references: [id])
+  session           WhatsAppSession? @relation(fields: [sessionId], references: [id])
 
   @@index([phone])
   @@index([sessionId])
   @@index([createdAt])
   @@index([clientId])
+  @@index([wasenderMessageId])
 }
 
 model Campaign {
@@ -488,4 +490,22 @@ model StageTransition {
 
   @@index([sessionId])
   @@index([timestamp])
+}
+
+model OutboundMessageQueue {
+  id              String   @id @default(cuid())
+  phone           String
+  body            Json     // Payload completo para WasenderAPI
+  attempts        Int      @default(0)
+  maxAttempts     Int      @default(3)
+  scheduledFor    DateTime @default(now())
+  processedAt     DateTime?
+  error           String?
+  isDailyLimit    Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([phone])
+  @@index([scheduledFor])
+  @@index([processedAt])
 }

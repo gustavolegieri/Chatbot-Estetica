@@ -1,6 +1,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { processWhatsAppMessage } from "@/lib/whatsapp-bot";
+import { prisma } from "@/lib/prisma";
+
+// Tipagem para waitUntil do Next.js (disponível em edge runtime)
+interface WaitUntil {
+  (promise: Promise<unknown>): void;
+}
 
 /** Verifica assinatura enviada pela WasenderAPI no header X-Webhook-Signature */
 function verifySignature(req: NextRequest, rawBody: string): boolean {
@@ -66,32 +72,50 @@ function extractPhone(msgKey: Record<string, unknown>): string | null {
   return null;
 }
 
-// Cache simples para deduplicação de mensagens (6h TTL para alto volume)
-const processedMessageIds = new Map<string, number>();
-const DEDUPLICATION_TTL = 6 * 60 * 60 * 1000; // 6 horas (reduzido de 24h para alto volume)
-
-function isMessageProcessed(messageId: string): boolean {
-  const timestamp = processedMessageIds.get(messageId);
-  if (!timestamp) return false;
-  
-  if (Date.now() - timestamp > DEDUPLICATION_TTL) {
-    processedMessageIds.delete(messageId);
+// Deduplicação persistida no banco de dados (Prisma)
+// Substitui o Map em memória que não funciona em serverless
+async function isMessageProcessed(messageId: string): Promise<boolean> {
+  try {
+    const existing = await prisma.whatsAppMessage.findUnique({
+      where: { wasenderMessageId: messageId }
+    });
+    return existing !== null;
+  } catch (error) {
+    // Se houver erro na consulta, assume que não foi processado
+    // para não bloquear o processamento
+    console.error("[Webhook] Erro ao verificar mensagem processada:", error);
     return false;
   }
-  
-  return true;
 }
 
-function markMessageAsProcessed(messageId: string): void {
-  processedMessageIds.set(messageId, Date.now());
-  
-  // Limpar entradas antigas periodicamente (aumentado para 5000 para alto volume)
-  if (processedMessageIds.size > 5000) {
-    const now = Date.now();
-    for (const [id, timestamp] of processedMessageIds.entries()) {
-      if (now - timestamp > DEDUPLICATION_TTL) {
-        processedMessageIds.delete(id);
+async function markMessageAsProcessed(
+  messageId: string,
+  phone: string,
+  text: string,
+  sessionId?: string,
+  clientId?: string
+): Promise<void> {
+  try {
+    // Cria registro com wasenderMessageId único
+    // Se já existir, vai lançar erro de unique constraint
+    await prisma.whatsAppMessage.create({
+      data: {
+        phone,
+        body: text,
+        direction: "INBOUND",
+        sender: "CLIENT",
+        wasenderMessageId: messageId,
+        sessionId,
+        clientId,
+        flowStage: "WEBHOOK_DEDUP",
       }
+    });
+  } catch (error: any) {
+    // Se for erro de unique constraint (P2002), significa que já foi processado
+    if (error.code === 'P2002') {
+      console.log("[Webhook] Mensagem já estava marcada como processada:", messageId);
+    } else {
+      console.error("[Webhook] Erro ao marcar mensagem como processada:", error);
     }
   }
 }
@@ -158,9 +182,9 @@ export async function POST(req: NextRequest) {
   
   console.log("[Webhook] Telefone extraído:", phone);
 
-  // Deduplicação baseada em ID da mensagem
+  // Deduplicação baseada em ID da mensagem (persistida no banco)
   const messageId = msgKey.id as string | undefined;
-  if (messageId && isMessageProcessed(messageId)) {
+  if (messageId && await isMessageProcessed(messageId)) {
     console.log("[Webhook] mensagem duplicada ignorada — messageId:", messageId);
     return NextResponse.json({ ok: true });
   }
@@ -176,28 +200,52 @@ export async function POST(req: NextRequest) {
     pushName
   });
 
+  // Obter sessionId e clientId para marcar mensagem como processada
+  let sessionId: string | undefined;
+  let clientId: string | undefined;
+  try {
+    const session = await prisma.whatsAppSession.findUnique({
+      where: { phone },
+      select: { id: true, clientId: true }
+    });
+    if (session) {
+      sessionId = session.id;
+      clientId = session.clientId || undefined;
+    }
+  } catch (error) {
+    console.error("[Webhook] Erro ao buscar sessão:", error);
+  }
+
   // Marcar mensagem como processada ANTES de processar para evitar duplicatas
   if (messageId) {
-    markMessageAsProcessed(messageId);
+    await markMessageAsProcessed(messageId, phone, text || buttonId || listId || "", sessionId || undefined, clientId || undefined);
   }
 
   try {
     console.log("[Webhook] Iniciando processamento da mensagem");
+    
+    // Tenta obter waitUntil do contexto Next.js para execução background em serverless
+    let waitUntil: ((promise: Promise<unknown>) => void) | undefined;
+    try {
+      // @ts-ignore - waitUntil é disponível em edge runtime do Next.js
+      waitUntil = req.waitUntil;
+    } catch {
+      // waitUntil não disponível, processamento será síncrono
+    }
+    
     await processWhatsAppMessage({
       phone,
       text: text || buttonId || listId || "",
       buttonId,
       listId,
       pushName: pushName || undefined,
-    });
+    }, waitUntil);
     
     console.log("[Webhook] processamento concluído");
   } catch (err) {
     console.error("[Webhook] ERRO:", err);
-    // Em caso de erro, remover marcação para permitir retry
-    if (messageId) {
-      processedMessageIds.delete(messageId);
-    }
+    // Em caso de erro, não removemos a marcação pois a deduplicação é baseada no messageId
+    // Se a mensagem falhar, o usuário pode enviar novamente e será um novo messageId
   }
 
   return NextResponse.json({ ok: true });

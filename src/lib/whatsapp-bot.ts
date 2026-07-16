@@ -245,7 +245,7 @@ async function handleMessageInternal(msg: IncomingMessage) {
   );
 }
 
-export async function processWhatsAppMessage(msg: IncomingMessage) {
+export async function processWhatsAppMessage(msg: IncomingMessage, waitUntil?: (promise: Promise<unknown>) => void) {
   // Important: processar por phone serialmente ajuda a evitar respostas "fora de hora"
   enqueueWhatsAppMessage(
     {
@@ -257,7 +257,8 @@ export async function processWhatsAppMessage(msg: IncomingMessage) {
     },
     async (merged) => {
       await handleMessageInternal(merged);
-    }
+    },
+    waitUntil // Passa waitUntil para garantir execução do debounce em serverless
   );
 }
 

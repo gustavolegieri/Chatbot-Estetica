@@ -22,6 +22,7 @@ import { phoneToWhatsApp } from "./utils";
 import { isValidPrivateRecipient } from "./whatsapp-jid";
 import { getMessageLogContext } from "./whatsapp-message-context";
 import { logWhatsAppMessage } from "./whatsapp-message-log";
+import { prisma } from "./prisma";
 
 const WASENDER_BASE = process.env.WASENDER_BASE_URL || "https://wasenderapi.com/api";
 
@@ -91,76 +92,32 @@ function toAbsoluteMediaUrl(url: string): string {
 }
 
 
-// Fila simples para mensagens que falharam por rate limit
-const messageQueue = new Map<string, Array<{ body: object; timestamp: number; attempts: number }>>();
-const QUEUE_MAX_AGE = 10 * 60 * 1000; // 10 minutos (aumentado para alto volume)
-const MAX_QUEUE_ATTEMPTS = 3; // Máximo de tentativas antes de descartar
-
-function addToQueue(phone: string, body: object) {
-  const key = phone.replace(/\D/g, "");
-  if (!messageQueue.has(key)) {
-    messageQueue.set(key, []);
+// Fila persistente no banco para mensagens que falharam por rate limit
+// Substitui o Map em memória que não funciona em serverless
+// Processamento é feito pelo cron job em /api/cron/process-message-queue
+async function addToQueue(phone: string, body: object, isDailyLimit: boolean = false) {
+  try {
+    const phoneDigits = phone.replace(/\D/g, "");
+    const scheduledFor = new Date(Date.now() + 35000); // 35 segundos no futuro
+    
+    await prisma.outboundMessageQueue.create({
+      data: {
+        phone: phoneDigits,
+        body: body as any,
+        attempts: 0,
+        maxAttempts: 3,
+        scheduledFor,
+        isDailyLimit,
+      }
+    });
+    
+    console.log("[WasenderAPI] 📥 Mensagem adicionada à fila persistente - telefone:", phone, "agendada para:", scheduledFor);
+  } catch (error) {
+    console.error("[WasenderAPI] ❌ Erro ao adicionar mensagem à fila:", error);
   }
-  const queue = messageQueue.get(key)!;
-  queue.push({ body, timestamp: Date.now(), attempts: 0 });
-  
-  console.log("[WasenderAPI] 📥 Mensagem adicionada à fila - telefone:", phone, "tamanho da fila:", queue.length);
-  
-  // Limpar mensagens antigas
-  const now = Date.now();
-  const validMessages = queue.filter(msg => now - msg.timestamp < QUEUE_MAX_AGE);
-  if (validMessages.length !== queue.length) {
-    console.log("[WasenderAPI] 🧹 Limadas", queue.length - validMessages.length, "mensagens antigas da fila");
-  }
-  messageQueue.set(key, validMessages);
 }
 
-async function processQueue(phone: string) {
-  const key = phone.replace(/\D/g, "");
-  const queue = messageQueue.get(key);
-  if (!queue || queue.length === 0) {
-    console.log("[WasenderAPI] 📭 Fila vazia para:", phone);
-    return;
-  }
-  
-  console.log("[WasenderAPI] 📤 Processando fila de mensagens para:", phone, "quantidade:", queue.length);
-  
-  const messages = [...queue];
-  messageQueue.set(key, []);
-  
-  for (const msg of messages) {
-    try {
-      console.log("[WasenderAPI] 📤 Enviando mensagem da fila (tentativa", msg.attempts + 1, "/", MAX_QUEUE_ATTEMPTS + ")");
-      // Aguardar 35 segundos entre mensagens para respeitar rate limit da API gratuita
-      await new Promise(resolve => setTimeout(resolve, 35000));
-      const result = await wasenderFetch(msg.body);
-      
-      // Verificar se o resultado indica limite diário
-      if (result && typeof result === 'object' && 'error' in result && (result as any).isDailyLimit) {
-        console.error("[WasenderAPI] ❌ Limite diário atingido - interrompendo processamento da fila");
-        // Descartar todas as mensagens restantes da fila
-        console.warn("[WasenderAPI] ⚠️ Descartando", messages.length - 1, "mensagens restantes da fila");
-        return;
-      }
-      
-      console.log("[WasenderAPI] ✅ Mensagem da fila enviada com sucesso");
-    } catch (err) {
-      console.error("[WasenderAPI] ❌ Erro ao processar mensagem da fila:", err);
-      // Readicionar à fila se falhar e não excedeu tentativas
-      if (msg.attempts < MAX_QUEUE_ATTEMPTS) {
-        msg.attempts++;
-        addToQueue(phone, msg.body);
-        console.log("[WasenderAPI] 🔄 Mensagem readicionada à fila (tentativa", msg.attempts, ")");
-      } else {
-        console.warn("[WasenderAPI] ⚠️ Mensagem descartada após", MAX_QUEUE_ATTEMPTS, "tentativas");
-      }
-    }
-  }
-  
-  console.log("[WasenderAPI] ✅ Fila processada para:", phone);
-}
-
-async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
+export async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
   const apiKey = getApiKey();
 
   if (!apiKey) {
@@ -210,13 +167,12 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
     
     console.warn(`[WasenderAPI] ⏳ Rate limit — aguardando ${waitMs / 1000}s (tentativa ${attempt}/3)`);
     
-    // Adicionar à fila em vez de bloquear
+    // Adicionar à fila persistente em vez de bloquear
     const phone = (body as any).to;
     if (phone) {
-      addToQueue(phone, body);
-      console.log("[WasenderAPI] 📤 Mensagem adicionada à fila devido a rate limit");
-      // Processar fila automaticamente após o delay
-      setTimeout(() => processQueue(phone), waitMs);
+      await addToQueue(phone, body, false);
+      console.log("[WasenderAPI] 📤 Mensagem adicionada à fila persistente devido a rate limit");
+      // Não processamos automaticamente - será processado por cron job ou rota separada
       return { queued: true, reason: "rate_limit" };
     }
     
@@ -259,12 +215,8 @@ async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
     result: result
   });
   
-  // Tentar processar fila após sucesso - mas com delay maior para evitar rate limit
-  const phone = (body as any).to;
-  if (phone) {
-    console.log("[WasenderAPI] ⏰ Agendando processamento da fila em 35s para:", phone);
-    setTimeout(() => processQueue(phone), 35000); // 35 segundos para respeitar rate limit da API gratuita
-  }
+  // Não processamos a fila automaticamente - será processado por cron job ou rota separada
+  // Isso evita setTimeout em serverless que não tem garantia de execução
   
   return result;
 }
