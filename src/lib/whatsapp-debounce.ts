@@ -37,28 +37,49 @@ async function acquireLock(phone: string): Promise<boolean> {
   const staleThreshold = new Date(now.getTime() - LOCK_TIMEOUT_MS);
 
   try {
-    const result = await prisma.whatsAppSession.updateMany({
-      where: {
+    // Tenta criar a sessão diretamente (create atômico)
+    // Se o phone já existir, falha com P2002 de forma segura, sem gap de corrida
+    await prisma.whatsAppSession.create({
+      data: {
         phone: normalized,
-        OR: [
-          { processingLockedAt: null },
-          { processingLockedAt: { lt: staleThreshold } },
-        ],
-      },
-      data: { processingLockedAt: now },
+        processingLockedAt: now,
+        metadata: { stage: "ETAPA1_AWAITING_NAME", welcomed: false } as object,
+      }
     });
+    
+    console.log("[Lock] Lock adquirido com sucesso (nova sessão) para", normalized);
+    return true;
+  } catch (error: any) {
+    // Se for P2002 (sessão já existe), cai no updateMany normal
+    if (error.code === 'P2002') {
+      try {
+        const result = await prisma.whatsAppSession.updateMany({
+          where: {
+            phone: normalized,
+            OR: [
+              { processingLockedAt: null },
+              { processingLockedAt: { lt: staleThreshold } },
+            ],
+          },
+          data: { processingLockedAt: now },
+        });
 
-    if (result.count === 0) {
-      console.log("[Lock] Mensagem ignorada — outra instância já está processando", normalized);
-      return false;
+        if (result.count === 0) {
+          console.log("[Lock] Mensagem ignorada — outra instância já está processando", normalized);
+          return false;
+        }
+
+        console.log("[Lock] Lock adquirido com sucesso para", normalized);
+        return true;
+      } catch (updateError) {
+        console.error("[Lock] Erro ao atualizar lock em sessão existente:", updateError);
+        return false; // Sem lock confirmado, não processar
+      }
     }
-
-    console.log("[Lock] Lock adquirido com sucesso para", normalized);
-    return true;
-  } catch (error) {
+    
+    // Erro genuinamente inesperado - retorna false
     console.error("[Lock] Erro ao adquirir lock:", error);
-    // Em caso de erro, permitimos o processamento para não bloquear
-    return true;
+    return false;
   }
 }
 
