@@ -282,7 +282,7 @@ async function enviarMensagemTeste(text: string, etapa: string): Promise<{ respo
         return {
           resposta: mensagem.body || '[Mensagem sem corpo]',
           timestamp: mensagem.createdAt,
-          flowStage: mensagem.flowStage,
+          flowStage: mensagem.flowStage ?? undefined,
         };
       }
     }
