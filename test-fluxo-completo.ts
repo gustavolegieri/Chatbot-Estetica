@@ -395,7 +395,7 @@ async function executarTesteFluxo(): Promise<TestReport> {
       }
       
       // Verificar se houve desvio de rota
-      const stageEsperado: string | undefined = textosEsperadosPorStage[stageAtual || 'null'] ? stageAtual : undefined;
+      const stageEsperado: string | undefined = textosEsperadosPorStage[stageAtual || 'null'] ? (stageAtual ?? undefined) : undefined;
       const desvioRota = stageEsperado && flowStage && flowStage !== stageEsperado;
       
       // Comparar texto
