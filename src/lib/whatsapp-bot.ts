@@ -27,6 +27,7 @@ interface IncomingMessage {
   buttonId?: string;
   listId?: string;
   pushName?: string;
+  messageId?: string;
 }
 
 function parseFlow(raw: unknown): FlowState {
