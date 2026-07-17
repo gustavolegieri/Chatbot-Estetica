@@ -29,70 +29,70 @@ export async function startCampaignProcessing(campaignId: string, opts: Processo
 
     let stopRequested = false;
 
-  const workers: Promise<void>[] = [];
+    const workers: Promise<void>[] = [];
 
-  for (let i = 0; i < concurrency; i++) {
-    workers.push((async () => {
-      while (!stopRequested) {
-        try {
-          // Check campaign status
-          const camp = await prisma.campaign.findUnique({ where: { id: campaignId } });
-          if (!camp || camp.status === "PAUSED") break;
-
-          // select one pending item
-          const next = await prisma.campaignQueue.findFirst({ where: { campaignId, status: "PENDING" }, orderBy: { queuedAt: "asc" } });
-          if (!next) break; // none left
-
-          // try to claim atomically
-          const claimed = await prisma.campaignQueue.updateMany({ where: { id: next.id, status: "PENDING" }, data: { status: "SENDING", attempts: { increment: 1 } } });
-          if (claimed.count === 0) continue; // lost race
-
+    for (let i = 0; i < concurrency; i++) {
+      workers.push((async () => {
+        while (!stopRequested) {
           try {
-            // Bloqueio: números que não devem receber mensagens automáticas
-            const blocked = await prisma.blockedPhone.findUnique({
-              where: { phone: next.phone },
-              select: { id: true },
-            });
+            // Check campaign status
+            const camp = await prisma.campaign.findUnique({ where: { id: campaignId } });
+            if (!camp || camp.status === "PAUSED") break;
 
-            if (blocked) {
-              await prisma.campaignQueue.update({
-                where: { id: next.id },
-                data: {
-                  status: "FAILED",
-                  lastError: "blocked_phone",
-                },
+            // select one pending item
+            const next = await prisma.campaignQueue.findFirst({ where: { campaignId, status: "PENDING" }, orderBy: { queuedAt: "asc" } });
+            if (!next) break; // none left
+
+            // try to claim atomically
+            const claimed = await prisma.campaignQueue.updateMany({ where: { id: next.id, status: "PENDING" }, data: { status: "SENDING", attempts: { increment: 1 } } });
+            if (claimed.count === 0) continue; // lost race
+
+            try {
+              // Bloqueio: números que não devem receber mensagens automáticas
+              const blocked = await prisma.blockedPhone.findUnique({
+                where: { phone: next.phone },
+                select: { id: true },
               });
-              emitter.emit("progress", { campaignId, id: next.id, status: "FAILED", error: "blocked_phone" });
-              continue;
+
+              if (blocked) {
+                await prisma.campaignQueue.update({
+                  where: { id: next.id },
+                  data: {
+                    status: "FAILED",
+                    lastError: "blocked_phone",
+                  },
+                });
+                emitter.emit("progress", { campaignId, id: next.id, status: "FAILED", error: "blocked_phone" });
+                continue;
+              }
+
+              const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+              const messageTemplate = campaign?.message ?? "";
+              const message = messageTemplate.replace(/\{name\}/g, next.name ?? "Cliente");
+              const res = await sendText({ number: next.phone, text: message, sender: "ADMIN" });
+
+              await prisma.campaignQueue.update({ where: { id: next.id }, data: { status: "SENT", sentAt: new Date() } });
+              await prisma.campaign.update({ where: { id: campaignId }, data: { successCount: { increment: 1 } } });
+              emitter.emit("progress", { campaignId, id: next.id, status: "SENT" });
+            } catch (err: any) {
+              const lastError = String(err?.message ?? err ?? "unknown");
+              await prisma.campaignQueue.update({ where: { id: next.id }, data: { status: "FAILED", lastError } });
+              await prisma.campaign.update({ where: { id: campaignId }, data: { failCount: { increment: 1 } } });
+              emitter.emit("progress", { campaignId, id: next.id, status: "FAILED", error: lastError });
             }
 
-            const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
-            const messageTemplate = campaign?.message ?? "";
-            const message = messageTemplate.replace(/\{name\}/g, next.name ?? "Cliente");
-            const res = await sendText({ number: next.phone, text: message, sender: "ADMIN" });
-
-            await prisma.campaignQueue.update({ where: { id: next.id }, data: { status: "SENT", sentAt: new Date() } });
-            await prisma.campaign.update({ where: { id: campaignId }, data: { successCount: { increment: 1 } } });
-            emitter.emit("progress", { campaignId, id: next.id, status: "SENT" });
-          } catch (err: any) {
-            const lastError = String(err?.message ?? err ?? "unknown");
-            await prisma.campaignQueue.update({ where: { id: next.id }, data: { status: "FAILED", lastError } });
-            await prisma.campaign.update({ where: { id: campaignId }, data: { failCount: { increment: 1 } } });
-            emitter.emit("progress", { campaignId, id: next.id, status: "FAILED", error: lastError });
+            // configurable delay between sends
+            await new Promise((r) => setTimeout(r, delayMs));
+          } catch (error) {
+            console.error(`[CampaignProcessor] Erro no worker ${i}, continuando loop:`, error);
+            // Continue o loop mesmo com erro - não deve derrubar o worker inteiro
+            await new Promise((r) => setTimeout(r, delayMs));
           }
-
-          // configurable delay between sends
-          await new Promise((r) => setTimeout(r, delayMs));
-        } catch (error) {
-          console.error(`[CampaignProcessor] Erro no worker ${i}, continuando loop:`, error);
-          // Continue o loop mesmo com erro - não deve derrubar o worker inteiro
-          await new Promise((r) => setTimeout(r, delayMs));
         }
-      }
-    })()));
-  }
+      })()));
+    }
 
-  await Promise.all(workers);
+    await Promise.all(workers);
 
   // mark completed if no pending left
   try {
