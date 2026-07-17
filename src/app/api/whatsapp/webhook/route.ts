@@ -155,6 +155,13 @@ async function deleteMessageProcessingMarker(messageId: string) {
   }
 }
 
+export async function GET(req: NextRequest) {
+  return NextResponse.json({
+    ok: true,
+    message: "Webhook endpoint is alive. This endpoint accepts POST requests for Wasender webhooks."
+  });
+}
+
 export async function POST(req: NextRequest) {
   let rawBody: string;
   try {
