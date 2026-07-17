@@ -117,12 +117,12 @@ export function repairDatabaseUrl(raw?: string): string | undefined {
     if (!url.includes("sslmode=")) {
       url += url.includes("?") ? "&sslmode=require" : "?sslmode=require";
     }
-    // Aumentar connection_limit para alto volume (200+ mensagens diárias)
+    // Reduzir connection_limit para ambiente serverless com pooler (evita esgotamento em múltiplas instâncias)
     if (!url.includes("connection_limit=")) {
-      url += url.includes("?") ? "&connection_limit=50" : "?connection_limit=50";
+      url += url.includes("?") ? "&connection_limit=5" : "?connection_limit=5";
     } else {
-      // Atualizar connection_limit se existir e for menor que 50
-      url = url.replace(/connection_limit=\d+/g, "connection_limit=50");
+      // Atualizar connection_limit se existir e for maior que 5
+      url = url.replace(/connection_limit=\d+/g, "connection_limit=5");
     }
   }
 
