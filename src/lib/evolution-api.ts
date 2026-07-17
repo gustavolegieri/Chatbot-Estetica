@@ -99,8 +99,7 @@ function toAbsoluteMediaUrl(url: string): string {
 async function addToQueue(phone: string, body: object, isDailyLimit: boolean = false) {
   try {
     const phoneDigits = phone.replace(/\D/g, "");
-    const scheduledFor = new Date(Date.now() + 35000); // 35 segundos no futuro
-    
+  const scheduledFor = new Date(Date.now() + 5_000); // 5 segundos no futuro
     // Gerar hash do conteúdo para deduplicação
     const bodyStr = JSON.stringify(body);
     const bodyHash = crypto.createHash("md5").update(`${phoneDigits}:${bodyStr}`).digest("hex");
@@ -175,7 +174,6 @@ export async function wasenderFetch(body: object, attempt = 1): Promise<unknown>
       const json = await response.clone().json() as { retry_after?: number; message?: string };
       if (json.retry_after) waitMs = Math.min(json.retry_after * 1000, 30_000); // Max 30s
       
-      // Verificar se é limite diário (não deve enfileirar)
       if (json.message?.toLowerCase().includes("daily") || json.message?.toLowerCase().includes("trial cap")) {
         isDailyLimit = true;
       }
@@ -186,20 +184,22 @@ export async function wasenderFetch(body: object, attempt = 1): Promise<unknown>
       console.error("[WasenderAPI] 💡 Faça upgrade para plano pago ou aguarde o reset diário");
       return { error: true, status: 429, message: "Limite diário da API atingido" };
     }
-    
-    console.warn(`[WasenderAPI] ⏳ Rate limit — aguardando ${waitMs / 1000}s (tentativa ${attempt}/3)`);
-    
-    // Adicionar à fila persistente em vez de bloquear
+
+    if (attempt < 3) {
+      console.warn(`[WasenderAPI] ⏳ Rate limit temporário — aguardando ${waitMs / 1000}s para retry (tentativa ${attempt}/3)`);
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      return wasenderFetch(body, attempt + 1);
+    }
+
+    console.warn(`[WasenderAPI] ⚠️ Rate limit persistente após ${attempt} tentativas — adicionando à fila persistente`);
     const phone = (body as any).to;
     if (phone) {
       await addToQueue(phone, body, false);
       console.log("[WasenderAPI] 📤 Mensagem adicionada à fila persistente devido a rate limit");
-      // Não processamos automaticamente - será processado por cron job ou rota separada
       return { queued: true, reason: "rate_limit" };
     }
-    
-    await new Promise((resolve) => setTimeout(resolve, waitMs));
-    return wasenderFetch(body, attempt + 1);
+
+    return { error: true, status: 429, message: "Rate limit persistente" };
   }
 
   if (!response.ok) {

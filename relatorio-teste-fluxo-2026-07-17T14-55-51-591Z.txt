@@ -1,0 +1,683 @@
+
+================================================================================
+RELATÓRIO DE TESTE DO FLUXO COMPLETO
+================================================================================
+
+Total de etapas testadas: 25
+✅ OK: 1
+❌ DIVERGENTES: 24
+
+--------------------------------------------------------------------------------
+DETALHAMENTO POR ETAPA
+--------------------------------------------------------------------------------
+
+ETAPA: 1. BOAS-VINDAS
+Status: OK
+Timestamp: 2026-07-17T14:50:28.652Z
+Esperado: Seja muito bem-vindo
+Recebido: Olá! Seja muito bem-vindo(a) à *Estética Automotiva* 🚗✨
+
+Aqui não fazemos lavagem comum — somos especialistas em *estética automotiva premium*: serviços que cuidam, protegem e valorizam o seu veículo de verdade.
+
+O que fazemos por você:
+🔹 *Lavagem detalhada* — muito além de água e sabão
+🔹 *Polimento técnico* — riscos e opacidade eliminados
+🔹 *Proteção de pintura* — vitrificação e cristalização
+🔹 *Higienização interior* — renovação completa por dentro
+🔹 *Detalhamentos completos* — carro como saído da concessionária
+
+📍 Consulte nosso endereço
+🕐 Segunda a sábado, 08:00 às 00:00
+
+Para começarmos, qual é o seu *nome*? 😊
+
+ETAPA: 2. COLETA DE NOME
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:50:45.000Z
+Esperado: qual é o seu nome
+Recebido: Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Revitalização
+*6* 🔄 Detalhes Especiais
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Diff:
+Esperava conter: "qual é o seu nome"
+Recebeu: "que bom te ter aqui joão  o que seu carro precisa hoje 1  lavagem 2  polimento 3  proteção  brilho 4  interior 5  revitalização 6  detalhes especiais 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+ETAPA: 3. MENU PRINCIPAL
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:50:58.302Z
+Esperado: O que você precisa
+Recebido: *Lavagem* — qual opção?
+
+*1* — Lavagem Simples
+*2* — Lavagem Completa
+*3* — Lavagem Detalhada
+
+*0* — Voltar ao menu principal
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "lavagem  qual opção 1  lavagem simples 2  lavagem completa 3  lavagem detalhada 0  voltar ao menu principal"
+
+ETAPA: 4. SUBMENU
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:51:14.063Z
+Esperado: serviços disponíveis
+Recebido: 💧 *Lavagem Simples*
+
+_Manutenção regular com cuidado e acabamento que faz diferença._
+
+✨ *O que inclui:*
+• Pré-lavagem com espuma ativa que solta a sujeira
+• Lavagem externa manual, segura para a pintura
+• Secagem completa com microfibra premium
+• Finalização dos pneus com pretinho
+• Aspiração e limpeza interna básica
+
+⏱️ 60 min
+💰 *R$ 55*
+
+O que você quer fazer?
+
+*1* 📅 Quero agendar
+*2* 🔄 Ver outros serviços
+*3* 💬 Tenho uma dúvida
+Diff:
+Similaridade: 50%
+Palavras esperadas: serviços, disponíveis
+Palavras encontradas: serviços
+
+ETAPA: 5. CLIENTE INDECISO - VEÍCULO
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:51:26.224Z
+Esperado: Qual é o modelo
+Recebido: Ops, essa opção não existe 😅
+
+Escolhe uma dessas:
+
+O que você quer fazer?
+
+*1* 📅 Quero agendar
+*2* 🔄 Ver outros serviços
+*3* 💬 Tenho uma dúvida
+Diff:
+Esperava conter: "qual é o modelo"
+Recebeu: "ops essa opção não existe  escolhe uma dessas o que você quer fazer 1  quero agendar 2  ver outros serviços 3  tenho uma dúvida"
+
+ETAPA: 6. CLIENTE INDECISO - PROBLEMA
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:51:39.199Z
+Esperado: recomendo
+Recebido: Qual é o *modelo* do seu veículo? 🚗
+
+_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_
+
+_Ou envie modelo e ano juntos: *Civic 2021*_
+Diff:
+Esperava conter: "recomendo"
+Recebeu: "qual é o modelo do seu veículo  _exemplos civic corolla hilux onix compass hb20_ _ou envie modelo e ano juntos civic 2021_"
+
+ETAPA: 7. AÇÕES COM PACOTES
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:51:52.846Z
+Esperado: Pacotes
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Esperava conter: "pacotes"
+Recebeu: "não identifiquei o modelo  envie só o modelo do carro marcamodelo _ex civic fiat argo hilux sw4_"
+
+ETAPA: 8. AÇÕES APÓS SERVIÇO
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:52:05.470Z
+Esperado: Agendar
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Esperava conter: "agendar"
+Recebeu: "não identifiquei o modelo  envie só o modelo do carro marcamodelo _ex civic fiat argo hilux sw4_"
+
+ETAPA: 9. COLETA DE VEÍCULO
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:52:18.742Z
+Esperado: Confirmando os dados
+Recebido: Anotado: Civic usado 2022 👍
+
+Qual a cor do veículo?
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: 10. ORÇAMENTO
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:52:32.538Z
+Esperado: Bônus
+Recebido: 🚘 *Dados do veículo*
+
+📌 Modelo: (ainda não informado)
+📅 Ano: (ainda não informado)
+
+Envie os dados que faltam, por exemplo:
+Modelo: Honda Civic
+Ano: 2020
+Diff:
+Esperava conter: "bônus"
+Recebeu: " dados do veículo  modelo ainda não informado  ano ainda não informado envie os dados que faltam por exemplo modelo honda civic ano 2020"
+
+ETAPA: 11. BÔNUS PRIMEIRA VEZ
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:52:44.759Z
+Esperado: Desconto aplicado
+Recebido: 🚘 *Dados do veículo*
+
+📌 Modelo: (ainda não informado)
+📅 Ano: (ainda não informado)
+
+Envie os dados que faltam, por exemplo:
+Modelo: Honda Civic
+Ano: 2020
+Diff:
+Esperava conter: "desconto aplicado"
+Recebeu: " dados do veículo  modelo ainda não informado  ano ainda não informado envie os dados que faltam por exemplo modelo honda civic ano 2020"
+
+ETAPA: 12. UPSELL
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:52:57.317Z
+Esperado: adicionar
+Recebido: 🚘 *Dados do veículo*
+
+📌 Modelo: (ainda não informado)
+📅 Ano: (ainda não informado)
+
+Envie os dados que faltam, por exemplo:
+Modelo: Honda Civic
+Ano: 2020
+Diff:
+Esperava conter: "adicionar"
+Recebeu: " dados do veículo  modelo ainda não informado  ano ainda não informado envie os dados que faltam por exemplo modelo honda civic ano 2020"
+
+ETAPA: 13. ESCOLHA DE DIA
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:53:10.752Z
+Esperado: calendário
+Recebido: Não entendi a cor 😊 Pode me dizer novamente? (ex: branco, prata, preto, azul)
+Diff:
+Esperava conter: "calendário"
+Recebeu: "não entendi a cor  pode me dizer novamente ex branco prata preto azul"
+
+ETAPA: 14. ESCOLHA DE HORÁRIO
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:53:24.224Z
+Esperado: horários disponíveis
+Recebido: Anotado: Civic usado 2022 09:00 👍
+
+Qual o estado geral do veículo? (excelente/bom/normal/ruim)
+Diff:
+Similaridade: 0%
+Palavras esperadas: horários, disponíveis
+Palavras encontradas: 
+
+ETAPA: 15. CUPOM
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:53:37.671Z
+Esperado: cupom
+Recebido: 🚘 *Confirmando os dados do veículo*
+
+Modelo: *Civic usado*
+Ano: *2022*
+Cor: *09:00*
+Estado: **
+
+Está certo? (sim/não)
+Diff:
+Esperava conter: "cupom"
+Recebeu: " confirmando os dados do veículo modelo civic usado ano 2022 cor 0900 estado  está certo simnão"
+
+ETAPA: 16. PONTOS DE FIDELIDADE
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:53:51.930Z
+Esperado: pontos
+Recebido: Anotado: *não usar* 👍
+
+Qual o *ano* do veículo?
+
+_Exemplo: 2021, 2019, 2018_
+Diff:
+Esperava conter: "pontos"
+Recebeu: "anotado não usar  qual o ano do veículo _exemplo 2021 2019 2018_"
+
+ETAPA: 17. CONFIRMAÇÃO DE ORÇAMENTO
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:54:04.527Z
+Esperado: orçamento
+Recebido: Claro 😊 Digite *menu* para ver opções.
+Diff:
+Esperava conter: "orçamento"
+Recebeu: "claro  digite menu para ver opções"
+
+ETAPA: 18. LOGÍSTICA
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:54:17.033Z
+Esperado: Como prefere
+Recebido: Preciso do *ano* com 4 dígitos 😊
+
+_Exemplo: 2021, 2019, 2015_
+Diff:
+Esperava conter: "como prefere"
+Recebeu: "preciso do ano com 4 dígitos  _exemplo 2021 2019 2015_"
+
+ETAPA: 19. PAGAMENTO
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:54:30.812Z
+Esperado: pagar
+Recebido: Preciso do *ano* com 4 dígitos 😊
+
+_Exemplo: 2021, 2019, 2015_
+Diff:
+Esperava conter: "pagar"
+Recebeu: "preciso do ano com 4 dígitos  _exemplo 2021 2019 2015_"
+
+ETAPA: 20. ESCOLHA PIX
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:54:43.018Z
+Esperado: PIX
+Recebido: Preciso do *ano* com 4 dígitos 😊
+
+_Exemplo: 2021, 2019, 2015_
+Diff:
+Esperava conter: "pix"
+Recebeu: "preciso do ano com 4 dígitos  _exemplo 2021 2019 2015_"
+
+ETAPA: 21. COMPROVANTE
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:54:55.534Z
+Esperado: comprovante
+Recebido: Claro 😊 Digite *menu* para ver opções.
+Diff:
+Esperava conter: "comprovante"
+Recebeu: "claro  digite menu para ver opções"
+
+ETAPA: 22. LEMBRETE
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:55:08.998Z
+Esperado: lembrete
+Recebido: Claro 😊 Digite *menu* para ver opções.
+Diff:
+Esperava conter: "lembrete"
+Recebeu: "claro  digite menu para ver opções"
+
+ETAPA: 23. RESUMO E CONFIRMAÇÃO
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:55:22.504Z
+Esperado: resumo
+Recebido: Claro 😊 Digite *menu* para ver opções.
+Diff:
+Esperava conter: "resumo"
+Recebeu: "claro  digite menu para ver opções"
+
+ETAPA: CROSS-CUTTING 1 - Small talk
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:55:35.713Z
+Esperado: Menu reimpresso (contém: O que você precisa...)
+Recebido: Preciso do *ano* com 4 dígitos 😊
+
+_Exemplo: 2021, 2019, 2015_
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "preciso do ano com 4 dígitos  _exemplo 2021 2019 2015_"
+
+ETAPA: CROSS-CUTTING 2 - Pergunta
+Status: DIVERGENTE
+Timestamp: 2026-07-17T14:55:49.233Z
+Esperado: Menu reimpresso (contém: O que você precisa...)
+Recebido: O preço da *Lavagem Simples* varia conforme o modelo e o estado do seu carro. 😊  
+Para um orçamento exato, entre em contato conosco.  
+Aceitamos cartão e dinheiro.  
+Se precisar falar com o dono, digite *falar com o dono*.
+
+Digite *menu* para ver opções.
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "o preço da lavagem simples varia conforme o modelo e o estado do seu carro  para um orçamento exato entre em contato conosco aceitamos cartão e dinheiro se precisar falar com o dono digite falar com o dono digite menu para ver opções"
+
+================================================================================
+
+
+
+================================================================================
+DUMP BRUTO DAS MENSAGENS (BANCO DE DADOS)
+================================================================================
+
+Total de mensagens: 50
+
+2026-07-17T14:50:22.967Z | INBOUND | CLIENT
+Texto: Oi
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T14:50:28.652Z | OUTBOUND | BOT
+Texto: Olá! Seja muito bem-vindo(a) à *Estética Automotiva* 🚗✨
+
+Aqui não fazemos lavagem comum — somos especialistas em *estética automotiva premium*: serviços que cuidam, protegem e valorizam o seu veículo de verdade.
+
+O que fazemos por você:
+🔹 *Lavagem detalhada* — muito além de água e sabão
+🔹 *Polimento técnico* — riscos e opacidade eliminados
+🔹 *Proteção de pintura* — vitrificação e cristalização
+🔹 *Higienização interior* — renovação completa por dentro
+🔹 *Detalhamentos completos* — carro como saído da concessionária
+
+📍 Consulte nosso endereço
+🕐 Segunda a sábado, 08:00 às 00:00
+
+Para começarmos, qual é o seu *nome*? 😊
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T14:50:36.070Z | INBOUND | CLIENT
+Texto: João
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T14:50:45.000Z | OUTBOUND | BOT
+Texto: Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Revitalização
+*6* 🔄 Detalhes Especiais
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T14:50:52.531Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+2026-07-17T14:50:58.302Z | OUTBOUND | BOT
+Texto: *Lavagem* — qual opção?
+
+*1* — Lavagem Simples
+*2* — Lavagem Completa
+*3* — Lavagem Detalhada
+
+*0* — Voltar ao menu principal
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+2026-07-17T14:51:05.999Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA2_SUB
+--------------------------------------------------------------------------------
+2026-07-17T14:51:14.063Z | OUTBOUND | BOT
+Texto: 💧 *Lavagem Simples*
+
+_Manutenção regular com cuidado e acabamento que faz diferença._
+
+✨ *O que inclui:*
+• Pré-lavagem com espuma ativa que solta a sujeira
+• Lavagem externa manual, segura para a pintura
+• Secagem completa com microfibra premium
+• Finalização dos pneus com pretinho
+• Aspiração e limpeza interna básica
+
+⏱️ 60 min
+💰 *R$ 55*
+
+O que você quer fazer?
+
+*1* 📅 Quero agendar
+*2* 🔄 Ver outros serviços
+*3* 💬 Tenho uma dúvida
+Stage: ETAPA2_SUB
+--------------------------------------------------------------------------------
+2026-07-17T14:51:21.256Z | INBOUND | CLIENT
+Texto: Civic
+Stage: ETAPA3_SERVICE_ACTION
+--------------------------------------------------------------------------------
+2026-07-17T14:51:26.224Z | OUTBOUND | BOT
+Texto: Ops, essa opção não existe 😅
+
+Escolhe uma dessas:
+
+O que você quer fazer?
+
+*1* 📅 Quero agendar
+*2* 🔄 Ver outros serviços
+*3* 💬 Tenho uma dúvida
+Stage: ETAPA3_SERVICE_ACTION
+--------------------------------------------------------------------------------
+2026-07-17T14:51:33.599Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA3_SERVICE_ACTION
+--------------------------------------------------------------------------------
+2026-07-17T14:51:39.199Z | OUTBOUND | BOT
+Texto: Qual é o *modelo* do seu veículo? 🚗
+
+_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_
+
+_Ou envie modelo e ano juntos: *Civic 2021*_
+Stage: ETAPA3_SERVICE_ACTION
+--------------------------------------------------------------------------------
+2026-07-17T14:51:47.074Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:51:52.846Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:52:00.639Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:52:05.470Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:52:13.124Z | INBOUND | CLIENT
+Texto: Civic 2022 prata usado
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:52:18.742Z | OUTBOUND | BOT
+Texto: Anotado: Civic usado 2022 👍
+
+Qual a cor do veículo?
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:52:26.722Z | INBOUND | CLIENT
+Texto: 2
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:52:32.538Z | OUTBOUND | BOT
+Texto: 🚘 *Dados do veículo*
+
+📌 Modelo: (ainda não informado)
+📅 Ano: (ainda não informado)
+
+Envie os dados que faltam, por exemplo:
+Modelo: Honda Civic
+Ano: 2020
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:52:39.954Z | INBOUND | CLIENT
+Texto: 2
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:52:44.759Z | OUTBOUND | BOT
+Texto: 🚘 *Dados do veículo*
+
+📌 Modelo: (ainda não informado)
+📅 Ano: (ainda não informado)
+
+Envie os dados que faltam, por exemplo:
+Modelo: Honda Civic
+Ano: 2020
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:52:52.518Z | INBOUND | CLIENT
+Texto: 2
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:52:57.317Z | OUTBOUND | BOT
+Texto: 🚘 *Dados do veículo*
+
+📌 Modelo: (ainda não informado)
+📅 Ano: (ainda não informado)
+
+Envie os dados que faltam, por exemplo:
+Modelo: Honda Civic
+Ano: 2020
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:53:05.103Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:53:10.752Z | OUTBOUND | BOT
+Texto: Não entendi a cor 😊 Pode me dizer novamente? (ex: branco, prata, preto, azul)
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:53:18.422Z | INBOUND | CLIENT
+Texto: 09:00
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:53:24.224Z | OUTBOUND | BOT
+Texto: Anotado: Civic usado 2022 09:00 👍
+
+Qual o estado geral do veículo? (excelente/bom/normal/ruim)
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:53:31.840Z | INBOUND | CLIENT
+Texto: pular
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:53:37.671Z | OUTBOUND | BOT
+Texto: 🚘 *Confirmando os dados do veículo*
+
+Modelo: *Civic usado*
+Ano: *2022*
+Cor: *09:00*
+Estado: **
+
+Está certo? (sim/não)
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:53:45.290Z | INBOUND | CLIENT
+Texto: não usar
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:53:51.930Z | OUTBOUND | BOT
+Texto: Anotado: *não usar* 👍
+
+Qual o *ano* do veículo?
+
+_Exemplo: 2021, 2019, 2018_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:53:59.691Z | INBOUND | CLIENT
+Texto: sim
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:54:04.527Z | OUTBOUND | BOT
+Texto: Claro 😊 Digite *menu* para ver opções.
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:54:12.195Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:54:17.033Z | OUTBOUND | BOT
+Texto: Preciso do *ano* com 4 dígitos 😊
+
+_Exemplo: 2021, 2019, 2015_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:54:24.723Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:54:30.812Z | OUTBOUND | BOT
+Texto: Preciso do *ano* com 4 dígitos 😊
+
+_Exemplo: 2021, 2019, 2015_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:54:38.017Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:54:43.018Z | OUTBOUND | BOT
+Texto: Preciso do *ano* com 4 dígitos 😊
+
+_Exemplo: 2021, 2019, 2015_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:54:50.711Z | INBOUND | CLIENT
+Texto: ok
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:54:55.534Z | OUTBOUND | BOT
+Texto: Claro 😊 Digite *menu* para ver opções.
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:55:03.046Z | INBOUND | CLIENT
+Texto: não
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:55:08.998Z | OUTBOUND | BOT
+Texto: Claro 😊 Digite *menu* para ver opções.
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:55:16.509Z | INBOUND | CLIENT
+Texto: sim
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:55:22.504Z | OUTBOUND | BOT
+Texto: Claro 😊 Digite *menu* para ver opções.
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:55:30.947Z | INBOUND | CLIENT
+Texto: pera aí
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:55:35.713Z | OUTBOUND | BOT
+Texto: Preciso do *ano* com 4 dígitos 😊
+
+_Exemplo: 2021, 2019, 2015_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:55:43.202Z | INBOUND | CLIENT
+Texto: quanto custa?
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T14:55:49.233Z | OUTBOUND | BOT
+Texto: O preço da *Lavagem Simples* varia conforme o modelo e o estado do seu carro. 😊  
+Para um orçamento exato, entre em contato conosco.  
+Aceitamos cartão e dinheiro.  
+Se precisar falar com o dono, digite *falar com o dono*.
+
+Digite *menu* para ver opções.
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+================================================================================

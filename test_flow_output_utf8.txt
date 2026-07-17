@@ -1,0 +1,1578 @@
+﻿Ôùç injected env (1) from .env.test // tip: Ôùê encrypted .env [www.dotenvx.com]
+­ƒôØ Textos esperados extra├¡dos: 7
+   5. CLIENTE INDECISO ÔÇö VE├ìCULO ÔÇö: Perfeito ­ƒÜù
+
+O que est├í acontecendo?
+
+1 ­ƒÄ¿ Pin...
+   6. CLIENTE INDECISO ÔÇö PROBLEMA ÔÇö: Para seu caso, recomendo *{item.label}* Ô£¿
+
+{serv...
+   7. A├ç├òES COM PACOTES ÔÇö: ­ƒôª Pacotes: Brilho Total (R$550+) | Prote├º├úo Compl...
+   9. COLETA DE VE├ìCULO ÔÇö: ­ƒÜÿ Confirmando os dados do ve├¡culo
+
+Modelo: {mod...
+   10. OR├çAMENTO ÔÇö: ­ƒÄü B├┤nus! Primeira vez: 10% de desconto
+
+├ë sua p...
+   11. B├öNUS PRIMEIRA VEZ ÔÇö: Ô£à Desconto aplicado!
+
+Seu b├┤nus de primeira comp...
+   17. CONFIRMA├ç├âO DE OR├çAMENTO ÔÇö: ­ƒÜÜ Como prefere?
+
+1 - Deixe eu levo o carro at├® ...
+­ƒº╣ Limpando dados de teste anteriores...
+Ô£à Dados de teste anteriores limpos
+
+­ƒº¬ Iniciando teste automatizado stateful do fluxo...
+­ƒô▒ Telefone de teste: 5511972851072
+
+
+­ƒôì Etapa #1 - Stage atual: null
+   Enviando: "Oi"
+[Prisma] Initializing with connection_limit: not set
+[Prisma] Database URL (masked): postgresql://***:***@localhost:5432/estetica_automotiva?schema=public
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'Oi' }
+[Lock] Lock adquirido com sucesso (nova sess├úo) para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'Oi' }
+[WhatsApp Bot] [1784306404367-r7zvw2jiu] Processando mensagem: { phone: '5511972851072', text: 'Oi' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÜÇ Iniciando flow de boas-vindas
+[WhatsApp Flow] ­ƒôñ Enviando mensagem de boas-vindas
+node.exe : [WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+No linha:1 caractere:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([WasenderAPI] Ô...gem simulada: { 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  to: '+5511972851072',
+  text: 'Ol├í! Seja muito bem-vindo(a) ├á *Garagem do Ka* ­ƒÜùÔ£¿\n' +
+    '\n' +
+    'Aqui n├úo fazemos lavagem comum ÔÇö somos especialistas em *est├®tica 
+automotiva premium*: servi├ºos que cuidam, protegem e valorizam o seu ve├¡culo 
+de verdade.\n' +
+    '\n' +
+    'O que fazemos por voc├¬:\n' +
+    '­ƒö╣ *Lavagem detalhada* ÔÇö muito al├®m de ├ígua e sab├úo\n' +
+    '­ƒö╣ *Polimento t├®cnico* ÔÇö riscos e opacidade eliminados\n' +
+    '­ƒö╣ *Prote├º├úo de pintura* ÔÇö vitrifica├º├úo e cristaliza├º├úo\n' +
+    '­ƒö╣ *Higieniza├º├úo interior* ÔÇö renova├º├úo completa por dentro\n' +
+    'ƒö╣ *Detalhamentos completos* ÔÇö carro como sa├¡do da concession├íria\n' 
++
+    '\n' +
+    '­ƒôì Rua Jos├® de Souza Marques, 164, Jardim Esplanada\n' +
+    '­ƒòÉ Segunda a s├íbado, 08:00 ├ás 18:00\n' +
+    '\n' +
+    'Para come├ºarmos, qual ├® o seu *nome*? ­ƒÿè'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:04.470Z) - Stage: ETAPA1_AWAITING_NAME
+      Esperava conter: "o que voc├¬ precisa"
+Recebeu: "ol├í seja muito bemvindoa ├á garagem do ka  aqui n├úo fazemos lavagem comum  somos especialistas em est├®tica automotiva premium servi├ºos que cuidam protegem e valorizam o seu ve├¡culo de verdade o que fazemos por voc├¬  lavagem detalhada  muito al├®m de ├ígua e sab├úo  polimento t├®cnico  riscos e opacidade eliminados  prote├º├úo de pintura  vitrifica├º├úo e cristaliza├º├úo  higieniza├º├úo interior  renova├º├úo completa por dentro  detalhamentos completos  carro como sa├¡do da concession├íria  rua jos├® de souza marques 164 jardim esplanada  segunda a s├íbado 0800 ├ás 1800 para come├ºarmos qual ├® o seu nome "
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado com welcomed=true
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: {
+  phone: '5511972851072',
+  stage: 'ETAPA1_AWAITING_NAME',
+  welcomed: true
+}
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WhatsApp Flow] Ô£à Flow de boas-vindas conclu├¡do
+[Lock] Lock liberado para 5511972851072
+
+­ƒôì Etapa #2 - Stage atual: ETAPA1_AWAITING_NAME
+   Enviando: "Jo├úo"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'Jo├úo' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'Jo├úo' }
+[WhatsApp Bot] [1784306405769-zb2p07l7k] Processando mensagem: { phone: '5511972851072', text: 'Jo├úo' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA2_MAIN_MENU', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Que bom te ter aqui, *Jo├úo*! ­ƒÿè\n' +
+    '\n' +
+    'O que seu carro precisa hoje?\n' +
+    '\n' +
+    '*1* ­ƒÆº Lavagem\n' +
+    '*2* Ô£¿ Polimento\n' +
+    '*3* ­ƒøí´©Å Prote├º├úo & Brilho\n' +
+    '*4* ­ƒ¬æ Interior\n' +
+    '*5* ­ƒö¼ Detalhes Especiais\n' +
+    '*6* ­ƒöä Revitaliza├º├úo\n' +
+    '*7* ­ƒôª Pacotes Premium\n' +
+    '*8* ­ƒñö Ajuda na escolha\n' +
+    '*9* ­ƒæñ Falar com atendente'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:06.846Z) - Stage: ETAPA1_AWAITING_NAME
+      Esperava conter: "o que voc├¬ precisa"
+Recebeu: "que bom te ter aqui jo├úo  o que seu carro precisa hoje 1  lavagem 2  polimento 3  prote├º├úo  brilho 4  interior 5  detalhes especiais 6  revitaliza├º├úo 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+­ƒôì Etapa #3 - Stage atual: ETAPA1_AWAITING_NAME
+   Enviando: "1"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: '1' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: '1' }
+[WhatsApp Bot] [1784306408156-z7c8uvn49] Processando mensagem: { phone: '5511972851072', text: '1' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA2_SUB', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: '*Lavagem* ÔÇö qual op├º├úo?\n' +
+    '\n' +
+    '*1* ÔÇö Lavagem Simples\n' +
+    '*2* ÔÇö Lavagem Completa\n' +
+    '*3* ÔÇö Lavagem Detalhada\n' +
+    '\n' +
+    '*0* ÔÇö Voltar ao menu principal'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔÜá´©Å DESVIO DE ROTA (2026-07-17T16:40:08.211Z)
+      Esperava: ETAPA1_AWAITING_NAME, Recebeu: ETAPA2_MAIN_MENU
+
+­ƒôì Etapa #4 - Stage atual: ETAPA2_MAIN_MENU
+   Enviando: "1"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: '1' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: '1' }
+[WhatsApp Bot] [1784306409280-zi5rbjg71] Processando mensagem: { phone: '5511972851072', text: '1' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: {
+  phone: '5511972851072',
+  stage: 'ETAPA3_SERVICE_ACTION',
+  welcomed: true
+}
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: '­ƒÆº *Lavagem Simples*\n' +
+    '\n' +
+    '_Manuten├º├úo regular com cuidado e acabamento que faz diferen├ºa._\n' +
+    '\n' +
+    'Ô£¿ *O que inclui:*\n' +
+    'ÔÇó Pr├®-lavagem com espuma ativa que solta a sujeira\n' +
+    'ÔÇó Lavagem externa manual, segura para a pintura\n' +
+    'ÔÇó Secagem completa com microfibra premium\n' +
+    'ÔÇó Finaliza├º├úo dos pneus com pretinho\n' +
+    'ÔÇó Aspira├º├úo e limpeza interna b├ísica\n' +
+    '\n' +
+    'ÔÅ▒´©Å 60 min\n' +
+    '­ƒÆ░ *R$ 55*\n' +
+    '\n' +
+    'O que voc├¬ quer fazer?\n' +
+    '\n' +
+    '*1* ­ƒôà Quero agendar\n' +
+    '*2* ­ƒöä Ver outros servi├ºos\n' +
+    '*3* ­ƒÆ¼ Tenho uma d├║vida'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔÜá´©Å DESVIO DE ROTA (2026-07-17T16:40:09.832Z)
+      Esperava: ETAPA2_MAIN_MENU, Recebeu: ETAPA2_SUB
+
+­ƒôì Etapa #5 - Stage atual: ETAPA2_SUB
+   Enviando: "1"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: '1' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: '1' }
+[WhatsApp Bot] [1784306411036-2ghe5mw7j] Processando mensagem: { phone: '5511972851072', text: '1' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Qual ├® o *modelo* do seu ve├¡culo? ­ƒÜù\n' +
+    '\n' +
+    '_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_\n' +
+    '\n' +
+    '_Ou envie modelo e ano juntos: *Civic 2021*_'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔÜá´©Å DESVIO DE ROTA (2026-07-17T16:40:11.068Z)
+      Esperava: ETAPA2_SUB, Recebeu: ETAPA3_SERVICE_ACTION
+
+­ƒôì Etapa #6 - Stage atual: ETAPA3_SERVICE_ACTION
+   Enviando: "1"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: '1' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: '1' }
+[WhatsApp Bot] [1784306412164-2yg5zrfpu] Processando mensagem: { phone: '5511972851072', text: '1' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'N├úo identifiquei o modelo ­ƒÿà\n' +
+    '\n' +
+    'Envie s├│ o *modelo* do carro (marca/modelo):\n' +
+    '_Ex: Civic, Fiat Argo, Hilux SW4_'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔÜá´©Å DESVIO DE ROTA (2026-07-17T16:40:12.199Z)
+      Esperava: ETAPA3_SERVICE_ACTION, Recebeu: ETAPA4_VEHICLE
+
+­ƒôì Etapa #7 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "Civic 2022"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'Civic 2022' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'Civic 2022' }
+[WhatsApp Bot] [1784306413287-toiuuyfgp] Processando mensagem: { phone: '5511972851072', text: 'Civic 2022' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: Civic 2022 ­ƒæì\n\nQual a cor do ve├¡culo?'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:13.333Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+­ƒôì Etapa #8 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "prata"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'prata' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] [1784306414419-51sbwi3bk] Processando mensagem: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: Civic 2022 prata ­ƒæì\n' +
+    '\n' +
+    'Qual o estado geral do ve├¡culo? (excelente/bom/normal/ruim)'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:14.466Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+­ƒôì Etapa #9 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "bom"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'bom' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'bom' }
+[WhatsApp Bot] [1784306415537-xxuymmxwq] Processando mensagem: { phone: '5511972851072', text: 'bom' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: '­ƒÜÿ *Confirmando os dados do ve├¡culo*\n' +
+    '\n' +
+    'Modelo: *Civic*\n' +
+    'Ano: *2022*\n' +
+    'Cor: *prata*\n' +
+    'Estado: **\n' +
+    '\n' +
+    'Est├í certo? (sim/n├úo)'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   Ô£à OK (2026-07-17T16:40:15.583Z) - Stage: ETAPA4_VEHICLE
+
+­ƒôì Etapa #10 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "prata"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'prata' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] [1784306416683-0l6yy3bc7] Processando mensagem: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: *prata* ƒæì\n\nQual o *ano* do ve├¡culo?\n\n_Exemplo: 2021, 
+2019, 2018_'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:16.751Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+[Lock] Lock liberado para 5511972851072
+
+­ƒôì Etapa #11 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "Civic 2022"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'Civic 2022' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'Civic 2022' }
+[WhatsApp Bot] [1784306417814-6t3gm8xmq] Processando mensagem: { phone: '5511972851072', text: 'Civic 2022' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: prata 2022 ­ƒæì\n\nQual a cor do ve├¡culo?'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:17.854Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+­ƒôì Etapa #12 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "prata"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'prata' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] [1784306418931-06l4o3zzj] Processando mensagem: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: prata 2022 prata ­ƒæì\n' +
+    '\n' +
+    'Qual o estado geral do ve├¡culo? (excelente/bom/normal/ruim)'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:18.975Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+­ƒôì Etapa #13 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "bom"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'bom' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'bom' }
+[WhatsApp Bot] [1784306420064-tdhc4kwgr] Processando mensagem: { phone: '5511972851072', text: 'bom' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: '­ƒÜÿ *Confirmando os dados do ve├¡culo*\n' +
+    '\n' +
+    'Modelo: *prata*\n' +
+    'Ano: *2022*\n' +
+    'Cor: *prata*\n' +
+    'Estado: *bom*\n' +
+    '\n' +
+    'Est├í certo? (sim/n├úo)'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+   Ô£à OK (2026-07-17T16:40:20.150Z) - Stage: ETAPA4_VEHICLE
+[Lock] Lock liberado para 5511972851072
+
+­ƒôì Etapa #14 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "prata"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'prata' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] [1784306421184-o2dvikmyt] Processando mensagem: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: *prata* ƒæì\n\nQual o *ano* do ve├¡culo?\n\n_Exemplo: 2021, 
+2019, 2018_'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:21.223Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+­ƒôì Etapa #15 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "Civic 2022"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'Civic 2022' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'Civic 2022' }
+[WhatsApp Bot] [1784306422315-py2cwhso8] Processando mensagem: { phone: '5511972851072', text: 'Civic 2022' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: prata 2022 ­ƒæì\n\nQual a cor do ve├¡culo?'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:22.354Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+­ƒôì Etapa #16 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "prata"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'prata' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] [1784306423451-3bnbamvhi] Processando mensagem: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: prata 2022 prata ­ƒæì\n' +
+    '\n' +
+    'Qual o estado geral do ve├¡culo? (excelente/bom/normal/ruim)'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:23.495Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+­ƒôì Etapa #17 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "bom"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'bom' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'bom' }
+[WhatsApp Bot] [1784306424574-akdvljj43] Processando mensagem: { phone: '5511972851072', text: 'bom' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: '­ƒÜÿ *Confirmando os dados do ve├¡culo*\n' +
+    '\n' +
+    'Modelo: *prata*\n' +
+    'Ano: *2022*\n' +
+    'Cor: *prata*\n' +
+    'Estado: *bom*\n' +
+    '\n' +
+    'Est├í certo? (sim/n├úo)'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   Ô£à OK (2026-07-17T16:40:24.612Z) - Stage: ETAPA4_VEHICLE
+
+­ƒôì Etapa #18 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "prata"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'prata' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] [1784306425706-s4m6vwj2v] Processando mensagem: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: *prata* ƒæì\n\nQual o *ano* do ve├¡culo?\n\n_Exemplo: 2021, 
+2019, 2018_'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:25.749Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+­ƒôì Etapa #19 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "Civic 2022"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'Civic 2022' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'Civic 2022' }
+[WhatsApp Bot] [1784306426839-o0ojk9694] Processando mensagem: { phone: '5511972851072', text: 'Civic 2022' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: prata 2022 ­ƒæì\n\nQual a cor do ve├¡culo?'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:26.884Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+­ƒôì Etapa #20 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "prata"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'prata' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] [1784306427976-f35sczsn3] Processando mensagem: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: prata 2022 prata ­ƒæì\n' +
+    '\n' +
+    'Qual o estado geral do ve├¡culo? (excelente/bom/normal/ruim)'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:28.017Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+­ƒôì Etapa #21 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "bom"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'bom' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'bom' }
+[WhatsApp Bot] [1784306429104-5ypgfeg6m] Processando mensagem: { phone: '5511972851072', text: 'bom' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: '­ƒÜÿ *Confirmando os dados do ve├¡culo*\n' +
+    '\n' +
+    'Modelo: *prata*\n' +
+    'Ano: *2022*\n' +
+    'Cor: *prata*\n' +
+    'Estado: *bom*\n' +
+    '\n' +
+    'Est├í certo? (sim/n├úo)'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   Ô£à OK (2026-07-17T16:40:29.154Z) - Stage: ETAPA4_VEHICLE
+
+­ƒôì Etapa #22 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "prata"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'prata' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] [1784306430244-70v6wrm6v] Processando mensagem: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: *prata* ƒæì\n\nQual o *ano* do ve├¡culo?\n\n_Exemplo: 2021, 
+2019, 2018_'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:30.298Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+­ƒôì Etapa #23 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "Civic 2022"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'Civic 2022' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'Civic 2022' }
+[WhatsApp Bot] [1784306431382-69e1i2por] Processando mensagem: { phone: '5511972851072', text: 'Civic 2022' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: prata 2022 ­ƒæì\n\nQual a cor do ve├¡culo?'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:31.425Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+­ƒôì Etapa #24 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "prata"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'prata' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] [1784306432498-gm6agaxc9] Processando mensagem: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: prata 2022 prata ­ƒæì\n' +
+    '\n' +
+    'Qual o estado geral do ve├¡culo? (excelente/bom/normal/ruim)'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:32.536Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+­ƒôì Etapa #25 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "bom"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'bom' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'bom' }
+[WhatsApp Bot] [1784306433621-x0mpzrw5k] Processando mensagem: { phone: '5511972851072', text: 'bom' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: '­ƒÜÿ *Confirmando os dados do ve├¡culo*\n' +
+    '\n' +
+    'Modelo: *prata*\n' +
+    'Ano: *2022*\n' +
+    'Cor: *prata*\n' +
+    'Estado: *bom*\n' +
+    '\n' +
+    'Est├í certo? (sim/n├úo)'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   Ô£à OK (2026-07-17T16:40:33.663Z) - Stage: ETAPA4_VEHICLE
+
+­ƒôì Etapa #26 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "prata"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'prata' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] [1784306434756-qdmdbhwzf] Processando mensagem: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: *prata* ƒæì\n\nQual o *ano* do ve├¡culo?\n\n_Exemplo: 2021, 
+2019, 2018_'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:34.806Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+­ƒôì Etapa #27 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "Civic 2022"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'Civic 2022' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'Civic 2022' }
+[WhatsApp Bot] [1784306435898-557ltjinm] Processando mensagem: { phone: '5511972851072', text: 'Civic 2022' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: prata 2022 ­ƒæì\n\nQual a cor do ve├¡culo?'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:35.965Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+[Lock] Lock liberado para 5511972851072
+
+­ƒôì Etapa #28 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "prata"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'prata' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] [1784306437001-1v66atuaq] Processando mensagem: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: prata 2022 prata ­ƒæì\n' +
+    '\n' +
+    'Qual o estado geral do ve├¡culo? (excelente/bom/normal/ruim)'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:37.038Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+­ƒôì Etapa #29 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "bom"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'bom' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'bom' }
+[WhatsApp Bot] [1784306438124-3an59tjpa] Processando mensagem: { phone: '5511972851072', text: 'bom' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: '­ƒÜÿ *Confirmando os dados do ve├¡culo*\n' +
+    '\n' +
+    'Modelo: *prata*\n' +
+    'Ano: *2022*\n' +
+    'Cor: *prata*\n' +
+    'Estado: *bom*\n' +
+    '\n' +
+    'Est├í certo? (sim/n├úo)'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   Ô£à OK (2026-07-17T16:40:38.162Z) - Stage: ETAPA4_VEHICLE
+
+­ƒôì Etapa #30 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "prata"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'prata' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] [1784306439263-s0rhwtk14] Processando mensagem: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: *prata* ƒæì\n\nQual o *ano* do ve├¡culo?\n\n_Exemplo: 2021, 
+2019, 2018_'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:39.317Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+
+­ƒö¼ Testando regras cross-cutting...
+
+   Primeiro, resetando para estado conhecido (menu principal)...
+
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'Oi' }
+[Lock] Lock adquirido com sucesso (nova sess├úo) para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'Oi' }
+[WhatsApp Bot] [1784306440434-fk5dj9ews] Processando mensagem: { phone: '5511972851072', text: 'Oi' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÜÇ Iniciando flow de boas-vindas
+[WhatsApp Flow] ­ƒôñ Enviando mensagem de boas-vindas
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Ol├í! Seja muito bem-vindo(a) ├á *Garagem do Ka* ­ƒÜùÔ£¿\n' +
+    '\n' +
+    'Aqui n├úo fazemos lavagem comum ÔÇö somos especialistas em *est├®tica 
+automotiva premium*: servi├ºos que cuidam, protegem e valorizam o seu ve├¡culo 
+de verdade.\n' +
+    '\n' +
+    'O que fazemos por voc├¬:\n' +
+    '­ƒö╣ *Lavagem detalhada* ÔÇö muito al├®m de ├ígua e sab├úo\n' +
+    '­ƒö╣ *Polimento t├®cnico* ÔÇö riscos e opacidade eliminados\n' +
+    '­ƒö╣ *Prote├º├úo de pintura* ÔÇö vitrifica├º├úo e cristaliza├º├úo\n' +
+    '­ƒö╣ *Higieniza├º├úo interior* ÔÇö renova├º├úo completa por dentro\n' +
+    'ƒö╣ *Detalhamentos completos* ÔÇö carro como sa├¡do da concession├íria\n' 
++
+    '\n' +
+    '­ƒôì Rua Jos├® de Souza Marques, 164, Jardim Esplanada\n' +
+    '­ƒòÉ Segunda a s├íbado, 08:00 ├ás 18:00\n' +
+    '\n' +
+    'Para come├ºarmos, qual ├® o seu *nome*? ­ƒÿè'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado com welcomed=true
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: {
+  phone: '5511972851072',
+  stage: 'ETAPA1_AWAITING_NAME',
+  welcomed: true
+}
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WhatsApp Flow] Ô£à Flow de boas-vindas conclu├¡do
+[Lock] Lock liberado para 5511972851072
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'Jo├úo' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'Jo├úo' }
+[WhatsApp Bot] [1784306441545-vaqgo9i8n] Processando mensagem: { phone: '5511972851072', text: 'Jo├úo' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Flow] ­ƒÆ¥ Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA2_MAIN_MENU', welcomed: true }
+[WhatsApp Flow] Ô£à Estado salvo com sucesso
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Que bom te ter aqui, *Jo├úo*! ­ƒÿè\n' +
+    '\n' +
+    'O que seu carro precisa hoje?\n' +
+    '\n' +
+    '*1* ­ƒÆº Lavagem\n' +
+    '*2* Ô£¿ Polimento\n' +
+    '*3* ­ƒøí´©Å Prote├º├úo & Brilho\n' +
+    '*4* ­ƒ¬æ Interior\n' +
+    '*5* ­ƒö¼ Detalhes Especiais\n' +
+    '*6* ­ƒöä Revitaliza├º├úo\n' +
+    '*7* ­ƒôª Pacotes Premium\n' +
+    '*8* ­ƒñö Ajuda na escolha\n' +
+    '*9* ­ƒæñ Falar com atendente'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+
+­ƒôì Testando: CROSS-CUTTING 1 - Small talk
+   Descri├º├úo: Small talk "pera a├¡" deve reimprimir menu sem avan├ºar
+   Enviando: "pera a├¡"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'pera a├¡' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'pera a├¡' }
+[WhatsApp Bot] [1784306443000-kjylukfvq] Processando mensagem: { phone: '5511972851072', text: 'pera a├¡' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Ops, essa op├º├úo n├úo existe ­ƒÿà\n' +
+    '\n' +
+    'Escolhe uma dessas:\n' +
+    '\n' +
+    'Que bom te ter aqui, *Jo├úo*! ­ƒÿè\n' +
+    '\n' +
+    'O que seu carro precisa hoje?\n' +
+    '\n' +
+    '*1* ­ƒÆº Lavagem\n' +
+    '*2* Ô£¿ Polimento\n' +
+    '*3* ­ƒøí´©Å Prote├º├úo & Brilho\n' +
+    '*4* ­ƒ¬æ Interior\n' +
+    '*5* ­ƒö¼ Detalhes Especiais\n' +
+    '*6* ­ƒöä Revitaliza├º├úo\n' +
+    '*7* ­ƒôª Pacotes Premium\n' +
+    '*8* ­ƒñö Ajuda na escolha\n' +
+    '*9* ­ƒæñ Falar com atendente'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:43.044Z)
+      Esperava conter: "o que voc├¬ precisa"
+Recebeu: "ops essa op├º├úo n├úo existe  escolhe uma dessas que bom te ter aqui jo├úo  o que seu carro precisa hoje 1  lavagem 2  polimento 3  prote├º├úo  brilho 4  interior 5  detalhes especiais 6  revitaliza├º├úo 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+­ƒôì Testando: CROSS-CUTTING 2 - Pergunta
+   Descri├º├úo: Pergunta deve acionar IA e reimprimir menu
+   Enviando: "quanto custa?"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'quanto custa?' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'quanto custa?' }
+[WhatsApp Bot] [1784306444111-hbomp7jjp] Processando mensagem: { phone: '5511972851072', text: 'quanto custa?' }
+[WhatsApp Bot] Configura├º├Áes carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WasenderAPI] ÔØî N├úo configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'O *valor* varia conforme o servi├ºo escolhido e o estado do seu 
+ve├¡culo ƒÜù.  \n' +
+    'Me informe qual servi├ºo (lavagem, polimento, prote├º├úo, interior etc.) 
+e o modelo do carro.  \n' +
+    'Com esses detalhes consigo dar uma estimativa mais precisa.  \n' +
+    'Se quiser falar direto com o dono, digite *falar com o dono*.\n' +
+    '\n' +
+    'Que bom te ter aqui, *Jo├úo*! ­ƒÿè\n' +
+    '\n' +
+    'O que seu carro precisa hoje?\n' +
+    '\n' +
+    '*1* ­ƒÆº Lavagem\n' +
+    '*2* Ô£¿ Polimento\n' +
+    '*3* ­ƒøí´©Å Prote├º├úo & Brilho\n' +
+    '*4* ­ƒ¬æ Interior\n' +
+    '*5* ­ƒö¼ Detalhes Especiais\n' +
+    '*6* ­ƒöä Revitaliza├º├úo\n' +
+    '*7* ­ƒôª Pacotes Premium\n' +
+    '*8* ­ƒñö Ajuda na escolha\n' +
+    '*9* ­ƒæñ Falar com atendente'
+}
+[WasenderAPI] ÔÜá´©Å Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ÔØî DIVERGENTE_TEXTO (2026-07-17T16:40:44.537Z)
+      Esperava conter: "o que voc├¬ precisa"
+Recebeu: "o valor varia conforme o servi├ºo escolhido e o estado do seu ve├¡culo  me informe qual servi├ºo lavagem polimento prote├º├úo interior etc e o modelo do carro com esses detalhes consigo dar uma estimativa mais precisa se quiser falar direto com o dono digite falar com o dono que bom te ter aqui jo├úo  o que seu carro precisa hoje 1  lavagem 2  polimento 3  prote├º├úo  brilho 4  interior 5  detalhes especiais 6  revitaliza├º├úo 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+­ƒôè Gerando dump bruto das mensagens...
+
+================================================================================
+RELAT├ôRIO DE TESTE DO FLUXO COMPLETO (STATEFUL)
+================================================================================
+
+Total de etapas testadas: 32
+Ô£à OK: 6
+ÔÜá´©Å DESVIO DE ROTA: 4
+ÔØî DIVERGENTE_TEXTO: 22
+­ƒö┤ ERRO: 0
+­ƒöä LOOP DETECTADO: 0
+
+--------------------------------------------------------------------------------
+DETALHAMENTO POR ETAPA
+--------------------------------------------------------------------------------
+
+ETAPA: #1
+Status: DIVERGENTE_TEXTO
+Stage esperado: N/A
+Stage recebido: ETAPA1_AWAITING_NAME
+Timestamp: 2026-07-17T16:40:04.470Z
+Esperado: O que voc├¬ precisa
+Recebido: Ol├í! Seja muito bem-vindo(a) ├á *Garagem do Ka* ­ƒÜùÔ£¿
+
+Aqui n├úo fazemos lavagem comum ÔÇö somos especialistas em *est├®tica automotiva premium*: servi├ºos que cuidam, protegem e valorizam o seu ve├¡culo de verdade.
+
+O que fazemos por voc├¬:
+­ƒö╣ *Lavagem detalhada* ÔÇö muito al├®m de ├ígua e sab├úo
+­ƒö╣ *Polimento t├®cnico* ÔÇö riscos e opacidade eliminados
+­ƒö╣ *Prote├º├úo de pintura* ÔÇö vitrifica├º├úo e cristaliza├º├úo
+­ƒö╣ *Higieniza├º├úo interior* ÔÇö renova├º├úo completa por dentro
+­ƒö╣ *Detalhamentos completos* ÔÇö carro como sa├¡do da concession├íria
+
+­ƒôì Rua Jos├® de Souza Marques, 164, Jardim Esplanada
+­ƒòÉ Segunda a s├íbado, 08:00 ├ás 18:00
+
+Para come├ºarmos, qual ├® o seu *nome*? ­ƒÿè
+Diff:
+Esperava conter: "o que voc├¬ precisa"
+Recebeu: "ol├í seja muito bemvindoa ├á garagem do ka  aqui n├úo fazemos lavagem comum  somos especialistas em est├®tica automotiva premium servi├ºos que cuidam protegem e valorizam o seu ve├¡culo de verdade o que fazemos por voc├¬  lavagem detalhada  muito al├®m de ├ígua e sab├úo  polimento t├®cnico  riscos e opacidade eliminados  prote├º├úo de pintura  vitrifica├º├úo e cristaliza├º├úo  higieniza├º├úo interior  renova├º├úo completa por dentro  detalhamentos completos  carro como sa├¡do da concession├íria  rua jos├® de souza marques 164 jardim esplanada  segunda a s├íbado 0800 ├ás 1800 para come├ºarmos qual ├® o seu nome "
+
+ETAPA: #2
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA1_AWAITING_NAME
+Stage recebido: ETAPA1_AWAITING_NAME
+Timestamp: 2026-07-17T16:40:06.846Z
+Esperado: O que voc├¬ precisa
+Recebido: Que bom te ter aqui, *Jo├úo*! ­ƒÿè
+
+O que seu carro precisa hoje?
+
+*1* ­ƒÆº Lavagem
+*2* Ô£¿ Polimento
+*3* ­ƒøí´©Å Prote├º├úo & Brilho
+*4* ­ƒ¬æ Interior
+*5* ­ƒö¼ Detalhes Especiais
+*6* ­ƒöä Revitaliza├º├úo
+*7* ­ƒôª Pacotes Premium
+*8* ­ƒñö Ajuda na escolha
+*9* ­ƒæñ Falar com atendente
+Diff:
+Esperava conter: "o que voc├¬ precisa"
+Recebeu: "que bom te ter aqui jo├úo  o que seu carro precisa hoje 1  lavagem 2  polimento 3  prote├º├úo  brilho 4  interior 5  detalhes especiais 6  revitaliza├º├úo 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+ETAPA: #3
+Status: DESVIO_ROTA
+Stage esperado: ETAPA1_AWAITING_NAME
+Stage recebido: ETAPA2_MAIN_MENU
+Timestamp: 2026-07-17T16:40:08.211Z
+Esperado: O que voc├¬ precisa
+Recebido: *Lavagem* ÔÇö qual op├º├úo?
+
+*1* ÔÇö Lavagem Simples
+*2* ÔÇö Lavagem Completa
+*3* ÔÇö Lavagem Detalhada
+
+*0* ÔÇö Voltar ao menu principal
+Diff:
+Esperava conter: "o que voc├¬ precisa"
+Recebeu: "lavagem  qual op├º├úo 1  lavagem simples 2  lavagem completa 3  lavagem detalhada 0  voltar ao menu principal"
+
+ETAPA: #4
+Status: DESVIO_ROTA
+Stage esperado: ETAPA2_MAIN_MENU
+Stage recebido: ETAPA2_SUB
+Timestamp: 2026-07-17T16:40:09.832Z
+Esperado: qual op├º├úo
+Recebido: ­ƒÆº *Lavagem Simples*
+
+_Manuten├º├úo regular com cuidado e acabamento que faz diferen├ºa._
+
+Ô£¿ *O que inclui:*
+ÔÇó Pr├®-lavagem com espuma ativa que solta a sujeira
+ÔÇó Lavagem externa manual, segura para a pintura
+ÔÇó Secagem completa com microfibra premium
+ÔÇó Finaliza├º├úo dos pneus com pretinho
+ÔÇó Aspira├º├úo e limpeza interna b├ísica
+
+ÔÅ▒´©Å 60 min
+­ƒÆ░ *R$ 55*
+
+O que voc├¬ quer fazer?
+
+*1* ­ƒôà Quero agendar
+*2* ­ƒöä Ver outros servi├ºos
+*3* ­ƒÆ¼ Tenho uma d├║vida
+Diff:
+Esperava conter: "qual op├º├úo"
+Recebeu: " lavagem simples _manuten├º├úo regular com cuidado e acabamento que faz diferen├ºa_  o que inclui  pr├®lavagem com espuma ativa que solta a sujeira  lavagem externa manual segura para a pintura  secagem completa com microfibra premium  finaliza├º├úo dos pneus com pretinho  aspira├º├úo e limpeza interna b├ísica  60 min  r 55 o que voc├¬ quer fazer 1  quero agendar 2  ver outros servi├ºos 3  tenho uma d├║vida"
+
+ETAPA: #5
+Status: DESVIO_ROTA
+Stage esperado: ETAPA2_SUB
+Stage recebido: ETAPA3_SERVICE_ACTION
+Timestamp: 2026-07-17T16:40:11.068Z
+Esperado: Quero agendar
+Recebido: Qual ├® o *modelo* do seu ve├¡culo? ­ƒÜù
+
+_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_
+
+_Ou envie modelo e ano juntos: *Civic 2021*_
+Diff:
+Esperava conter: "quero agendar"
+Recebeu: "qual ├® o modelo do seu ve├¡culo  _exemplos civic corolla hilux onix compass hb20_ _ou envie modelo e ano juntos civic 2021_"
+
+ETAPA: #6
+Status: DESVIO_ROTA
+Stage esperado: ETAPA3_SERVICE_ACTION
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:12.199Z
+Esperado: Confirmando os dados
+Recebido: N├úo identifiquei o modelo ­ƒÿà
+
+Envie s├│ o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #7
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:13.333Z
+Esperado: Confirmando os dados
+Recebido: Anotado: Civic 2022 ­ƒæì
+
+Qual a cor do ve├¡culo?
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #8
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:14.466Z
+Esperado: Confirmando os dados
+Recebido: Anotado: Civic 2022 prata ­ƒæì
+
+Qual o estado geral do ve├¡culo? (excelente/bom/normal/ruim)
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #9
+Status: OK
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:15.583Z
+Esperado: Confirmando os dados
+Recebido: ­ƒÜÿ *Confirmando os dados do ve├¡culo*
+
+Modelo: *Civic*
+Ano: *2022*
+Cor: *prata*
+Estado: **
+
+Est├í certo? (sim/n├úo)
+
+ETAPA: #10
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:16.751Z
+Esperado: Confirmando os dados
+Recebido: Anotado: *prata* ­ƒæì
+
+Qual o *ano* do ve├¡culo?
+
+_Exemplo: 2021, 2019, 2018_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #11
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:17.854Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 ­ƒæì
+
+Qual a cor do ve├¡culo?
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #12
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:18.975Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 prata ­ƒæì
+
+Qual o estado geral do ve├¡culo? (excelente/bom/normal/ruim)
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #13
+Status: OK
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:20.150Z
+Esperado: Confirmando os dados
+Recebido: ­ƒÜÿ *Confirmando os dados do ve├¡culo*
+
+Modelo: *prata*
+Ano: *2022*
+Cor: *prata*
+Estado: *bom*
+
+Est├í certo? (sim/n├úo)
+
+ETAPA: #14
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:21.223Z
+Esperado: Confirmando os dados
+Recebido: Anotado: *prata* ­ƒæì
+
+Qual o *ano* do ve├¡culo?
+
+_Exemplo: 2021, 2019, 2018_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #15
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:22.354Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 ­ƒæì
+
+Qual a cor do ve├¡culo?
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #16
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:23.495Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 prata ­ƒæì
+
+Qual o estado geral do ve├¡culo? (excelente/bom/normal/ruim)
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #17
+Status: OK
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:24.612Z
+Esperado: Confirmando os dados
+Recebido: ­ƒÜÿ *Confirmando os dados do ve├¡culo*
+
+Modelo: *prata*
+Ano: *2022*
+Cor: *prata*
+Estado: *bom*
+
+Est├í certo? (sim/n├úo)
+
+ETAPA: #18
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:25.749Z
+Esperado: Confirmando os dados
+Recebido: Anotado: *prata* ­ƒæì
+
+Qual o *ano* do ve├¡culo?
+
+_Exemplo: 2021, 2019, 2018_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #19
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:26.884Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 ­ƒæì
+
+Qual a cor do ve├¡culo?
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #20
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:28.017Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 prata ­ƒæì
+
+Qual o estado geral do ve├¡culo? (excelente/bom/normal/ruim)
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #21
+Status: OK
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:29.154Z
+Esperado: Confirmando os dados
+Recebido: ­ƒÜÿ *Confirmando os dados do ve├¡culo*
+
+Modelo: *prata*
+Ano: *2022*
+Cor: *prata*
+Estado: *bom*
+
+Est├í certo? (sim/n├úo)
+
+ETAPA: #22
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:30.298Z
+Esperado: Confirmando os dados
+Recebido: Anotado: *prata* ­ƒæì
+
+Qual o *ano* do ve├¡culo?
+
+_Exemplo: 2021, 2019, 2018_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #23
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:31.425Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 ­ƒæì
+
+Qual a cor do ve├¡culo?
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #24
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:32.536Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 prata ­ƒæì
+
+Qual o estado geral do ve├¡culo? (excelente/bom/normal/ruim)
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #25
+Status: OK
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:33.663Z
+Esperado: Confirmando os dados
+Recebido: ­ƒÜÿ *Confirmando os dados do ve├¡culo*
+
+Modelo: *prata*
+Ano: *2022*
+Cor: *prata*
+Estado: *bom*
+
+Est├í certo? (sim/n├úo)
+
+ETAPA: #26
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:34.806Z
+Esperado: Confirmando os dados
+Recebido: Anotado: *prata* ­ƒæì
+
+Qual o *ano* do ve├¡culo?
+
+_Exemplo: 2021, 2019, 2018_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #27
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:35.965Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 ­ƒæì
+
+Qual a cor do ve├¡culo?
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #28
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:37.038Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 prata ­ƒæì
+
+Qual o estado geral do ve├¡culo? (excelente/bom/normal/ruim)
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #29
+Status: OK
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:38.162Z
+Esperado: Confirmando os dados
+Recebido: ­ƒÜÿ *Confirmando os dados do ve├¡culo*
+
+Modelo: *prata*
+Ano: *2022*
+Cor: *prata*
+Estado: *bom*
+
+Est├í certo? (sim/n├úo)
+
+ETAPA: #30
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:40:39.317Z
+Esperado: Confirmando os dados
+Recebido: Anotado: *prata* ­ƒæì
+
+Qual o *ano* do ve├¡culo?
+
+_Exemplo: 2021, 2019, 2018_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: CROSS-CUTTING 1 - Small talk
+Status: DIVERGENTE_TEXTO
+Stage esperado: N/A
+Stage recebido: ETAPA2_MAIN_MENU
+Timestamp: 2026-07-17T16:40:43.044Z
+Esperado: Menu reimpresso (cont├®m: O que voc├¬ precisa...)
+Recebido: Ops, essa op├º├úo n├úo existe ­ƒÿà
+
+Escolhe uma dessas:
+
+Que bom te ter aqui, *Jo├úo*! ­ƒÿè
+
+O que seu carro precisa hoje?
+
+*1* ­ƒÆº Lavagem
+*2* Ô£¿ Polimento
+*3* ­ƒøí´©Å Prote├º├úo & Brilho
+*4* ­ƒ¬æ Interior
+*5* ­ƒö¼ Detalhes Especiais
+*6* ­ƒöä Revitaliza├º├úo
+*7* ­ƒôª Pacotes Premium
+*8* ­ƒñö Ajuda na escolha
+*9* ­ƒæñ Falar com atendente
+Diff:
+Esperava conter: "o que voc├¬ precisa"
+Recebeu: "ops essa op├º├úo n├úo existe  escolhe uma dessas que bom te ter aqui jo├úo  o que seu carro precisa hoje 1  lavagem 2  polimento 3  prote├º├úo  brilho 4  interior 5  detalhes especiais 6  revitaliza├º├úo 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+ETAPA: CROSS-CUTTING 2 - Pergunta
+Status: DIVERGENTE_TEXTO
+Stage esperado: N/A
+Stage recebido: ETAPA2_MAIN_MENU
+Timestamp: 2026-07-17T16:40:44.537Z
+Esperado: Menu reimpresso (cont├®m: O que voc├¬ precisa...)
+Recebido: O *valor* varia conforme o servi├ºo escolhido e o estado do seu ve├¡culo ­ƒÜù.  
+Me informe qual servi├ºo (lavagem, polimento, prote├º├úo, interior etc.) e o modelo do carro.  
+Com esses detalhes consigo dar uma estimativa mais precisa.  
+Se quiser falar direto com o dono, digite *falar com o dono*.
+
+Que bom te ter aqui, *Jo├úo*! ­ƒÿè
+
+O que seu carro precisa hoje?
+
+*1* ­ƒÆº Lavagem
+*2* Ô£¿ Polimento
+*3* ­ƒøí´©Å Prote├º├úo & Brilho
+*4* ­ƒ¬æ Interior
+*5* ­ƒö¼ Detalhes Especiais
+*6* ­ƒöä Revitaliza├º├úo
+*7* ­ƒôª Pacotes Premium
+*8* ­ƒñö Ajuda na escolha
+*9* ­ƒæñ Falar com atendente
+Diff:
+Esperava conter: "o que voc├¬ precisa"
+Recebeu: "o valor varia conforme o servi├ºo escolhido e o estado do seu ve├¡culo  me informe qual servi├ºo lavagem polimento prote├º├úo interior etc e o modelo do carro com esses detalhes consigo dar uma estimativa mais precisa se quiser falar direto com o dono digite falar com o dono que bom te ter aqui jo├úo  o que seu carro precisa hoje 1  lavagem 2  polimento 3  prote├º├úo  brilho 4  interior 5  detalhes especiais 6  revitaliza├º├úo 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+================================================================================
+
+
+================================================================================
+DUMP BRUTO DAS MENSAGENS (BANCO DE DADOS)
+================================================================================
+
+Total de mensagens: 8
+
+2026-07-17T16:40:40.455Z | INBOUND | CLIENT
+Texto: Oi
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T16:40:40.477Z | OUTBOUND | BOT
+Texto: Ol├í! Seja muito bem-vindo(a) ├á *Garagem do Ka* ­ƒÜùÔ£¿
+
+Aqui n├úo fazemos lavagem comum ÔÇö somos especialistas em *est├®tica automotiva premium*: servi├ºos que cuidam, protegem e valorizam o seu ve├¡culo de verdade.
+
+O que fazemos por voc├¬:
+­ƒö╣ *Lavagem detalhada* ÔÇö muito al├®m de ├ígua e sab├úo
+­ƒö╣ *Polimento t├®cnico* ÔÇö riscos e opacidade eliminados
+­ƒö╣ *Prote├º├úo de pintura* ÔÇö vitrifica├º├úo e cristaliza├º├úo
+­ƒö╣ *Higieniza├º├úo interior* ÔÇö renova├º├úo completa por dentro
+­ƒö╣ *Detalhamentos completos* ÔÇö carro como sa├¡do da concession├íria
+
+­ƒôì Rua Jos├® de Souza Marques, 164, Jardim Esplanada
+­ƒòÉ Segunda a s├íbado, 08:00 ├ás 18:00
+
+Para come├ºarmos, qual ├® o seu *nome*? ­ƒÿè
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T16:40:41.561Z | INBOUND | CLIENT
+Texto: Jo├úo
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T16:40:41.944Z | OUTBOUND | BOT
+Texto: Que bom te ter aqui, *Jo├úo*! ­ƒÿè
+
+O que seu carro precisa hoje?
+
+*1* ­ƒÆº Lavagem
+*2* Ô£¿ Polimento
+*3* ­ƒøí´©Å Prote├º├úo & Brilho
+*4* ­ƒ¬æ Interior
+*5* ­ƒö¼ Detalhes Especiais
+*6* ­ƒöä Revitaliza├º├úo
+*7* ­ƒôª Pacotes Premium
+*8* ­ƒñö Ajuda na escolha
+*9* ­ƒæñ Falar com atendente
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T16:40:43.019Z | INBOUND | CLIENT
+Texto: pera a├¡
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+2026-07-17T16:40:43.044Z | OUTBOUND | BOT
+Texto: Ops, essa op├º├úo n├úo existe ­ƒÿà
+
+Escolhe uma dessas:
+
+Que bom te ter aqui, *Jo├úo*! ­ƒÿè
+
+O que seu carro precisa hoje?
+
+*1* ­ƒÆº Lavagem
+*2* Ô£¿ Polimento
+*3* ­ƒøí´©Å Prote├º├úo & Brilho
+*4* ­ƒ¬æ Interior
+*5* ­ƒö¼ Detalhes Especiais
+*6* ­ƒöä Revitaliza├º├úo
+*7* ­ƒôª Pacotes Premium
+*8* ­ƒñö Ajuda na escolha
+*9* ­ƒæñ Falar com atendente
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+2026-07-17T16:40:44.124Z | INBOUND | CLIENT
+Texto: quanto custa?
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+2026-07-17T16:40:44.537Z | OUTBOUND | BOT
+Texto: O *valor* varia conforme o servi├ºo escolhido e o estado do seu ve├¡culo ­ƒÜù.  
+Me informe qual servi├ºo (lavagem, polimento, prote├º├úo, interior etc.) e o modelo do carro.  
+Com esses detalhes consigo dar uma estimativa mais precisa.  
+Se quiser falar direto com o dono, digite *falar com o dono*.
+
+Que bom te ter aqui, *Jo├úo*! ­ƒÿè
+
+O que seu carro precisa hoje?
+
+*1* ­ƒÆº Lavagem
+*2* Ô£¿ Polimento
+*3* ­ƒøí´©Å Prote├º├úo & Brilho
+*4* ­ƒ¬æ Interior
+*5* ­ƒö¼ Detalhes Especiais
+*6* ­ƒöä Revitaliza├º├úo
+*7* ­ƒôª Pacotes Premium
+*8* ­ƒñö Ajuda na escolha
+*9* ­ƒæñ Falar com atendente
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+================================================================================
+
+­ƒôä Relat├│rio salvo em: relatorio-teste-fluxo-2026-07-17T16-40-45-379Z.txt
+
+­ƒôè Teste conclu├¡do!
+Ô£à 6 etapas OK
+ÔÜá´©Å 4 desvios de rota
+ÔØî 22 diverg├¬ncias de texto
+­ƒö┤ 0 erros
+­ƒöä 0 loops detectados
+
+­ƒº╣ Limpando dados de teste...
+Ô£à Dados de teste limpos

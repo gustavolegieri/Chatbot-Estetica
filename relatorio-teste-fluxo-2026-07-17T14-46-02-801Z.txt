@@ -1,0 +1,500 @@
+
+================================================================================
+RELATÓRIO DE TESTE DO FLUXO COMPLETO
+================================================================================
+
+Total de etapas testadas: 25
+✅ OK: 0
+❌ DIVERGENTES: 25
+
+--------------------------------------------------------------------------------
+DETALHAMENTO POR ETAPA
+--------------------------------------------------------------------------------
+
+ETAPA: 1. BOAS-VINDAS
+Status: DIVERGENTE
+Esperado: Seja muito bem-vindo
+Recebido: [Nenhuma mensagem encontrada no banco para: "Oi"]
+Diff:
+Esperava conter: "seja muito bemvindo"
+Recebeu: "nenhuma mensagem encontrada no banco para oi"
+
+ETAPA: 2. COLETA DE NOME
+Status: DIVERGENTE
+Esperado: qual é o seu nome
+Recebido: [Nenhuma mensagem encontrada no banco para: "João"]
+Diff:
+Esperava conter: "qual é o seu nome"
+Recebeu: "nenhuma mensagem encontrada no banco para joão"
+
+ETAPA: 3. MENU PRINCIPAL
+Status: DIVERGENTE
+Esperado: O que você precisa
+Recebido: [Nenhuma mensagem encontrada no banco para: "1"]
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "nenhuma mensagem encontrada no banco para 1"
+
+ETAPA: 4. SUBMENU
+Status: DIVERGENTE
+Esperado: serviços disponíveis
+Recebido: Olá! Seja muito bem-vindo(a) à *Estética Automotiva* 🚗✨
+
+Aqui não fazemos lavagem comum — somos especialistas em *estética automotiva premium*: serviços que cuidam, protegem e valorizam o seu veículo de verdade.
+
+O que fazemos por você:
+🔹 *Lavagem detalhada* — muito além de água e sabão
+🔹 *Polimento técnico* — riscos e opacidade eliminados
+🔹 *Proteção de pintura* — vitrificação e cristalização
+🔹 *Higienização interior* — renovação completa por dentro
+🔹 *Detalhamentos completos* — carro como saído da concessionária
+
+📍 Consulte nosso endereço
+🕐 Segunda a sábado, 08:00 às 00:00
+
+Para começarmos, qual é o seu *nome*? 😊
+Diff:
+Similaridade: 50%
+Palavras esperadas: serviços, disponíveis
+Palavras encontradas: serviços
+
+ETAPA: 5. CLIENTE INDECISO - VEÍCULO
+Status: DIVERGENTE
+Esperado: Qual é o modelo
+Recebido: Olá! Seja muito bem-vindo(a) à *Estética Automotiva* 🚗✨
+
+Aqui não fazemos lavagem comum — somos especialistas em *estética automotiva premium*: serviços que cuidam, protegem e valorizam o seu veículo de verdade.
+
+O que fazemos por você:
+🔹 *Lavagem detalhada* — muito além de água e sabão
+🔹 *Polimento técnico* — riscos e opacidade eliminados
+🔹 *Proteção de pintura* — vitrificação e cristalização
+🔹 *Higienização interior* — renovação completa por dentro
+🔹 *Detalhamentos completos* — carro como saído da concessionária
+
+📍 Consulte nosso endereço
+🕐 Segunda a sábado, 08:00 às 00:00
+
+Para começarmos, qual é o seu *nome*? 😊
+Diff:
+Esperava conter: "qual é o modelo"
+Recebeu: "olá seja muito bemvindoa à estética automotiva  aqui não fazemos lavagem comum  somos especialistas em estética automotiva premium serviços que cuidam protegem e valorizam o seu veículo de verdade o que fazemos por você  lavagem detalhada  muito além de água e sabão  polimento técnico  riscos e opacidade eliminados  proteção de pintura  vitrificação e cristalização  higienização interior  renovação completa por dentro  detalhamentos completos  carro como saído da concessionária  consulte nosso endereço  segunda a sábado 0800 às 0000 para começarmos qual é o seu nome "
+
+ETAPA: 6. CLIENTE INDECISO - PROBLEMA
+Status: DIVERGENTE
+Esperado: recomendo
+Recebido: Olá! Seja muito bem-vindo(a) à *Estética Automotiva* 🚗✨
+
+Aqui não fazemos lavagem comum — somos especialistas em *estética automotiva premium*: serviços que cuidam, protegem e valorizam o seu veículo de verdade.
+
+O que fazemos por você:
+🔹 *Lavagem detalhada* — muito além de água e sabão
+🔹 *Polimento técnico* — riscos e opacidade eliminados
+🔹 *Proteção de pintura* — vitrificação e cristalização
+🔹 *Higienização interior* — renovação completa por dentro
+🔹 *Detalhamentos completos* — carro como saído da concessionária
+
+📍 Consulte nosso endereço
+🕐 Segunda a sábado, 08:00 às 00:00
+
+Para começarmos, qual é o seu *nome*? 😊
+Diff:
+Esperava conter: "recomendo"
+Recebeu: "olá seja muito bemvindoa à estética automotiva  aqui não fazemos lavagem comum  somos especialistas em estética automotiva premium serviços que cuidam protegem e valorizam o seu veículo de verdade o que fazemos por você  lavagem detalhada  muito além de água e sabão  polimento técnico  riscos e opacidade eliminados  proteção de pintura  vitrificação e cristalização  higienização interior  renovação completa por dentro  detalhamentos completos  carro como saído da concessionária  consulte nosso endereço  segunda a sábado 0800 às 0000 para começarmos qual é o seu nome "
+
+ETAPA: 7. AÇÕES COM PACOTES
+Status: DIVERGENTE
+Esperado: Pacotes
+Recebido: Olá! Seja muito bem-vindo(a) à *Estética Automotiva* 🚗✨
+
+Aqui não fazemos lavagem comum — somos especialistas em *estética automotiva premium*: serviços que cuidam, protegem e valorizam o seu veículo de verdade.
+
+O que fazemos por você:
+🔹 *Lavagem detalhada* — muito além de água e sabão
+🔹 *Polimento técnico* — riscos e opacidade eliminados
+🔹 *Proteção de pintura* — vitrificação e cristalização
+🔹 *Higienização interior* — renovação completa por dentro
+🔹 *Detalhamentos completos* — carro como saído da concessionária
+
+📍 Consulte nosso endereço
+🕐 Segunda a sábado, 08:00 às 00:00
+
+Para começarmos, qual é o seu *nome*? 😊
+Diff:
+Esperava conter: "pacotes"
+Recebeu: "olá seja muito bemvindoa à estética automotiva  aqui não fazemos lavagem comum  somos especialistas em estética automotiva premium serviços que cuidam protegem e valorizam o seu veículo de verdade o que fazemos por você  lavagem detalhada  muito além de água e sabão  polimento técnico  riscos e opacidade eliminados  proteção de pintura  vitrificação e cristalização  higienização interior  renovação completa por dentro  detalhamentos completos  carro como saído da concessionária  consulte nosso endereço  segunda a sábado 0800 às 0000 para começarmos qual é o seu nome "
+
+ETAPA: 8. AÇÕES APÓS SERVIÇO
+Status: DIVERGENTE
+Esperado: Agendar
+Recebido: Olá! Seja muito bem-vindo(a) à *Estética Automotiva* 🚗✨
+
+Aqui não fazemos lavagem comum — somos especialistas em *estética automotiva premium*: serviços que cuidam, protegem e valorizam o seu veículo de verdade.
+
+O que fazemos por você:
+🔹 *Lavagem detalhada* — muito além de água e sabão
+🔹 *Polimento técnico* — riscos e opacidade eliminados
+🔹 *Proteção de pintura* — vitrificação e cristalização
+🔹 *Higienização interior* — renovação completa por dentro
+🔹 *Detalhamentos completos* — carro como saído da concessionária
+
+📍 Consulte nosso endereço
+🕐 Segunda a sábado, 08:00 às 00:00
+
+Para começarmos, qual é o seu *nome*? 😊
+Diff:
+Esperava conter: "agendar"
+Recebeu: "olá seja muito bemvindoa à estética automotiva  aqui não fazemos lavagem comum  somos especialistas em estética automotiva premium serviços que cuidam protegem e valorizam o seu veículo de verdade o que fazemos por você  lavagem detalhada  muito além de água e sabão  polimento técnico  riscos e opacidade eliminados  proteção de pintura  vitrificação e cristalização  higienização interior  renovação completa por dentro  detalhamentos completos  carro como saído da concessionária  consulte nosso endereço  segunda a sábado 0800 às 0000 para começarmos qual é o seu nome "
+
+ETAPA: 9. COLETA DE VEÍCULO
+Status: DIVERGENTE
+Esperado: Confirmando os dados
+Recebido: Que bom te ter aqui, *Civic*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Revitalização
+*6* 🔄 Detalhes Especiais
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: 10. ORÇAMENTO
+Status: DIVERGENTE
+Esperado: Bônus
+Recebido: Que bom te ter aqui, *Civic*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Revitalização
+*6* 🔄 Detalhes Especiais
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Diff:
+Esperava conter: "bônus"
+Recebeu: "que bom te ter aqui civic  o que seu carro precisa hoje 1  lavagem 2  polimento 3  proteção  brilho 4  interior 5  revitalização 6  detalhes especiais 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+ETAPA: 11. BÔNUS PRIMEIRA VEZ
+Status: DIVERGENTE
+Esperado: Desconto aplicado
+Recebido: Que bom te ter aqui, *Civic*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Revitalização
+*6* 🔄 Detalhes Especiais
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Diff:
+Esperava conter: "desconto aplicado"
+Recebeu: "que bom te ter aqui civic  o que seu carro precisa hoje 1  lavagem 2  polimento 3  proteção  brilho 4  interior 5  revitalização 6  detalhes especiais 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+ETAPA: 12. UPSELL
+Status: DIVERGENTE
+Esperado: adicionar
+Recebido: Ops, essa opção não existe 😅
+
+Escolhe uma dessas:
+
+Que bom te ter aqui, *Civic*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Revitalização
+*6* 🔄 Detalhes Especiais
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Diff:
+Esperava conter: "adicionar"
+Recebeu: "ops essa opção não existe  escolhe uma dessas que bom te ter aqui civic  o que seu carro precisa hoje 1  lavagem 2  polimento 3  proteção  brilho 4  interior 5  revitalização 6  detalhes especiais 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+ETAPA: 13. ESCOLHA DE DIA
+Status: DIVERGENTE
+Esperado: calendário
+Recebido: Ops, essa opção não existe 😅
+
+Escolhe uma dessas:
+
+Que bom te ter aqui, *Civic*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Revitalização
+*6* 🔄 Detalhes Especiais
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Diff:
+Esperava conter: "calendário"
+Recebeu: "ops essa opção não existe  escolhe uma dessas que bom te ter aqui civic  o que seu carro precisa hoje 1  lavagem 2  polimento 3  proteção  brilho 4  interior 5  revitalização 6  detalhes especiais 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+ETAPA: 14. ESCOLHA DE HORÁRIO
+Status: DIVERGENTE
+Esperado: horários disponíveis
+Recebido: Ops, essa opção não existe 😅
+
+Escolhe uma dessas:
+
+Que bom te ter aqui, *Civic*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Revitalização
+*6* 🔄 Detalhes Especiais
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Diff:
+Similaridade: 0%
+Palavras esperadas: horários, disponíveis
+Palavras encontradas: 
+
+ETAPA: 15. CUPOM
+Status: DIVERGENTE
+Esperado: cupom
+Recebido: ✨ *Polimento*
+
+_Correção de riscos, swirls e opacidade — pintura com brilho de showroom._
+
+✨ *O que inclui:*
+• Avaliação presencial da profundidade dos riscos
+• Polimento técnico com compostos profissionais
+• Correção de hologramas, marcas e perda de brilho
+• Lustro final e proteção conforme estado da pintura
+
+⏱️ sob consulta
+💰 *Valor mediante avaliação presencial* — agende para cotação
+
+O que você quer fazer?
+
+*1* 📅 Quero agendar
+*2* 🔄 Ver outros serviços
+*3* 💬 Tenho uma dúvida
+Diff:
+Esperava conter: "cupom"
+Recebeu: " polimento _correção de riscos swirls e opacidade  pintura com brilho de showroom_  o que inclui  avaliação presencial da profundidade dos riscos  polimento técnico com compostos profissionais  correção de hologramas marcas e perda de brilho  lustro final e proteção conforme estado da pintura  sob consulta  valor mediante avaliação presencial  agende para cotação o que você quer fazer 1  quero agendar 2  ver outros serviços 3  tenho uma dúvida"
+
+ETAPA: 16. PONTOS DE FIDELIDADE
+Status: DIVERGENTE
+Esperado: pontos
+Recebido: *Lavagem* — qual opção?
+
+*1* — Lavagem Simples
+*2* — Lavagem Completa
+*3* — Lavagem Detalhada
+
+*0* — Voltar ao menu principal
+Diff:
+Esperava conter: "pontos"
+Recebeu: "lavagem  qual opção 1  lavagem simples 2  lavagem completa 3  lavagem detalhada 0  voltar ao menu principal"
+
+ETAPA: 17. CONFIRMAÇÃO DE ORÇAMENTO
+Status: DIVERGENTE
+Esperado: orçamento
+Recebido: *Lavagem* — qual opção?
+
+*1* — Lavagem Simples
+*2* — Lavagem Completa
+*3* — Lavagem Detalhada
+
+*0* — Voltar ao menu principal
+Diff:
+Esperava conter: "orçamento"
+Recebeu: "lavagem  qual opção 1  lavagem simples 2  lavagem completa 3  lavagem detalhada 0  voltar ao menu principal"
+
+ETAPA: 18. LOGÍSTICA
+Status: DIVERGENTE
+Esperado: Como prefere
+Recebido: *Lavagem* — qual opção?
+
+*1* — Lavagem Simples
+*2* — Lavagem Completa
+*3* — Lavagem Detalhada
+
+*0* — Voltar ao menu principal
+Diff:
+Esperava conter: "como prefere"
+Recebeu: "lavagem  qual opção 1  lavagem simples 2  lavagem completa 3  lavagem detalhada 0  voltar ao menu principal"
+
+ETAPA: 19. PAGAMENTO
+Status: DIVERGENTE
+Esperado: pagar
+Recebido: Ops, essa opção não existe 😅
+
+Escolhe uma dessas:
+
+*Lavagem* — qual opção?
+
+*1* — Lavagem Simples
+*2* — Lavagem Completa
+*3* — Lavagem Detalhada
+
+*0* — Voltar ao menu principal
+Diff:
+Esperava conter: "pagar"
+Recebeu: "ops essa opção não existe  escolhe uma dessas lavagem  qual opção 1  lavagem simples 2  lavagem completa 3  lavagem detalhada 0  voltar ao menu principal"
+
+ETAPA: 20. ESCOLHA PIX
+Status: DIVERGENTE
+Esperado: PIX
+Recebido: Ops, essa opção não existe 😅
+
+Escolhe uma dessas:
+
+*Lavagem* — qual opção?
+
+*1* — Lavagem Simples
+*2* — Lavagem Completa
+*3* — Lavagem Detalhada
+
+*0* — Voltar ao menu principal
+Diff:
+Esperava conter: "pix"
+Recebeu: "ops essa opção não existe  escolhe uma dessas lavagem  qual opção 1  lavagem simples 2  lavagem completa 3  lavagem detalhada 0  voltar ao menu principal"
+
+ETAPA: 21. COMPROVANTE
+Status: DIVERGENTE
+Esperado: comprovante
+Recebido: Ops, essa opção não existe 😅
+
+Escolhe uma dessas:
+
+*Lavagem* — qual opção?
+
+*1* — Lavagem Simples
+*2* — Lavagem Completa
+*3* — Lavagem Detalhada
+
+*0* — Voltar ao menu principal
+Diff:
+Esperava conter: "comprovante"
+Recebeu: "ops essa opção não existe  escolhe uma dessas lavagem  qual opção 1  lavagem simples 2  lavagem completa 3  lavagem detalhada 0  voltar ao menu principal"
+
+ETAPA: 22. LEMBRETE
+Status: DIVERGENTE
+Esperado: lembrete
+Recebido: Ops, essa opção não existe 😅
+
+Escolhe uma dessas:
+
+*Lavagem* — qual opção?
+
+*1* — Lavagem Simples
+*2* — Lavagem Completa
+*3* — Lavagem Detalhada
+
+*0* — Voltar ao menu principal
+Diff:
+Esperava conter: "lembrete"
+Recebeu: "ops essa opção não existe  escolhe uma dessas lavagem  qual opção 1  lavagem simples 2  lavagem completa 3  lavagem detalhada 0  voltar ao menu principal"
+
+ETAPA: 23. RESUMO E CONFIRMAÇÃO
+Status: DIVERGENTE
+Esperado: resumo
+Recebido: 💧 *Lavagem Simples*
+
+_Manutenção regular com cuidado e acabamento que faz diferença._
+
+✨ *O que inclui:*
+• Pré-lavagem com espuma ativa que solta a sujeira
+• Lavagem externa manual, segura para a pintura
+• Secagem completa com microfibra premium
+• Finalização dos pneus com pretinho
+• Aspiração e limpeza interna básica
+
+⏱️ 60 min
+💰 *R$ 55*
+
+O que você quer fazer?
+
+*1* 📅 Quero agendar
+*2* 🔄 Ver outros serviços
+*3* 💬 Tenho uma dúvida
+Diff:
+Esperava conter: "resumo"
+Recebeu: " lavagem simples _manutenção regular com cuidado e acabamento que faz diferença_  o que inclui  prélavagem com espuma ativa que solta a sujeira  lavagem externa manual segura para a pintura  secagem completa com microfibra premium  finalização dos pneus com pretinho  aspiração e limpeza interna básica  60 min  r 55 o que você quer fazer 1  quero agendar 2  ver outros serviços 3  tenho uma dúvida"
+
+ETAPA: CROSS-CUTTING 1 - Small talk
+Status: DIVERGENTE
+Esperado: Menu reimpresso (contém: O que você precisa...)
+Recebido: 💧 *Lavagem Simples*
+
+_Manutenção regular com cuidado e acabamento que faz diferença._
+
+✨ *O que inclui:*
+• Pré-lavagem com espuma ativa que solta a sujeira
+• Lavagem externa manual, segura para a pintura
+• Secagem completa com microfibra premium
+• Finalização dos pneus com pretinho
+• Aspiração e limpeza interna básica
+
+⏱️ 60 min
+💰 *R$ 55*
+
+O que você quer fazer?
+
+*1* 📅 Quero agendar
+*2* 🔄 Ver outros serviços
+*3* 💬 Tenho uma dúvida
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: " lavagem simples _manutenção regular com cuidado e acabamento que faz diferença_  o que inclui  prélavagem com espuma ativa que solta a sujeira  lavagem externa manual segura para a pintura  secagem completa com microfibra premium  finalização dos pneus com pretinho  aspiração e limpeza interna básica  60 min  r 55 o que você quer fazer 1  quero agendar 2  ver outros serviços 3  tenho uma dúvida"
+
+ETAPA: CROSS-CUTTING 2 - Pergunta
+Status: DIVERGENTE
+Esperado: Menu reimpresso (contém: O que você precisa...)
+Recebido: 💧 *Lavagem Simples*
+
+_Manutenção regular com cuidado e acabamento que faz diferença._
+
+✨ *O que inclui:*
+• Pré-lavagem com espuma ativa que solta a sujeira
+• Lavagem externa manual, segura para a pintura
+• Secagem completa com microfibra premium
+• Finalização dos pneus com pretinho
+• Aspiração e limpeza interna básica
+
+⏱️ 60 min
+💰 *R$ 55*
+
+O que você quer fazer?
+
+*1* 📅 Quero agendar
+*2* 🔄 Ver outros serviços
+*3* 💬 Tenho uma dúvida
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: " lavagem simples _manutenção regular com cuidado e acabamento que faz diferença_  o que inclui  prélavagem com espuma ativa que solta a sujeira  lavagem externa manual segura para a pintura  secagem completa com microfibra premium  finalização dos pneus com pretinho  aspiração e limpeza interna básica  60 min  r 55 o que você quer fazer 1  quero agendar 2  ver outros serviços 3  tenho uma dúvida"
+
+================================================================================

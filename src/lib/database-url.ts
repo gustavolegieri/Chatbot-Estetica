@@ -117,8 +117,11 @@ export function repairDatabaseUrl(raw?: string): string | undefined {
     if (!url.includes("sslmode=")) {
       url += url.includes("?") ? "&sslmode=require" : "?sslmode=require";
     }
-    // Não aplica mais default de connection_limit
-    // O valor deve ser especificado explicitamente no .env conforme necessidade do ambiente
+    // Aplica fallback seguro de connection_limit=2 para ambiente serverless com pooler
+    // Se não estiver especificado manualmente, usa 2 para evitar esgotamento
+    if (!url.includes("connection_limit=")) {
+      url += url.includes("?") ? "&connection_limit=2" : "?connection_limit=2";
+    }
   }
 
   return url;

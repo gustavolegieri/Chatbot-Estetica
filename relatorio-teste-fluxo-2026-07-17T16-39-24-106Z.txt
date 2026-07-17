@@ -1,0 +1,645 @@
+
+================================================================================
+RELATÓRIO DE TESTE DO FLUXO COMPLETO (STATEFUL)
+================================================================================
+
+Total de etapas testadas: 32
+✅ OK: 6
+⚠️ DESVIO DE ROTA: 4
+❌ DIVERGENTE_TEXTO: 22
+🔴 ERRO: 0
+🔄 LOOP DETECTADO: 0
+
+--------------------------------------------------------------------------------
+DETALHAMENTO POR ETAPA
+--------------------------------------------------------------------------------
+
+ETAPA: #1
+Status: DIVERGENTE_TEXTO
+Stage esperado: N/A
+Stage recebido: ETAPA1_AWAITING_NAME
+Timestamp: 2026-07-17T16:38:42.970Z
+Esperado: O que você precisa
+Recebido: Olá! Seja muito bem-vindo(a) à *Garagem do Ka* 🚗✨
+
+Aqui não fazemos lavagem comum — somos especialistas em *estética automotiva premium*: serviços que cuidam, protegem e valorizam o seu veículo de verdade.
+
+O que fazemos por você:
+🔹 *Lavagem detalhada* — muito além de água e sabão
+🔹 *Polimento técnico* — riscos e opacidade eliminados
+🔹 *Proteção de pintura* — vitrificação e cristalização
+🔹 *Higienização interior* — renovação completa por dentro
+🔹 *Detalhamentos completos* — carro como saído da concessionária
+
+📍 Rua José de Souza Marques, 164, Jardim Esplanada
+🕐 Segunda a sábado, 08:00 às 18:00
+
+Para começarmos, qual é o seu *nome*? 😊
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "olá seja muito bemvindoa à garagem do ka  aqui não fazemos lavagem comum  somos especialistas em estética automotiva premium serviços que cuidam protegem e valorizam o seu veículo de verdade o que fazemos por você  lavagem detalhada  muito além de água e sabão  polimento técnico  riscos e opacidade eliminados  proteção de pintura  vitrificação e cristalização  higienização interior  renovação completa por dentro  detalhamentos completos  carro como saído da concessionária  rua josé de souza marques 164 jardim esplanada  segunda a sábado 0800 às 1800 para começarmos qual é o seu nome "
+
+ETAPA: #2
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA1_AWAITING_NAME
+Stage recebido: ETAPA1_AWAITING_NAME
+Timestamp: 2026-07-17T16:38:44.956Z
+Esperado: O que você precisa
+Recebido: Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "que bom te ter aqui joão  o que seu carro precisa hoje 1  lavagem 2  polimento 3  proteção  brilho 4  interior 5  detalhes especiais 6  revitalização 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+ETAPA: #3
+Status: DESVIO_ROTA
+Stage esperado: ETAPA1_AWAITING_NAME
+Stage recebido: ETAPA2_MAIN_MENU
+Timestamp: 2026-07-17T16:38:46.320Z
+Esperado: O que você precisa
+Recebido: *Lavagem* — qual opção?
+
+*1* — Lavagem Simples
+*2* — Lavagem Completa
+*3* — Lavagem Detalhada
+
+*0* — Voltar ao menu principal
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "lavagem  qual opção 1  lavagem simples 2  lavagem completa 3  lavagem detalhada 0  voltar ao menu principal"
+
+ETAPA: #4
+Status: DESVIO_ROTA
+Stage esperado: ETAPA2_MAIN_MENU
+Stage recebido: ETAPA2_SUB
+Timestamp: 2026-07-17T16:38:47.953Z
+Esperado: qual opção
+Recebido: 💧 *Lavagem Simples*
+
+_Manutenção regular com cuidado e acabamento que faz diferença._
+
+✨ *O que inclui:*
+• Pré-lavagem com espuma ativa que solta a sujeira
+• Lavagem externa manual, segura para a pintura
+• Secagem completa com microfibra premium
+• Finalização dos pneus com pretinho
+• Aspiração e limpeza interna básica
+
+⏱️ 60 min
+💰 *R$ 55*
+
+O que você quer fazer?
+
+*1* 📅 Quero agendar
+*2* 🔄 Ver outros serviços
+*3* 💬 Tenho uma dúvida
+Diff:
+Esperava conter: "qual opção"
+Recebeu: " lavagem simples _manutenção regular com cuidado e acabamento que faz diferença_  o que inclui  prélavagem com espuma ativa que solta a sujeira  lavagem externa manual segura para a pintura  secagem completa com microfibra premium  finalização dos pneus com pretinho  aspiração e limpeza interna básica  60 min  r 55 o que você quer fazer 1  quero agendar 2  ver outros serviços 3  tenho uma dúvida"
+
+ETAPA: #5
+Status: DESVIO_ROTA
+Stage esperado: ETAPA2_SUB
+Stage recebido: ETAPA3_SERVICE_ACTION
+Timestamp: 2026-07-17T16:38:49.203Z
+Esperado: Quero agendar
+Recebido: Qual é o *modelo* do seu veículo? 🚗
+
+_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_
+
+_Ou envie modelo e ano juntos: *Civic 2021*_
+Diff:
+Esperava conter: "quero agendar"
+Recebeu: "qual é o modelo do seu veículo  _exemplos civic corolla hilux onix compass hb20_ _ou envie modelo e ano juntos civic 2021_"
+
+ETAPA: #6
+Status: DESVIO_ROTA
+Stage esperado: ETAPA3_SERVICE_ACTION
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:38:50.363Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #7
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:38:51.479Z
+Esperado: Confirmando os dados
+Recebido: Anotado: Civic 2022 👍
+
+Qual a cor do veículo?
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #8
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:38:52.596Z
+Esperado: Confirmando os dados
+Recebido: Anotado: Civic 2022 prata 👍
+
+Qual o estado geral do veículo? (excelente/bom/normal/ruim)
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #9
+Status: OK
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:38:53.740Z
+Esperado: Confirmando os dados
+Recebido: 🚘 *Confirmando os dados do veículo*
+
+Modelo: *Civic*
+Ano: *2022*
+Cor: *prata*
+Estado: **
+
+Está certo? (sim/não)
+
+ETAPA: #10
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:38:54.856Z
+Esperado: Confirmando os dados
+Recebido: Anotado: *prata* 👍
+
+Qual o *ano* do veículo?
+
+_Exemplo: 2021, 2019, 2018_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #11
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:38:55.978Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 👍
+
+Qual a cor do veículo?
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #12
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:38:57.117Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 prata 👍
+
+Qual o estado geral do veículo? (excelente/bom/normal/ruim)
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #13
+Status: OK
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:38:58.256Z
+Esperado: Confirmando os dados
+Recebido: 🚘 *Confirmando os dados do veículo*
+
+Modelo: *prata*
+Ano: *2022*
+Cor: *prata*
+Estado: *bom*
+
+Está certo? (sim/não)
+
+ETAPA: #14
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:38:59.373Z
+Esperado: Confirmando os dados
+Recebido: Anotado: *prata* 👍
+
+Qual o *ano* do veículo?
+
+_Exemplo: 2021, 2019, 2018_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #15
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:39:00.514Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 👍
+
+Qual a cor do veículo?
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #16
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:39:01.674Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 prata 👍
+
+Qual o estado geral do veículo? (excelente/bom/normal/ruim)
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #17
+Status: OK
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:39:02.769Z
+Esperado: Confirmando os dados
+Recebido: 🚘 *Confirmando os dados do veículo*
+
+Modelo: *prata*
+Ano: *2022*
+Cor: *prata*
+Estado: *bom*
+
+Está certo? (sim/não)
+
+ETAPA: #18
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:39:03.897Z
+Esperado: Confirmando os dados
+Recebido: Anotado: *prata* 👍
+
+Qual o *ano* do veículo?
+
+_Exemplo: 2021, 2019, 2018_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #19
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:39:05.016Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 👍
+
+Qual a cor do veículo?
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #20
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:39:06.144Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 prata 👍
+
+Qual o estado geral do veículo? (excelente/bom/normal/ruim)
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #21
+Status: OK
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:39:07.273Z
+Esperado: Confirmando os dados
+Recebido: 🚘 *Confirmando os dados do veículo*
+
+Modelo: *prata*
+Ano: *2022*
+Cor: *prata*
+Estado: *bom*
+
+Está certo? (sim/não)
+
+ETAPA: #22
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:39:08.414Z
+Esperado: Confirmando os dados
+Recebido: Anotado: *prata* 👍
+
+Qual o *ano* do veículo?
+
+_Exemplo: 2021, 2019, 2018_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #23
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:39:09.531Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 👍
+
+Qual a cor do veículo?
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #24
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:39:10.680Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 prata 👍
+
+Qual o estado geral do veículo? (excelente/bom/normal/ruim)
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #25
+Status: OK
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:39:11.797Z
+Esperado: Confirmando os dados
+Recebido: 🚘 *Confirmando os dados do veículo*
+
+Modelo: *prata*
+Ano: *2022*
+Cor: *prata*
+Estado: *bom*
+
+Está certo? (sim/não)
+
+ETAPA: #26
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:39:12.945Z
+Esperado: Confirmando os dados
+Recebido: Anotado: *prata* 👍
+
+Qual o *ano* do veículo?
+
+_Exemplo: 2021, 2019, 2018_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #27
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:39:14.070Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 👍
+
+Qual a cor do veículo?
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #28
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:39:15.205Z
+Esperado: Confirmando os dados
+Recebido: Anotado: prata 2022 prata 👍
+
+Qual o estado geral do veículo? (excelente/bom/normal/ruim)
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #29
+Status: OK
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:39:16.325Z
+Esperado: Confirmando os dados
+Recebido: 🚘 *Confirmando os dados do veículo*
+
+Modelo: *prata*
+Ano: *2022*
+Cor: *prata*
+Estado: *bom*
+
+Está certo? (sim/não)
+
+ETAPA: #30
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:39:17.503Z
+Esperado: Confirmando os dados
+Recebido: Anotado: *prata* 👍
+
+Qual o *ano* do veículo?
+
+_Exemplo: 2021, 2019, 2018_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: CROSS-CUTTING 1 - Small talk
+Status: DIVERGENTE_TEXTO
+Stage esperado: N/A
+Stage recebido: ETAPA2_MAIN_MENU
+Timestamp: 2026-07-17T16:39:21.466Z
+Esperado: Menu reimpresso (contém: O que você precisa...)
+Recebido: Ops, essa opção não existe 😅
+
+Escolhe uma dessas:
+
+Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "ops essa opção não existe  escolhe uma dessas que bom te ter aqui joão  o que seu carro precisa hoje 1  lavagem 2  polimento 3  proteção  brilho 4  interior 5  detalhes especiais 6  revitalização 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+ETAPA: CROSS-CUTTING 2 - Pergunta
+Status: DIVERGENTE_TEXTO
+Stage esperado: N/A
+Stage recebido: ETAPA2_MAIN_MENU
+Timestamp: 2026-07-17T16:39:23.518Z
+Esperado: Menu reimpresso (contém: O que você precisa...)
+Recebido: Olá! 😊 *O valor* varia conforme o serviço e o estado do seu veículo. Podemos fazer um orçamento personalizado, é só nos dizer qual serviço deseja. Se quiser falar direto com o dono, digite *falar com o dono*.
+
+Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "olá  o valor varia conforme o serviço e o estado do seu veículo podemos fazer um orçamento personalizado é só nos dizer qual serviço deseja se quiser falar direto com o dono digite falar com o dono que bom te ter aqui joão  o que seu carro precisa hoje 1  lavagem 2  polimento 3  proteção  brilho 4  interior 5  detalhes especiais 6  revitalização 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+================================================================================
+
+
+
+================================================================================
+DUMP BRUTO DAS MENSAGENS (BANCO DE DADOS)
+================================================================================
+
+Total de mensagens: 8
+
+2026-07-17T16:39:18.869Z | INBOUND | CLIENT
+Texto: Oi
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T16:39:18.898Z | OUTBOUND | BOT
+Texto: Olá! Seja muito bem-vindo(a) à *Garagem do Ka* 🚗✨
+
+Aqui não fazemos lavagem comum — somos especialistas em *estética automotiva premium*: serviços que cuidam, protegem e valorizam o seu veículo de verdade.
+
+O que fazemos por você:
+🔹 *Lavagem detalhada* — muito além de água e sabão
+🔹 *Polimento técnico* — riscos e opacidade eliminados
+🔹 *Proteção de pintura* — vitrificação e cristalização
+🔹 *Higienização interior* — renovação completa por dentro
+🔹 *Detalhamentos completos* — carro como saído da concessionária
+
+📍 Rua José de Souza Marques, 164, Jardim Esplanada
+🕐 Segunda a sábado, 08:00 às 18:00
+
+Para começarmos, qual é o seu *nome*? 😊
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T16:39:20.000Z | INBOUND | CLIENT
+Texto: João
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T16:39:20.359Z | OUTBOUND | BOT
+Texto: Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T16:39:21.442Z | INBOUND | CLIENT
+Texto: pera aí
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+2026-07-17T16:39:21.466Z | OUTBOUND | BOT
+Texto: Ops, essa opção não existe 😅
+
+Escolhe uma dessas:
+
+Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+2026-07-17T16:39:22.573Z | INBOUND | CLIENT
+Texto: quanto custa?
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+2026-07-17T16:39:23.518Z | OUTBOUND | BOT
+Texto: Olá! 😊 *O valor* varia conforme o serviço e o estado do seu veículo. Podemos fazer um orçamento personalizado, é só nos dizer qual serviço deseja. Se quiser falar direto com o dono, digite *falar com o dono*.
+
+Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+================================================================================

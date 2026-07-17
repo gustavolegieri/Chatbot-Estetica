@@ -1,0 +1,323 @@
+
+================================================================================
+RELATÓRIO DE TESTE DO FLUXO COMPLETO (STATEFUL)
+================================================================================
+
+Total de etapas testadas: 10
+✅ OK: 0
+⚠️ DESVIO DE ROTA: 4
+❌ DIVERGENTE_TEXTO: 5
+🔴 ERRO: 0
+🔄 LOOP DETECTADO: 1
+
+--------------------------------------------------------------------------------
+DETALHAMENTO POR ETAPA
+--------------------------------------------------------------------------------
+
+ETAPA: #1
+Status: DIVERGENTE_TEXTO
+Stage esperado: N/A
+Stage recebido: ETAPA1_AWAITING_NAME
+Timestamp: 2026-07-17T16:33:14.125Z
+Esperado: O que você precisa
+Recebido: Olá! Seja muito bem-vindo(a) à *Garagem do Ka* 🚗✨
+
+Aqui não fazemos lavagem comum — somos especialistas em *estética automotiva premium*: serviços que cuidam, protegem e valorizam o seu veículo de verdade.
+
+O que fazemos por você:
+🔹 *Lavagem detalhada* — muito além de água e sabão
+🔹 *Polimento técnico* — riscos e opacidade eliminados
+🔹 *Proteção de pintura* — vitrificação e cristalização
+🔹 *Higienização interior* — renovação completa por dentro
+🔹 *Detalhamentos completos* — carro como saído da concessionária
+
+📍 Rua José de Souza Marques, 164, Jardim Esplanada
+🕐 Segunda a sábado, 08:00 às 18:00
+
+Para começarmos, qual é o seu *nome*? 😊
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "olá seja muito bemvindoa à garagem do ka  aqui não fazemos lavagem comum  somos especialistas em estética automotiva premium serviços que cuidam protegem e valorizam o seu veículo de verdade o que fazemos por você  lavagem detalhada  muito além de água e sabão  polimento técnico  riscos e opacidade eliminados  proteção de pintura  vitrificação e cristalização  higienização interior  renovação completa por dentro  detalhamentos completos  carro como saído da concessionária  rua josé de souza marques 164 jardim esplanada  segunda a sábado 0800 às 1800 para começarmos qual é o seu nome "
+
+ETAPA: #2
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA1_AWAITING_NAME
+Stage recebido: ETAPA1_AWAITING_NAME
+Timestamp: 2026-07-17T16:33:15.713Z
+Esperado: O que você precisa
+Recebido: Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "que bom te ter aqui joão  o que seu carro precisa hoje 1  lavagem 2  polimento 3  proteção  brilho 4  interior 5  detalhes especiais 6  revitalização 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+ETAPA: #3
+Status: DESVIO_ROTA
+Stage esperado: ETAPA1_AWAITING_NAME
+Stage recebido: ETAPA2_MAIN_MENU
+Timestamp: 2026-07-17T16:33:16.998Z
+Esperado: O que você precisa
+Recebido: *Lavagem* — qual opção?
+
+*1* — Lavagem Simples
+*2* — Lavagem Completa
+*3* — Lavagem Detalhada
+
+*0* — Voltar ao menu principal
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "lavagem  qual opção 1  lavagem simples 2  lavagem completa 3  lavagem detalhada 0  voltar ao menu principal"
+
+ETAPA: #4
+Status: DESVIO_ROTA
+Stage esperado: ETAPA2_MAIN_MENU
+Stage recebido: ETAPA2_SUB
+Timestamp: 2026-07-17T16:33:18.636Z
+Esperado: qual opção
+Recebido: 💧 *Lavagem Simples*
+
+_Manutenção regular com cuidado e acabamento que faz diferença._
+
+✨ *O que inclui:*
+• Pré-lavagem com espuma ativa que solta a sujeira
+• Lavagem externa manual, segura para a pintura
+• Secagem completa com microfibra premium
+• Finalização dos pneus com pretinho
+• Aspiração e limpeza interna básica
+
+⏱️ 60 min
+💰 *R$ 55*
+
+O que você quer fazer?
+
+*1* 📅 Quero agendar
+*2* 🔄 Ver outros serviços
+*3* 💬 Tenho uma dúvida
+Diff:
+Esperava conter: "qual opção"
+Recebeu: " lavagem simples _manutenção regular com cuidado e acabamento que faz diferença_  o que inclui  prélavagem com espuma ativa que solta a sujeira  lavagem externa manual segura para a pintura  secagem completa com microfibra premium  finalização dos pneus com pretinho  aspiração e limpeza interna básica  60 min  r 55 o que você quer fazer 1  quero agendar 2  ver outros serviços 3  tenho uma dúvida"
+
+ETAPA: #5
+Status: DESVIO_ROTA
+Stage esperado: ETAPA2_SUB
+Stage recebido: ETAPA3_SERVICE_ACTION
+Timestamp: 2026-07-17T16:33:19.890Z
+Esperado: Quero agendar
+Recebido: Qual é o *modelo* do seu veículo? 🚗
+
+_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_
+
+_Ou envie modelo e ano juntos: *Civic 2021*_
+Diff:
+Esperava conter: "quero agendar"
+Recebeu: "qual é o modelo do seu veículo  _exemplos civic corolla hilux onix compass hb20_ _ou envie modelo e ano juntos civic 2021_"
+
+ETAPA: #6
+Status: DESVIO_ROTA
+Stage esperado: ETAPA3_SERVICE_ACTION
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:33:21.003Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #7
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:33:22.174Z
+Esperado: Confirmando os dados
+Recebido: Anotado: Civic 2022 👍
+
+Qual a cor do veículo?
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #8
+Status: LOOP_DETECTADO
+Stage esperado: N/A
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T16:33:23.307Z
+Esperado: prata
+Recebido: Anotado: Civic 2022 prata 👍
+
+Qual o estado geral do veículo? (excelente/bom/normal/ruim)
+Diff:
+Loop detectado: stage ETAPA4_VEHICLE repetiu 3 vezes sem progressão
+
+ETAPA: CROSS-CUTTING 1 - Small talk
+Status: DIVERGENTE_TEXTO
+Stage esperado: N/A
+Stage recebido: ETAPA2_MAIN_MENU
+Timestamp: 2026-07-17T16:33:26.826Z
+Esperado: Menu reimpresso (contém: O que você precisa...)
+Recebido: Ops, essa opção não existe 😅
+
+Escolhe uma dessas:
+
+Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "ops essa opção não existe  escolhe uma dessas que bom te ter aqui joão  o que seu carro precisa hoje 1  lavagem 2  polimento 3  proteção  brilho 4  interior 5  detalhes especiais 6  revitalização 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+ETAPA: CROSS-CUTTING 2 - Pergunta
+Status: DIVERGENTE_TEXTO
+Stage esperado: N/A
+Stage recebido: ETAPA2_MAIN_MENU
+Timestamp: 2026-07-17T16:33:28.461Z
+Esperado: Menu reimpresso (contém: O que você precisa...)
+Recebido: Olá! 😊 O preço depende do tipo de serviço e do estado do seu veículo.  
+Para uma cotação exata, precisamos saber se você quer lavagem, polimento, proteção, interior ou outro detalhe.  
+Os valores são ajustados conforme modelo e condição.  
+Se quiser falar direto com o dono, digite *falar com o dono*.
+
+Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "olá  o preço depende do tipo de serviço e do estado do seu veículo para uma cotação exata precisamos saber se você quer lavagem polimento proteção interior ou outro detalhe os valores são ajustados conforme modelo e condição se quiser falar direto com o dono digite falar com o dono que bom te ter aqui joão  o que seu carro precisa hoje 1  lavagem 2  polimento 3  proteção  brilho 4  interior 5  detalhes especiais 6  revitalização 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+================================================================================
+
+
+
+================================================================================
+DUMP BRUTO DAS MENSAGENS (BANCO DE DADOS)
+================================================================================
+
+Total de mensagens: 8
+
+2026-07-17T16:33:23.922Z | INBOUND | CLIENT
+Texto: Oi
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T16:33:23.941Z | OUTBOUND | BOT
+Texto: Olá! Seja muito bem-vindo(a) à *Garagem do Ka* 🚗✨
+
+Aqui não fazemos lavagem comum — somos especialistas em *estética automotiva premium*: serviços que cuidam, protegem e valorizam o seu veículo de verdade.
+
+O que fazemos por você:
+🔹 *Lavagem detalhada* — muito além de água e sabão
+🔹 *Polimento técnico* — riscos e opacidade eliminados
+🔹 *Proteção de pintura* — vitrificação e cristalização
+🔹 *Higienização interior* — renovação completa por dentro
+🔹 *Detalhamentos completos* — carro como saído da concessionária
+
+📍 Rua José de Souza Marques, 164, Jardim Esplanada
+🕐 Segunda a sábado, 08:00 às 18:00
+
+Para começarmos, qual é o seu *nome*? 😊
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T16:33:25.050Z | INBOUND | CLIENT
+Texto: João
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T16:33:25.583Z | OUTBOUND | BOT
+Texto: Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T16:33:26.805Z | INBOUND | CLIENT
+Texto: pera aí
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+2026-07-17T16:33:26.826Z | OUTBOUND | BOT
+Texto: Ops, essa opção não existe 😅
+
+Escolhe uma dessas:
+
+Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+2026-07-17T16:33:27.955Z | INBOUND | CLIENT
+Texto: quanto custa?
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+2026-07-17T16:33:28.461Z | OUTBOUND | BOT
+Texto: Olá! 😊 O preço depende do tipo de serviço e do estado do seu veículo.  
+Para uma cotação exata, precisamos saber se você quer lavagem, polimento, proteção, interior ou outro detalhe.  
+Os valores são ajustados conforme modelo e condição.  
+Se quiser falar direto com o dono, digite *falar com o dono*.
+
+Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+================================================================================

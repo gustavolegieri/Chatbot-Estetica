@@ -35,25 +35,29 @@ function isRecoverableError(statusCode: number, errorMessage?: string): boolean 
  * NOTA: Vercel Hobby limita cron jobs a 1x/dia, então usamos cron externo.
  * 
  * Endpoint: /api/cron/process-message-queue
- * Método: POST
- * Autenticação: Bearer token via CRON_SECRET (OBRIGATÓRIO)
+ * Método: POST ou GET
+ * Autenticação: Bearer token via CRON_SECRET ou query string `?secret=` (OBRIGATÓRIO)
  * 
- * Exemplo de chamada:
+ * Exemplos de chamada:
  * curl -X POST https://chatbot-estetica-ten.vercel.app/api/cron/process-message-queue \
  *   -H "Authorization: Bearer SEU_CRON_SECRET"
+ *
+ * curl "https://chatbot-estetica-ten.vercel.app/api/cron/process-message-queue?secret=SEU_CRON_SECRET"
  */
 export async function POST(req: NextRequest) {
   try {
     // Verificar autenticação (OBRIGATÓRIO para cron externo)
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = req.headers.get("authorization");
+    const querySecret = req.nextUrl.searchParams.get("secret");
+    const token = authHeader?.replace(/^Bearer\s+/i, "") ?? querySecret;
     
     if (!cronSecret) {
       console.error("[Cron] CRON_SECRET não configurado no ambiente");
       return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
     }
     
-    if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
+    if (!token || token !== cronSecret) {
       console.warn("[Cron] Autenticação inválida ou ausente");
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }

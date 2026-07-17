@@ -1,0 +1,926 @@
+
+================================================================================
+RELATÓRIO DE TESTE DO FLUXO COMPLETO (STATEFUL)
+================================================================================
+
+Total de etapas testadas: 32
+✅ OK: 1
+⚠️ DESVIO DE ROTA: 4
+❌ DIVERGENTE_TEXTO: 27
+🔴 ERRO: 0
+
+--------------------------------------------------------------------------------
+DETALHAMENTO POR ETAPA
+--------------------------------------------------------------------------------
+
+ETAPA: #1
+Status: OK
+Stage esperado: N/A
+Stage recebido: ETAPA1_AWAITING_NAME
+Timestamp: 2026-07-17T15:05:52.975Z
+Esperado: Seja muito bem-vindo
+Recebido: Olá! Seja muito bem-vindo(a) à *Estética Automotiva* 🚗✨
+
+Aqui não fazemos lavagem comum — somos especialistas em *estética automotiva premium*: serviços que cuidam, protegem e valorizam o seu veículo de verdade.
+
+O que fazemos por você:
+🔹 *Lavagem detalhada* — muito além de água e sabão
+🔹 *Polimento técnico* — riscos e opacidade eliminados
+🔹 *Proteção de pintura* — vitrificação e cristalização
+🔹 *Higienização interior* — renovação completa por dentro
+🔹 *Detalhamentos completos* — carro como saído da concessionária
+
+📍 Consulte nosso endereço
+🕐 Segunda a sábado, 08:00 às 00:00
+
+Para começarmos, qual é o seu *nome*? 😊
+
+ETAPA: #2
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA1_AWAITING_NAME
+Stage recebido: ETAPA1_AWAITING_NAME
+Timestamp: 2026-07-17T15:06:07.961Z
+Esperado: Seja muito bem-vindo
+Recebido: Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Revitalização
+*6* 🔄 Detalhes Especiais
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Diff:
+Esperava conter: "seja muito bemvindo"
+Recebeu: "que bom te ter aqui joão  o que seu carro precisa hoje 1  lavagem 2  polimento 3  proteção  brilho 4  interior 5  revitalização 6  detalhes especiais 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+ETAPA: #3
+Status: DESVIO_ROTA
+Stage esperado: ETAPA1_AWAITING_NAME
+Stage recebido: ETAPA2_MAIN_MENU
+Timestamp: 2026-07-17T15:06:21.375Z
+Esperado: O que você precisa
+Recebido: *Lavagem* — qual opção?
+
+*1* — Lavagem Simples
+*2* — Lavagem Completa
+*3* — Lavagem Detalhada
+
+*0* — Voltar ao menu principal
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "lavagem  qual opção 1  lavagem simples 2  lavagem completa 3  lavagem detalhada 0  voltar ao menu principal"
+
+ETAPA: #4
+Status: DESVIO_ROTA
+Stage esperado: ETAPA2_MAIN_MENU
+Stage recebido: ETAPA2_SUB
+Timestamp: 2026-07-17T15:06:36.734Z
+Esperado: qual opção
+Recebido: 💧 *Lavagem Simples*
+
+_Manutenção regular com cuidado e acabamento que faz diferença._
+
+✨ *O que inclui:*
+• Pré-lavagem com espuma ativa que solta a sujeira
+• Lavagem externa manual, segura para a pintura
+• Secagem completa com microfibra premium
+• Finalização dos pneus com pretinho
+• Aspiração e limpeza interna básica
+
+⏱️ 60 min
+💰 *R$ 55*
+
+O que você quer fazer?
+
+*1* 📅 Quero agendar
+*2* 🔄 Ver outros serviços
+*3* 💬 Tenho uma dúvida
+Diff:
+Esperava conter: "qual opção"
+Recebeu: " lavagem simples _manutenção regular com cuidado e acabamento que faz diferença_  o que inclui  prélavagem com espuma ativa que solta a sujeira  lavagem externa manual segura para a pintura  secagem completa com microfibra premium  finalização dos pneus com pretinho  aspiração e limpeza interna básica  60 min  r 55 o que você quer fazer 1  quero agendar 2  ver outros serviços 3  tenho uma dúvida"
+
+ETAPA: #5
+Status: DESVIO_ROTA
+Stage esperado: ETAPA2_SUB
+Stage recebido: ETAPA3_SERVICE_ACTION
+Timestamp: 2026-07-17T15:06:49.773Z
+Esperado: Quero agendar
+Recebido: Qual é o *modelo* do seu veículo? 🚗
+
+_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_
+
+_Ou envie modelo e ano juntos: *Civic 2021*_
+Diff:
+Esperava conter: "quero agendar"
+Recebeu: "qual é o modelo do seu veículo  _exemplos civic corolla hilux onix compass hb20_ _ou envie modelo e ano juntos civic 2021_"
+
+ETAPA: #6
+Status: DESVIO_ROTA
+Stage esperado: ETAPA3_SERVICE_ACTION
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:07:02.875Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #7
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:07:16.954Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #8
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:07:29.032Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #9
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:07:41.887Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #10
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:07:55.826Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #11
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:08:08.079Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #12
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:08:21.139Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #13
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:08:34.895Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #14
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:08:47.061Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #15
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:09:00.059Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #16
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:09:13.899Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #17
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:09:25.950Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #18
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:09:37.987Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #19
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:09:51.878Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #20
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:10:04.827Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #21
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:10:16.953Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #22
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:10:30.058Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #23
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:10:42.142Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #24
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:10:56.364Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #25
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:11:09.665Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #26
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:11:21.793Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #27
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:11:34.495Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #28
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:11:48.168Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #29
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:12:00.261Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: #30
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:12:13.135Z
+Esperado: Confirmando os dados
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+ETAPA: CROSS-CUTTING 1 - Small talk
+Status: DIVERGENTE_TEXTO
+Stage esperado: N/A
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:12:27.738Z
+Esperado: Menu reimpresso (contém: O que você precisa...)
+Recebido: Anotado: *pera aí* 👍
+
+Qual o *ano* do veículo?
+
+_Exemplo: 2021, 2019, 2018_
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "anotado pera aí  qual o ano do veículo _exemplo 2021 2019 2018_"
+
+ETAPA: CROSS-CUTTING 2 - Pergunta
+Status: DIVERGENTE_TEXTO
+Stage esperado: N/A
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-17T15:12:40.476Z
+Esperado: Menu reimpresso (contém: O que você precisa...)
+Recebido: *Lavagem Simples* varia conforme o modelo e o estado do carro, então o valor pode mudar. 💦 Aceitamos cartão e dinheiro. Nosso horário de atendimento é de segunda a sábado, das 08h às 00h. Se quiser detalhes específicos, digite *falar com o dono*.
+
+Digite *menu* para ver opções.
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "lavagem simples varia conforme o modelo e o estado do carro então o valor pode mudar  aceitamos cartão e dinheiro nosso horário de atendimento é de segunda a sábado das 08h às 00h se quiser detalhes específicos digite falar com o dono digite menu para ver opções"
+
+================================================================================
+
+
+
+================================================================================
+DUMP BRUTO DAS MENSAGENS (BANCO DE DADOS)
+================================================================================
+
+Total de mensagens: 64
+
+2026-07-17T15:05:47.315Z | INBOUND | CLIENT
+Texto: Oi
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T15:05:52.975Z | OUTBOUND | BOT
+Texto: Olá! Seja muito bem-vindo(a) à *Estética Automotiva* 🚗✨
+
+Aqui não fazemos lavagem comum — somos especialistas em *estética automotiva premium*: serviços que cuidam, protegem e valorizam o seu veículo de verdade.
+
+O que fazemos por você:
+🔹 *Lavagem detalhada* — muito além de água e sabão
+🔹 *Polimento técnico* — riscos e opacidade eliminados
+🔹 *Proteção de pintura* — vitrificação e cristalização
+🔹 *Higienização interior* — renovação completa por dentro
+🔹 *Detalhamentos completos* — carro como saído da concessionária
+
+📍 Consulte nosso endereço
+🕐 Segunda a sábado, 08:00 às 00:00
+
+Para começarmos, qual é o seu *nome*? 😊
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T15:06:00.163Z | INBOUND | CLIENT
+Texto: João
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T15:06:07.961Z | OUTBOUND | BOT
+Texto: Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Revitalização
+*6* 🔄 Detalhes Especiais
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T15:06:15.716Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+2026-07-17T15:06:21.375Z | OUTBOUND | BOT
+Texto: *Lavagem* — qual opção?
+
+*1* — Lavagem Simples
+*2* — Lavagem Completa
+*3* — Lavagem Detalhada
+
+*0* — Voltar ao menu principal
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+2026-07-17T15:06:28.786Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA2_SUB
+--------------------------------------------------------------------------------
+2026-07-17T15:06:36.734Z | OUTBOUND | BOT
+Texto: 💧 *Lavagem Simples*
+
+_Manutenção regular com cuidado e acabamento que faz diferença._
+
+✨ *O que inclui:*
+• Pré-lavagem com espuma ativa que solta a sujeira
+• Lavagem externa manual, segura para a pintura
+• Secagem completa com microfibra premium
+• Finalização dos pneus com pretinho
+• Aspiração e limpeza interna básica
+
+⏱️ 60 min
+💰 *R$ 55*
+
+O que você quer fazer?
+
+*1* 📅 Quero agendar
+*2* 🔄 Ver outros serviços
+*3* 💬 Tenho uma dúvida
+Stage: ETAPA2_SUB
+--------------------------------------------------------------------------------
+2026-07-17T15:06:44.094Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA3_SERVICE_ACTION
+--------------------------------------------------------------------------------
+2026-07-17T15:06:49.773Z | OUTBOUND | BOT
+Texto: Qual é o *modelo* do seu veículo? 🚗
+
+_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_
+
+_Ou envie modelo e ano juntos: *Civic 2021*_
+Stage: ETAPA3_SERVICE_ACTION
+--------------------------------------------------------------------------------
+2026-07-17T15:06:58.036Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:07:02.875Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:07:10.989Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:07:16.954Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:07:24.026Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:07:29.032Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:07:37.037Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:07:41.887Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:07:50.021Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:07:55.826Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:08:03.230Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:08:08.079Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:08:16.306Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:08:21.139Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:08:29.059Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:08:34.895Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:08:42.035Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:08:47.061Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:08:55.045Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:09:00.059Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:09:08.092Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:09:13.899Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:09:21.087Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:09:25.950Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:09:33.138Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:09:37.987Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:09:46.047Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:09:51.878Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:09:59.975Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:10:04.827Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:10:12.092Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:10:16.953Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:10:24.249Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:10:30.058Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:10:37.105Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:10:42.142Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:10:51.242Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:10:56.364Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:11:04.073Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:11:09.665Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:11:16.791Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:11:21.793Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:11:29.511Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:11:34.495Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:11:42.390Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:11:48.168Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:11:55.427Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:12:00.261Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:12:08.302Z | INBOUND | CLIENT
+Texto: 1
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:12:13.135Z | OUTBOUND | BOT
+Texto: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:12:21.029Z | INBOUND | CLIENT
+Texto: pera aí
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:12:27.738Z | OUTBOUND | BOT
+Texto: Anotado: *pera aí* 👍
+
+Qual o *ano* do veículo?
+
+_Exemplo: 2021, 2019, 2018_
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:12:34.860Z | INBOUND | CLIENT
+Texto: quanto custa?
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+2026-07-17T15:12:40.476Z | OUTBOUND | BOT
+Texto: *Lavagem Simples* varia conforme o modelo e o estado do carro, então o valor pode mudar. 💦 Aceitamos cartão e dinheiro. Nosso horário de atendimento é de segunda a sábado, das 08h às 00h. Se quiser detalhes específicos, digite *falar com o dono*.
+
+Digite *menu* para ver opções.
+Stage: ETAPA4_VEHICLE
+--------------------------------------------------------------------------------
+================================================================================

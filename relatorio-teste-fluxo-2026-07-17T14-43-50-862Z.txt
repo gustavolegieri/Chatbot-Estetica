@@ -1,0 +1,189 @@
+
+================================================================================
+RELATÓRIO DE TESTE DO FLUXO COMPLETO
+================================================================================
+
+Total de etapas testadas: 25
+✅ OK: 0
+❌ DIVERGENTES: 25
+
+--------------------------------------------------------------------------------
+DETALHAMENTO POR ETAPA
+--------------------------------------------------------------------------------
+
+ETAPA: 1. BOAS-VINDAS
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 2. COLETA DE NOME
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 3. MENU PRINCIPAL
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 4. SUBMENU
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 5. CLIENTE INDECISO - VEÍCULO
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 6. CLIENTE INDECISO - PROBLEMA
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 7. AÇÕES COM PACOTES
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 8. AÇÕES APÓS SERVIÇO
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 9. COLETA DE VEÍCULO
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 10. ORÇAMENTO
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 11. BÔNUS PRIMEIRA VEZ
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 12. UPSELL
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 13. ESCOLHA DE DIA
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 14. ESCOLHA DE HORÁRIO
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 15. CUPOM
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 16. PONTOS DE FIDELIDADE
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 17. CONFIRMAÇÃO DE ORÇAMENTO
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 18. LOGÍSTICA
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 19. PAGAMENTO
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 20. ESCOLHA PIX
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 21. COMPROVANTE
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 22. LEMBRETE
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: 23. RESUMO E CONFIRMAÇÃO
+Status: DIVERGENTE
+Esperado: undefined
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: CROSS-CUTTING 1 - Small talk
+Status: DIVERGENTE
+Esperado: Menu reimpresso
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+ETAPA: CROSS-CUTTING 2 - Pergunta
+Status: DIVERGENTE
+Esperado: Menu reimpresso
+Recebido: ERRO: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Diff:
+Erro ao enviar mensagem: TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+
+================================================================================

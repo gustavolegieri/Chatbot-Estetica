@@ -120,8 +120,6 @@ async function markMessageAsProcessed(
   clientId?: string
 ): Promise<boolean> {
   try {
-    // Cria registro com wasenderMessageId único
-    // Se já existir, vai lançar erro de unique constraint
     await prisma.whatsAppMessage.create({
       data: {
         phone,
@@ -134,16 +132,26 @@ async function markMessageAsProcessed(
         flowStage: "WEBHOOK_DEDUP",
       }
     });
-    return true; // Marcado com sucesso
+    return true;
   } catch (error: any) {
-    // Se for erro de unique constraint (P2002), significa que já foi processado
     if (error.code === 'P2002') {
       console.log("[Webhook] Mensagem já estava marcada como processada:", messageId);
-      return false; // JÁ EXISTE - retornar false para abortar
+      return false;
     } else {
       console.error("[Webhook] Erro ao marcar mensagem como processada:", error);
-      return true; // Outro erro, permite processamento para não bloquear
+      return true;
     }
+  }
+}
+
+async function deleteMessageProcessingMarker(messageId: string) {
+  try {
+    await prisma.whatsAppMessage.deleteMany({
+      where: { wasenderMessageId: messageId },
+    });
+    console.log("[Webhook] Marcador de deduplicação removido após falha:", messageId);
+  } catch (error) {
+    console.error("[Webhook] Erro ao remover marcador de deduplicação:", error);
   }
 }
 
@@ -219,10 +227,6 @@ export async function POST(req: NextRequest) {
   // Deduplicação baseada em ID da mensagem (persistida no banco)
   const messageId = msgKey.id as string | undefined;
   console.log("[Webhook] messageId recebido:", messageId, "tipo:", typeof messageId);
-  if (messageId && await isMessageProcessed(messageId)) {
-    console.log("[Webhook] mensagem duplicada ignorada — messageId:", messageId);
-    return NextResponse.json({ ok: true });
-  }
 
   const text = extractText(msg);
   const { buttonId, listId } = extractInteractive(msg);
@@ -251,14 +255,16 @@ export async function POST(req: NextRequest) {
     console.error("[Webhook] Erro ao buscar sessão:", error);
   }
 
-  // Marcar mensagem como processada ANTES de processar para evitar duplicatas
+  let markerCreated = false;
   if (messageId) {
-    console.log("[Webhook] Marcando mensagem como processada:", messageId);
-    const marked = await markMessageAsProcessed(messageId, phone, text || buttonId || listId || "", sessionId || undefined, clientId || undefined);
-    
-    // Se já estava marcada (P2002), abortar imediatamente
-    if (!marked) {
-      console.log("[Webhook] Abortando processamento - mensagem já processada por outra instância");
+    markerCreated = await markMessageAsProcessed(
+      messageId,
+      phone,
+      text || buttonId || listId || "",
+      sessionId,
+      clientId
+    );
+    if (!markerCreated) {
       return NextResponse.json({ ok: true });
     }
   } else {
@@ -268,7 +274,6 @@ export async function POST(req: NextRequest) {
   try {
     console.log("[Webhook] Iniciando processamento da mensagem");
     
-    // Tenta obter waitUntil do contexto Next.js para execução background em serverless
     let waitUntil: ((promise: Promise<unknown>) => void) | undefined;
     try {
       // @ts-ignore - waitUntil é disponível em edge runtime do Next.js
@@ -283,13 +288,15 @@ export async function POST(req: NextRequest) {
       buttonId,
       listId,
       pushName: pushName || undefined,
+      messageId,
     }, waitUntil);
-    
+
     console.log("[Webhook] processamento concluído");
   } catch (err) {
     console.error("[Webhook] ERRO:", err);
-    // Em caso de erro, não removemos a marcação pois a deduplicação é baseada no messageId
-    // Se a mensagem falhar, o usuário pode enviar novamente e será um novo messageId
+    if (markerCreated && messageId) {
+      await deleteMessageProcessingMarker(messageId);
+    }
   }
 
   return NextResponse.json({ ok: true });

@@ -249,7 +249,7 @@ async function handleMessageInternal(msg: IncomingMessage) {
 export async function processWhatsAppMessage(msg: IncomingMessage, waitUntil?: (promise: Promise<unknown>) => void) {
   console.log("[WhatsApp Bot] processWhatsAppMessage chamado:", { phone: msg.phone, text: msg.text });
   // Important: processar por phone serialmente ajuda a evitar respostas "fora de hora"
-  enqueueWhatsAppMessage(
+  return enqueueWhatsAppMessage(
     {
       phone: msg.phone,
       text: msg.text,

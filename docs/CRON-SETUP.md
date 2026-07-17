@@ -25,6 +25,20 @@ No plano **Hobby** do Vercel, cron jobs só podem rodar **uma vez por dia**. Se 
 
 5. Clique em **Save** para cada job
 
+### Usando cronjob.org
+
+Se você usa `cronjob.org`, configure uma tarefa para chamar:
+
+- `https://seu-projeto.vercel.app/api/cron/process-message-queue?secret=g7K9xP2mN4Qv8Rz1`
+- `https://seu-projeto.vercel.app/api/cron/reminders?secret=g7K9xP2mN4Qv8Rz1`
+
+Recomendo intervalos de:
+
+- `process-message-queue`: a cada 1-2 minutos
+- `reminders`: a cada 5-10 minutos
+
+Isso mantém o Hobby funcionando como se tivesse cron frequente. 
+
 ### Opção 2: Via vercel.json
 
 O arquivo `vercel.json` já está configurado no projeto com:

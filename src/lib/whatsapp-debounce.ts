@@ -36,49 +36,52 @@ async function acquireLock(phone: string): Promise<boolean> {
   const now = new Date();
   const staleThreshold = new Date(now.getTime() - LOCK_TIMEOUT_MS);
 
+  // 1. Tenta adquirir lock atomicamente numa sessão já existente
+  const result = await prisma.whatsAppSession.updateMany({
+    where: {
+      phone: normalized,
+      OR: [
+        { processingLockedAt: null },
+        { processingLockedAt: { lt: staleThreshold } },
+      ],
+    },
+    data: { processingLockedAt: now },
+  });
+
+  if (result.count > 0) {
+    console.log("[Lock] Lock adquirido com sucesso para", normalized);
+    return true; // conseguiu o lock numa sessão existente
+  }
+
+  // 2. count === 0: ou está locked por outra instância, ou a sessão ainda não existe
+  const exists = await prisma.whatsAppSession.findUnique({
+    where: { phone: normalized },
+    select: { phone: true },
+  });
+
+  if (exists) {
+    console.log("[Lock] Mensagem ignorada — outra instância já está processando", normalized);
+    return false; // estava locked de verdade
+  }
+
+  // 3. Telefone novo: tenta criar, mas trata corrida contra outro create concorrente
   try {
-    // Tenta criar a sessão diretamente (create atômico)
-    // Se o phone já existir, falha com P2002 de forma segura, sem gap de corrida
     await prisma.whatsAppSession.create({
       data: {
         phone: normalized,
         processingLockedAt: now,
         metadata: { stage: "ETAPA1_AWAITING_NAME", welcomed: false } as object,
-      }
+      },
     });
-    
     console.log("[Lock] Lock adquirido com sucesso (nova sessão) para", normalized);
     return true;
   } catch (error: any) {
-    // Se for P2002 (sessão já existe), cai no updateMany normal
-    if (error.code === 'P2002') {
-      try {
-        const result = await prisma.whatsAppSession.updateMany({
-          where: {
-            phone: normalized,
-            OR: [
-              { processingLockedAt: null },
-              { processingLockedAt: { lt: staleThreshold } },
-            ],
-          },
-          data: { processingLockedAt: now },
-        });
-
-        if (result.count === 0) {
-          console.log("[Lock] Mensagem ignorada — outra instância já está processando", normalized);
-          return false;
-        }
-
-        console.log("[Lock] Lock adquirido com sucesso para", normalized);
-        return true;
-      } catch (updateError) {
-        console.error("[Lock] Erro ao atualizar lock em sessão existente:", updateError);
-        return false; // Sem lock confirmado, não processar
-      }
+    if (error.code === "P2002") {
+      // outra instância criou a sessão entre o findUnique e o create — perdeu a corrida
+      console.log("[Lock] Mensagem ignorada — outra instância criou a sessão primeiro", normalized);
+      return false;
     }
-    
-    // Erro genuinamente inesperado - retorna false
-    console.error("[Lock] Erro ao adquirir lock:", error);
+    console.error("[Lock] Erro ao criar nova sessão:", error);
     return false;
   }
 }
@@ -112,7 +115,7 @@ export function enqueueWhatsAppMessage(
   msg: IncomingPayload,
   handler: (merged: IncomingPayload) => Promise<void>,
   waitUntil?: (promise: Promise<unknown>) => void
-) {
+): Promise<void> {
   const key = normalizePhone(msg.phone);
   const existing = pending.get(key);
 
@@ -134,51 +137,49 @@ export function enqueueWhatsAppMessage(
     });
   }
 
-  // Sempre cancela o timer anterior (seja o dummy ou um real) antes de definir o novo
   const entry = pending.get(key)!;
   clearTimeout(entry.timer);
-  
-  // Função que processa a mensagem após o debounce
-  const processMessage = async () => {
-    pending.delete(key);
 
-    // Usa apenas a última mensagem recebida
-    const mergedText = entry.texts[entry.texts.length - 1]?.trim() || "";
-    if (!mergedText && !entry.buttonId && !entry.listId) {
-      return;
-    }
+  const completionPromise = new Promise<void>(async (resolve, reject) => {
+    const processMessage = async () => {
+      pending.delete(key);
 
-    // Tenta adquirir lock distribuído antes de processar
-    const lockAcquired = await acquireLock(entry.phone);
-    if (!lockAcquired) {
-      return; // Outra instância já está processando
-    }
-
-    try {
-      await handler({
-        phone: entry.phone,
-        text: mergedText || entry.buttonId || entry.listId || "",
-        pushName: entry.pushName,
-        buttonId: entry.buttonId,
-        listId: entry.listId,
-      });
-    } finally {
-      // Sempre libera o lock, mesmo em caso de erro
-      await releaseLock(entry.phone);
-    }
-  };
-  
-  // Se waitUntil estiver disponível (Vercel), usa para garantir execução após resposta
-  if (waitUntil) {
-    const promise = new Promise<void>((resolve) => {
-      entry.timer = setTimeout(async () => {
-        await processMessage();
+      const mergedText = entry.texts[entry.texts.length - 1]?.trim() || "";
+      if (!mergedText && !entry.buttonId && !entry.listId) {
         resolve();
-      }, DEBOUNCE_MS);
-    });
-    waitUntil(promise);
-  } else {
-    // Sem waitUntil: cria timer normal (ambiente local/dev)
-    entry.timer = setTimeout(processMessage, DEBOUNCE_MS);
+        return;
+      }
+
+      const lockAcquired = await acquireLock(entry.phone);
+      if (!lockAcquired) {
+        resolve();
+        return;
+      }
+
+      try {
+        await handler({
+          phone: entry.phone,
+          text: mergedText || entry.buttonId || entry.listId || "",
+          pushName: entry.pushName,
+          buttonId: entry.buttonId,
+          listId: entry.listId,
+        });
+        resolve();
+      } catch (error) {
+        reject(error);
+      } finally {
+        await releaseLock(entry.phone);
+      }
+    };
+
+    entry.timer = setTimeout(() => {
+      processMessage().catch(reject);
+    }, DEBOUNCE_MS);
+  });
+
+  if (waitUntil) {
+    waitUntil(completionPromise);
   }
+
+  return completionPromise;
 }
