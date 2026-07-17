@@ -263,8 +263,12 @@ function storeVehicle(flow: FlowState, text: string): FlowState {
 }
 
 function hasVehicleInFlow(flow: FlowState) {
-  if (flow.vehicleModel && flow.vehicleYear) return true;
-  if (flow.vehicleRaw && isValidVehicle(flow.vehicleRaw)) return true;
+  // Verifica campos estruturados (exige todos os 4)
+  if (flow.vehicleModel && flow.vehicleYear && flow.vehicleColor && flow.vehicleCondition) return true;
+  
+  // Verifica vehicleRaw APENAS se já tem cor e condição (requisito mínimo)
+  if (flow.vehicleRaw && isValidVehicle(flow.vehicleRaw) && flow.vehicleColor && flow.vehicleCondition) return true;
+  
   return false;
 }
 
@@ -1233,12 +1237,31 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
           await sendText({ number: msg.phone, text: vehicleModelNotUnderstood(prompts) });
           return;
         }
-        await saveFlow(msg.phone, {
-          ...flow,
-          vehicleModel: model,
-          vehicleCollectStep: "year",
-        });
-        await sendText({ number: msg.phone, text: etapa4AskYear(model) });
+        
+        // Verificar se o usuário já forneceu o ano junto com o modelo (ex: "Civic 2021")
+        const year = parseYearFromText(input);
+        
+        if (year) {
+          // Usuário forneceu modelo + ano juntos, pular para perguntar a cor
+          await saveFlow(msg.phone, {
+            ...flow,
+            vehicleModel: model,
+            vehicleYear: year,
+            vehicleCollectStep: "color",
+          });
+          await sendText({
+            number: msg.phone,
+            text: `Anotado: ${model} ${year} 👍\n\nQual a cor do veículo?`,
+          });
+        } else {
+          // Usuário forneceu apenas o modelo, perguntar o ano
+          await saveFlow(msg.phone, {
+            ...flow,
+            vehicleModel: model,
+            vehicleCollectStep: "year",
+          });
+          await sendText({ number: msg.phone, text: etapa4AskYear(model) });
+        }
         return;
       }
 

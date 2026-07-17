@@ -71,21 +71,26 @@ export async function resetAllExpiredSessions(): Promise<{ reset: number; checke
 
   let reset = 0;
   for (const session of sessions) {
-    const meta = (session.metadata ?? {}) as unknown as FlowState;
-    const fresh = buildFreshFlowState();
-    const alreadyFresh =
-      meta.stage === fresh.stage &&
-      meta.welcomed === fresh.welcomed &&
-      !meta.pendingWelcomeRestart &&
-      !meta.serviceKey &&
-      !meta.vehicleRaw &&
-      !meta.resumeStage;
+    try {
+      const meta = (session.metadata ?? {}) as unknown as FlowState;
+      const fresh = buildFreshFlowState();
+      const alreadyFresh =
+        meta.stage === fresh.stage &&
+        meta.welcomed === fresh.welcomed &&
+        !meta.pendingWelcomeRestart &&
+        !meta.serviceKey &&
+        !meta.vehicleRaw &&
+        !meta.resumeStage;
 
-    if (alreadyFresh) continue;
+      if (alreadyFresh) continue;
 
-    // Apenas reseta o estado interno, sem enviar mensagem
-    await saveFreshFlow(session.phone);
-    reset++;
+      // Apenas reseta o estado interno, sem enviar mensagem
+      await saveFreshFlow(session.phone);
+      reset++;
+    } catch (error) {
+      console.error(`[SessionReset] Falha ao resetar sessão ${session.id}, pulando:`, error);
+      continue; // não deixa 1 falha travar as outras sessões
+    }
   }
 
   return { reset, checked: sessions.length };

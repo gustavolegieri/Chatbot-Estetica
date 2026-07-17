@@ -43,84 +43,89 @@ export async function processAppointmentRemindersAndAutoCancel(): Promise<{
   let autoCancelled = 0;
 
   for (const apt of appointments) {
-    const startsAt = appointmentStartsAt(apt.date, apt.startTime);
-    if (startsAt <= now) continue;
+    try {
+      const startsAt = appointmentStartsAt(apt.date, apt.startTime);
+      if (startsAt <= now) continue;
 
-    // Bloqueio: evita respostas automáticas do bot
-    if (apt.client?.phone && (await isPhoneBlocked(apt.client.phone))) {
-      continue;
-    }
-
-    const minsUntil = (startsAt.getTime() - now.getTime()) / 60000;
-
-    // Custom reminders based on user preference
-    if (apt.reminderPreference) {
-      let shouldSend = false;
-      let updateData: any = {};
-
-      if (apt.reminderPreference === "30min" && !apt.reminder30minSentAt) {
-        shouldSend = minsUntil <= 35 && minsUntil >= 25;
-        updateData = { reminder30minSentAt: now };
-      } else if (apt.reminderPreference === "1hour" && !apt.reminder1hSentAt) {
-        shouldSend = minsUntil <= 65 && minsUntil >= 55;
-        updateData = { reminder1hSentAt: now };
-      } else if (apt.reminderPreference === "1day" && !apt.reminder1daySentAt) {
-        const hoursUntil = minsUntil / 60;
-        shouldSend = hoursUntil <= 25 && hoursUntil >= 23;
-        updateData = { reminder1daySentAt: now };
+      // Bloqueio: evita respostas automáticas do bot
+      if (apt.client?.phone && (await isPhoneBlocked(apt.client.phone))) {
+        continue;
       }
 
-      if (shouldSend && Object.keys(updateData).length > 0) {
-        await sendReminderCustom(apt, apt.reminderPreference);
+      const minsUntil = (startsAt.getTime() - now.getTime()) / 60000;
+
+      // Custom reminders based on user preference
+      if (apt.reminderPreference) {
+        let shouldSend = false;
+        let updateData: any = {};
+
+        if (apt.reminderPreference === "30min" && !apt.reminder30minSentAt) {
+          shouldSend = minsUntil <= 35 && minsUntil >= 25;
+          updateData = { reminder30minSentAt: now };
+        } else if (apt.reminderPreference === "1hour" && !apt.reminder1hSentAt) {
+          shouldSend = minsUntil <= 65 && minsUntil >= 55;
+          updateData = { reminder1hSentAt: now };
+        } else if (apt.reminderPreference === "1day" && !apt.reminder1daySentAt) {
+          const hoursUntil = minsUntil / 60;
+          shouldSend = hoursUntil <= 25 && hoursUntil >= 23;
+          updateData = { reminder1daySentAt: now };
+        }
+
+        if (shouldSend && Object.keys(updateData).length > 0) {
+          await sendReminderCustom(apt, apt.reminderPreference);
+          await prisma.appointment.update({
+            where: { id: apt.id },
+            data: updateData,
+          });
+          reminderCustom++;
+        }
+      }
+
+      // 4h reminder (default for everyone)
+      if (!apt.reminder4hSentAt && minsUntil <= reminder4hMin + 5 && minsUntil >= reminder4hMin - 25) {
+        await sendReminder4h(apt);
         await prisma.appointment.update({
           where: { id: apt.id },
-          data: updateData,
+          data: { reminder4hSentAt: now },
         });
-        reminderCustom++;
+        reminder4h++;
       }
-    }
 
-    // 4h reminder (default for everyone)
-    if (!apt.reminder4hSentAt && minsUntil <= reminder4hMin + 5 && minsUntil >= reminder4hMin - 25) {
-      await sendReminder4h(apt);
-      await prisma.appointment.update({
-        where: { id: apt.id },
-        data: { reminder4hSentAt: now },
-      });
-      reminder4h++;
-    }
+      // Confirm warning (30min before)
+      if (
+        !apt.clientConfirmedAt &&
+        !apt.confirmWarningSentAt &&
+        minsUntil <= reminder30minMin + 2 &&
+        minsUntil >= reminder30minMin - 2
+      ) {
+        await sendConfirmWarning(apt);
+        await prisma.appointment.update({
+          where: { id: apt.id },
+          data: { confirmWarningSentAt: now },
+        });
+        warnings++;
+      }
 
-    // Confirm warning (30min before)
-    if (
-      !apt.clientConfirmedAt &&
-      !apt.confirmWarningSentAt &&
-      minsUntil <= reminder30minMin + 2 &&
-      minsUntil >= reminder30minMin - 2
-    ) {
-      await sendConfirmWarning(apt);
-      await prisma.appointment.update({
-        where: { id: apt.id },
-        data: { confirmWarningSentAt: now },
-      });
-      warnings++;
-    }
+      // Auto cancel
+      const shouldAutoCancel =
+        !apt.clientConfirmedAt &&
+        apt.confirmWarningSentAt &&
+        now >= addMinutes(apt.confirmWarningSentAt, autoCancelMin);
 
-    // Auto cancel
-    const shouldAutoCancel =
-      !apt.clientConfirmedAt &&
-      apt.confirmWarningSentAt &&
-      now >= addMinutes(apt.confirmWarningSentAt, autoCancelMin);
-
-    if (shouldAutoCancel) {
-      await prisma.appointment.update({
-        where: { id: apt.id },
-        data: { status: AppointmentStatus.CANCELLED },
-      });
-      await sendAppointmentCancelledNotice(
-        apt,
-        "O horário foi liberado por falta de confirmação no prazo combinado."
-      );
-      autoCancelled++;
+      if (shouldAutoCancel) {
+        await prisma.appointment.update({
+          where: { id: apt.id },
+          data: { status: AppointmentStatus.CANCELLED },
+        });
+        await sendAppointmentCancelledNotice(
+          apt,
+          "O horário foi liberado por falta de confirmação no prazo combinado."
+        );
+        autoCancelled++;
+      }
+    } catch (error) {
+      console.error(`[Reminders] Falha ao processar agendamento ${apt.id}, pulando:`, error);
+      continue; // não deixa 1 falha travar os outros clientes
     }
   }
 

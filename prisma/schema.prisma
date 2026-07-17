@@ -402,18 +402,22 @@ model OutboundMessageQueue {
   id           String    @id @default(cuid())
   phone        String
   body         Json
+  bodyHash     String?   // Hash do conteúdo para deduplicação
   attempts     Int       @default(0)
   maxAttempts  Int       @default(3)
   scheduledFor DateTime  @default(now())
   processedAt  DateTime?
   error        String?
   isDailyLimit Boolean   @default(false)
+  claimedBy    String?   // UUID da execução que claimou esta mensagem (lock distribuído)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
   @@index([phone])
   @@index([scheduledFor])
   @@index([processedAt])
+  @@index([bodyHash])
+  @@index([claimedBy])
 }
 
 enum UserRole {

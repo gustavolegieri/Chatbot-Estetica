@@ -23,6 +23,7 @@ import { isValidPrivateRecipient } from "./whatsapp-jid";
 import { getMessageLogContext } from "./whatsapp-message-context";
 import { logWhatsAppMessage } from "./whatsapp-message-log";
 import { prisma } from "./prisma";
+import crypto from "crypto";
 
 const WASENDER_BASE = process.env.WASENDER_BASE_URL || "https://wasenderapi.com/api";
 
@@ -100,6 +101,23 @@ async function addToQueue(phone: string, body: object, isDailyLimit: boolean = f
     const phoneDigits = phone.replace(/\D/g, "");
     const scheduledFor = new Date(Date.now() + 35000); // 35 segundos no futuro
     
+    // Gerar hash do conteúdo para deduplicação
+    const bodyStr = JSON.stringify(body);
+    const bodyHash = crypto.createHash("md5").update(`${phoneDigits}:${bodyStr}`).digest("hex");
+    
+    // Verificar deduplicação: mensagem com mesmo hash já está na fila?
+    const existing = await prisma.outboundMessageQueue.findFirst({
+      where: {
+        bodyHash,
+        processedAt: null,
+      }
+    });
+    
+    if (existing) {
+      console.log("[WasenderAPI] ⚠️ Mensagem duplicada detectada (hash:", bodyHash, ") - não enfileirando novamente");
+      return;
+    }
+    
     // Serializar o body como JSONValue para garantir compatibilidade com Prisma Json
     const bodyJson = JSON.parse(JSON.stringify(body));
     
@@ -107,6 +125,7 @@ async function addToQueue(phone: string, body: object, isDailyLimit: boolean = f
       data: {
         phone: phoneDigits,
         body: bodyJson,
+        bodyHash,
         attempts: 0,
         maxAttempts: 3,
         scheduledFor,
@@ -114,7 +133,7 @@ async function addToQueue(phone: string, body: object, isDailyLimit: boolean = f
       }
     });
     
-    console.log("[WasenderAPI] 📥 Mensagem adicionada à fila persistente - telefone:", phone, "agendada para:", scheduledFor);
+    console.log("[WasenderAPI] 📥 Mensagem adicionada à fila persistente - telefone:", phone, "hash:", bodyHash, "agendada para:", scheduledFor);
   } catch (error) {
     console.error("[WasenderAPI] ❌ Erro ao adicionar mensagem à fila:", error);
   }

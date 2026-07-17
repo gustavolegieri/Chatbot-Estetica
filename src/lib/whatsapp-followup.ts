@@ -34,20 +34,25 @@ export async function sendIdleSessionRecoveries() {
 
   let sent = 0;
   for (const session of sessions) {
-    const meta = parseFlow(session.metadata) as FlowState & { recoverySent?: boolean };
-    if (meta.recoverySent) continue;
+    try {
+      const meta = parseFlow(session.metadata) as FlowState & { recoverySent?: boolean };
+      if (meta.recoverySent) continue;
 
-    const name =
-      resolveValidCustomerName(meta.customerName) ??
-      resolveValidCustomerName(session.client?.name);
-    await sendWelcomeFlow(session.phone, name);
-    await prisma.whatsAppSession.update({
-      where: { id: session.id },
-      data: {
-        metadata: { ...buildRecoveryMeta(meta, name), recoverySent: true },
-      },
-    });
-    sent++;
+      const name =
+        resolveValidCustomerName(meta.customerName) ??
+        resolveValidCustomerName(session.client?.name);
+      await sendWelcomeFlow(session.phone, name);
+      await prisma.whatsAppSession.update({
+        where: { id: session.id },
+        data: {
+          metadata: { ...buildRecoveryMeta(meta, name), recoverySent: true },
+        },
+      });
+      sent++;
+    } catch (error) {
+      console.error(`[Followup] Falha ao processar sessão ${session.id}, pulando:`, error);
+      continue; // não deixa 1 falha travar as outras sessões
+    }
   }
 
   return { sent, checked: sessions.length };
