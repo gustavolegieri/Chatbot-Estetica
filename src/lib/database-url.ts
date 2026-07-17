@@ -118,12 +118,11 @@ export function repairDatabaseUrl(raw?: string): string | undefined {
       url += url.includes("?") ? "&sslmode=require" : "?sslmode=require";
     }
     // Reduzir connection_limit para ambiente serverless com pooler (evita esgotamento em múltiplas instâncias)
+    // Só aplica default de 5 se não estiver especificado manualmente
     if (!url.includes("connection_limit=")) {
       url += url.includes("?") ? "&connection_limit=5" : "?connection_limit=5";
-    } else {
-      // Atualizar connection_limit se existir e for maior que 5
-      url = url.replace(/connection_limit=\d+/g, "connection_limit=5");
     }
+    // Se já estiver especificado, respeita o valor manual (não sobrescreve)
   }
 
   return url;
