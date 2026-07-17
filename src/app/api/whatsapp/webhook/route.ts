@@ -118,7 +118,7 @@ async function markMessageAsProcessed(
   text: string,
   sessionId?: string,
   clientId?: string
-): Promise<void> {
+): Promise<boolean> {
   try {
     // Cria registro com wasenderMessageId único
     // Se já existir, vai lançar erro de unique constraint
@@ -134,12 +134,15 @@ async function markMessageAsProcessed(
         flowStage: "WEBHOOK_DEDUP",
       }
     });
+    return true; // Marcado com sucesso
   } catch (error: any) {
     // Se for erro de unique constraint (P2002), significa que já foi processado
     if (error.code === 'P2002') {
       console.log("[Webhook] Mensagem já estava marcada como processada:", messageId);
+      return false; // JÁ EXISTE - retornar false para abortar
     } else {
       console.error("[Webhook] Erro ao marcar mensagem como processada:", error);
+      return true; // Outro erro, permite processamento para não bloquear
     }
   }
 }
@@ -251,7 +254,13 @@ export async function POST(req: NextRequest) {
   // Marcar mensagem como processada ANTES de processar para evitar duplicatas
   if (messageId) {
     console.log("[Webhook] Marcando mensagem como processada:", messageId);
-    await markMessageAsProcessed(messageId, phone, text || buttonId || listId || "", sessionId || undefined, clientId || undefined);
+    const marked = await markMessageAsProcessed(messageId, phone, text || buttonId || listId || "", sessionId || undefined, clientId || undefined);
+    
+    // Se já estava marcada (P2002), abortar imediatamente
+    if (!marked) {
+      console.log("[Webhook] Abortando processamento - mensagem já processada por outra instância");
+      return NextResponse.json({ ok: true });
+    }
   } else {
     console.log("[Webhook] AVISO: messageId não disponível, deduplicação pode não funcionar");
   }
