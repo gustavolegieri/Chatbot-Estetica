@@ -73,7 +73,7 @@ export function wantsRefusal(text: string): boolean {
 export function isGreetingOrSmallTalk(text: string): boolean {
   const t = text.toLowerCase().trim();
   return (
-    /^(oi|olá|ola|hey|e aí|eai|bom dia|boa tarde|boa noite|obrigad|valeu|ok|okay|blz|beleza|show|perfeito|entendi|tá|ta|sim|não|nao)$/.test(t) ||
+    /^(oi|olá|ola|hey|e aí|eai|bom dia|boa tarde|boa noite|obrigad|valeu|ok|okay|blz|beleza|show|perfeito|entendi|tá|ta)$/.test(t) ||
     /^(pera|pera ai|perai|um momento|um instante|espera|aguarda|só um segundo|só um momento|pode ser|claro|com certeza|certo|entendido|ótimo|otimo|legal|massa|combinado|fechado)$/.test(t)
   );
 }

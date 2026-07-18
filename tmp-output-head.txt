@@ -1,0 +1,220 @@
+PS C:\Users\legie\Desktop\chatbot-estetica\Chatbot-Estetica> 
+   Enviando: "bom"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'bom' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'bom' }
+[WhatsApp Bot] [1784333188761-58tcq4tea] Processando mensagem: { phone: '5511972851072', text: 'bom' }
+[WhatsApp Bot] Configurações carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Bot] Test mode active - bypassing business hours check
+[WhatsApp Flow] 💾 Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] ✅ Estado salvo com sucesso
+[WasenderAPI] ❌ Não configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: '🚘 *Confirmando os dados do veículo*\n' +
+    '\n' +
+    'Modelo: *prata*\n' +
+    'Ano: *2022*\n' +
+    'Cor: *prata*\n' +
+    'Estado: *bom*\n' +
+    '\n' +
+    'Está certo? (sim/não)'
+}
+[WasenderAPI] ⚠️ Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ✅ OK (2026-07-18T00:06:28.800Z) - Stage: ETAPA4_VEHICLE
+
+📍 Etapa #26 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "prata"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'prata' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] [1784333190161-ocee6dtjj] Processando mensagem: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] Configurações carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Bot] Test mode active - bypassing business hours check
+[WhatsApp Flow] 💾 Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] ✅ Estado salvo com sucesso
+[WasenderAPI] ❌ Não configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: *prata* 👍\n\nQual o *ano* do veículo?\n\n_Exemplo: 2021, 2019, 2018_'
+}
+[WasenderAPI] ⚠️ Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ❌ DIVERGENTE_TEXTO (2026-07-18T00:06:30.203Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+📍 Etapa #27 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "Civic 2022"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'Civic 2022' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'Civic 2022' }
+[WhatsApp Bot] [1784333191563-j53ooi89y] Processando mensagem: { phone: '5511972851072', text: 'Civic 2022' }
+[WhatsApp Bot] Configurações carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Bot] Test mode active - bypassing business hours check
+[WhatsApp Flow] 💾 Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] ✅ Estado salvo com sucesso
+[WasenderAPI] ❌ Não configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: prata 2022 👍\n\nQual a cor do veículo?'
+}
+[WasenderAPI] ⚠️ Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ❌ DIVERGENTE_TEXTO (2026-07-18T00:06:31.602Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+📍 Etapa #28 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "prata"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'prata' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] [1784333192952-w9yntoicl] Processando mensagem: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] Configurações carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Bot] Test mode active - bypassing business hours check
+[WhatsApp Flow] 💾 Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] ✅ Estado salvo com sucesso
+[WasenderAPI] ❌ Não configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: prata 2022 prata 👍\n' +
+    '\n' +
+    'Qual o estado geral do veículo? (excelente/bom/normal/ruim)'
+}
+[WasenderAPI] ⚠️ Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ❌ DIVERGENTE_TEXTO (2026-07-18T00:06:32.999Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+📍 Etapa #29 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "bom"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'bom' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'bom' }
+[WhatsApp Bot] [1784333194350-4mvzltqlk] Processando mensagem: { phone: '5511972851072', text: 'bom' }
+[WhatsApp Bot] Configurações carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Bot] Test mode active - bypassing business hours check
+[WhatsApp Flow] 💾 Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] ✅ Estado salvo com sucesso
+[WasenderAPI] ❌ Não configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: '🚘 *Confirmando os dados do veículo*\n' +
+    '\n' +
+    'Modelo: *prata*\n' +
+    'Ano: *2022*\n' +
+    'Cor: *prata*\n' +
+    'Estado: *bom*\n' +
+    '\n' +
+    'Está certo? (sim/não)'
+}
+[WasenderAPI] ⚠️ Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ✅ OK (2026-07-18T00:06:34.392Z) - Stage: ETAPA4_VEHICLE
+
+📍 Etapa #30 - Stage atual: ETAPA4_VEHICLE
+   Enviando: "prata"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'prata' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] [1784333195750-t6daynvur] Processando mensagem: { phone: '5511972851072', text: 'prata' }
+[WhatsApp Bot] Configurações carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Bot] Test mode active - bypassing business hours check
+[WhatsApp Flow] 💾 Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA4_VEHICLE', welcomed: true }
+[WhatsApp Flow] ✅ Estado salvo com sucesso
+[WasenderAPI] ❌ Não configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Anotado: *prata* 👍\n\nQual o *ano* do veículo?\n\n_Exemplo: 2021, 2019, 2018_'
+}
+[WasenderAPI] ⚠️ Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+   ❌ DIVERGENTE_TEXTO (2026-07-18T00:06:35.793Z) - Stage: ETAPA4_VEHICLE
+      Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+
+
+🔬 Testando regras cross-cutting...
+
+   Primeiro, resetando para estado conhecido (menu principal)...
+
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'Oi' }
+[Lock] Lock adquirido com sucesso (nova sessão) para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'Oi' }
+[WhatsApp Bot] [1784333197169-rd437c1fe] Processando mensagem: { phone: '5511972851072', text: 'Oi' }
+[WhatsApp Bot] Configurações carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Bot] Test mode active - bypassing business hours check
+[WhatsApp Flow] 🚀 Iniciando flow de boas-vindas
+[WhatsApp Flow] 📤 Enviando mensagem de boas-vindas
+[WasenderAPI] ❌ Não configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Olá! Seja muito bem-vindo(a) à *Garagem do Ka* 🚗✨\n' +
+    '\n' +
+    'Aqui não fazemos lavagem comum — somos especialistas em *estética automotiva premium*: serviços que cuidam, protegem e valorizam o seu veículo de verdade.\n' +
+    '\n' +
+    'O que fazemos por você:\n' +
+    '🔹 *Lavagem detalhada* — muito além de água e sabão\n' +
+    '🔹 *Polimento técnico* — riscos e opacidade eliminados\n' +
+    '🔹 *Proteção de pintura* — vitrificação e cristalização\n' +
+    '🔹 *Higienização interior* — renovação completa por dentro\n' +
+    '🔹 *Detalhamentos completos* — carro como saído da concessionária\n' +
+    '\n' +
+    '📍 Rua José de Souza Marques, 164, Jardim Esplanada\n' +
+    '🕐 Segunda a sábado, 08:00 às 18:00\n' +
+    '\n' +
+    'Para começarmos, qual é o seu *nome*? 😊'
+}
+[WasenderAPI] ⚠️ Configure WASENDER_API_KEY no .env
+[WhatsApp Flow] 💾 Salvando estado com welcomed=true
+[WhatsApp Flow] 💾 Salvando estado do fluxo: {
+  phone: '5511972851072',
+  stage: 'ETAPA1_AWAITING_NAME',
+  welcomed: true
+}
+[WhatsApp Flow] ✅ Estado salvo com sucesso
+[WhatsApp Flow] ✅ Flow de boas-vindas concluído
+[Lock] Lock liberado para 5511972851072
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'João' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'João' }
+[WhatsApp Bot] [1784333199135-215ujo84v] Processando mensagem: { phone: '5511972851072', text: 'João' }
+[WhatsApp Bot] Configurações carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511972851072
+[WhatsApp Bot] Test mode active - bypassing business hours check
+[WhatsApp Flow] 💾 Salvando estado do fluxo: { phone: '5511972851072', stage: 'ETAPA2_MAIN_MENU', welcomed: true }
+[WhatsApp Flow] ✅ Estado salvo com sucesso
+[WasenderAPI] ❌ Não configurada - mensagem simulada: {
+  to: '+5511972851072',
+  text: 'Que bom te ter aqui, *João*! 😊\n' +
+    '\n' +
+    'O que seu carro precisa hoje?\n' +
+    '\n' +
+    '*1* 💧 Lavagem\n' +
+    '*2* ✨ Polimento\n' +
+    '*3* 🛡️ Proteção & Brilho\n' +
+    '*4* 🪑 Interior\n' +
+    '*5* 🔬 Detalhes Especiais\n' +
+    '*6* 🔄 Revitalização\n' +
+    '*7* 📦 Pacotes Premium\n' +
+    '*8* 🤔 Ajuda na escolha\n' +
+    '*9* 👤 Falar com atendente'
+}
+[WasenderAPI] ⚠️ Configure WASENDER_API_KEY no .env
+[Lock] Lock liberado para 5511972851072
+
+📍 Testando: CROSS-CUTTING 1 - Small talk
+   Descrição: Small talk "pera aí" deve reimprimir menu sem avançar
+   Enviando: "pera aí"
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511972851072', text: 'pera aí' }
+[Lock] Lock adquirido com sucesso para 5511972851072
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511972851072', text: 'pera aí' }
+[WhatsApp Bot] [1784333200932-bhop7wowh] Processando mensagem: { phone: '5511972851072', text: 'pera aí' }
+[WhatsApp Bot] Configurações carregadas: { whatsappEnabled: true, testModeEnabled: false, testModePhone: null }

@@ -179,8 +179,19 @@ async function handleMessageInternal(msg: IncomingMessage) {
       }
 
       const businessStatus = settings ? getBusinessHoursStatus(settings) : { isOpen: true };
-      
-      if (settings && !businessStatus.isOpen) {
+      const normalizedPhone = msg.phone.replace(/\D/g, "");
+      const envTestMode = process.env.TEST_MODE === "true";
+      const settingsTestModeAuthorized =
+        settings?.testModeEnabled &&
+        !!settings.testModePhone &&
+        normalizedPhone === settings.testModePhone.replace(/\D/g, "");
+      const bypassBusinessHours = envTestMode || settingsTestModeAuthorized;
+
+      if (bypassBusinessHours) {
+        console.log("[WhatsApp Bot] Test mode active - bypassing business hours check");
+      }
+
+      if (settings && !businessStatus.isOpen && !bypassBusinessHours) {
         const name =
           resolveValidCustomerName(flowRef.current.customerName) ??
           resolveValidCustomerName(session.client?.name) ??

@@ -356,8 +356,8 @@ export function etapa4AskYear(model: string, prompts?: PromptMap) {
   return renderPrompt(p(prompts), "etapa4_ask_year", { model });
 }
 
-export function etapa4VehicleConfirmation(model: string, year: string) {
-  return `🚘 *Confirmando os dados do veículo*\n\nModelo: *${model || "—"}*\nAno: *${year || "—"}*\n\nEstá certo? (sim/não)`;
+export function etapa4VehicleConfirmation(model: string, year: string, color: string, condition: string) {
+  return `🚘 *Confirmando os dados do veículo*\n\nModelo: *${model || "—"}*\nAno: *${year || "—"}*\nCor: *${color || "—"}*\nEstado: *${condition || "—"}*\n\nEstá certo? (sim/não)`;
 }
 
 export function vehicleModelNotUnderstood(prompts?: PromptMap) {

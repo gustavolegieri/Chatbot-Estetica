@@ -1,0 +1,653 @@
+
+================================================================================
+RELATÓRIO DE TESTE DO FLUXO COMPLETO (STATEFUL)
+================================================================================
+
+Total de etapas testadas: 28
+✅ OK: 5
+⚠️ DESVIO DE ROTA: 15
+❌ DIVERGENTE_TEXTO: 7
+🔴 ERRO: 0
+🔄 LOOP DETECTADO: 1
+
+--------------------------------------------------------------------------------
+DETALHAMENTO POR ETAPA
+--------------------------------------------------------------------------------
+
+ETAPA: #1
+Status: DIVERGENTE_TEXTO
+Stage esperado: N/A
+Stage recebido: ETAPA1_AWAITING_NAME
+Timestamp: 2026-07-18T00:14:20.621Z
+Esperado: O que você precisa
+Recebido: Olá! Seja muito bem-vindo(a) à *Garagem do Ka* 🚗✨
+
+Aqui não fazemos lavagem comum — somos especialistas em *estética automotiva premium*: serviços que cuidam, protegem e valorizam o seu veículo de verdade.
+
+O que fazemos por você:
+🔹 *Lavagem detalhada* — muito além de água e sabão
+🔹 *Polimento técnico* — riscos e opacidade eliminados
+🔹 *Proteção de pintura* — vitrificação e cristalização
+🔹 *Higienização interior* — renovação completa por dentro
+🔹 *Detalhamentos completos* — carro como saído da concessionária
+
+📍 Rua José de Souza Marques, 164, Jardim Esplanada
+🕐 Segunda a sábado, 08:00 às 18:00
+
+Para começarmos, qual é o seu *nome*? 😊
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "olá seja muito bemvindoa à garagem do ka  aqui não fazemos lavagem comum  somos especialistas em estética automotiva premium serviços que cuidam protegem e valorizam o seu veículo de verdade o que fazemos por você  lavagem detalhada  muito além de água e sabão  polimento técnico  riscos e opacidade eliminados  proteção de pintura  vitrificação e cristalização  higienização interior  renovação completa por dentro  detalhamentos completos  carro como saído da concessionária  rua josé de souza marques 164 jardim esplanada  segunda a sábado 0800 às 1800 para começarmos qual é o seu nome "
+
+ETAPA: #2
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA1_AWAITING_NAME
+Stage recebido: ETAPA1_AWAITING_NAME
+Timestamp: 2026-07-18T00:14:23.292Z
+Esperado: O que você precisa
+Recebido: Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "que bom te ter aqui joão  o que seu carro precisa hoje 1  lavagem 2  polimento 3  proteção  brilho 4  interior 5  detalhes especiais 6  revitalização 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+ETAPA: #3
+Status: DESVIO_ROTA
+Stage esperado: ETAPA1_AWAITING_NAME
+Stage recebido: ETAPA2_MAIN_MENU
+Timestamp: 2026-07-18T00:14:24.708Z
+Esperado: O que você precisa
+Recebido: *Lavagem* — qual opção?
+
+*1* — Lavagem Simples
+*2* — Lavagem Completa
+*3* — Lavagem Detalhada
+
+*0* — Voltar ao menu principal
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "lavagem  qual opção 1  lavagem simples 2  lavagem completa 3  lavagem detalhada 0  voltar ao menu principal"
+
+ETAPA: #4
+Status: DESVIO_ROTA
+Stage esperado: ETAPA2_MAIN_MENU
+Stage recebido: ETAPA2_SUB
+Timestamp: 2026-07-18T00:14:26.615Z
+Esperado: qual opção
+Recebido: 💧 *Lavagem Simples*
+
+_Manutenção regular com cuidado e acabamento que faz diferença._
+
+✨ *O que inclui:*
+• Pré-lavagem com espuma ativa que solta a sujeira
+• Lavagem externa manual, segura para a pintura
+• Secagem completa com microfibra premium
+• Finalização dos pneus com pretinho
+• Aspiração e limpeza interna básica
+
+⏱️ 60 min
+💰 *R$ 55*
+
+O que você quer fazer?
+
+*1* 📅 Quero agendar
+*2* 🔄 Ver outros serviços
+*3* 💬 Tenho uma dúvida
+Diff:
+Esperava conter: "qual opção"
+Recebeu: " lavagem simples _manutenção regular com cuidado e acabamento que faz diferença_  o que inclui  prélavagem com espuma ativa que solta a sujeira  lavagem externa manual segura para a pintura  secagem completa com microfibra premium  finalização dos pneus com pretinho  aspiração e limpeza interna básica  60 min  r 55 o que você quer fazer 1  quero agendar 2  ver outros serviços 3  tenho uma dúvida"
+
+ETAPA: #5
+Status: DESVIO_ROTA
+Stage esperado: ETAPA2_SUB
+Stage recebido: ETAPA3_SERVICE_ACTION
+Timestamp: 2026-07-18T00:14:28.042Z
+Esperado: Quero agendar
+Recebido: Qual é o *modelo* do seu veículo? 🚗
+
+_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_
+
+_Ou envie modelo e ano juntos: *Civic 2021*_
+Diff:
+Esperava conter: "quero agendar"
+Recebeu: "qual é o modelo do seu veículo  _exemplos civic corolla hilux onix compass hb20_ _ou envie modelo e ano juntos civic 2021_"
+
+ETAPA: #6
+Status: DESVIO_ROTA
+Stage esperado: ETAPA3_SERVICE_ACTION
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-18T00:14:29.454Z
+Esperado: Confirmando os dados,Qual o ano do veículo,Qual a cor do veículo,Qual o estado geral do veículo
+Recebido: Não identifiquei o modelo 😅
+
+Envie só o *modelo* do carro (marca/modelo):
+_Ex: Civic, Fiat Argo, Hilux SW4_
+Diff:
+Similaridade: 0%
+Palavras esperadas: confirmando, dados
+Palavras encontradas: 
+---
+Similaridade: 0%
+Palavras esperadas: qual, veículo
+Palavras encontradas: 
+---
+Similaridade: 0%
+Palavras esperadas: qual, veículo
+Palavras encontradas: 
+---
+Similaridade: 0%
+Palavras esperadas: qual, estado, geral, veículo
+Palavras encontradas: 
+
+ETAPA: #7
+Status: OK
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-18T00:14:30.874Z
+Esperado: Confirmando os dados,Qual o ano do veículo,Qual a cor do veículo,Qual o estado geral do veículo
+Recebido: Anotado: Civic 2022 👍
+
+Qual a cor do veículo?
+
+ETAPA: #8
+Status: OK
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-18T00:14:32.333Z
+Esperado: Confirmando os dados,Qual o ano do veículo,Qual a cor do veículo,Qual o estado geral do veículo
+Recebido: Anotado: Civic 2022 prata 👍
+
+Qual o estado geral do veículo? (excelente/bom/normal/ruim)
+
+ETAPA: #9
+Status: OK
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA4_VEHICLE
+Timestamp: 2026-07-18T00:14:33.753Z
+Esperado: Confirmando os dados,Qual o ano do veículo,Qual a cor do veículo,Qual o estado geral do veículo
+Recebido: 🚘 *Confirmando os dados do veículo*
+
+Modelo: *Civic*
+Ano: *2022*
+Cor: *prata*
+Estado: *bom*
+
+Está certo? (sim/não)
+
+ETAPA: #10
+Status: DESVIO_ROTA
+Stage esperado: ETAPA4_VEHICLE
+Stage recebido: ETAPA5_QUOTE
+Timestamp: 2026-07-18T00:14:35.171Z
+Esperado: Bônus
+Recebido: Aqui está o orçamento para você, *João*:
+
+━━━━━━━━━━━━━━━━━━━━
+🚗 *Veículo:* Civic 2022
+🔧 *Serviço:* Lavagem Simples
+━━━━━━━━━━━━━━━━━━━━
+✨ Ideal para manutenção rápida do veículo.
+
+💰 *R$ 55 a R$ 55*
+⏱️ *Tempo estimado:* 60 min
+
+_O valor exato confirmamos na avaliação presencial — às vezes o carro surpreende para melhor ou para pior 😊_
+
+O que você quer fazer?
+
+*1* 📅 Agendar agora
+*2* 🔄 Ver outro serviço
+*3* 💬 Tenho dúvidas antes
+Diff:
+Esperava conter: "bônus"
+Recebeu: "aqui está o orçamento para você joão   veículo civic 2022  serviço lavagem simples   ideal para manutenção rápida do veículo  r 55 a r 55  tempo estimado 60 min _o valor exato confirmamos na avaliação presencial  às vezes o carro surpreende para melhor ou para pior _ o que você quer fazer 1  agendar agora 2  ver outro serviço 3  tenho dúvidas antes"
+
+ETAPA: #11
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA5_QUOTE
+Stage recebido: ETAPA5_QUOTE
+Timestamp: 2026-07-18T00:14:36.574Z
+Esperado: Bônus
+Recebido: Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Diff:
+Esperava conter: "bônus"
+Recebeu: "que bom te ter aqui joão  o que seu carro precisa hoje 1  lavagem 2  polimento 3  proteção  brilho 4  interior 5  detalhes especiais 6  revitalização 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+ETAPA: #12
+Status: DESVIO_ROTA
+Stage esperado: ETAPA5_QUOTE
+Stage recebido: ETAPA2_MAIN_MENU
+Timestamp: 2026-07-18T00:14:37.971Z
+Esperado: O que você precisa
+Recebido: *Lavagem* — qual opção?
+
+*1* — Lavagem Simples
+*2* — Lavagem Completa
+*3* — Lavagem Detalhada
+
+*0* — Voltar ao menu principal
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "lavagem  qual opção 1  lavagem simples 2  lavagem completa 3  lavagem detalhada 0  voltar ao menu principal"
+
+ETAPA: #13
+Status: DESVIO_ROTA
+Stage esperado: ETAPA2_MAIN_MENU
+Stage recebido: ETAPA2_SUB
+Timestamp: 2026-07-18T00:14:39.905Z
+Esperado: qual opção
+Recebido: 💧 *Lavagem Simples*
+
+_Manutenção regular com cuidado e acabamento que faz diferença._
+
+✨ *O que inclui:*
+• Pré-lavagem com espuma ativa que solta a sujeira
+• Lavagem externa manual, segura para a pintura
+• Secagem completa com microfibra premium
+• Finalização dos pneus com pretinho
+• Aspiração e limpeza interna básica
+
+⏱️ 60 min
+💰 *R$ 55*
+
+O que você quer fazer?
+
+*1* 📅 Quero agendar
+*2* 🔄 Ver outros serviços
+*3* 💬 Tenho uma dúvida
+Diff:
+Esperava conter: "qual opção"
+Recebeu: " lavagem simples _manutenção regular com cuidado e acabamento que faz diferença_  o que inclui  prélavagem com espuma ativa que solta a sujeira  lavagem externa manual segura para a pintura  secagem completa com microfibra premium  finalização dos pneus com pretinho  aspiração e limpeza interna básica  60 min  r 55 o que você quer fazer 1  quero agendar 2  ver outros serviços 3  tenho uma dúvida"
+
+ETAPA: #14
+Status: DESVIO_ROTA
+Stage esperado: ETAPA2_SUB
+Stage recebido: ETAPA5_QUOTE
+Timestamp: 2026-07-18T00:14:41.306Z
+Esperado: Bônus
+Recebido: Aqui está o orçamento para você, *João*:
+
+━━━━━━━━━━━━━━━━━━━━
+🚗 *Veículo:* Civic 2022
+🔧 *Serviço:* Lavagem Simples
+━━━━━━━━━━━━━━━━━━━━
+✨ Ideal para manutenção rápida do veículo.
+
+💰 *R$ 55 a R$ 55*
+⏱️ *Tempo estimado:* 60 min
+
+_O valor exato confirmamos na avaliação presencial — às vezes o carro surpreende para melhor ou para pior 😊_
+
+O que você quer fazer?
+
+*1* 📅 Agendar agora
+*2* 🔄 Ver outro serviço
+*3* 💬 Tenho dúvidas antes
+Diff:
+Esperava conter: "bônus"
+Recebeu: "aqui está o orçamento para você joão   veículo civic 2022  serviço lavagem simples   ideal para manutenção rápida do veículo  r 55 a r 55  tempo estimado 60 min _o valor exato confirmamos na avaliação presencial  às vezes o carro surpreende para melhor ou para pior _ o que você quer fazer 1  agendar agora 2  ver outro serviço 3  tenho dúvidas antes"
+
+ETAPA: #15
+Status: DESVIO_ROTA
+Stage esperado: ETAPA5_QUOTE
+Stage recebido: ETAPA7_DAY
+Timestamp: 2026-07-18T00:14:44.393Z
+Esperado: calendário
+Recebido: 
+📅 *Escolha o dia*
+
+Toque na lista acima para ver os dias disponíveis ou
+digite o número do dia desejado (ex: 16 para dia 16).
+
+✅ Legenda:
+🟢 Mais disponível  🟡 Médio  🔴 Mais movimentado
+🚫 Domingos: fechado
+📍 Hoje: destacado em azul
+
+💬 *Digite o número do dia* (ex: 16)
+🔙 *0* para voltar ao menu
+Diff:
+Esperava conter: "calendário"
+Recebeu: " escolha o dia toque na lista acima para ver os dias disponíveis ou digite o número do dia desejado ex 16 para dia 16  legenda  mais disponível  médio  mais movimentado  domingos fechado  hoje destacado em azul  digite o número do dia ex 16  0 para voltar ao menu"
+
+ETAPA: #16
+Status: DESVIO_ROTA
+Stage esperado: ETAPA7_DAY
+Stage recebido: ETAPA7_TIME
+Timestamp: 2026-07-18T00:14:45.803Z
+Esperado: horários disponíveis
+Recebido: Horários disponíveis em *Segunda-feira*:
+
+_Seu serviço leva ~*1h* — esse intervalo fica bloqueado na agenda._
+
+*1* — 08:00
+*2* — 09:00
+*3* — 10:00
+*4* — 11:00
+*5* — 12:00
+*6* — 13:00
+*7* — 14:00
+*8* — 15:00
+*9* — 16:00
+*10* — 17:00
+
+_Ou digite o horário, ex: *09:00*_
+Diff:
+Esperava stage: ETAPA7_DAY, recebeu: ETAPA7_TIME
+
+ETAPA: #17
+Status: DESVIO_ROTA
+Stage esperado: ETAPA7_TIME
+Stage recebido: ETAPA9_COUPON
+Timestamp: 2026-07-18T00:14:47.215Z
+Esperado: cupom
+Recebido: Você tem um cupom de desconto?
+
+Se sim, me envie o código agora.
+Se não, responda *não* para seguir para os pontos de fidelidade.
+Diff:
+Esperava stage: ETAPA7_TIME, recebeu: ETAPA9_COUPON
+
+ETAPA: #18
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA9_COUPON
+Stage recebido: ETAPA9_COUPON
+Timestamp: 2026-07-18T00:14:48.615Z
+Esperado: cupom
+Recebido: Você tem *0* pontos de fidelidade! 🎁
+
+Pode usar para ganhar *R$ 0,00* de desconto.
+
+*1* ✅ Usar pontos
+*2* ❌ Não usar pontos
+Diff:
+Esperava conter: "cupom"
+Recebeu: "você tem 0 pontos de fidelidade  pode usar para ganhar r 000 de desconto 1  usar pontos 2  não usar pontos"
+
+ETAPA: #19
+Status: DESVIO_ROTA
+Stage esperado: ETAPA9_COUPON
+Stage recebido: ETAPA9_LOYALTY
+Timestamp: 2026-07-18T00:14:51.033Z
+Esperado: pontos
+Recebido: ━━━━━━━━━━━━━━━
+📋 **Seu orçamento**
+━━━━━━━━━━━━━━━
+💰 **Valor total: R$ 55,00**
+━━━━━━━━━━━━━━━
+
+Vamos confirmar o agendamento?
+
+*1* ✅ Sim, confirmar
+*2* ❌ Não, voltar ao menu
+Diff:
+Esperava conter: "pontos"
+Recebeu: "  seu orçamento   valor total r 5500  vamos confirmar o agendamento 1  sim confirmar 2  não voltar ao menu"
+
+ETAPA: #20
+Status: DESVIO_ROTA
+Stage esperado: ETAPA9_LOYALTY
+Stage recebido: ETAPA10_LOGISTICS
+Timestamp: 2026-07-18T00:14:53.005Z
+Esperado: Como prefere
+Recebido: 🚚 Como prefere?
+
+*1* - Deixe eu levo o carro até a estética
+*2* - A estética vai buscar o carro
+Diff:
+Esperava stage: ETAPA9_LOYALTY, recebeu: ETAPA10_LOGISTICS
+
+ETAPA: #21
+Status: DIVERGENTE_TEXTO
+Stage esperado: ETAPA10_LOGISTICS
+Stage recebido: ETAPA10_LOGISTICS
+Timestamp: 2026-07-18T00:14:54.431Z
+Esperado: Como prefere
+Recebido: 📍 Combinado! Você pode levar o carro até a loja quando puder.
+Diff:
+Esperava conter: "como prefere"
+Recebeu: " combinado você pode levar o carro até a loja quando puder"
+
+ETAPA: #22
+Status: DESVIO_ROTA
+Stage esperado: ETAPA10_LOGISTICS
+Stage recebido: ETAPA8_PIX_CHOICE
+Timestamp: 2026-07-18T00:14:56.348Z
+Esperado: PIX
+Recebido: 💸 Como você prefere pagar via PIX?
+
+1 PIX (Pagar agora)
+2 PIX (Pagar na entrega)
+Diff:
+Esperava stage: ETAPA10_LOGISTICS, recebeu: ETAPA8_PIX_CHOICE
+
+ETAPA: #23
+Status: OK
+Stage esperado: ETAPA8_PIX_CHOICE
+Stage recebido: ETAPA8_PIX_CHOICE
+Timestamp: 2026-07-18T00:14:58.817Z
+Esperado: PIX
+Recebido: 📸 *Por favor, envie o comprovante de pagamento*
+
+Valor a ser pago: *R$ 55,00*
+
+Você pode enviar uma foto ou print do comprovante PIX.
+
+ETAPA: #24
+Status: DESVIO_ROTA
+Stage esperado: ETAPA8_PIX_CHOICE
+Stage recebido: ETAPA8_RECEIPT_UPLOAD
+Timestamp: 2026-07-18T00:15:00.734Z
+Esperado: (não definido)
+Recebido: 📸 *Por favor, envie o comprovante de pagamento*
+
+Valor a ser pago: *R$ 55,00*
+
+Você pode enviar uma foto ou print do comprovante PIX.
+Diff:
+Esperava stage: ETAPA8_PIX_CHOICE, recebeu: ETAPA8_RECEIPT_UPLOAD
+
+ETAPA: #25
+Status: OK
+Stage esperado: N/A
+Stage recebido: ETAPA8_RECEIPT_UPLOAD
+Timestamp: 2026-07-18T00:15:02.632Z
+Esperado: (não definido)
+Recebido: 📸 *Por favor, envie o comprovante de pagamento*
+
+Valor a ser pago: *R$ 55,00*
+
+Você pode enviar uma foto ou print do comprovante PIX.
+
+ETAPA: #26
+Status: LOOP_DETECTADO
+Stage esperado: N/A
+Stage recebido: ETAPA8_RECEIPT_UPLOAD
+Timestamp: 2026-07-18T00:15:04.531Z
+Esperado: 1
+Recebido: 📸 *Por favor, envie o comprovante de pagamento*
+
+Valor a ser pago: *R$ 55,00*
+
+Você pode enviar uma foto ou print do comprovante PIX.
+Diff:
+Loop detectado: stage ETAPA8_RECEIPT_UPLOAD repetiu 3 vezes com mesmo texto (travado)
+
+ETAPA: CROSS-CUTTING 1 - Small talk
+Status: DIVERGENTE_TEXTO
+Stage esperado: N/A
+Stage recebido: ETAPA2_MAIN_MENU
+Timestamp: 2026-07-18T00:15:09.684Z
+Esperado: Menu reimpresso (contém: O que você precisa...)
+Recebido: Ops, essa opção não existe 😅
+
+Escolhe uma dessas:
+
+Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "ops essa opção não existe  escolhe uma dessas que bom te ter aqui joão  o que seu carro precisa hoje 1  lavagem 2  polimento 3  proteção  brilho 4  interior 5  detalhes especiais 6  revitalização 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+ETAPA: CROSS-CUTTING 2 - Pergunta
+Status: DIVERGENTE_TEXTO
+Stage esperado: N/A
+Stage recebido: ETAPA2_MAIN_MENU
+Timestamp: 2026-07-18T00:15:11.466Z
+Esperado: Menu reimpresso (contém: O que você precisa...)
+Recebido: O *valor* depende do serviço escolhido, do modelo e do estado do seu carro. 🚗  
+Para um orçamento exato, precisamos de alguns detalhes do veículo.  
+Se preferir, digite *falar com o dono* que ele te ajuda direto.
+
+Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "o valor depende do serviço escolhido do modelo e do estado do seu carro  para um orçamento exato precisamos de alguns detalhes do veículo se preferir digite falar com o dono que ele te ajuda direto que bom te ter aqui joão  o que seu carro precisa hoje 1  lavagem 2  polimento 3  proteção  brilho 4  interior 5  detalhes especiais 6  revitalização 7  pacotes premium 8  ajuda na escolha 9  falar com atendente"
+
+================================================================================
+
+
+
+================================================================================
+DUMP BRUTO DAS MENSAGENS (BANCO DE DADOS)
+================================================================================
+
+Total de mensagens: 8
+
+2026-07-18T00:15:05.926Z | INBOUND | CLIENT
+Texto: Oi
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-18T00:15:05.950Z | OUTBOUND | BOT
+Texto: Olá! Seja muito bem-vindo(a) à *Garagem do Ka* 🚗✨
+
+Aqui não fazemos lavagem comum — somos especialistas em *estética automotiva premium*: serviços que cuidam, protegem e valorizam o seu veículo de verdade.
+
+O que fazemos por você:
+🔹 *Lavagem detalhada* — muito além de água e sabão
+🔹 *Polimento técnico* — riscos e opacidade eliminados
+🔹 *Proteção de pintura* — vitrificação e cristalização
+🔹 *Higienização interior* — renovação completa por dentro
+🔹 *Detalhamentos completos* — carro como saído da concessionária
+
+📍 Rua José de Souza Marques, 164, Jardim Esplanada
+🕐 Segunda a sábado, 08:00 às 18:00
+
+Para começarmos, qual é o seu *nome*? 😊
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-18T00:15:07.891Z | INBOUND | CLIENT
+Texto: João
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-18T00:15:08.301Z | OUTBOUND | BOT
+Texto: Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-18T00:15:09.660Z | INBOUND | CLIENT
+Texto: pera aí
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+2026-07-18T00:15:09.684Z | OUTBOUND | BOT
+Texto: Ops, essa opção não existe 😅
+
+Escolhe uma dessas:
+
+Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+2026-07-18T00:15:11.043Z | INBOUND | CLIENT
+Texto: quanto custa?
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+2026-07-18T00:15:11.466Z | OUTBOUND | BOT
+Texto: O *valor* depende do serviço escolhido, do modelo e do estado do seu carro. 🚗  
+Para um orçamento exato, precisamos de alguns detalhes do veículo.  
+Se preferir, digite *falar com o dono* que ele te ajuda direto.
+
+Que bom te ter aqui, *João*! 😊
+
+O que seu carro precisa hoje?
+
+*1* 💧 Lavagem
+*2* ✨ Polimento
+*3* 🛡️ Proteção & Brilho
+*4* 🪑 Interior
+*5* 🔬 Detalhes Especiais
+*6* 🔄 Revitalização
+*7* 📦 Pacotes Premium
+*8* 🤔 Ajuda na escolha
+*9* 👤 Falar com atendente
+Stage: ETAPA2_MAIN_MENU
+--------------------------------------------------------------------------------
+================================================================================

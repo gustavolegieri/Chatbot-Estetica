@@ -1,0 +1,206 @@
+
+================================================================================
+RELATÓRIO DE TESTE DO FLUXO COMPLETO (STATEFUL)
+================================================================================
+
+Total de etapas testadas: 5
+✅ OK: 2
+⚠️ DESVIO DE ROTA: 0
+❌ DIVERGENTE_TEXTO: 2
+🔴 ERRO: 0
+🔄 LOOP DETECTADO: 1
+
+--------------------------------------------------------------------------------
+DETALHAMENTO POR ETAPA
+--------------------------------------------------------------------------------
+
+ETAPA: #1
+Status: OK
+Stage esperado: N/A
+Stage recebido: AFTER_HOURS
+Timestamp: 2026-07-17T23:57:00.078Z
+Esperado: (não definido)
+Recebido: Olá, *Teste*! 👋
+
+🌙 *Já encerramos por hoje*
+
+Nosso expediente hoje foi até *18:00*.
+
+Muito obrigado por entrar em contato com a *Garagem do Ka* — sua mensagem é muito importante pra gente 💙
+
+📅 *Nosso horário:*
+Segunda a sábado, 08:00 às 18:00
+
+_Assim que estivermos abertos, nossa equipe retoma o atendimento. Até breve!_ 🚗✨
+
+ETAPA: #2
+Status: OK
+Stage esperado: N/A
+Stage recebido: AFTER_HOURS
+Timestamp: 2026-07-17T23:57:01.513Z
+Esperado: (não definido)
+Recebido: Olá, *Teste*! 👋
+
+🌙 *Já encerramos por hoje*
+
+Nosso expediente hoje foi até *18:00*.
+
+Muito obrigado por entrar em contato com a *Garagem do Ka* — sua mensagem é muito importante pra gente 💙
+
+📅 *Nosso horário:*
+Segunda a sábado, 08:00 às 18:00
+
+_Assim que estivermos abertos, nossa equipe retoma o atendimento. Até breve!_ 🚗✨
+
+ETAPA: #3
+Status: LOOP_DETECTADO
+Stage esperado: N/A
+Stage recebido: AFTER_HOURS
+Timestamp: 2026-07-17T23:57:02.903Z
+Esperado: 1
+Recebido: Olá, *Teste*! 👋
+
+🌙 *Já encerramos por hoje*
+
+Nosso expediente hoje foi até *18:00*.
+
+Muito obrigado por entrar em contato com a *Garagem do Ka* — sua mensagem é muito importante pra gente 💙
+
+📅 *Nosso horário:*
+Segunda a sábado, 08:00 às 18:00
+
+_Assim que estivermos abertos, nossa equipe retoma o atendimento. Até breve!_ 🚗✨
+Diff:
+Loop detectado: stage AFTER_HOURS repetiu 3 vezes com mesmo texto (travado)
+
+ETAPA: CROSS-CUTTING 1 - Small talk
+Status: DIVERGENTE_TEXTO
+Stage esperado: N/A
+Stage recebido: AFTER_HOURS
+Timestamp: 2026-07-17T23:57:06.562Z
+Esperado: Menu reimpresso (contém: O que você precisa...)
+Recebido: Olá, *Teste*! 👋
+
+🌙 *Já encerramos por hoje*
+
+Nosso expediente hoje foi até *18:00*.
+
+Muito obrigado por entrar em contato com a *Garagem do Ka* — sua mensagem é muito importante pra gente 💙
+
+📅 *Nosso horário:*
+Segunda a sábado, 08:00 às 18:00
+
+_Assim que estivermos abertos, nossa equipe retoma o atendimento. Até breve!_ 🚗✨
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "olá teste   já encerramos por hoje nosso expediente hoje foi até 1800 muito obrigado por entrar em contato com a garagem do ka  sua mensagem é muito importante pra gente   nosso horário segunda a sábado 0800 às 1800 _assim que estivermos abertos nossa equipe retoma o atendimento até breve_ "
+
+ETAPA: CROSS-CUTTING 2 - Pergunta
+Status: DIVERGENTE_TEXTO
+Stage esperado: N/A
+Stage recebido: AFTER_HOURS
+Timestamp: 2026-07-17T23:57:07.945Z
+Esperado: Menu reimpresso (contém: O que você precisa...)
+Recebido: Olá, *Teste*! 👋
+
+🌙 *Já encerramos por hoje*
+
+Nosso expediente hoje foi até *18:00*.
+
+Muito obrigado por entrar em contato com a *Garagem do Ka* — sua mensagem é muito importante pra gente 💙
+
+📅 *Nosso horário:*
+Segunda a sábado, 08:00 às 18:00
+
+_Assim que estivermos abertos, nossa equipe retoma o atendimento. Até breve!_ 🚗✨
+Diff:
+Esperava conter: "o que você precisa"
+Recebeu: "olá teste   já encerramos por hoje nosso expediente hoje foi até 1800 muito obrigado por entrar em contato com a garagem do ka  sua mensagem é muito importante pra gente   nosso horário segunda a sábado 0800 às 1800 _assim que estivermos abertos nossa equipe retoma o atendimento até breve_ "
+
+================================================================================
+
+
+
+================================================================================
+DUMP BRUTO DAS MENSAGENS (BANCO DE DADOS)
+================================================================================
+
+Total de mensagens: 8
+
+2026-07-17T23:57:03.796Z | INBOUND | CLIENT
+Texto: Oi
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T23:57:03.812Z | OUTBOUND | BOT
+Texto: Olá, *Teste*! 👋
+
+🌙 *Já encerramos por hoje*
+
+Nosso expediente hoje foi até *18:00*.
+
+Muito obrigado por entrar em contato com a *Garagem do Ka* — sua mensagem é muito importante pra gente 💙
+
+📅 *Nosso horário:*
+Segunda a sábado, 08:00 às 18:00
+
+_Assim que estivermos abertos, nossa equipe retoma o atendimento. Até breve!_ 🚗✨
+Stage: AFTER_HOURS
+--------------------------------------------------------------------------------
+2026-07-17T23:57:05.170Z | INBOUND | CLIENT
+Texto: João
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T23:57:05.188Z | OUTBOUND | BOT
+Texto: Olá, *Teste*! 👋
+
+🌙 *Já encerramos por hoje*
+
+Nosso expediente hoje foi até *18:00*.
+
+Muito obrigado por entrar em contato com a *Garagem do Ka* — sua mensagem é muito importante pra gente 💙
+
+📅 *Nosso horário:*
+Segunda a sábado, 08:00 às 18:00
+
+_Assim que estivermos abertos, nossa equipe retoma o atendimento. Até breve!_ 🚗✨
+Stage: AFTER_HOURS
+--------------------------------------------------------------------------------
+2026-07-17T23:57:06.547Z | INBOUND | CLIENT
+Texto: pera aí
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T23:57:06.562Z | OUTBOUND | BOT
+Texto: Olá, *Teste*! 👋
+
+🌙 *Já encerramos por hoje*
+
+Nosso expediente hoje foi até *18:00*.
+
+Muito obrigado por entrar em contato com a *Garagem do Ka* — sua mensagem é muito importante pra gente 💙
+
+📅 *Nosso horário:*
+Segunda a sábado, 08:00 às 18:00
+
+_Assim que estivermos abertos, nossa equipe retoma o atendimento. Até breve!_ 🚗✨
+Stage: AFTER_HOURS
+--------------------------------------------------------------------------------
+2026-07-17T23:57:07.929Z | INBOUND | CLIENT
+Texto: quanto custa?
+Stage: ETAPA1_AWAITING_NAME
+--------------------------------------------------------------------------------
+2026-07-17T23:57:07.945Z | OUTBOUND | BOT
+Texto: Olá, *Teste*! 👋
+
+🌙 *Já encerramos por hoje*
+
+Nosso expediente hoje foi até *18:00*.
+
+Muito obrigado por entrar em contato com a *Garagem do Ka* — sua mensagem é muito importante pra gente 💙
+
+📅 *Nosso horário:*
+Segunda a sábado, 08:00 às 18:00
+
+_Assim que estivermos abertos, nossa equipe retoma o atendimento. Até breve!_ 🚗✨
+Stage: AFTER_HOURS
+--------------------------------------------------------------------------------
+================================================================================

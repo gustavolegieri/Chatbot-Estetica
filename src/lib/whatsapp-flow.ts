@@ -1206,25 +1206,49 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     }
 
     case "ETAPA4_VEHICLE": {
-      // Verificar se é uma resposta de confirmação (sim/não) - usar match mais estrito
       const confirmAnswer = input.toLowerCase().trim();
-      
-      // Verificar se é uma confirmação (somente "sim", "s", "confirmo" - NÃO aceitar "1" aqui)
-      if (/^(sim|s|confirmo)$/i.test(confirmAnswer)) {
-        flow.vehicleConfirmed = true;
-        await saveFlow(msg.phone, flow);
-        await sendQuote(msg, flow, wctx);
-        return;
-      }
+      const awaitingVehicleConfirmation = !flow.vehicleCollectStep && hasVehicleInFlow(flow);
 
-      // Verificar se é uma negação (somente "não", "nao", "n" ou "2" exatos)
-      if (/^(nao|não|n|2)$/i.test(confirmAnswer)) {
-        await sendText({ number: msg.phone, text: buildVehicleCollectionPrompt({
-          model: null,
-          year: null,
-          color: null,
-          condition: null,
-        }) });
+      if (awaitingVehicleConfirmation) {
+        if (/^(sim|s|confirmo)$/i.test(confirmAnswer)) {
+          flow.vehicleConfirmed = true;
+          await saveFlow(msg.phone, flow);
+          await sendQuote(msg, flow, wctx);
+          return;
+        }
+
+        if (/^(nao|não|n|2)$/i.test(confirmAnswer)) {
+          const nextFlow = {
+            ...flow,
+            vehicleCollectStep: "model",
+            vehicleConfirmed: false,
+          };
+          await saveFlow(msg.phone, nextFlow);
+          await sendText({
+            number: msg.phone,
+            text: buildVehicleCollectionPrompt({
+              model: flow.vehicleModel ?? null,
+              year: flow.vehicleYear ?? null,
+              color: flow.vehicleColor ?? null,
+              condition: flow.vehicleCondition ?? null,
+            }),
+          });
+          return;
+        }
+
+        await sendText({
+          number: msg.phone,
+          text: `Por favor, responda apenas *sim* ou *não* para confirmar os dados do veículo.`,
+        });
+        await sendText({
+          number: msg.phone,
+          text: etapa4VehicleConfirmation(
+            flow.vehicleModel ?? "",
+            flow.vehicleYear ?? "",
+            flow.vehicleColor ?? "",
+            flow.vehicleCondition ?? ""
+          ),
+        });
         return;
       }
 
@@ -1237,12 +1261,10 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
           await sendText({ number: msg.phone, text: vehicleModelNotUnderstood(prompts) });
           return;
         }
-        
-        // Verificar se o usuário já forneceu o ano junto com o modelo (ex: "Civic 2021")
+
         const year = parseYearFromText(input);
-        
+
         if (year) {
-          // Usuário forneceu modelo + ano juntos, pular para perguntar a cor
           await saveFlow(msg.phone, {
             ...flow,
             vehicleModel: model,
@@ -1254,7 +1276,6 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
             text: `Anotado: ${model} ${year} 👍\n\nQual a cor do veículo?`,
           });
         } else {
-          // Usuário forneceu apenas o modelo, perguntar o ano
           await saveFlow(msg.phone, {
             ...flow,
             vehicleModel: model,
@@ -1306,21 +1327,25 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
 
       if (step === "condition") {
         const condition = normalizeConditionValue(input);
-        await saveFlow(msg.phone, {
+        const nextFlow = {
           ...flow,
           vehicleCondition: condition,
           vehicleCollectStep: undefined,
-        });
+        };
+        await saveFlow(msg.phone, nextFlow);
 
-        // Mostrar confirmação com todos os dados (modelo, ano, cor, estado)
         await sendText({
           number: msg.phone,
-          text: `🚘 *Confirmando os dados do veículo*\n\nModelo: *${flow.vehicleModel || ""}*\nAno: *${flow.vehicleYear || ""}*\nCor: *${flow.vehicleColor || ""}*\nEstado: *${flow.vehicleCondition || ""}*\n\nEstá certo? (sim/não)`,
+          text: etapa4VehicleConfirmation(
+            nextFlow.vehicleModel ?? "",
+            nextFlow.vehicleYear ?? "",
+            nextFlow.vehicleColor ?? "",
+            nextFlow.vehicleCondition ?? ""
+          ),
         });
         return;
       }
 
-      // Fallback para coleta de modelo (se step estiver indefinido)
       const model = parseModelFromText(input);
       if (!model) {
         await sendText({ number: msg.phone, text: vehicleModelNotUnderstood(prompts) });
