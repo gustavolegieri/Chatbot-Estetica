@@ -8,6 +8,7 @@ import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { PrismaClient } from '@prisma/client';
 import { config } from 'dotenv';
+import { getDefaultInput, expectedTextsByStage, isAllowedTransition } from './src/lib/test-harness-utils';
 
 // Carregar .env.test explicitamente ANTES de qualquer outro
 const envConfig = config({ path: '.env.test' });
@@ -136,85 +137,12 @@ const textosEsperados = extrairTextosEsperados();
 function decidirProximoInput(stageAtual: string, respostaBot: string, visitCount: Record<string, number>): string {
   // Incrementar contador para este stage
   visitCount[stageAtual] = (visitCount[stageAtual] || 0) + 1;
-  
-  const respostaLower = respostaBot.toLowerCase();
-  
-  // Para ETAPA4_VEHICLE, precisa analisar o contexto da resposta
-  if (stageAtual === 'ETAPA4_VEHICLE') {
-    if (respostaLower.includes('modelo') && !respostaLower.includes('confirmando')) {
-      return 'Civic 2022'; // Primeira visita: modelo + ano
-    }
-    if (respostaLower.includes('cor') || respostaLower.includes('qual a cor')) {
-      return 'prata'; // Segunda visita: cor
-    }
-    if (respostaLower.includes('estado') || respostaLower.includes('estado geral')) {
-      return 'bom'; // Terceira visita: estado
-    }
-    if (respostaLower.includes('confirmando') || respostaLower.includes('está certo')) {
-      return 'sim'; // Quarta visita: confirmação
-    }
-    // Se não conseguiu decidir pelo contexto, retorna o input padrão
-    return 'Civic 2022';
-  }
-  
-  // Se é primeira vez no stage, usa mapeamento padrão
-  if (visitCount[stageAtual] === 1) {
-    const mapeamentoPadrao: Record<string, string> = {
-      'null': 'Oi',
-      'ETAPA1_AWAITING_NAME': 'João',
-      'ETAPA2_MAIN_MENU': '1', // Ramo decidido: escolhe categoria (Lavagem)
-      'ETAPA2_SUB': '1', // Escolhe serviço específico (Lavagem Simples)
-      'ETAPA3_SERVICE_ACTION': '1', // Escolhe "Quero agendar"
-      'ETAPA4_VEHICLE': 'Civic 2022', // Primeira visita: modelo + ano
-      'ETAPA5_QUOTE': '2',
-      'ETAPA6_UPSELL': '2',
-      'ETAPA7_DAY': '1',
-      'ETAPA7_TIME': '09:00',
-      'ETAPA9_COUPON': 'pular',
-      'ETAPA9_LOYALTY': 'não usar',
-      'ETAPA10_BUDGET': 'sim',
-      'ETAPA10_LOGISTICS': '1',
-      'ETAPA8_PAYMENT': '1',
-      'ETAPA8_PIX_CHOICE': '1',
-      'ETAPA14_REMINDER': 'não',
-      'ETAPA15_SUMMARY_CONFIRM': 'sim',
-      'ETAPA3_UNDECIDED_VEHICLE': 'Civic 2022',
-      'ETAPA3_UNDECIDED_PROBLEM': '1',
-    };
-    
-    if (mapeamentoPadrao[stageAtual]) {
-      return mapeamentoPadrao[stageAtual];
-    }
-  }
-  
-  // Se não conseguiu decidir, retorna um input genérico
-  return '1';
+  return getDefaultInput(stageAtual, respostaBot, visitCount);
 }
 
 // Textos esperados por stage (simplificados para comparação)
-// Baseados no fluxo-oficial.md - são as SAÍDAS do bot, não entradas do usuário
-const textosEsperadosPorStage: Record<string, string> = {
-  'null': 'Seja muito bem-vindo', // Boas-vindas iniciais
-  'ETAPA1_AWAITING_NAME': 'O que você precisa', // Menu principal após coletar nome
-  'ETAPA2_MAIN_MENU': 'O que você precisa', // Menu principal
-  'ETAPA2_SUB': 'qual opção', // Submenu de serviços
-  'ETAPA3_SERVICE_ACTION': 'Quero agendar', // Ações após selecionar serviço
-  'ETAPA4_VEHICLE': 'Confirmando os dados', // Confirmação de dados do veículo
-  'ETAPA5_QUOTE': 'Bônus', // Orçamento com bônus primeira vez
-  'ETAPA6_UPSELL': 'adicionar', // Upsell de serviços adicionais
-  'ETAPA7_DAY': 'calendário', // Escolha de dia
-  'ETAPA7_TIME': 'horários disponíveis', // Escolha de horário
-  'ETAPA9_COUPON': 'cupom', // Pedido de cupom
-  'ETAPA9_LOYALTY': 'pontos', // Pontos de fidelidade
-  'ETAPA10_BUDGET': 'orçamento', // Confirmação de orçamento
-  'ETAPA10_LOGISTICS': 'Como prefere', // Logística (busca/entrega)
-  'ETAPA8_PAYMENT': 'pagar', // Método de pagamento
-  'ETAPA8_PIX_CHOICE': 'PIX', // Escolha PIX
-  'ETAPA14_REMINDER': 'lembrete', // Configuração de lembrete
-  'ETAPA15_SUMMARY_CONFIRM': 'resumo', // Resumo final
-  'ETAPA3_UNDECIDED_VEHICLE': 'O que está acontecendo', // Cliente indeciso - veículo
-  'ETAPA3_UNDECIDED_PROBLEM': 'recomendo', // Cliente indeciso - problema
-};
+// Centralizados em utilitário
+const textosEsperadosPorStage = expectedTextsByStage;
 
 // Testes de regras cross-cutting (serão testados separadamente)
 const testesCrossCutting: Record<string, { etapa: string; mensagem: string; descricao: string }> = {
@@ -279,10 +207,16 @@ async function enviarMensagemTeste(text: string, etapa: string): Promise<{ respo
       });
 
       if (mensagem) {
+        const session = await prisma.whatsAppSession.findUnique({
+          where: { phone: TEST_PHONE },
+        });
+
+        const flowStageFromSession = session?.metadata ? (session.metadata as any).stage : undefined;
+
         return {
           resposta: mensagem.body || '[Mensagem sem corpo]',
           timestamp: mensagem.createdAt,
-          flowStage: mensagem.flowStage ?? undefined,
+          flowStage: flowStageFromSession || mensagem.flowStage || undefined,
         };
       }
     }
@@ -298,41 +232,47 @@ async function enviarMensagemTeste(text: string, etapa: string): Promise<{ respo
   }
 }
 
-// Função para comparar texto esperado com recebido
-function compararTexto(esperado: string, recebido: string): { ok: boolean; diff?: string } {
-  const normalizar = (text: string) => text.toLowerCase().trim()
+// Helpers de comparação de texto esperado
+function normalizeText(text: string) {
+  return text.toLowerCase().trim()
     .replace(/\s+/g, ' ') // Normalizar espaços
     .replace(/[^\w\sà-úá-úãõâêîôûäëïöü]/g, ''); // Remover pontuação (exceto acentos)
+}
 
-  const esperadoNorm = normalizar(esperado);
-  const recebidoNorm = normalizar(recebido);
+function compararTexto(esperado: string | string[], recebido: string): { ok: boolean; diff?: string } {
+  const esperadoArray = Array.isArray(esperado) ? esperado : [esperado];
+  const recebidoNorm = normalizeText(recebido);
 
-  // Se o esperado for muito curto, verificar inclusão
-  if (esperadoNorm.length < 20) {
-    if (recebidoNorm.includes(esperadoNorm)) {
+  let bestDiff: string | undefined;
+
+  for (const item of esperadoArray) {
+    const esperadoNorm = normalizeText(item);
+
+    // Se o esperado for muito curto, verificar inclusão
+    if (esperadoNorm.length < 20) {
+      if (recebidoNorm.includes(esperadoNorm)) {
+        return { ok: true };
+      }
+      bestDiff = `Esperava conter: "${esperadoNorm}"\nRecebeu: "${recebidoNorm}"`;
+      continue;
+    }
+
+    const palavrasEsperadas = esperadoNorm.split(' ').filter(w => w.length > 3);
+    const palavrasRecebidas = recebidoNorm.split(' ').filter(w => w.length > 3);
+    const palavrasEncontradas = palavrasEsperadas.filter(p => palavrasRecebidas.includes(p));
+    const similaridade = palavrasEncontradas.length / Math.max(palavrasEsperadas.length, 1);
+
+    if (similaridade >= 0.7) {
       return { ok: true };
     }
-    return {
-      ok: false,
-      diff: `Esperava conter: "${esperadoNorm}"\nRecebeu: "${recebidoNorm}"`
-    };
-  }
 
-  // Para textos mais longos, verificar similaridade
-  const palavrasEsperadas = esperadoNorm.split(' ').filter(w => w.length > 3);
-  const palavrasRecebidas = recebidoNorm.split(' ').filter(w => w.length > 3);
-
-  // Verificar se pelo menos 70% das palavras-chave estão presentes
-  const palavrasEncontradas = palavrasEsperadas.filter(p => palavrasRecebidas.includes(p));
-  const similaridade = palavrasEncontradas.length / Math.max(palavrasEsperadas.length, 1);
-
-  if (similaridade >= 0.7) {
-    return { ok: true };
+    const diff = `Similaridade: ${(similaridade * 100).toFixed(0)}%\nPalavras esperadas: ${palavrasEsperadas.join(', ')}\nPalavras encontradas: ${palavrasEncontradas.join(', ')}`;
+    bestDiff = bestDiff ? `${bestDiff}\n---\n${diff}` : diff;
   }
 
   return {
     ok: false,
-    diff: `Similaridade: ${(similaridade * 100).toFixed(0)}%\nPalavras esperadas: ${palavrasEsperadas.join(', ')}\nPalavras encontradas: ${palavrasEncontradas.join(', ')}`
+    diff: bestDiff ?? 'Nenhum texto esperado definido.',
   };
 }
 
@@ -394,12 +334,41 @@ async function executarTesteFluxo(): Promise<TestReport> {
         }
       }
       
-      // Verificar se houve desvio de rota
-      const stageEsperado: string | undefined = textosEsperadosPorStage[stageAtual || 'null'] ? (stageAtual ?? undefined) : undefined;
-      const desvioRota = stageEsperado && flowStage && flowStage !== stageEsperado;
-      
+      // Verificar se houve desvio de rota com base no próximo stage esperado
+      const nextStageExpectation: Record<string, string> = {
+        null: 'ETAPA1_AWAITING_NAME',
+        ETAPA1_AWAITING_NAME: 'ETAPA2_MAIN_MENU',
+        ETAPA2_MAIN_MENU: 'ETAPA2_SUB',
+        ETAPA2_SUB: 'ETAPA3_SERVICE_ACTION',
+        ETAPA3_SERVICE_ACTION: 'ETAPA4_VEHICLE',
+        ETAPA4_VEHICLE: 'ETAPA4_VEHICLE',
+        ETAPA5_QUOTE: 'ETAPA6_UPSELL',
+        ETAPA6_UPSELL: 'ETAPA7_DAY',
+        ETAPA7_DAY: 'ETAPA7_TIME',
+        ETAPA7_TIME: 'ETAPA10_BUDGET',
+        ETAPA9_COUPON: 'ETAPA9_LOYALTY',
+        ETAPA9_LOYALTY: 'ETAPA10_BUDGET',
+        ETAPA10_BUDGET: 'ETAPA10_LOGISTICS',
+        ETAPA10_LOGISTICS: 'ETAPA8_PAYMENT',
+        ETAPA8_PAYMENT: 'ETAPA8_PIX_CHOICE',
+        ETAPA8_PIX_CHOICE: 'ETAPA8_RECEIPT_UPLOAD',
+        ETAPA8_RECEIPT_UPLOAD: 'ETAPA14_REMINDER',
+        ETAPA14_REMINDER: 'ETAPA15_SUMMARY_CONFIRM',
+        ETAPA15_SUMMARY_CONFIRM: 'ETAPA16_CONFIRMATION',
+      };
+
+      const stageEsperado = nextStageExpectation[stageAtual || 'null'];
+      // Allow some stages to advance to multiple valid next stages
+      const et4AllowedAdvance = stageAtual === 'ETAPA4_VEHICLE' && (flowStage === 'ETAPA4_VEHICLE' || flowStage === 'ETAPA5_QUOTE');
+      const et5AllowedAdvance = stageAtual === 'ETAPA5_QUOTE' && (flowStage === 'ETAPA6_UPSELL' || flowStage === 'ETAPA7_DAY' || flowStage === 'ETAPA5_FIRST_TIME_BONUS');
+      const et7TimeAllowed = stageAtual === 'ETAPA7_TIME' && (flowStage === 'ETAPA9_COUPON' || flowStage === 'ETAPA10_BUDGET' || flowStage === 'ETAPA9_LOYALTY');
+
+      const desvioRota =
+        Boolean(stageEsperado && flowStage && flowStage !== stageEsperado) &&
+        !(et4AllowedAdvance || et5AllowedAdvance || et7TimeAllowed);
+
       // Comparar texto
-      const textoEsperado = textosEsperadosPorStage[flowStage || 'null'] || '';
+      const textoEsperado = textosEsperadosPorStage[flowStage || 'null'] || textosEsperadosPorStage[stageAtual || 'null'] || '';
       const comparacao = textoEsperado ? compararTexto(textoEsperado, resposta) : { ok: true };
       
       // Determinar status
