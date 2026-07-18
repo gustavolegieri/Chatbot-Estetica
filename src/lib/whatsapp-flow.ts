@@ -276,7 +276,7 @@ function beginVehicleCollection(flow: FlowState): FlowState {
   return {
     ...flow,
     stage: "ETAPA4_VEHICLE",
-    vehicleCollectStep: "model",
+    vehicleCollectStep: "model" as FlowState['vehicleCollectStep'],
     vehicleRaw: undefined,
     vehicleModel: undefined,
     vehicleYear: undefined,
@@ -1114,7 +1114,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         await saveFlow(msg.phone, {
           ...flow,
           vehicleModel: model,
-          vehicleCollectStep: "year",
+          vehicleCollectStep: "year" as FlowState['vehicleCollectStep'],
         });
         await sendText({ number: msg.phone, text: etapa4AskYear(model) });
         return;
@@ -1220,7 +1220,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         if (/^(nao|não|n|2)$/i.test(confirmAnswer)) {
           const nextFlow = {
             ...flow,
-            vehicleCollectStep: "model",
+            vehicleCollectStep: "model" as FlowState['vehicleCollectStep'],
             vehicleConfirmed: false,
           };
           await saveFlow(msg.phone, nextFlow);
@@ -1269,7 +1269,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
             ...flow,
             vehicleModel: model,
             vehicleYear: year,
-            vehicleCollectStep: "color",
+            vehicleCollectStep: "color" as FlowState['vehicleCollectStep'],
           });
           await sendText({
             number: msg.phone,
@@ -1279,7 +1279,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
           await saveFlow(msg.phone, {
             ...flow,
             vehicleModel: model,
-            vehicleCollectStep: "year",
+            vehicleCollectStep: "year" as FlowState['vehicleCollectStep'],
           });
           await sendText({ number: msg.phone, text: etapa4AskYear(model) });
         }
@@ -1295,7 +1295,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         await saveFlow(msg.phone, {
           ...flow,
           vehicleYear: year,
-          vehicleCollectStep: "color",
+          vehicleCollectStep: "color" as FlowState['vehicleCollectStep'],
         });
         await sendText({
           number: msg.phone,
@@ -1316,7 +1316,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         await saveFlow(msg.phone, {
           ...flow,
           vehicleColor: color,
-          vehicleCollectStep: "condition",
+          vehicleCollectStep: "condition" as FlowState['vehicleCollectStep'],
         });
         await sendText({
           number: msg.phone,
@@ -1354,7 +1354,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       await saveFlow(msg.phone, {
         ...flow,
         vehicleModel: model,
-        vehicleCollectStep: "year",
+        vehicleCollectStep: "year" as FlowState['vehicleCollectStep'],
       });
       await sendText({ number: msg.phone, text: etapa4AskYear(model) });
       return;

@@ -369,6 +369,7 @@ async function executarTesteFluxo(): Promise<TestReport> {
 
       // Comparar texto
       const textoEsperado = textosEsperadosPorStage[flowStage || 'null'] || textosEsperadosPorStage[stageAtual || 'null'] || '';
+      const textoEsperadoStr = Array.isArray(textoEsperado) ? textoEsperado.join(' | ') : textoEsperado;
       const comparacao = textoEsperado ? compararTexto(textoEsperado, resposta) : { ok: true };
       
       // Determinar status
@@ -386,7 +387,7 @@ async function executarTesteFluxo(): Promise<TestReport> {
         status,
         stageEsperado: stageEsperado,
         stageRecebido: flowStage,
-        esperado: textoEsperado || '(não definido)',
+        esperado: textoEsperadoStr || '(não definido)',
         recebido: resposta,
         timestamp,
         diff: comparacao.diff || (desvioRota ? `Esperava stage: ${stageEsperado}, recebeu: ${flowStage}` : undefined),
@@ -458,13 +459,14 @@ async function executarTesteFluxo(): Promise<TestReport> {
       
       // Para cross-cutting, esperamos que o menu seja reimpresso
       const textoEsperado = textosEsperadosPorStage[teste.etapa] || '';
+      const textoEsperadoStr = Array.isArray(textoEsperado) ? textoEsperado.join(' | ') : textoEsperado;
       const comparacao = textoEsperado ? compararTexto(textoEsperado, resposta) : { ok: true };
       
       const resultado: TestResult = {
         etapa: nome,
         status: comparacao.ok ? 'OK' : 'DIVERGENTE_TEXTO',
         stageRecebido: flowStage,
-        esperado: `Menu reimpresso (contém: ${textoEsperado.substring(0, 50)}...)`,
+        esperado: `Menu reimpresso (contém: ${textoEsperadoStr.substring(0, 50)}...)`,
         recebido: resposta,
         timestamp,
         diff: comparacao.diff,
