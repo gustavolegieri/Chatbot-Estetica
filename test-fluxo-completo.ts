@@ -10,11 +10,12 @@ import { PrismaClient } from '@prisma/client';
 import { config } from 'dotenv';
 import { getDefaultInput, expectedTextsByStage, isAllowedTransition } from './src/lib/test-harness-utils';
 
-// Carregar .env.test explicitamente ANTES de qualquer outro
+// Carregar variáveis do .env e .env.test explicitamente ANTES de qualquer outro
+config({ path: '.env' });
 const envConfig = config({ path: '.env.test' });
 
-// Forçar DATABASE_URL do .env.test
-process.env.DATABASE_URL = envConfig.parsed?.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/estetica_automotiva?schema=public';
+// Forçar DATABASE_URL do .env.test, mas preservar outras variáveis do .env
+process.env.DATABASE_URL = envConfig.parsed?.DATABASE_URL || process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/estetica_automotiva?schema=public';
 
 // Configurações
 const TEST_PHONE = '5511972851072'; // Telefone autorizado pelo modo de teste
@@ -22,7 +23,7 @@ const prisma = new PrismaClient();
 
 // Flag para indicar modo de teste (evita envios reais)
 process.env.TEST_MODE = 'true';
-process.env.WASENDER_API_KEY = ''; // Forçar modo simulado
+// Não sobrescrever a chave do Wasender; usar o valor do .env se existir
 
 // Interfaces
 interface TestResult {

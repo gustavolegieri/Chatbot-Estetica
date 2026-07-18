@@ -49,7 +49,8 @@ O que seu carro precisa hoje?
 
 *1* 📅 Quero agendar
 *2* 🔄 Ver outros serviços
-*3* 💬 Tenho uma dúvida`,
+*3* 💬 Tenho uma dúvida
+*4* 👤 Falar com o dono`,
   },
   {
     key: "package_action_menu",
@@ -57,7 +58,8 @@ O que seu carro precisa hoje?
     category: "fluxo",
     content: `*1* 📅 Agendar um pacote
 *2* 🔍 Comparar pacotes
-*3* 🔧 Ver serviços avulsos`,
+*3* 🔧 Ver serviços avulsos
+*4* 👤 Falar com o dono`,
   },
   {
     key: "etapa4_vehicle",

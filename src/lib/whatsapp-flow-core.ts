@@ -14,7 +14,7 @@ import { answerCustomerDoubt } from "./whatsapp-ai";
 import { loadWhatsAppCatalog } from "./whatsapp-service-catalog";
 import { loadPromptMap } from "./bot-prompts";
 import { prisma } from "./prisma";
-import { etapa2MainMenu, serviceDetail, etapa8ReceiptUpload, etapa8ReceiptError, etapa8ReceiptInvalid } from "./whatsapp-flow-messages";
+import { etapa2MainMenu, serviceDetail, etapa8ReceiptUpload, etapa8ReceiptError, etapa8ReceiptInvalid, etapa8Payment } from "./whatsapp-flow-messages";
 import { buildVehicleConfirmationPrompt } from "./flow-validation";
 import { generateCalendarImageOnlyForTest, generateCalendarLegend } from "./calendar-helper";
 import { buildAvailableSlotsForDay, parseTimeSelection } from "./appointments";
@@ -590,7 +590,6 @@ export async function handleReminderStep(
     console.error("[handleReminderStep] Error generating summary card:", error);
   }
   
-  // Send text first
   const upsellLabel = state.upsellLabel ? `✨ + ${state.upsellLabel}` : "";
   const needsReturn = state.needsReturn ? "🔄 Devolução: sim" : "";
   
@@ -616,12 +615,10 @@ export async function handleReminderStep(
     "✅ Confirma? (sim/não)",
   ];
   
-  responses.push({ text: summaryLines.filter(Boolean).join("\n") });
-  
-  // Send image after text
   if (summaryCardUrl) {
     responses.push({ text: "", mediaUrl: summaryCardUrl, mediaType: "image" });
   }
+  responses.push({ text: summaryLines.filter(Boolean).join("\n") });
   
   return { responses, nextState: newState };
 }
@@ -1002,6 +999,20 @@ export async function handleSummaryConfirm(
   const input = message.trim().toLowerCase();
   const isYes = /^(sim|s|1|yes|confirmo|agendar)$/i.test(input);
 
+  const prompts = await loadPromptMap();
+
+  const isChangePayment = /^(3|trocar forma|forma de pagamento|pagamento)$/i.test(input);
+  if (isChangePayment) {
+    const newState: FlowState = {
+      ...state,
+      stage: "ETAPA8_PAYMENT",
+    };
+    responses.push({ text: `✅ Vamos ajustar a forma de pagamento.
+
+${etapa8Payment(true, prompts)}` });
+    return { responses, nextState: newState };
+  }
+
   if (isYes) {
     // User confirmed summary - proceed to final confirmation
     const newState: FlowState = {
@@ -1025,11 +1036,14 @@ export async function handleSummaryConfirm(
     return { responses, nextState: newState };
   }
 
-  responses.push({ text: "Sem problemas! Alterar algo?" });
+  responses.push({ text: `Sem problemas! O que você quer alterar?
+
+*1* Sim, confirmar
+*2* Não, alterar algo
+*3* Trocar forma de pagamento` });
   const resetState: FlowState = {
     ...state,
-    stage: "ETAPA1_AWAITING_NAME",
-    customerName: undefined,
+    stage: "ETAPA15_SUMMARY_CONFIRM",
   };
   return { responses, nextState: resetState };
 }
@@ -1130,6 +1144,20 @@ async function loadPaymentContext() {
 /**
  * Handler para perguntas sobre serviço (dúvidas específicas)
  */
+export function buildAiDoubtFollowUpText(): string {
+  return [
+    "Posso te ajudar com mais alguma coisa?",
+    "",
+    "*1* Voltar para onde eu estava",
+    "*2* Ver menu principal",
+    "*3* Falar com o dono",
+  ].join("\n");
+}
+
+export function resolveDoubtReturnStage(state: FlowState): FlowStage {
+  return state.returnStage ?? "ETAPA3_SERVICE_ACTION";
+}
+
 export async function handleServiceQuestion(
   state: FlowState,
   message: string,
@@ -1139,48 +1167,51 @@ export async function handleServiceQuestion(
   if (!state.awaitingServiceQuestion) {
     const choice = message.trim();
     if (choice === "1") {
-      // Back to service action to schedule
+      const targetStage = resolveDoubtReturnStage(state);
       const newState: FlowState = {
         ...state,
-        stage: "ETAPA3_SERVICE_ACTION",
+        stage: targetStage,
         awaitingServiceQuestion: false,
       };
-      
-      const prompts = await loadPromptMap();
-      const wctx = await loadWhatsAppCatalog(true);
-      const serviceKey = state.serviceKey;
-      const service = serviceKey ? wctx.catalog[serviceKey] : null;
-      
-      if (service) {
-        const description = serviceDetail(service, prompts);
-        responses.push({ text: description });
+
+      if (targetStage === "ETAPA2_MAIN_MENU") {
+        const wctx = await loadWhatsAppCatalog(true);
+        const prompts = await loadPromptMap();
+        responses.push({ text: etapa2MainMenu(state.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+      } else {
+        const prompts = await loadPromptMap();
+        const wctx = await loadWhatsAppCatalog(true);
+        const serviceKey = state.serviceKey;
+        const service = serviceKey ? wctx.catalog[serviceKey] : null;
+
+        if (service) {
+          const description = serviceDetail(service, prompts);
+          responses.push({ text: description });
+        }
+
+        responses.push({ text: "Entendi. Voltando para onde você estava." });
       }
-      
-      responses.push({
-        text: "Como deseja prosseguir?\n\n*1* 📅 Agendar agora\n*2* 🔄 Ver outros\n*3* 💬 Tenho dúvidas",
-      });
-      
+
       return { responses, nextState: newState };
     } else if (choice === "2") {
-      // Back to main menu
       const newState: FlowState = {
         ...state,
         stage: "ETAPA2_MAIN_MENU",
         awaitingServiceQuestion: false,
       };
-      
+
       const wctx = await loadWhatsAppCatalog(true);
       const prompts = await loadPromptMap();
       responses.push({ text: etapa2MainMenu(state.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
-      
+
       return { responses, nextState: newState };
     } else if (choice === "3") {
-      // More questions
       const newState: FlowState = {
         ...state,
-        awaitingServiceQuestion: true,
+        awaitingServiceQuestion: false,
+        stage: "ETAPA2_MAIN_MENU",
       };
-      responses.push({ text: "📝 Qual sua próxima dúvida sobre o serviço?" });
+      responses.push({ text: "Entendi! Vou avisar a equipe da *Garagem do Ka* para te atender por aqui." });
       return { responses, nextState: newState };
     }
   }
@@ -1219,14 +1250,15 @@ export async function handleServiceQuestion(
 
     if (aiResponse) {
       responses.push({ text: `🤖 *Resposta:*${aiResponse}` });
-      responses.push({ text: "\n\n*1* - Voltar e agendar\n*2* - Ver outros serviços\n*3* - Mais dúvidas" });
-      
+      responses.push({ text: buildAiDoubtFollowUpText() });
+
       const newState: FlowState = {
         ...state,
         awaitingServiceQuestion: false,
         stage: "ETAPA10_FAQ",
+        returnStage: state.returnStage ?? (state.stage === "ETAPA5_QUOTE" ? "ETAPA5_QUOTE" : "ETAPA3_SERVICE_ACTION"),
       };
-      
+
       return { responses, nextState: newState };
     } else {
       responses.push({ text: "😕 Não consegui responder sua dúvida. Por favor, tente reformular ou digite 'menu' para voltar." });

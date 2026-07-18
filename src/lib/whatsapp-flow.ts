@@ -25,6 +25,7 @@ import {
   type WhatsAppCatalogContext,
 } from "./whatsapp-service-catalog";
 import { resolveValidCustomerName } from "./customer-name";
+import { requestHumanHandoff } from "./whatsapp-handoff";
 import {
   etapa1Welcome,
   etapa2MainMenu,
@@ -136,6 +137,30 @@ async function sendTextWrapper(msg: IncomingMessage, text: string) {
  * Adapta o resultado do core handler para o formato do WhatsApp flow
  * Converte FlowResponse[] em chamadas de sendText/sendMedia e persiste o estado
  */
+async function handleHumanHandoffRequest(msg: IncomingMessage, flow: FlowState) {
+  const session = await prisma.whatsAppSession.findFirst({
+    where: { phone: normalizePhone(msg.phone) },
+    select: { id: true },
+  });
+
+  const clientName = resolveValidCustomerName(flow.customerName) ?? resolveValidCustomerName(msg.pushName);
+
+  if (session?.id) {
+    await requestHumanHandoff({
+      phone: msg.phone,
+      sessionId: session.id,
+      reason: "menu option",
+      clientName: clientName ?? undefined,
+    });
+    return;
+  }
+
+  await sendText({
+    number: msg.phone,
+    text: `Entendi${clientName ? `, *${clientName}*` : ""}! 😊\n\nVou avisar a equipe da *Garagem do Ka* para te atender por aqui.`,
+  });
+}
+
 async function executeCoreHandler(
   msg: IncomingMessage,
   flow: FlowState,
@@ -1152,6 +1177,10 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     }
 
     case "ETAPA3_PACKAGE_ACTION": {
+      if (num === 4) {
+        await handleHumanHandoffRequest(msg, flow);
+        return;
+      }
       if (wantsOtherServices(input, num, 3)) {
         await saveFlow(msg.phone, { ...flow, stage: "ETAPA2_MAIN_MENU" });
         await sendText({ number: msg.phone, text: msgH.mainMenu(flow, msg.pushName) });
@@ -1181,6 +1210,10 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     }
 
     case "ETAPA3_SERVICE_ACTION": {
+      if (num === 4) {
+        await handleHumanHandoffRequest(msg, flow);
+        return;
+      }
       if (wantsOtherServices(input, num)) {
         await saveFlow(msg.phone, { ...flow, stage: "ETAPA2_MAIN_MENU" });
         await sendText({ number: msg.phone, text: msgH.mainMenu(flow, msg.pushName) });

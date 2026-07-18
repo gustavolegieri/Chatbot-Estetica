@@ -4,6 +4,7 @@
  * Por enquanto, usa placeholder.
  */
 import QRCode from 'qrcode';
+import { uploadImageToCloudinary } from './image-upload';
 
 export interface PixQrCodeData {
   amount: number;
@@ -13,12 +14,14 @@ export interface PixQrCodeData {
   key: string;
 }
 
-export async function generatePixQrCode(data: PixQrCodeData): Promise<string> {
+export async function generatePixQrCode(
+  data: PixQrCodeData,
+  uploadFn: typeof uploadImageToCloudinary = uploadImageToCloudinary
+): Promise<string> {
   try {
     const payload = generatePixPayload(data);
-    
-    // Generate QR code as base64 data URL (works in Vercel)
-    const qrCodeDataUrl = await QRCode.toDataURL(payload, {
+
+    const qrCodeBuffer = await QRCode.toBuffer(payload, {
       width: 300,
       margin: 2,
       color: {
@@ -26,14 +29,23 @@ export async function generatePixQrCode(data: PixQrCodeData): Promise<string> {
         light: '#FFFFFF'
       }
     });
-    
-    console.log('[generatePixQrCode] QR Code generated as data URL');
-    
-    // Return the data URL directly (works in Vercel serverless)
-    return qrCodeDataUrl;
+
+    const timestamp = Date.now();
+    const uploadResult = await uploadFn(
+      Buffer.from(qrCodeBuffer),
+      `pix-qr-${timestamp}`,
+      'pix-qr'
+    );
+
+    if (uploadResult.success && uploadResult.url) {
+      console.log('[generatePixQrCode] QR Code uploaded to public URL:', uploadResult.url);
+      return uploadResult.url;
+    }
+
+    console.warn('[generatePixQrCode] Upload failed, falling back to placeholder:', uploadResult.error);
+    return `https://placehold.co/300x300/00ff00/ffffff?text=PIX+QR+Code&text=${data.amount.toFixed(2)}`;
   } catch (error) {
     console.error('[generatePixQrCode] Error:', error);
-    // Fallback to placeholder
     return `https://placehold.co/300x300/00ff00/ffffff?text=PIX+QR+Code&text=${data.amount.toFixed(2)}`;
   }
 }
