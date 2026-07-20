@@ -389,7 +389,7 @@ async function fetchUpcomingAppointments(phone: string) {
   });
 }
 
-function renderAppointmentsSummary(appointments: Array<{ date: Date; startTime: string; service: { name: string; whatsappShort?: string } }> ) {
+function renderAppointmentsSummary(appointments: Array<{ date: Date; startTime: string; service: { name: string; whatsappShort?: string | null } }> ) {
   if (!appointments.length) return `Você não tem agendamentos ativos no momento. Quer ver o menu para agendar outro serviço?`;
 
   const lines = [
