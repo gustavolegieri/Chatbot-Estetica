@@ -68,7 +68,6 @@ export async function generateCalendarImageOnlyForTest(testDate: string | null):
  */
 export function generateCalendarLegend(): string {
   return [
-    "",
     "📅 *Escolha o dia*",
     "",
     "Toque na lista acima para ver os dias disponíveis ou",
@@ -150,7 +149,7 @@ export async function sendCalendarWithImageAndList({ number, prompts }: { number
     const result = await sendMedia({ 
       number, 
       mediaUrl: finalImageUrl, 
-      caption: "📅 Calendário de disponibilidade" 
+      caption: generateCalendarLegend(),
     });
     console.log("[Calendar] Resultado do envio:", JSON.stringify(result));
     

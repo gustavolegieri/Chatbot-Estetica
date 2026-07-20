@@ -311,7 +311,178 @@ function beginVehicleCollection(flow: FlowState): FlowState {
   };
 }
 
+function buildContactAnswer(ctx: FlowContext) {
+  const lines = [
+    `📍 Endereço: ${ctx.address || "Ainda não definido"}`,
+    `⏱ Horário: ${ctx.hours}`,
+  ];
+
+  if (ctx.pixKey) {
+    lines.push(`💳 PIX: ${ctx.pixKey}`);
+    if (ctx.pixHolder) lines.push(`Nome: ${ctx.pixHolder}`);
+    if (ctx.pixBank) lines.push(`Banco: ${ctx.pixBank}`);
+  } else {
+    lines.push(`💳 Pagamento: aceitamos PIX, cartão e dinheiro no local.`);
+  }
+
+  return lines.join("\n");
+}
+
+async function hydrateReturningClientData(flow: FlowState, phone: string) {
+  if (flow.savedVehicle && flow.loyaltyPoints != null) return flow;
+
+  const client = await prisma.client.findUnique({
+    where: { phone: normalizePhone(phone) },
+    include: {
+      appointments: {
+        where: { status: "COMPLETED" },
+        select: { id: true },
+      },
+    },
+  });
+
+  if (!client) return flow;
+
+  return {
+    ...flow,
+    savedVehicle: client.vehicleModel || client.vehiclePlate || null,
+    loyaltyPoints: client.appointments.length * 10,
+  };
+}
+
+async function createReferralCoupon(): Promise<string> {
+  const baseCode = `INDICA${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  let code = baseCode;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const existing = await prisma.coupon.findUnique({ where: { code } });
+    if (!existing) break;
+    code = `INDICA${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  }
+
+  const validTo = new Date();
+  validTo.setDate(validTo.getDate() + 30);
+
+  await prisma.coupon.create({
+    data: {
+      code,
+      type: "percent",
+      amount: new Prisma.Decimal(10),
+      active: true,
+      usageLimit: 1,
+      usagePerCustomer: 1,
+      validFrom: new Date(),
+      validTo,
+    },
+  });
+
+  return code;
+}
+
+async function fetchUpcomingAppointments(phone: string) {
+  return prisma.appointment.findMany({
+    where: {
+      client: { phone: normalizePhone(phone) },
+      status: { in: ["CONFIRMED", "PENDING", "IN_PROGRESS"] },
+    },
+    orderBy: { date: "asc" },
+    include: { service: true },
+  });
+}
+
+function renderAppointmentsSummary(appointments: Array<{ date: Date; startTime: string; service: { name: string; whatsappShort?: string } }> ) {
+  if (!appointments.length) return `Você não tem agendamentos ativos no momento. Quer ver o menu para agendar outro serviço?`;
+
+  const lines = [
+    `Aqui estão seus próximos agendamentos:`,
+    "━━━━━━━━━━━━━━━",
+  ];
+
+  for (const appointment of appointments.slice(0, 4)) {
+    const serviceLabel = appointment.service.whatsappShort ?? appointment.service.name;
+    lines.push(`• ${format(new Date(appointment.date), "dd/MM/yyyy")} às ${appointment.startTime} — ${serviceLabel}`);
+  }
+
+  return `${lines.join("\n")}\n\nSe quiser, digite *menu* para voltar ao início.`;
+}
+
+async function handleGlobalCommands(
+  msg: IncomingMessage,
+  flow: FlowState,
+  ctx: FlowContext,
+  wctx: WhatsAppCatalogContext,
+  lower: string
+): Promise<boolean> {
+  const isAppointments = /\b(meus agendamentos|minhas reservas|minhas agendas|meu agendamento|meu horário|meus horários)\b/i.test(lower);
+  const isPoints = /\b(meus pontos|pontos|saldo de pontos|saldo)\b/i.test(lower);
+  const isReferral = /\b(indicar (?:um |uma )?amigo|indique (?:um |uma )?amigo|indicar amigo|refe?r[aê]ncia|indicação)\b/i.test(lower);
+  const isAddress = /\b(endereço|localiza[cç][aã]o|onde fica|onde estamos|localização|rua|avenida|av\.?|local)\b/i.test(lower);
+  const isHours = /\b(hor[aá]rio|horarios|horários|funcionamento|abertura|fechamento|atendemos|atendendo)\b/i.test(lower);
+  const isPayment = /\b(pagamento|pix|cart[aã]o|dinheiro|forma de pagamento|tarifa|valor|preço|preco|custa|quanto custa)\b/i.test(lower);
+
+  if (isAppointments) {
+    const appointments = await fetchUpcomingAppointments(msg.phone);
+    await sendText({ number: msg.phone, text: renderAppointmentsSummary(appointments) });
+    return true;
+  }
+
+  if (isPoints) {
+    const points = flow.loyaltyPoints ?? 0;
+    const discountValue = Math.floor(points / 100) * 10;
+    await sendText({
+      number: msg.phone,
+      text: `Você tem *${points}* pontos de fidelidade.\n` +
+        `Pode usar para ganhar *R$ ${discountValue.toFixed(2).replace('.', ',')}* de desconto no próximo agendamento.\n\n` +
+        `Digite *menu* para ver o catálogo ou continue o atendimento normalmente.`,
+    });
+    return true;
+  }
+
+  if (isReferral) {
+    const code = await createReferralCoupon();
+    await sendText({
+      number: msg.phone,
+      text: `🎁 Seu cupom de indicação: *${code}*\n\nCompartilhe com um amigo para ele ganhar *10% de desconto* no primeiro agendamento.\n` +
+        `O cupom vale por 30 dias e tem 1 uso.\n\nSe quiser, digite *menu* para voltar ao atendimento.`,
+    });
+    return true;
+  }
+
+  if (isAddress || isHours || isPayment) {
+    const answer = buildContactAnswer(ctx);
+    const extra = isPayment
+      ? `\n\nAceitamos PIX, cartão e dinheiro no local. Se quiser, posso ajudar a agendar um horário.`
+      : "";
+    await sendText({ number: msg.phone, text: `${answer}${extra}` });
+    return true;
+  }
+
+  return false;
+}
+
 async function goToVehicleStep(msg: IncomingMessage, flow: FlowState, wctx: WhatsAppCatalogContext) {
+  if (flow.savedVehicle && !hasVehicleInFlow(flow)) {
+    const next: FlowState = {
+      ...flow,
+      stage: "ETAPA4_VEHICLE",
+      vehicleRaw: flow.savedVehicle,
+      vehicleModel: flow.savedVehicle,
+      vehicleColor: "não informado",
+      vehicleCondition: "bom",
+      vehicleIsSuv: undefined,
+      vehicleCollectStep: undefined,
+    };
+    await saveFlow(msg.phone, next);
+    await sendText({
+      number: msg.phone,
+      text: `Veículo salvo encontrado: *${flow.savedVehicle}*.
+
+Deseja usar esse veículo novamente?
+*1* — Sim
+*2* — Não, informar outro veículo`,
+    });
+    return;
+  }
+
   const next = beginVehicleCollection(flow);
   await saveFlow(msg.phone, next);
   await sendText({ number: msg.phone, text: etapa4Vehicle(false, wctx.prompts) });
@@ -873,10 +1044,22 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
   const lower = input.toLowerCase();
   const isShortMenuPick = num !== null && input.length <= 2;
 
+  const hydratedFlow = await hydrateReturningClientData(flow, msg.phone);
+  if (hydratedFlow.savedVehicle !== flow.savedVehicle || hydratedFlow.loyaltyPoints !== flow.loyaltyPoints) {
+    flow = hydratedFlow;
+    await saveFlow(msg.phone, flow);
+  } else {
+    flow = hydratedFlow;
+  }
+
   // DETECÇÃO DE CANCELAMENTO (cross-cutting) - usando core handler unificado
   // Rode antes do switch de etapas para interceptar intenções de cancelamento
   if (flow.awaitingDiscountResponse) {
     await executeCoreHandler(msg, flow, handleDiscountResponse, msg.phone);
+    return;
+  }
+
+  if (await handleGlobalCommands(msg, flow, ctx, wctx, lower)) {
     return;
   }
 
@@ -1255,15 +1438,21 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
             ...flow,
             vehicleCollectStep: "model" as FlowState['vehicleCollectStep'],
             vehicleConfirmed: false,
+            vehicleRaw: undefined,
+            vehicleModel: undefined,
+            vehicleYear: undefined,
+            vehicleColor: undefined,
+            vehicleCondition: undefined,
+            vehicleIsSuv: undefined,
           };
           await saveFlow(msg.phone, nextFlow);
           await sendText({
             number: msg.phone,
             text: buildVehicleCollectionPrompt({
-              model: flow.vehicleModel ?? null,
-              year: flow.vehicleYear ?? null,
-              color: flow.vehicleColor ?? null,
-              condition: flow.vehicleCondition ?? null,
+              model: null,
+              year: null,
+              color: null,
+              condition: null,
             }),
           });
           return;
@@ -1459,7 +1648,6 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         flow.stage = "ETAPA7_DAY";
         await saveFlow(msg.phone, flow);
         await sendCalendarWithImageAndList({ number: msg.phone, prompts });
-        await sendText({ number: msg.phone, text: generateCalendarLegend() });
         return;
       }
       const key = flow.serviceKey ?? "lavagem_detalhada";
@@ -1468,7 +1656,6 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         flow.stage = "ETAPA7_DAY";
         await saveFlow(msg.phone, flow);
         await sendCalendarWithImageAndList({ number: msg.phone, prompts });
-        await sendText({ number: msg.phone, text: generateCalendarLegend() });
         return;
       }
       flow.upsellLabel = upsell.complement;
@@ -1596,7 +1783,6 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       flow.stage = "ETAPA7_DAY";
       await saveFlow(msg.phone, flow);
       await sendCalendarWithImageAndList({ number: msg.phone, prompts });
-      await sendText({ number: msg.phone, text: generateCalendarLegend() });
       return;
     }
 
@@ -1972,14 +2158,13 @@ async function handlePayment(
 ) {
   const { prompts } = wctx;
   const isNoPix = flow.stage === "ETAPA8_PAYMENT_NO_PIX";
-  const max = isNoPix ? 2 : 3; // Atualizado: 2 opções sem PIX, 3 com PIX
-  const min = isNoPix ? 1 : 1;
+  const max = isNoPix ? 2 : 3;
+  const min = 1;
 
   if (!num || num < min || num > max) {
-    // Usar template compacto para 3 opções
-    const optionsText = isNoPix 
-      ? `*1* Cartão\n*2* Dinheiro`
-      : `*1* PIX\n*2* Cartão\n*3* Dinheiro`;
+    const optionsText = isNoPix
+      ? `*1* Cartão (na loja)\n*2* Dinheiro (na loja)`
+      : `*1* PIX\n*2* Cartão (na loja)\n*3* Dinheiro (na loja)`;
     await sendText({
       number: msg.phone,
       text: invalidMenu(optionsText, prompts),
@@ -1987,19 +2172,17 @@ async function handlePayment(
     return;
   }
 
-  // Nova variante: Opção de Cartão unificado (débito + crédito)
-  const methodsNoPix = ["Cartão", "Dinheiro"];
-  const methodsFull = ["PIX", "Cartão", "Dinheiro"];
+  const methodsNoPix = ["Cartão (na loja)", "Dinheiro (na loja)"];
+  const methodsFull = ["PIX", "Cartão (na loja)", "Dinheiro (na loja)"];
   const methods = isNoPix ? methodsNoPix : methodsFull;
   flow.paymentMethod = methods[num - 1];
 
-  // Se escolher Cartão, perguntar qual tipo
-  if (flow.paymentMethod === "Cartão") {
-    flow.stage = "ETAPA8_PAYMENT_CARD_TYPE";
+  if (flow.paymentMethod === "Cartão (na loja)" || flow.paymentMethod === "Dinheiro (na loja)") {
+    flow.stage = "ETAPA14_REMINDER";
     await saveFlow(msg.phone, flow);
     await sendText({
       number: msg.phone,
-      text: `Qual tipo de cartão você prefere?\n\n*1* Débito\n*2* Crédito`,
+      text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa`,
     });
     return;
   }
@@ -2012,7 +2195,6 @@ async function handlePayment(
   }
 
   // Se PIX for selecionado e tiver chave PIX configurada, mostrar escolha de pagamento
-  // Atualizado para seguir especificação: "💸 Como você prefere pagar via PIX?\n\n1 PIX (Pagar agora)\n2 PIX (Pagar na entrega)"
   if (!isNoPix && num === 1 && ctx.pixKey) {
     flow.stage = "ETAPA8_PIX_CHOICE";
     await saveFlow(msg.phone, flow);
@@ -2023,7 +2205,6 @@ async function handlePayment(
     return;
   }
 
-  // Dinheiro vai direto para lembrete
   flow.stage = "ETAPA14_REMINDER";
   await saveFlow(msg.phone, flow);
   await sendText({ number: msg.phone, text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa` });

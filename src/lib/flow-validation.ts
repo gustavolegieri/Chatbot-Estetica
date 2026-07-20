@@ -162,10 +162,10 @@ export function buildCalendarPrompt(date = new Date()): string {
     "🟡  Poucas vagas  ⛔  Fechado/Passado",
     "🔵  Hoje",
     "",
-    "📋 *Dias para agendar:*",
+    "📋 *Dias disponíveis para agendar:*",
     ...availableLines,
     "",
     "💬 *Digite o número do dia* (ex: 15)",
-    "🔙 *0* para voltar",
+    "🔙 *0* para voltar ao início",
   ].join("\n");
 }

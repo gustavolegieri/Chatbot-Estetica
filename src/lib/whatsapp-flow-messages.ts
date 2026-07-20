@@ -442,8 +442,8 @@ export function etapa7NoSlots(dayLabel: string, prompts?: PromptMap) {
 
 export function etapa8Payment(hasPix: boolean, prompts?: PromptMap) {
   const options = hasPix
-    ? [`*1* PIX`, `*2* Débito`, `*3* Crédito`, `*4* Dinheiro`]
-    : [`*1* Débito`, `*2* Crédito`, `*3* Dinheiro`];
+    ? [`*1* PIX`, `*2* Cartão (na loja)`, `*3* Dinheiro (na loja)`]
+    : [`*1* Cartão (na loja)`, `*2* Dinheiro (na loja)`];
 
   return renderPrompt(p(prompts), "etapa8_payment", {
     options: options.join("\n"),

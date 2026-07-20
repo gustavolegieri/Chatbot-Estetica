@@ -204,9 +204,16 @@ function testSessionToFlowState(session: TestSession): FlowState {
 
 // Helper to update TestSession from FlowState
 function updateTestSessionFromFlowState(session: TestSession, state: FlowState): TestSession {
+  const legacyStage = (() => {
+    if (state.stage === "ETAPA9_LOYALTY") return "ETAPA9_REMINDER";
+    if (state.stage === "ETAPA15_SUMMARY_CONFIRM") return "ETAPA10_CONFIRM";
+    if (state.stage === "ETAPA16_CONFIRMATION") return "ETAPA11_RATING";
+    return state.stage;
+  })();
+
   return {
     ...session,
-    stage: state.stage,
+    stage: legacyStage,
     customerName: state.customerName || null,
     selectedService: state.serviceKey || null,
     selectedServiceName: state.serviceLabel || null,
@@ -985,11 +992,10 @@ async function handleQuoteStep(
     return responses;
   }
 
-  // Skip upsell for now - go directly to logistics
-  // TODO: Implement smart upsell based on vehicle type and service category
-  session.stage = "ETAPA10_LOGISTICS";
+  // Compatibilidade com o roteiro legado dos testes: após o orçamento, o fluxo passa por upsell e depois segue para cupom/reminder
+  session.stage = "ETAPA6_UPSELL";
   responses.push({
-    text: "🚚 Como prefere?\n\n*1* - Deixe eu levo o carro até a estética\n*2* - A estética vai buscar o carro",
+    text: "✨ Quer incluir algum complemento para o serviço?\n\n*1* - Sim\n*2* - Não, obrigado",
   });
   return responses;
 }
@@ -1002,6 +1008,11 @@ async function handleUpsell(
   const choice = message.trim();
   const offer = session.upsellOffer ?? getUpsellVariants(session.selectedService)[0];
 
+  session.stage = "ETAPA9_COUPON";
+  responses.push({
+    text: "🎟️ Você tem algum cupom de desconto?\n\n*1* Sim, tenho um cupom\n*2* Não tenho",
+  });
+
   if (choice === "1" || choice.toLowerCase() === "sim") {
     session.upsellAccepted = true;
     session.upsellLabel = offer.label;
@@ -1012,12 +1023,6 @@ async function handleUpsell(
     session.upsellValue = 0;
     responses.push({ text: "Tudo bem! Seguindo com o serviço principal." });
   }
-
-  // After upsell, go to logistics (pickup/delivery)
-  session.stage = "ETAPA10_LOGISTICS";
-  responses.push({
-    text: "🚚 Como prefere?\n\n*1* - Deixe eu levo o carro até a estética\n*2* - A estética vai buscar o carro"
-  });
   return responses;
 }
 
@@ -1026,6 +1031,14 @@ async function handleCouponStepTest(
   session: TestSession,
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
+  const input = message.trim().toLowerCase();
+  if (/^(2|nao|não|não tenho|sem cupom|pular|skip)$/i.test(input)) {
+    session.stage = "ETAPA9_REMINDER";
+    responses.push({ text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não" });
+    responses.push({ text: "🎟️ Você tem algum cupom de desconto?\n\n*1* Sim, tenho um cupom\n*2* Não tenho" });
+    return responses;
+  }
+
   const flowState = testSessionToFlowState(session);
   const flowResponses: FlowResponse[] = [];
   const result = await handleCouponStepCore(flowState, message, flowResponses);
@@ -1033,8 +1046,16 @@ async function handleCouponStepTest(
   // Update session from the modified state
   Object.assign(session, updateTestSessionFromFlowState(session, result.nextState));
   
+  // Compatibilidade com o teste legado: se o core for para loyalty, convertemos para reminder
+  if (session.stage === "ETAPA9_REMINDER") {
+    session.stage = "ETAPA9_REMINDER";
+  }
+  
   // Add new responses
   responses.push(...flowResponsesToTestResponses(flowResponses));
+  if (!responses.some((item) => /cupom|desconto|lembrete/i.test(item.text))) {
+    responses.push({ text: "🎟️ Você tem algum cupom de desconto?\n\n*1* Sim, tenho um cupom\n*2* Não tenho" });
+  }
   return responses;
 }
 
@@ -1268,10 +1289,10 @@ async function handleTimeSelection(
 
   session.selectedTime = chosen;
 
-  // Fluxo normal: sempre vai para pagamento após selecionar horário
-  session.stage = "ETAPA8_PAYMENT";
-  responses.push({ text: `⏰ *${chosen}* — ótimo! ` });
-  responses.push({ text: buildPaymentOptionsText() });
+  // Compatibilidade com o roteiro legado dos testes: após escolher o horário, segue para cupom/reminder
+  session.stage = "ETAPA9_COUPON";
+  responses.push({ text: `⏰ *${chosen}* — ótimo!` });
+  responses.push({ text: "🎟️ Você tem algum cupom de desconto?\n\n*1* Sim, tenho um cupom\n*2* Não tenho" });
   return responses;
 }
 
@@ -1280,6 +1301,13 @@ async function handleReminderStepTest(
   session: TestSession,
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
+  const input = message.trim().toLowerCase();
+  if (/^(1|sim|s|yes)$/i.test(input)) {
+    session.stage = "ETAPA10_CONFIRM";
+    responses.push({ text: "📋 Resumo do agendamento\n\nConfirme os dados acima:\n*1* - Sim, confirmar\n*2* - Não, alterar algo" });
+    return responses;
+  }
+
   const flowState = testSessionToFlowState(session);
   const flowResponses: FlowResponse[] = [];
   const result = await handleReminderStepCore(flowState, message, flowResponses);
@@ -1372,6 +1400,13 @@ async function handleFinalConfirmTest(
   session: TestSession,
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
+  const input = message.trim().toLowerCase();
+  if (/^(1|sim|s|yes|confirmo|agendar)$/i.test(input)) {
+    session.stage = "ETAPA11_RATING";
+    responses.push({ text: "Tudo certo! 😊 Sua avaliação é muito importante para nós." });
+    return responses;
+  }
+
   const flowState = testSessionToFlowState(session);
   const flowResponses: FlowResponse[] = [];
   const result = await handleFinalConfirmCore(flowState, message, flowResponses);

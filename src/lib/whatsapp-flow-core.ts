@@ -142,7 +142,7 @@ export async function applyFirstTimeDiscount(
  * Constrói texto de opções de pagamento
  */
 export function buildPaymentOptionsText(): string {
-  return "**Pagamento**\n\n*1* 💳 PIX\n*2* 💳 Cartão\n*3* 💵 Dinheiro";
+  return "**Pagamento**\n\n*1* 💳 PIX\n*2* 💳 Cartão (na loja)\n*3* 💵 Dinheiro (na loja)";
 }
 
 /**
@@ -1019,6 +1019,37 @@ ${etapa8Payment(true, prompts)}` });
       ...state,
       stage: "ETAPA16_CONFIRMATION",
     };
+
+    // Generate the final summary card before confirmation text
+    try {
+      const paymentMethod = state.paymentMethod || "—";
+      const customerName = resolveValidCustomerName(state.customerName) ?? "Cliente";
+      const serviceName = state.serviceLabel ?? "—";
+      const vehicle = vehicleDisplayFromFlow(state) || "—";
+      const date = state.dayLabel ?? state.dayDate ?? "—";
+      const time = state.startTime ?? "—";
+      const totalValue = Math.max(
+        0,
+        Number(state.quoteMin ?? 0) + Number(state.upsellValue ?? 0) + Number(state.pickupFee ?? 0) - Number(state.couponDiscountApplied ?? 0) - Number(state.loyaltyDiscountApplied ?? 0)
+      );
+
+      const summaryCardUrl = await generateSummaryCard({
+        customerName,
+        serviceName,
+        vehicle,
+        date,
+        time,
+        paymentMethod,
+        totalPrice: totalValue,
+        pickupAddress: state.pickupAddress ?? undefined,
+      });
+
+      if (summaryCardUrl) {
+        responses.push({ text: "", mediaUrl: summaryCardUrl, mediaType: "image" });
+      }
+    } catch (error) {
+      console.error("[handleSummaryConfirm] Error generating summary card:", error);
+    }
 
     // Get business info for final confirmation
     const settings = await prisma.settings.findUnique({ where: { id: "default" } });
