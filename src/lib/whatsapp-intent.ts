@@ -180,7 +180,7 @@ export async function detectIntentSmart(text: string) {
 
   return {
     intent: ai.intent,
-    categoryNum: ai.intent === "schedule" ? 1 : ai.intent === "doubt" ? 3 : ai.intent === "service" ? 2 : null,
+    categoryNum: ai.intent === "schedule" ? 1 : ai.intent === "doubt" ? 3 : null,
     serviceKey: ai.suggestedService ?? null,
     urgency: ai.urgency ?? "medium",
     raw: "ai",

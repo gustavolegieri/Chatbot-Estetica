@@ -44,7 +44,7 @@ export interface HandoffSummary {
   vehicle?: string;
   intention: string;
   urgency: "high" | "medium" | "low";
-  history: string[];
+  history: string;
   conversationLength: number;
 }
 
