@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     }
 
     const result = await consultarDisponibilidade(parsed.data.data, parsed.data.servico_id);
-    if ("error" in result) return n8nError(result.error, result.status);
+    if (!result.ok) return n8nError(result.error, result.status);
     return n8nOk(result.data);
   } catch (error) {
     console.error("[n8n/disponibilidade]", error);

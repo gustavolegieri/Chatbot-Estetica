@@ -68,7 +68,7 @@ const handler = createMcpHandler(
           const data = args.data;
           if (!data) return toolError("Parâmetro data é obrigatório (YYYY-MM-DD).");
           const result = await consultarDisponibilidade(data, args.servico_id);
-          if ("error" in result) return toolError(result.error ?? "Erro ao consultar disponibilidade");
+          if (!result.ok) return toolError(result.error);
           return toolText(result);
         } catch (error) {
           console.error("[mcp] consultar_disponibilidade", error);
@@ -95,7 +95,7 @@ const handler = createMcpHandler(
           const telefone = args.telefone;
           if (!telefone) return toolError("Parâmetro telefone é obrigatório.");
           const result = await consultarAgendamentosCliente(telefone);
-          if ("error" in result) return toolError(result.error ?? "Erro ao consultar agendamentos");
+          if (!result.ok) return toolError(result.error);
           return toolText(result);
         } catch (error) {
           console.error("[mcp] consultar_agendamentos_cliente", error);

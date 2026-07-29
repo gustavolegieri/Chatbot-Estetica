@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     if (!telefone) return n8nError("Parâmetro telefone é obrigatório", 400);
 
     const result = await consultarAgendamentosCliente(telefone);
-    if ("error" in result) return n8nError(result.error, result.status);
+    if (!result.ok) return n8nError(result.error, result.status);
     return n8nOk(result.data);
   } catch (error) {
     console.error("[n8n/agendamentos GET]", error);

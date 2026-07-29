@@ -8,6 +8,10 @@ import {
   serializeCliente,
 } from "@/lib/n8n-helpers";
 
+type QueryError = { ok: false; error: string; status: number };
+type QueryOk<T> = { ok: true; data: T };
+export type QueryResult<T> = QueryOk<T> | QueryError;
+
 /** Lista serviços ativos com preços e variação por porte */
 export async function listServicosPrecos() {
   const services = await prisma.service.findMany({
@@ -35,13 +39,16 @@ export async function listServicosPrecos() {
 }
 
 /** Horários livres em uma data (YYYY-MM-DD) */
-export async function consultarDisponibilidade(dateStr: string, servicoId?: string) {
+export async function consultarDisponibilidade(
+  dateStr: string,
+  servicoId?: string
+): Promise<QueryResult<{ data: string; duracao_min: number; horarios: string[] }>> {
   let durationMin: number;
 
   if (servicoId) {
     const service = await prisma.service.findUnique({ where: { id: servicoId } });
     if (!service) {
-      return { error: "Serviço não encontrado" as const, status: 404 as const };
+      return { ok: false, error: "Serviço não encontrado", status: 404 };
     }
     durationMin = service.durationMin;
   } else {
@@ -52,6 +59,7 @@ export async function consultarDisponibilidade(dateStr: string, servicoId?: stri
   const horarios = await getAvailableSlots(dateStr, durationMin);
 
   return {
+    ok: true,
     data: {
       data: dateStr,
       duracao_min: durationMin,
@@ -64,7 +72,7 @@ export async function consultarDisponibilidade(dateStr: string, servicoId?: stri
 export async function consultarAgendamentosCliente(telefone: string) {
   const client = await findClientByPhone(telefone);
   if (!client) {
-    return { error: "Cliente não encontrado" as const, status: 404 as const };
+    return { ok: false as const, error: "Cliente não encontrado", status: 404 };
   }
 
   const now = new Date();
@@ -82,7 +90,7 @@ export async function consultarAgendamentosCliente(telefone: string) {
 
   const futuros = appointments.filter((a) => appointmentDateTime(a.date, a.startTime) >= now);
 
-  return { data: futuros.map(serializeAgendamento) };
+  return { ok: true as const, data: futuros.map(serializeAgendamento) };
 }
 
 /**
