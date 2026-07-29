@@ -5,6 +5,22 @@
 
 import { cerebrasChat, isCerebrasConfigured, parseJsonFromModel } from "./cerebras-ai";
 import { CATALOG } from "./whatsapp-catalog";
+import type { FlowState } from "./whatsapp-flow-types";
+import type { FlowContext } from "./whatsapp-flow-messages";
+import type { WhatsAppCatalogContext } from "./whatsapp-service-catalog";
+
+function buildServicesSummary(wctx: WhatsAppCatalogContext): string {
+  const lines: string[] = [];
+  for (const [num, cat] of Object.entries(wctx.categories)) {
+    if (Number(num) === 8) continue;
+    const items = cat.keys
+      .filter((k) => k !== "indeciso" && k !== "pacotes")
+      .map((k) => wctx.catalog[k]?.label)
+      .filter(Boolean);
+    if (items.length) lines.push(`${cat.title}: ${items.join(", ")}`);
+  }
+  return lines.join("\n");
+}
 
 export interface IntentAnalysis {
   intent: "schedule" | "reschedule" | "cancel" | "doubt" | "schedule_or_doubt" | "other" | "greeting";
