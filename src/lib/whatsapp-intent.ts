@@ -1,4 +1,5 @@
 import { CATALOG, CATEGORIES, MAIN_MENU_CATEGORIES } from "./whatsapp-catalog";
+import { analyzeIntentAIV2 } from "./whatsapp-ai-enhanced";
 
 /** Número do menu principal (1–8 categorias) */
 export function detectCategoryNum(text: string): number | null {
@@ -101,4 +102,120 @@ export function subMenuForCategory(categoryNum: number): string {
     ``,
     `*0* — Voltar ao menu principal`,
   ].join("\n");
+}
+
+/**
+ * Versão assistida por IA para intenções mais ambíguas.
+ * Mantém as funções síncronas acima para compatibilidade.
+ */
+export async function detectIntentSmart(text: string) {
+  const num = onlyMenuNumber(text);
+  const regexCategory = detectCategoryNum(text);
+  const regexService = detectServiceKey(text);
+
+  if (regexCategory || regexService) {
+    return {
+      intent: regexService ? "service" : "menu",
+      categoryNum: regexCategory,
+      serviceKey: regexService,
+      urgency: "medium" as const,
+      raw: "regex",
+    };
+  }
+
+  if (wantsToSchedule(text, num)) {
+    return {
+      intent: "schedule",
+      categoryNum: 1,
+      serviceKey: null,
+      urgency: "medium" as const,
+      raw: "rule",
+      menuNumber: num,
+    };
+  }
+
+  if (wantsDoubt(text, num)) {
+    return {
+      intent: "doubt",
+      categoryNum: 3,
+      serviceKey: null,
+      urgency: "medium" as const,
+      raw: "rule",
+      menuNumber: num,
+    };
+  }
+
+  if (wantsRefusal(text)) {
+    return {
+      intent: "cancel",
+      categoryNum: null,
+      serviceKey: null,
+      urgency: "medium" as const,
+      raw: "rule",
+      menuNumber: num,
+    };
+  }
+
+  if (isGreetingOrSmallTalk(text)) {
+    return {
+      intent: "greeting",
+      categoryNum: null,
+      serviceKey: null,
+      urgency: "low" as const,
+      raw: "rule",
+      menuNumber: num,
+    };
+  }
+
+  const ai = await analyzeIntentAIV2(text);
+  if (!ai) {
+    return {
+      intent: "other",
+      categoryNum: null,
+      serviceKey: null,
+      urgency: "medium" as const,
+      raw: "fallback",
+    };
+  }
+
+  return {
+    intent: ai.intent,
+    categoryNum: ai.intent === "schedule" ? 1 : ai.intent === "doubt" ? 3 : ai.intent === "service" ? 2 : null,
+    serviceKey: ai.suggestedService ?? null,
+    urgency: ai.urgency ?? "medium",
+    raw: "ai",
+    menuNumber: num,
+    reason: ai.reason,
+  };
+}
+
+export async function wantsToScheduleSmart(text: string, num: number | null): Promise<boolean> {
+  if (wantsToSchedule(text, num)) return true;
+  const ai = await analyzeIntentAIV2(text);
+  return ai?.intent === "schedule";
+}
+
+export async function wantsDoubtSmart(text: string, num: number | null): Promise<boolean> {
+  if (wantsDoubt(text, num)) return true;
+  const ai = await analyzeIntentAIV2(text);
+  return ai?.intent === "doubt" || ai?.intent === "schedule_or_doubt";
+}
+
+export async function wantsRefusalSmart(text: string): Promise<boolean> {
+  if (wantsRefusal(text)) return true;
+  const ai = await analyzeIntentAIV2(text);
+  return ai?.intent === "cancel";
+}
+
+export async function isGreetingOrSmallTalkSmart(text: string): Promise<boolean> {
+  if (isGreetingOrSmallTalk(text)) return true;
+  const ai = await analyzeIntentAIV2(text);
+  return ai?.intent === "greeting";
+}
+
+export async function detectServiceKeySmart(text: string): Promise<string | null> {
+  const service = detectServiceKey(text);
+  if (service) return service;
+  const ai = await analyzeIntentAIV2(text);
+  return ai?.suggestedService ?? null;
 }

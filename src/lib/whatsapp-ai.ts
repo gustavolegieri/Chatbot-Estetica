@@ -1,7 +1,80 @@
-import { cerebrasChat, isCerebrasConfigured, parseJsonFromModel } from "./cerebras-ai";
+﻿import { cerebrasChat, isCerebrasConfigured, parseJsonFromModel } from "./cerebras-ai";
 import type { FlowStage, FlowState } from "./whatsapp-flow-types";
 import type { FlowContext } from "./whatsapp-flow-messages";
 import type { WhatsAppCatalogContext } from "./whatsapp-service-catalog";
+import {
+  analyzeIntentAIV2,
+  analyzeIndecisiveClient,
+  detectExistingAppointment,
+  detectNavigationCommand,
+  detectUrgency,
+  generateConfirmationMessage,
+  generateFeedbackRequest,
+  generateFriendlyError,
+  generateHandoffSummary,
+  generateOrderSummary,
+  generateWhatsAppSummary,
+  parseVehicleAI,
+} from "./whatsapp-ai-enhanced";
+
+export { analyzeIntentAIV2 as analyzeIntentSmart, parseVehicleAI, analyzeIndecisiveClient, detectNavigationCommand, detectUrgency, generateHandoffSummary, generateOrderSummary, generateConfirmationMessage, generateFriendlyError, detectExistingAppointment, generateFeedbackRequest, generateWhatsAppSummary };
+
+export interface SmartFlowAiResult {
+  intent?: string;
+  vehicle?: ReturnType<typeof parseVehicleAI>;
+}
+
+export async function analyzeSmartFlow(text: string) {
+  const intent = await analyzeIntentAIV2(text);
+  const vehicle = await parseVehicleAI(text);
+  const navigation = await detectNavigationCommand(text);
+  const urgency = await detectUrgency(text);
+  const existingAppointment = await detectExistingAppointment(text);
+
+  return {
+    intent,
+    vehicle,
+    navigation,
+    urgency,
+    existingAppointment,
+  };
+}
+
+export async function buildSmartSummary(text: string, flow: FlowState, ctx: FlowContext, wctx: WhatsAppCatalogContext) {
+  const [orderSummary, handoffSummary, feedbackRequest] = await Promise.all([
+    generateOrderSummary({
+      customerName: flow.customerName ?? "Cliente",
+      serviceLabel: flow.serviceLabel ?? "Serviço",
+      vehicleDisplay: flow.vehicleRaw ?? flow.vehicleModel ?? "seu veículo",
+      day: flow.dayLabel ?? flow.dayDate ?? undefined,
+      time: flow.startTime ?? flow.periodLabel ?? undefined,
+      quoteMin: flow.quoteMin,
+      quoteMax: flow.quoteMax,
+    }),
+    generateHandoffSummary({
+      clientName: flow.customerName ?? "Cliente",
+      service: flow.serviceLabel ?? undefined,
+      vehicle: flow.vehicleRaw ?? flow.vehicleModel ?? undefined,
+      intention: text,
+      history: [text],
+    }),
+    generateFeedbackRequest(),
+  ]);
+
+  return {
+    orderSummary,
+    handoffSummary,
+    feedbackRequest,
+  };
+}
+
+export async function buildFriendlyFallback(text: string, flowStage?: string, lastService?: string) {
+  return generateFriendlyError(text, { flowStage, lastService });
+}
+
+export async function buildQuickFAQ(text: string, flow: FlowState, ctx: FlowContext, wctx: WhatsAppCatalogContext) {
+  return answerCustomerDoubt({ question: text, flow, ctx, wctx });
+}
 
 export type MessageIntent =
   | "name"

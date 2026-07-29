@@ -185,3 +185,55 @@ export function mergeVehicleIntoFlow(
 export function vehicleDisplay(v: Partial<ParsedVehicle>): string {
   return v.summary || v.model || v.raw || "seu veículo";
 }
+
+/**
+ * Fallback assíncrono com IA quando o parser por regras não encontra dados.
+ * Mantém o parser síncrono para compatibilidade com o fluxo atual.
+ */
+export async function parseVehicleMessageSmart(text: string): Promise<ParsedVehicle> {
+  const parsed = parseVehicleMessage(text);
+  const shouldUseAi = !parsed.hasData || !parsed.model || !parsed.year || !parsed.color || !parsed.condition;
+
+  if (!shouldUseAi) return parsed;
+
+  try {
+    const { parseVehicleAI } = await import("./whatsapp-ai-enhanced");
+    const ai = await parseVehicleAI(text);
+    if (!ai?.hasData) return parsed;
+
+    return {
+      raw: parsed.raw,
+      model: ai.model || parsed.model,
+      year: ai.year || parsed.year,
+      color: ai.color || parsed.color,
+      condition: ai.condition || parsed.condition,
+      summary: [ai.model || parsed.model, ai.year || parsed.year].filter(Boolean).join(" ").trim() || parsed.summary,
+      isSuv: ai.isSuv || parsed.isSuv,
+      hasData: true,
+    };
+  } catch {
+    return parsed;
+  }
+}
+
+export function vehicleQuickSummary(vehicle: Partial<ParsedVehicle>): string {
+  return vehicleDisplay(vehicle);
+}
+
+export function detectVehicleCompletion(vehicle: Partial<ParsedVehicle>): boolean {
+  return Boolean(vehicle.model && vehicle.year && vehicle.color);
+}
+
+export function mergeVehicleIntoFlowSmart(
+  existing: Partial<ParsedVehicle>,
+  incoming: ParsedVehicle
+): ParsedVehicle {
+  return mergeVehicleIntoFlow(existing, incoming);
+}
+
+export function buildVehicleNextStepMessage(vehicle: Partial<ParsedVehicle>): string {
+  if (!vehicle.model) return "Me diga o modelo do veículo para continuar.";
+  if (!vehicle.year) return `Agora me diga o ano do ${vehicle.model}.`;
+  if (!vehicle.color) return `Qual é a cor do ${vehicle.model}?`;
+  return `Perfeito — já tenho os dados do veículo: ${vehicleDisplay(vehicle)}.`;
+}

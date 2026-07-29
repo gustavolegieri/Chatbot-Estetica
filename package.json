@@ -16,6 +16,7 @@
     "test": "node --import tsx --test"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "@napi-rs/canvas": "^1.0.2",
     "@prisma/client": "^6.9.0",
     "@resvg/resvg-js": "^2.6.2",
@@ -28,6 +29,7 @@
     "form-data": "^4.0.6",
     "jose": "^6.0.11",
     "lucide-react": "^0.513.0",
+    "mcp-handler": "^1.1.0",
     "next": "^15.3.3",
     "node-fetch": "^3.3.2",
     "nodemailer": "^9.0.3",

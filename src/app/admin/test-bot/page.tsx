@@ -7,6 +7,8 @@ interface TestBotMessage {
   text: string;
   sender: "user" | "bot";
   timestamp: string;
+  mediaUrl?: string;
+  mediaType?: "image" | "video" | "document";
 }
 
 interface FlowState {
@@ -66,6 +68,12 @@ export default function TestBotPage() {
     }
   };
 
+  const parseMediaTag = (text: string): { cleanText: string; mediaUrl?: string; mediaType?: "image" | "video" | "document" } => {
+    const match = text.match(/^\[MÍDIA:\s*(image|video|document)\|([^\]]+)\]\s*([\s\S]*)$/i);
+    if (!match) return { cleanText: text };
+    return { cleanText: match[3].trim(), mediaType: match[1] as any, mediaUrl: match[2] };
+  };
+
   const sendMessage = async () => {
     if (!inputText.trim() || isLoading) return;
 
@@ -93,7 +101,13 @@ export default function TestBotPage() {
       const data = await response.json();
       if (data.success) {
         setSessionId(data.sessionId);
-        setMessages(data.messages);
+        setMessages(data.messages.map((m: TestBotMessage) => {
+          if (m.sender === "bot" && m.text.startsWith("[MÍDIA:")) {
+            const parsed = parseMediaTag(m.text);
+            return { ...m, text: parsed.cleanText, mediaUrl: parsed.mediaUrl, mediaType: parsed.mediaType };
+          }
+          return m;
+        }));
         setFlowState(data.flowState);
       }
     } catch (error) {
@@ -214,24 +228,32 @@ export default function TestBotPage() {
               messages.map((msg, index) => (
                 <div
                   key={index}
-                  className={`flex ${
-                    msg.sender === "user" ? "justify-end" : "justify-start"
-                  }`}
+                  className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[70%] rounded-2xl px-4 py-3 ${
-                      msg.sender === "user"
-                        ? "bg-blue-500 text-white"
-                        : "bg-white shadow"
-                    }`}
+                    className={`max-w-[70%] rounded-2xl px-4 py-3 ${msg.sender === "user" ? "bg-blue-500 text-white" : "bg-white shadow"}`}
                   >
+                    {msg.mediaUrl && msg.mediaType === "image" && (
+                      <img
+                        src={msg.mediaUrl}
+                        alt="Mídia do bot"
+                        className="max-w-full h-auto rounded-lg mb-2"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    )}
+                    {msg.mediaUrl && msg.mediaType === "video" && (
+                      <video src={msg.mediaUrl} controls className="max-w-full h-auto rounded-lg mb-2" />
+                    )}
+                    {msg.mediaUrl && msg.mediaType === "document" && (
+                      <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer" className="block text-sm text-blue-600 underline mb-2">
+                        📎 {msg.text || "Documento"}
+                      </a>
+                    )}
                     <p className="whitespace-pre-wrap break-words">{msg.text}</p>
                     <p
-                      className={`text-xs mt-1 ${
-                        msg.sender === "user"
-                          ? "text-blue-100"
-                          : "text-gray-400"
-                      }`}
+                      className={`text-xs mt-1 ${msg.sender === "user" ? "text-blue-100" : "text-gray-400"}`}
                     >
                       {new Date(msg.timestamp).toLocaleTimeString("pt-BR", {
                         hour: "2-digit",

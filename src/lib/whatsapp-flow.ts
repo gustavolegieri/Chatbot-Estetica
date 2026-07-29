@@ -177,8 +177,8 @@ async function executeCoreHandler(
   for (const response of result.responses) {
     if (response.mediaUrl && response.mediaType) {
       if (msg.testMode?.sendTextCallback) {
-        // Em modo de teste, ignora mídia por enquanto
-        await msg.testMode.sendTextCallback(`[MÍDIA: ${response.mediaType}] ${response.text || ""}`);
+        // Em modo de teste, retorna texto + mídia para exibição no painel
+        await msg.testMode.sendTextCallback(`[MÍDIA: ${response.mediaType}|${response.mediaUrl}] ${response.text || ""}`);
       } else {
         await sendMedia({
           number: msg.phone,

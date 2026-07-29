@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendText } from '@/lib/evolution-api';
 import { sendMedia } from '@/lib/evolution-api';
-import { generateCalendarImageOnlyForTest, generateCalendarLegend } from '@/lib/calendar-helper';
+import { generateCalendarImageOnlyForTest, generateCalendarLegend, sendCalendarWithImageAndList } from '@/lib/calendar-helper';
 import { testFluxoStorage } from '@/lib/test-fluxo-storage';
 import { etapa1Welcome, etapa2MainMenu, etapa4Vehicle, etapa4AskYear, etapa4VehicleConfirmation, etapa5Quote, etapa6Upsell, etapa7Day, etapa7Time, etapa8Payment, etapa8PixBlock, etapa8PixChoice, etapa9Confirm, serviceDetail, packageActionText, formatHours, type FlowContext } from '@/lib/whatsapp-flow-messages';
 import { loadWhatsAppCatalog, buildMainMenu, subMenuForCategoryCtx } from '@/lib/whatsapp-service-catalog';
@@ -174,7 +174,8 @@ async function testIndividualStep(phone: string, stepId: string) {
       // 12. UPSELL
       text = '✨ Que tal adicionar Vitrificação Cerâmica?\n\n💰 R$ 150,00 a mais\n\n1 - Sim, incluir\n2 - Não, obrigado';
     } else if (step.type === 'day_selection') {
-      // 13. ESCOLHA DE DIA
+      // 13. ESCOLHA DE DIA - enviar calendário completo (imagem + legenda + lista)
+      await sendCalendarWithImageAndList({ number: phone, prompts: wctx.prompts });
       text = etapa7Day(wctx.prompts);
     } else if (step.type === 'time_selection') {
       // 14. ESCOLHA DE HORÁRIO

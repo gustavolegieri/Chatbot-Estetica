@@ -45,13 +45,15 @@ import {
 import { recordTestBotRating } from "./test-bot-evaluation-store";
 import { loadPromptMap } from "./bot-prompts";
 import { parseVehicleMessage } from "./whatsapp-vehicle-parse";
-import { loadWhatsAppCatalog } from "./whatsapp-service-catalog";
-import { prisma } from "./prisma";
+import { isGreetingOrSmallTalk, wantsDoubt } from "./whatsapp-intent";
 import { buildAvailableSlotsForDay, parseTimeSelection } from "./appointments";
+import { loadWhatsAppCatalog, buildMainMenu as buildCatalogMainMenu } from "./whatsapp-service-catalog";
+import { prisma } from "./prisma";
 import { calculateDistance, calculatePickupFee } from "./maps";
 import { findCouponByCode } from "./coupons";
-import { format } from "date-fns";
+import { format, format as formatDate } from "date-fns";
 import { answerCustomerDoubt } from "./whatsapp-ai";
+import { normalizePhone } from "./utils";
 import { generateSummaryCard, generateSummaryText, SummaryCardData } from "./summary-card";
 import { generatePixQrCode, generatePixPayload } from "./pix-qr";
 import { analyzeReceiptImage, validateReceiptAmount } from "./receipt-analyzer";
@@ -362,7 +364,7 @@ export async function processTestFlow({
     const prompts = await loadPromptMap();
     session.stage = "ETAPA2_MAIN_MENU";
     await trackFunnelProgress(sessionId, session.sessionId || "", "ETAPA2_MAIN_MENU");
-    responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+    responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildCatalogMainMenu(wctx.categories, prompts), prompts) });
     return responses;
   }
 
@@ -391,7 +393,7 @@ export async function processTestFlow({
     const wctx = await loadWhatsAppCatalog(true);
     const menuText = etapa2MainMenu(
       session.customerName || "Cliente",
-      buildMainMenu(wctx.categories, prompts),
+      buildCatalogMainMenu(wctx.categories, prompts),
       prompts
     );
     responses.push({ text: menuText });
@@ -472,7 +474,7 @@ export async function processTestFlow({
       const wctx = await loadWhatsAppCatalog(true);
       const menuText = etapa2MainMenu(
         session.customerName || "Cliente",
-        buildMainMenu(wctx.categories, prompts),
+        buildCatalogMainMenu(wctx.categories, prompts),
         prompts
       );
       responses.push({ text: menuText });
@@ -718,7 +720,7 @@ async function handleNameCollection(
 
   session.stage = "ETAPA2_MAIN_MENU";
   const wctx = await loadWhatsAppCatalog(true);
-  const menuText = etapa2MainMenu(name, buildMainMenu(wctx.categories, prompts), prompts);
+  const menuText = etapa2MainMenu(name, buildCatalogMainMenu(wctx.categories, prompts), prompts);
   responses.push({ text: menuText });
   return responses;
 }
@@ -747,7 +749,7 @@ async function handleClientRecognition(
 
   session.stage = "ETAPA2_MAIN_MENU";
   const wctx = await loadWhatsAppCatalog(true);
-  responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+  responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildCatalogMainMenu(wctx.categories, prompts), prompts) });
   return responses;
 }
 
@@ -762,7 +764,7 @@ async function handleMainMenu(
   if (!/^[1-8]$/.test(choice)) {
     responses.push({ text: "❌ Escolha inválida. Selecione uma opção de 1 a 8." });
     const wctx = await loadWhatsAppCatalog(true);
-    const menuText = etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts);
+    const menuText = etapa2MainMenu(session.customerName || "Cliente", buildCatalogMainMenu(wctx.categories, prompts), prompts);
     responses.push({ text: menuText });
     return responses;
   }
@@ -841,7 +843,7 @@ async function handleSubMenu(
   if (choice === 0) {
     session.stage = "ETAPA2_MAIN_MENU";
     const wctx = await loadWhatsAppCatalog(true);
-    responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+    responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildCatalogMainMenu(wctx.categories, prompts), prompts) });
     return responses;
   }
 
@@ -876,7 +878,7 @@ async function handleServiceAction(
   if (choice === "0") {
     session.stage = "ETAPA2_MAIN_MENU";
     const wctx = await loadWhatsAppCatalog(true);
-    responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+    responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildCatalogMainMenu(wctx.categories, prompts), prompts) });
     return responses;
   }
 
@@ -891,7 +893,7 @@ async function handleServiceAction(
     case "2":
       session.stage = "ETAPA2_MAIN_MENU";
       const wctx = await loadWhatsAppCatalog(true);
-      responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+      responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildCatalogMainMenu(wctx.categories, prompts), prompts) });
       break;
 
     case "3":
@@ -912,11 +914,19 @@ async function handleVehicleStage(
   session: TestSession,
   responses: TestResponse[]
 ): Promise<TestResponse[]> {
-  const input = message.trim().toLowerCase();
+  const input = message.trim();
+  const lower = input.toLowerCase();
   const isYes = /^(sim|s|1|yes|confirmo|confirma|tudo certo)$/i.test(input);
   const isNo = /^(nao|não|n|2|no|errado|alterar|tudo errado|nada certo)$/i.test(input);
 
-  if (isYes) {
+  if (isGreetingOrSmallTalk(input)) {
+    const wctx = await loadWhatsAppCatalog(true);
+    const prompts = await loadPromptMap();
+    responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildCatalogMainMenu(wctx.categories, prompts), prompts) });
+    return responses;
+  }
+
+  if (isYes && session.vehicle.model && session.vehicle.year && session.vehicle.color && session.vehicle.condition) {
     const basePrice = await calculateBasePrice(session);
     session.quote = basePrice;
     session.stage = "ETAPA5_QUOTE";
@@ -935,46 +945,48 @@ async function handleVehicleStage(
 
   if (isNo) {
     session.stage = "ETAPA4_VEHICLE";
-    responses.push({ text: "Sem problemas! Me informe os dados corretos. " });
+    responses.push({
+      text: buildVehicleCollectionPrompt({
+        ...session.vehicle,
+        year: session.vehicle.year?.toString() || null,
+      }),
+    });
     return responses;
   }
 
-  // Resposta "mesmo veículo" para cliente recorrente
-  if (/^(mesmo|mesmo veiculo|sim|1)$/i.test(input) && session.savedVehicle) {
+  if (/^(mesmo|mesmo veiculo|mesmo veículo|sim|1)$/i.test(lower) && session.savedVehicle) {
     session.vehicle = { model: "Honda Civic", year: 2020, color: "preto", condition: "bom" };
     responses.push({ text: buildVehicleConfirmationPrompt({ model: "Honda Civic", year: "2020", color: "preto", condition: "bom" }) });
     return responses;
   }
 
-  const vehicleInfo = parseVehicleMessage(message);
-  const normalizedCondition = normalizeConditionValue(vehicleInfo.condition);
+  const vehicleInfo = parseVehicleMessage(input);
+  const normalizedCondition = normalizeVehicleConditionValue(vehicleInfo.condition || "") || null;
 
-  session.vehicle = {
-    model: vehicleInfo.model || session.vehicle.model,
-    year: vehicleInfo.year ? parseInt(vehicleInfo.year) : session.vehicle.year,
-    color: vehicleInfo.color || session.vehicle.color,
-    condition: normalizedCondition || session.vehicle.condition,
-  };
+  if (vehicleInfo.model) session.vehicle.model = vehicleInfo.model;
+  if (vehicleInfo.year) session.vehicle.year = parseInt(vehicleInfo.year, 10);
+  if (vehicleInfo.color) session.vehicle.color = vehicleInfo.color;
+  if (normalizedCondition) {
+    session.vehicle.condition = normalizedCondition === "precisa de atenção" ? "ruim" : (normalizedCondition as any);
+  }
 
-  // Verifica se tem todos os campos necessários
-  const missing: string[] = [];
-  if (!session.vehicle.model) missing.push("modelo");
-  if (!session.vehicle.year) missing.push("ano");
-  if (!session.vehicle.color) missing.push("cor");
-
-  if (missing.length > 0) {
-    responses.push({
-      text: `📝 Faltam: ${missing.join(", ")}. Me informe para completar.\n\nEx: "Honda Civic 2020, preto"`,
-    });
+  if (session.vehicle.model && session.vehicle.year && session.vehicle.color && session.vehicle.condition) {
+    session.stage = "ETAPA4_VEHICLE_CONFIRM";
+    responses.push({ text: buildVehicleConfirmationPrompt({
+      model: session.vehicle.model,
+      year: session.vehicle.year.toString(),
+      color: session.vehicle.color,
+      condition: session.vehicle.condition,
+    }) });
     return responses;
   }
 
-  responses.push({ text: buildVehicleConfirmationPrompt({
-    model: session.vehicle.model,
-    year: session.vehicle.year?.toString() ?? "",
-    color: session.vehicle.color,
-    condition: session.vehicle.condition,
-  }) });
+  responses.push({
+    text: buildVehicleCollectionPrompt({
+      ...session.vehicle,
+      year: session.vehicle.year?.toString() || null,
+    }),
+  });
   return responses;
 }
 
@@ -992,10 +1004,16 @@ async function handleQuoteStep(
     return responses;
   }
 
-  // Compatibilidade com o roteiro legado dos testes: após o orçamento, o fluxo passa por upsell e depois segue para cupom/reminder
-  session.stage = "ETAPA6_UPSELL";
+  // No happy path do teste, o calendário deve aparecer antes de avançar para cupom/reminder.
+  session.stage = "ETAPA7_DAY";
   responses.push({
-    text: "✨ Quer incluir algum complemento para o serviço?\n\n*1* - Sim\n*2* - Não, obrigado",
+    text: "📅 Perfeito! Agora vamos escolher o melhor dia para o seu atendimento.",
+  });
+  const calendarImagePath = await generateCalendarImageOnlyForTest(session.testDate || null);
+  responses.push({
+    text: generateCalendarLegend(),
+    mediaUrl: calendarImagePath,
+    mediaType: "image",
   });
   return responses;
 }
@@ -1008,11 +1026,7 @@ async function handleUpsell(
   const choice = message.trim();
   const offer = session.upsellOffer ?? getUpsellVariants(session.selectedService)[0];
 
-  session.stage = "ETAPA9_COUPON";
-  responses.push({
-    text: "🎟️ Você tem algum cupom de desconto?\n\n*1* Sim, tenho um cupom\n*2* Não tenho",
-  });
-
+  session.stage = "ETAPA7_DAY";
   if (choice === "1" || choice.toLowerCase() === "sim") {
     session.upsellAccepted = true;
     session.upsellLabel = offer.label;
@@ -1023,6 +1037,13 @@ async function handleUpsell(
     session.upsellValue = 0;
     responses.push({ text: "Tudo bem! Seguindo com o serviço principal." });
   }
+  responses.push({ text: "📅 Perfeito! Agora vamos escolher o melhor dia para o seu atendimento." });
+  const calendarImagePath = await generateCalendarImageOnlyForTest(session.testDate || null);
+  responses.push({
+    text: generateCalendarLegend(),
+    mediaUrl: calendarImagePath,
+    mediaType: "image",
+  });
   return responses;
 }
 
@@ -1195,12 +1216,11 @@ async function handleDateSelection(
     session.stage = "ETAPA2_MAIN_MENU";
     const wctx = await loadWhatsAppCatalog(true);
     const prompts = await loadPromptMap();
-    responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+    responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildCatalogMainMenu(wctx.categories, prompts), prompts) });
     return responses;
   }
 
   if (input === "hoje") {
-    // Use test date if available, otherwise use current date
     const today = session.testDate ? new Date(session.testDate) : new Date();
     if (today.getDay() === 0) {
       responses.push({ text: "❌ Domingo fechamos. " });
@@ -1208,45 +1228,44 @@ async function handleDateSelection(
       responses.push({ text: generateCalendarLegend(), mediaUrl: calendarImagePath, mediaType: "image" });
       return responses;
     }
-    const dateStr = format(today, "yyyy-MM-dd");
+    const dateStr = formatDate(today, "yyyy-MM-dd");
     const slots = await getDynamicTimeSlots(session, dateStr);
     session.selectedDay = today.toLocaleDateString("pt-BR");
     session.selectedDateIso = dateStr;
     session.availableSlots = slots;
-    session.stage = "ETAPA7_TIME";
+    session.stage = slots.length > 0 ? "ETAPA7_TIME" : "ETAPA7_DAY";
     const optionsText = slots.length > 0 ? slots.map((time, i) => `*${i + 1}* - ${time}`).join("\n") : "Sem horários disponíveis";
     responses.push({ text: `📅 *Hoje* (${today.toLocaleDateString("pt-BR")})\n\n⏰ Qual horário?\n\n${optionsText}` });
     return responses;
   }
 
-  const dayNum = parseInt(input);
+  const dayNum = parseInt(input, 10);
   if (!isNaN(dayNum) && dayNum >= 1 && dayNum <= 31) {
-    // Use test date if available, otherwise use current date
     const today = session.testDate ? new Date(session.testDate) : new Date();
     const selectedDate = new Date(today.getFullYear(), today.getMonth(), dayNum);
-    
-    // Check if date is in the past
     const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const selectedMidnight = new Date(today.getFullYear(), today.getMonth(), dayNum);
+
     if (selectedMidnight < todayMidnight) {
       responses.push({ text: "❌ Não é possível agendar para datas passadas. Por favor, escolha uma data a partir de hoje." });
       const calendarImagePath = await generateCalendarImageOnlyForTest(session.testDate || null);
       responses.push({ text: generateCalendarLegend(), mediaUrl: calendarImagePath, mediaType: "image" });
       return responses;
     }
-    
+
     if (selectedDate.getDay() === 0) {
       responses.push({ text: "❌ Domingo fechamos. " });
       const calendarImagePath = await generateCalendarImageOnlyForTest(session.testDate || null);
       responses.push({ text: generateCalendarLegend(), mediaUrl: calendarImagePath, mediaType: "image" });
       return responses;
     }
-    const dateStr = format(selectedDate, "yyyy-MM-dd");
+
+    const dateStr = formatDate(selectedDate, "yyyy-MM-dd");
     const slots = await getDynamicTimeSlots(session, dateStr);
     session.selectedDay = selectedDate.toLocaleDateString("pt-BR");
     session.selectedDateIso = dateStr;
     session.availableSlots = slots;
-    session.stage = "ETAPA7_TIME";
+    session.stage = slots.length > 0 ? "ETAPA7_TIME" : "ETAPA7_DAY";
     const optionsText = slots.length > 0 ? slots.map((time, i) => `*${i + 1}* - ${time}`).join("\n") : "Sem horários disponíveis";
     responses.push({ text: `📅 ${selectedDate.toLocaleDateString("pt-BR", { weekday: "long" })}\n\n⏰ Horários?\n\n${optionsText}` });
     return responses;
@@ -1258,6 +1277,7 @@ async function handleDateSelection(
   return responses;
 }
 
+
 async function handleTimeSelection(
   message: string,
   session: TestSession,
@@ -1268,7 +1288,7 @@ async function handleTimeSelection(
     session.stage = "ETAPA2_MAIN_MENU";
     const wctx = await loadWhatsAppCatalog(true);
     const prompts = await loadPromptMap();
-    responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+    responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildCatalogMainMenu(wctx.categories, prompts), prompts) });
     return responses;
   }
 
@@ -1558,7 +1578,7 @@ async function handleServiceQuestion(
       session.stage = "ETAPA2_MAIN_MENU";
       const wctx = await loadWhatsAppCatalog(true);
       const prompts = await loadPromptMap();
-      responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+      responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildCatalogMainMenu(wctx.categories, prompts), prompts) });
       return responses;
     } else if (choice === "3") {
       // More questions
@@ -1702,7 +1722,7 @@ async function handleFAQ(
         session.serviceRecommendation = null;
         session.stage = "ETAPA2_MAIN_MENU";
         const prompts = await loadPromptMap();
-        responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+        responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildCatalogMainMenu(wctx.categories, prompts), prompts) });
         return responses;
       }
     } else if (choice === "2") {
@@ -1711,7 +1731,7 @@ async function handleFAQ(
       session.stage = "ETAPA2_MAIN_MENU";
       const wctx = await loadWhatsAppCatalog(true);
       const prompts = await loadPromptMap();
-      responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildMainMenu(wctx.categories, prompts), prompts) });
+      responses.push({ text: etapa2MainMenu(session.customerName || "Cliente", buildCatalogMainMenu(wctx.categories, prompts), prompts) });
       return responses;
     } else {
       // Invalid choice, show options again

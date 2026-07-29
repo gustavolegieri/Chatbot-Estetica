@@ -1,4 +1,4 @@
-/** Defaults dos prompts do bot — usados no seed e como fallback */
+﻿/** Defaults dos prompts do bot — usados no seed e como fallback */
 
 export interface PromptDef {
   key: string;
@@ -16,19 +16,21 @@ export const BOT_PROMPT_DEFAULTS: PromptDef[] = [
     hint: "{businessName}, {address}, {hours}",
     content: `Olá! Seja muito bem-vindo(a) à *{businessName}* 🚗✨
 
-Aqui não fazemos lavagem comum — somos especialistas em *estética automotiva premium*: serviços que cuidam, protegem e valorizam o seu veículo de verdade.
+Aqui você encontra estética automotiva premium, com atendimento simples de entender e orientado para resultado.
 
 O que fazemos por você:
-🔹 *Lavagem detalhada* — muito além de água e sabão
-🔹 *Polimento técnico* — riscos e opacidade eliminados
+🔹 *Lavagem detalhada* — limpeza cuidadosa por dentro e por fora
+🔹 *Polimento técnico* — ajuda a recuperar brilho e aparência
 🔹 *Proteção de pintura* — vitrificação e cristalização
-🔹 *Higienização interior* — renovação completa por dentro
-🔹 *Detalhamentos completos* — carro como saído da concessionária
+🔹 *Higienização interior* — bancos, teto e acabamento
+🔹 *Detalhamentos completos* — cuidado mais profundo no veículo
 
 📍 {address}
 🕐 {hours}
 
-Para começarmos, qual é o seu *nome*? 😊`,
+Para começar, me diga o seu *nome*.
+
+_Se preferir, responda com uma frase curta como "sou João"._`,
   },
   {
     key: "etapa2_main_menu",
@@ -37,7 +39,8 @@ Para começarmos, qual é o seu *nome*? 😊`,
     hint: "{clientName}, {menu}",
     content: `Que bom te ter aqui, *{clientName}*! 😊
 
-O que seu carro precisa hoje?
+Me diga o que você precisa hoje. Se quiser, também pode escrever direto:
+*agendar*, *dúvida*, *menu* ou *falar com o dono*.
 
 {menu}`,
   },
@@ -45,12 +48,14 @@ O que seu carro precisa hoje?
     key: "service_action_menu",
     label: "Ações após detalhe do serviço",
     category: "fluxo",
-    content: `O que você quer fazer?
+    content: `O que você quer fazer agora?
 
 *1* 📅 Quero agendar
 *2* 🔄 Ver outros serviços
 *3* 💬 Tenho uma dúvida
-*4* 👤 Falar com o dono`,
+*4* 👤 Falar com o dono
+
+_Digite só o número da opção._`,
   },
   {
     key: "package_action_menu",
@@ -125,21 +130,22 @@ _Onix 2020_`,
     content: `Aqui está o orçamento para você, *{name}*:
 
 ━━━━━━━━━━━━━━━━━━━━
-🚗 *Veículo:* {vehicle}
-🔧 *Serviço:* {service}
+🚗 Veículo: {vehicle}
+🔧 Serviço: {service}
 ━━━━━━━━━━━━━━━━━━━━
+
 {pitch}
 
 {valueLine}
-⏱️ *Tempo estimado:* {time}
+⏱️ Tempo estimado: {time}
 
-_O valor exato confirmamos na avaliação presencial — às vezes o carro surpreende para melhor ou para pior 😊_
+_O valor exato confirmamos na avaliação presencial._
 
-O que você quer fazer?
+Próximo passo:
 
 *1* 📅 Agendar agora
 *2* 🔄 Ver outro serviço
-*3* 💬 Tenho dúvidas antes`,
+*3* 💬 Tirar dúvidas antes`,
   },
   {
     key: "etapa6_upsell",
