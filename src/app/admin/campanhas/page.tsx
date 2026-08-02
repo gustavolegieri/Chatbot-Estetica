@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { AdminHeader } from "@/components/layout/AdminHeader";
-import { Play, Pause, RotateCcw, Send, Plus, CheckCircle2, AlertCircle, Users, MessageSquare, Clock, BarChart3 } from "lucide-react";
+import { Play, Pause, RotateCcw, Send, Plus, CheckCircle2, AlertCircle, Users, MessageSquare, Clock, BarChart3, RefreshCw } from "lucide-react";
 
 const statusColors: Record<string, string> = {
   DRAFT: "bg-slate-700 text-slate-300",
@@ -91,7 +91,22 @@ export default function CampanhasPage() {
 
   return (
     <div className="space-y-6">
-      <AdminHeader title="Campanhas" description="Envie mensagens em lote para seus clientes" />
+      <AdminHeader
+        title="Campanhas"
+        description="Planeje comunicações segmentadas e acompanhe o desempenho do relacionamento."
+        actions={
+          <div className="flex items-center gap-2">
+            <button onClick={() => void loadCampaigns()} className="btn-secondary gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Atualizar
+            </button>
+            <button onClick={() => setShowForm(!showForm)} className="btn-primary gap-2">
+              <Plus className="h-4 w-4" />
+              {showForm ? "Fechar criação" : "Nova campanha"}
+            </button>
+          </div>
+        }
+      />
 
       {msg && (
         <div className={`flex items-center gap-3 rounded-xl border px-5 py-4 shadow-gold ${
@@ -138,10 +153,6 @@ export default function CampanhasPage() {
           </div>
         </div>
       </div>
-
-      <button onClick={() => setShowForm(!showForm)} className="btn-primary gap-2 px-6 py-3">
-        <Plus className="h-4 w-4" /> {showForm ? "Fechar" : "Nova campanha"}
-      </button>
 
       {showForm && (
         <div className="card">

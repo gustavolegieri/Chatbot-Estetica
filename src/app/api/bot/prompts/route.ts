@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { invalidatePromptCache, seedBotPrompts } from "@/lib/bot-prompts";
 import { BOT_PROMPT_DEFAULTS } from "@/lib/bot-prompt-defaults";
+import { getCerebrasStatus } from "@/lib/cerebras-ai";
 
 export async function GET() {
   const session = await getSession();
@@ -32,6 +33,8 @@ export async function GET() {
       expected: BOT_PROMPT_DEFAULTS.length,
       byCategory,
       wasSeeded: count > 0,
+      // A chave nunca é exposta: o painel recebe apenas o estado público da IA.
+      ai: getCerebrasStatus(),
     },
   });
 }

@@ -4,11 +4,13 @@ import { analyzeIntentAIV2 } from "./whatsapp-ai-enhanced";
 /** Número do menu principal (1–8 categorias) */
 export function detectCategoryNum(text: string): number | null {
   const t = text.toLowerCase();
-  if (/não sei|nao sei|qual serviço|qual servico|me indica|me ajuda|indeciso/.test(t)) return 6;
-  if (/vidro|parabrisa/.test(t)) return 5;
-  if (/descontamina|pintura|polimento|polir|cera nobre/.test(t)) return 4;
-  if (/higieniza|interna|couro|estofado|tecido|carpete|cheiro/.test(t)) return 3;
-  if (/motor|farol|farois|cristaliza.*farol/.test(t)) return 2;
+  // Keep free-text routing aligned with the visible WhatsApp menu:
+  // lavagem=1, polimento=2, proteção=3, interior=4, especiais=5 e ajuda=8.
+  if (/não sei|nao sei|qual serviço|qual servico|me indica|me ajuda|indeciso|ajuda.*escolh/.test(t)) return 8;
+  if (/motor|farol|farois|cristaliza.*farol/.test(t)) return 5;
+  if (/polimento|polir|riscad|pintura opaca|sem brilho/.test(t)) return 2;
+  if (/descontamina|prote[cç][aã]o|vitrif|ceram|cera nobre|vidro|parabrisa/.test(t)) return 3;
+  if (/higieniza|interna|couro|estofado|tecido|carpete|cheiro|odor|mancha/.test(t)) return 4;
   if (/lavagem|lavar|simples|completa|detalhad/.test(t)) return 1;
   return null;
 }
@@ -34,7 +36,7 @@ export function detectServiceKey(text: string): string | null {
     if (re.test(t)) return key;
   }
   const cat = detectCategoryNum(text);
-  if (cat && cat !== 6) {
+  if (cat && cat !== 8) {
     const first = CATEGORIES[cat]?.keys[0];
     if (first && first !== "indeciso") return first;
   }

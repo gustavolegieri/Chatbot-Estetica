@@ -246,9 +246,12 @@ export const UPSELL_BY_KEY: Record<string, { complement: string; benefit: string
 };
 
 export const UNDECIDED_TO_KEY: Record<number, string> = {
-  1: "lavagem_detalhada",
-  2: "polimento_cotacao",
-  3: "higienizacao_tecido_completa",
-  4: "descontaminacao_pintura",
+  // Problemas exibidos em `indecisive_problem`, na mesma ordem do menu.
+  // O polimento começa por avaliação; a proteção usa o serviço de
+  // descontaminação + cera nobre que existe no catálogo atual.
+  1: "polimento_cotacao",
+  2: "higienizacao_tecido_completa",
+  3: "descontaminacao_pintura",
+  4: "limpeza_premium",
   5: "lavagem_completa",
 };

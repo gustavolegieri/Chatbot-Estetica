@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, Pencil, Trash2, Shield, Unlock, CheckCircle2, XCircle } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Shield, CheckCircle2, XCircle, RefreshCw, UsersRound, UserRoundCheck } from "lucide-react";
 import { AdminHeader } from "@/components/layout/AdminHeader";
 import { Modal } from "@/components/ui/Modal";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -54,6 +54,9 @@ export default function UsuariosPage() {
         user.role.toLowerCase().includes(term)
     );
   }, [search, users]);
+
+  const activeUsers = users.filter((user) => user.active).length;
+  const administrators = users.filter((user) => user.role === "ADMIN").length;
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -177,7 +180,12 @@ export default function UsuariosPage() {
   }
 
   if (userRole === null) {
-    return <div className="flex h-64 items-center justify-center text-slate-500">Verificando permissões...</div>;
+    return (
+      <div>
+        <AdminHeader title="Usuários" description="Controle de acessos e papéis da operação" />
+        <div className="flex h-64 items-center justify-center"><RefreshCw className="h-6 w-6 animate-spin text-brand-300" /></div>
+      </div>
+    );
   }
 
   if (userRole !== "ADMIN") {
@@ -195,15 +203,21 @@ export default function UsuariosPage() {
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <AdminHeader
         title="Usuários"
-        description="Gerencie contas de administrador e operadores"
+        description="Gerencie acessos administrativos e operadores da central de atendimento."
         actions={
-          <button onClick={openCreate} className="btn-primary">
-            <Plus className="mr-2 h-4 w-4" />
-            Novo usuário
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => void loadUsers()} disabled={loading} className="btn-secondary gap-2">
+              <RefreshCw className={"h-4 w-4 " + (loading ? "animate-spin" : "")} />
+              Atualizar
+            </button>
+            <button onClick={openCreate} className="btn-primary gap-2">
+              <Plus className="h-4 w-4" />
+              Novo usuário
+            </button>
+          </div>
         }
       />
 
@@ -218,62 +232,83 @@ export default function UsuariosPage() {
         </div>
       )}
 
-      <div className="mb-4 relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input
-          className="input pl-10"
-          placeholder="Buscar por nome, e-mail ou papel..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
+      <section className="grid gap-4 sm:grid-cols-3">
+        <article className="card p-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-900/40 text-brand-300 ring-1 ring-brand-700/40"><UsersRound className="h-5 w-5" /></div>
+            <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Contas</p><p className="mt-1 text-2xl font-semibold text-slate-100">{users.length}</p></div>
+          </div>
+        </article>
+        <article className="card p-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-900/35 text-emerald-400 ring-1 ring-emerald-700/40"><UserRoundCheck className="h-5 w-5" /></div>
+            <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Ativos</p><p className="mt-1 text-2xl font-semibold text-slate-100">{activeUsers}</p></div>
+          </div>
+        </article>
+        <article className="card p-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-900/35 text-violet-400 ring-1 ring-violet-700/40"><Shield className="h-5 w-5" /></div>
+            <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Administradores</p><p className="mt-1 text-2xl font-semibold text-slate-100">{administrators}</p></div>
+          </div>
+        </article>
+      </section>
 
-      <div className="card">
+      <section className="card overflow-hidden p-0">
+        <div className="flex flex-col gap-3 border-b border-surface-700 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-semibold text-brand-100">Acessos da operação</h2>
+            <p className="mt-1 text-sm text-slate-400">Defina quem administra configurações e quem atende a fila CRM.</p>
+          </div>
+          <div className="relative w-full sm:max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <input className="input py-2 pl-10" placeholder="Buscar por nome, e-mail ou papel..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+        </div>
         {loading ? (
-          <p className="text-center text-slate-500">Carregando...</p>
+          <div className="flex min-h-64 items-center justify-center"><RefreshCw className="h-6 w-6 animate-spin text-brand-300" /></div>
         ) : filteredUsers.length === 0 ? (
-          <EmptyState icon={Shield} title="Nenhum usuário encontrado" description="Cadastre um novo usuário para começar." />
+          <div className="py-10"><EmptyState icon={Shield} title="Nenhum usuário encontrado" description="Cadastre um novo usuário para começar." /></div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[760px] text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-slate-500">
-                  <th className="pb-3 font-medium">Nome</th>
-                  <th className="pb-3 font-medium">E-mail</th>
-                  <th className="pb-3 font-medium">Papel</th>
-                  <th className="pb-3 font-medium">Ativo</th>
-                  <th className="pb-3 font-medium">Criado</th>
-                  <th className="pb-3 font-medium">Ações</th>
+                <tr>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Usuário</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">E-mail</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Papel</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Status</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Criado</th>
+                  <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredUsers.map((user) => (
-                  <tr key={user.id} className="border-b border-slate-100">
-                    <td className="py-3 font-medium">{user.name}</td>
-                    <td className="py-3 text-slate-500">{user.email}</td>
-                    <td className="py-3">
-                      <span className="rounded-full bg-slate-800 px-2 py-1 text-[11px] uppercase tracking-[0.2em] text-slate-300">
-                        {user.role}
+                  <tr key={user.id}>
+                    <td className="px-5 py-4 font-medium text-slate-200">{user.name}</td>
+                    <td className="px-5 py-4 text-slate-400">{user.email}</td>
+                    <td className="px-5 py-4">
+                      <span className={user.role === "ADMIN" ? "rounded-full bg-violet-900/35 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-violet-300" : "rounded-full bg-surface-700 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300"}>
+                        {user.role === "ADMIN" ? "Administrador" : "Operador"}
                       </span>
                     </td>
-                    <td className="py-3">
+                    <td className="px-5 py-4">
                       {user.active ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-950/90 px-2 py-1 text-[11px] text-emerald-300">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-900/35 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">
                           <CheckCircle2 className="h-3.5 w-3.5" /> Ativo
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-red-950/90 px-2 py-1 text-[11px] text-red-300">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-900/35 px-2.5 py-1 text-[11px] font-semibold text-red-300">
                           <XCircle className="h-3.5 w-3.5" /> Inativo
                         </span>
                       )}
                     </td>
-                    <td className="py-3 text-slate-500">{new Date(user.createdAt).toLocaleDateString("pt-BR")}</td>
-                    <td className="py-3">
-                      <div className="flex gap-2">
-                        <button onClick={() => openEdit(user)} className="rounded p-1 text-slate-400 transition hover:bg-surface-800 hover:text-brand-200">
+                    <td className="px-5 py-4 text-slate-500">{new Date(user.createdAt).toLocaleDateString("pt-BR")}</td>
+                    <td className="px-5 py-4">
+                      <div className="flex justify-end gap-1">
+                        <button onClick={() => openEdit(user)} className="rounded-lg p-2 text-slate-400 transition hover:bg-surface-700 hover:text-brand-200" title="Editar usuário">
                           <Pencil className="h-4 w-4" />
                         </button>
-                        <button onClick={() => handleDelete(user.id)} className="rounded p-1 text-red-400 transition hover:bg-red-950/40 hover:text-red-200">
+                        <button onClick={() => handleDelete(user.id)} className="rounded-lg p-2 text-red-400 transition hover:bg-red-950/40 hover:text-red-200" title="Excluir usuário">
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
@@ -284,7 +319,7 @@ export default function UsuariosPage() {
             </table>
           </div>
         )}
-      </div>
+      </section>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Editar usuário" : "Novo usuário"}>
         <form onSubmit={handleSubmit} className="space-y-4">

@@ -12,9 +12,33 @@ import { calculateDistance, calculatePickupFee } from "./maps";
 import { normalizePhone } from "./utils";
 import { answerCustomerDoubt } from "./whatsapp-ai";
 import { loadWhatsAppCatalog } from "./whatsapp-service-catalog";
-import { loadPromptMap } from "./bot-prompts";
+import { loadPromptMap, type PromptMap } from "./bot-prompts";
 import { prisma } from "./prisma";
-import { etapa2MainMenu, serviceDetail, etapa8ReceiptUpload, etapa8ReceiptError, etapa8ReceiptInvalid, etapa8Payment } from "./whatsapp-flow-messages";
+import {
+  aiFollowup,
+  couponApplied,
+  couponCodeRequest,
+  etapa2MainMenu,
+  etapa8Payment,
+  etapa8ReceiptError,
+  etapa8ReceiptInvalid,
+  etapa8ReceiptUpload,
+  etapa9Loyalty,
+  etapa10Budget,
+  etapa10Logistics,
+  etapa10LogisticsClientLeads,
+  etapa10LogisticsPickupAddress,
+  etapa10LogisticsReturnPreference,
+  etapa10LogisticsWithReturn,
+  etapa10LogisticsWithoutReturn,
+  etapa7Day,
+  firstTimeBonusApplied,
+  etapa15SummaryConfirm,
+  paymentConfirmation,
+  reminderChoice,
+  serviceDetail,
+  summaryReview,
+} from "./whatsapp-flow-messages";
 import { buildVehicleConfirmationPrompt } from "./flow-validation";
 import { generateCalendarImageOnlyForTest, generateCalendarLegend } from "./calendar-helper";
 import { buildAvailableSlotsForDay, parseTimeSelection } from "./appointments";
@@ -29,7 +53,6 @@ import { generateSummaryCard, generateSummaryText, SummaryCardData } from "./sum
 import { format } from "date-fns";
 import { vehicleDisplayFromFlow } from "./whatsapp-vehicle-parse";
 import { resolveValidCustomerName } from "./customer-name";
-import { formatHours } from "./whatsapp-flow-messages";
 
 // Re-export FlowState for use in other modules
 export type { FlowState, FlowStage };
@@ -46,6 +69,43 @@ export interface FlowResult {
   nextState: FlowState;
   shouldTrackFunnel?: boolean;
   funnelStage?: string;
+}
+
+function asMoney(value: unknown): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+}
+
+/**
+ * Estados gravados antes desta versão já tinham o cupom embutido em quoteMin.
+ * Só descontos marcados como "base" são subtraídos do total para evitar cobrar
+ * ou descontar duas vezes durante uma conversa em andamento.
+ */
+export function getCouponDiscountForTotal(state: FlowState): number {
+  return state.quoteDiscountMode === "base" ? asMoney(state.couponDiscountApplied) : 0;
+}
+
+export function getFirstTimeBonusForTotal(state: FlowState): number {
+  return state.firstTimeBonusApplied &&
+    state.quoteDiscountMode === "base" &&
+    !state.couponId &&
+    !state.couponCode
+    ? asMoney(state.firstTimeBonusDiscount)
+    : 0;
+}
+
+export function calculateFlowTotal(state: FlowState): number {
+  const serviceValue = asMoney(state.quoteMin);
+  const upsellValue = state.upsellAccepted ? asMoney(state.upsellValue) : 0;
+  const pickupFee = asMoney(state.pickupFee);
+  const couponDiscount = getCouponDiscountForTotal(state);
+  const firstTimeDiscount = getFirstTimeBonusForTotal(state);
+  const loyaltyDiscount = asMoney(state.loyaltyDiscountApplied);
+
+  return Math.max(
+    0,
+    serviceValue + upsellValue + pickupFee - couponDiscount - firstTimeDiscount - loyaltyDiscount
+  );
 }
 
 /**
@@ -126,11 +186,11 @@ export async function applyFirstTimeDiscount(
       couponDiscountApplied: discount,
       firstTimeBonusApplied: true,
       firstTimeBonusDiscount: discount,
+      quoteDiscountMode: "base" as const,
     };
 
-    responses.push({
-      text: `🎁 *Bônus!* Primeira vez: 10% de desconto aplicado! (-R$ ${discount.toFixed(2).replace('.', ',')})`
-    });
+    const prompts = await loadPromptMap();
+    responses.push({ text: firstTimeBonusApplied(calculateFlowTotal(newState), prompts) });
 
     return newState;
   }
@@ -326,13 +386,14 @@ export async function handleLoyaltyStep(
 ): Promise<FlowResult> {
   const input = message.trim().toLowerCase();
   const usePoints = /^(sim|s|1)$/i.test(input);
+  const prompts = await loadPromptMap();
 
   let loyaltyDiscount = 0;
   if (usePoints && state.loyaltyPoints && state.loyaltyPoints > 0) {
     loyaltyDiscount = Math.floor(state.loyaltyPoints / 100) * 10; // 100 pontos = R$ 10
-    responses.push({ text: "✅ Desconto aplicado!" });
+    responses.push({ text: "✅ Pontos de fidelidade aplicados ao orçamento." });
   } else {
-    responses.push({ text: "Sem problemas!" });
+    responses.push({ text: "Perfeito. Seguiremos sem utilizar pontos nesta reserva." });
   }
 
   const newState: FlowState = {
@@ -343,15 +404,9 @@ export async function handleLoyaltyStep(
   };
 
   // Mostrar orçamento conforme ETAPA10_BUDGET
-  const baseQuote = Number(state.quoteMin ?? 0);
-  const complementValue = Number(state.upsellValue ?? 0);
-  const couponDiscount = Number(state.couponDiscountApplied ?? 0);
-  const pickupFee = Number(state.pickupFee ?? 0);
-  const totalValue = Math.max(0, baseQuote + complementValue + pickupFee - couponDiscount - loyaltyDiscount);
+  const totalValue = calculateFlowTotal({ ...state, loyaltyDiscountApplied: loyaltyDiscount });
 
-  responses.push({
-    text: `━━━━━━━━━━━━━━━\n📋 **Seu orçamento**\n━━━━━━━━━━━━━━━\n💰 **Valor total: R$ ${totalValue.toFixed(2).replace(".", ",")}**\n━━━━━━━━━━━━━━━\n\nVamos confirmar o agendamento?\n\n*1* ✅ Sim, confirmar\n*2* ❌ Não, voltar ao menu`,
-  });
+  responses.push({ text: etapa10Budget(`R$ ${totalValue.toFixed(2).replace(".", ",")}`, prompts) });
 
   return { responses, nextState: newState };
 }
@@ -376,7 +431,7 @@ function parseCouponCodeFromText(text: string): string | null {
 /**
  * Helper para aplicar cupom ao valor do orçamento
  */
-function applyCouponToFlowValue(params: {
+export function applyCouponToFlowValue(params: {
   coupon: any;
   flow: FlowState;
 }): { flow: FlowState; discountApplied: number } {
@@ -408,14 +463,17 @@ function applyCouponToFlowValue(params: {
   newMin = clampMoney(newMin);
   newMax = clampMoney(newMax);
 
-  const discountApplied = clampMoney((baseMin + baseMax) / 2 - (newMin + newMax) / 2);
+  // O total do fluxo é calculado sobre quoteMin. O desconto precisa usar a
+  // mesma base para que a proposta, o pagamento e o financeiro coincidam.
+  const discountApplied = clampMoney(baseMin - newMin);
 
   return {
     flow: {
       ...flow,
-      quoteMin: newMin,
-      quoteMax: newMax,
       couponDiscountApplied: discountApplied,
+      // Mantém o valor-base do orçamento e registra o desconto separado.
+      // Isso permite compor bônus, cupom e pontos sem desconto duplicado.
+      quoteDiscountMode: "base",
     },
     discountApplied,
   };
@@ -432,6 +490,7 @@ export async function handleCouponStep(
 ): Promise<FlowResult> {
   const input = message.trim();
   const skip = shouldSkipCouponPrompt(input);
+  const prompts = await loadPromptMap();
 
   if (skip) {
     const newState: FlowState = {
@@ -440,14 +499,12 @@ export async function handleCouponStep(
     };
     const loyaltyPoints = state.loyaltyPoints ?? 0;
     const discountValue = Math.floor(loyaltyPoints / 100) * 10; // 100 pontos = R$ 10
-    responses.push({
-      text: `Você tem *${loyaltyPoints}* pontos de fidelidade! 🎁\n\nPode usar para ganhar *R$ ${discountValue.toFixed(2).replace(".", ",")}* de desconto.\n\n*1* ✅ Usar pontos\n*2* ❌ Não usar pontos`,
-    });
+    responses.push({ text: etapa9Loyalty(loyaltyPoints, discountValue, prompts) });
     return { responses, nextState: newState };
   }
 
   if (/^(1|sim|s|yes|tenho|com cupom)$/i.test(input)) {
-    responses.push({ text: "Perfeito 😊 Me envie o *código do cupom* (ex: *AA*)." });
+    responses.push({ text: couponCodeRequest(prompts) });
     return { responses, nextState: state };
   }
 
@@ -455,8 +512,18 @@ export async function handleCouponStep(
   if (!code) {
     // Se usuário só perguntar "tenho cupom?", não tem código ainda
     if (/\b(cupom|c[oó]digo|desconto)\b/i.test(input) && !state.couponCode) {
-      responses.push({ text: "Perfeito 😊 Me envie o *código do cupom* (ex: *AA*)." });
+      responses.push({ text: couponCodeRequest(prompts) });
     }
+    return { responses, nextState: state };
+  }
+
+  if (state.couponId || state.couponCode) {
+    responses.push({ text: "Um benefício já está aplicado a esta reserva. Para manter o valor correto, utilizamos apenas um cupom por atendimento." });
+    return { responses, nextState: state };
+  }
+
+  if (code.toUpperCase() === "PRIMEIRA10" && (state.firstTimeBonusApplied || !state.isFirstTimeCustomer)) {
+    responses.push({ text: "Esse benefício é exclusivo para a primeira visita e não pode ser aplicado novamente nesta reserva." });
     return { responses, nextState: state };
   }
 
@@ -506,18 +573,14 @@ export async function handleCouponStep(
 
   const formattedCouponCode = code.toUpperCase();
   const formattedDiscount = applied.discountApplied > 0 ? `*R$ ${applied.discountApplied.toFixed(2).replace(".", ",")}*` : "*sem valor fixo*";
-  const finalValue = Math.max(0, (newState.quoteMin ?? 0));
+  const finalValue = calculateFlowTotal(newState);
   const formattedFinalValue = `*R$ ${finalValue.toFixed(2).replace(".", ",")}*`;
 
-  responses.push({
-    text: `✅ Cupom *${formattedCouponCode}* aplicado com sucesso!`
-  });
+  responses.push({ text: couponApplied(formattedCouponCode, formattedDiscount, formattedFinalValue, prompts) });
 
   const loyaltyPoints = state.loyaltyPoints ?? 0;
   const discountValue = Math.floor(loyaltyPoints / 100) * 10; // 100 pontos = R$ 10
-  responses.push({
-    text: `Você tem *${loyaltyPoints}* pontos de fidelidade! 🎁\n\nPode usar para ganhar *R$ ${discountValue.toFixed(2).replace(".", ",")}* de desconto.\n\n*1* ✅ Usar pontos\n*2* ❌ Não usar pontos`,
-  });
+  responses.push({ text: etapa9Loyalty(loyaltyPoints, discountValue, prompts) });
 
   return { responses, nextState: newState };
 }
@@ -533,6 +596,7 @@ export async function handleReminderStep(
 ): Promise<FlowResult> {
   const input = message.trim().toLowerCase();
   const num = parseInt(input, 10);
+  const prompts = await loadPromptMap();
   
   let reminderEnabled = false;
   let reminderPreference: "30min" | "1hour" | "1day" | "none" = "none";
@@ -544,7 +608,7 @@ export async function handleReminderStep(
     reminderEnabled = false;
     reminderPreference = "none";
   } else {
-    responses.push({ text: "Responda *1* para sim ou *2* para não." });
+    responses.push({ text: `Escolha uma opção para seguir:\n\n${reminderChoice(prompts)}` });
     return { responses, nextState: state };
   }
   
@@ -556,12 +620,7 @@ export async function handleReminderStep(
   };
   
   // Calculate total value with all discounts
-  const baseQuote = Number(state.quoteMin ?? 0);
-  const complementValue = Number(state.upsellValue ?? 0);
-  const couponDiscount = Number(state.couponDiscountApplied ?? 0);
-  const loyaltyDiscount = Number(state.loyaltyDiscountApplied ?? 0);
-  const pickupFee = Number(state.pickupFee ?? 0);
-  const totalValue = Math.max(0, baseQuote + complementValue + pickupFee - couponDiscount - loyaltyDiscount);
+  const totalValue = calculateFlowTotal(state);
   
   const paymentMethod = state.paymentMethod || "—";
   const reminderText = reminderEnabled ? "Sim" : "Não";
@@ -590,35 +649,35 @@ export async function handleReminderStep(
     console.error("[handleReminderStep] Error generating summary card:", error);
   }
   
-  const upsellLabel = state.upsellLabel ? `✨ + ${state.upsellLabel}` : "";
-  const needsReturn = state.needsReturn ? "🔄 Devolução: sim" : "";
-  
-  const summaryLines = [
-    "━━━━━━━━━━━━━━━",
-    "📋 **RESUMO DO AGENDAMENTO**",
-    `👤 ${customerName}`,
-    `🧧 *${serviceName}*`,
-    upsellLabel,
-    `🚘 ${vehicle}`,
-    `📅 ${date}`,
-    `⏰ ${time}`,
-    `🚚 Leva e traz: ${pickupText}`,
-    address !== "—" ? `📍 Endereço: ${address}` : "",
-    needsReturn,
-    `💳 ${paymentMethod}`,
-    `🔔 Lembrete: ${reminderText}`,
-    `💰 **R$ ${totalValue.toFixed(2).replace(".", ",")}**`,
-    "━━━━━━━━━━━━━━━",
-    "",
-    "⏱️ Cancelamento até 2h antes sem custo.",
-    "",
-    "✅ Confirma? (sim/não)",
-  ];
+  const serviceWithComplement = state.upsellLabel
+    ? `${serviceName} + ${state.upsellLabel}`
+    : serviceName;
+  const pickupWithReturn = state.needsPickup
+    ? state.needsReturn
+      ? "Busca e devolução solicitadas"
+      : "Busca solicitada"
+    : pickupText;
   
   if (summaryCardUrl) {
     responses.push({ text: "", mediaUrl: summaryCardUrl, mediaType: "image" });
   }
-  responses.push({ text: summaryLines.filter(Boolean).join("\n") });
+  responses.push({
+    text: etapa15SummaryConfirm(
+      {
+        name: customerName,
+        service: serviceWithComplement,
+        vehicle,
+        day: date,
+        time,
+        pickup: pickupWithReturn,
+        address,
+        payment: paymentMethod,
+        reminder: reminderText,
+        value: `R$ ${totalValue.toFixed(2).replace(".", ",")}`,
+      },
+      prompts
+    ),
+  });
   
   return { responses, nextState: newState };
 }
@@ -633,20 +692,37 @@ export async function handleLogistics(
   responses: FlowResponse[]
 ): Promise<FlowResult> {
   const input = message.trim();
-  const wantsDelivery = input === "2" || /^(busca|entrega|sim|delivery)$/i.test(input.toLowerCase());
+  const normalized = input.toLowerCase();
+  const prompts = await loadPromptMap();
+  const wantsDelivery = input === "2" || /^(busca|entrega|sim|s|delivery)$/i.test(normalized);
+  const wantsClientLeads = input === "1" || /^(levar|eu levo|na loja|cliente leva)$/i.test(normalized);
 
   if (state.awaitingPickupAddress) {
     const address = input.trim();
-    if (!address) {
-      responses.push({ text: "🚚 Ótimo! Me envie o endereço completo onde o carro está para calcular a taxa de busca." });
+    if (address.length < 8) {
+      responses.push({ text: etapa10LogisticsPickupAddress(prompts) });
       return { responses, nextState: state };
     }
 
     const settings = await prisma.settings.findUnique({ where: { id: "default" } });
     const feePerKm = Number(settings?.pickupFeePerKm ?? 2.5);
     const feeBase = Number(settings?.pickupFeeBase ?? 0);
-    const distance = await calculateDistance(address);
-    const pickupFee = distance ? calculatePickupFee(distance.distanceKm, feePerKm, feeBase) : 0;
+    let distance: Awaited<ReturnType<typeof calculateDistance>> | null = null;
+    try {
+      distance = await calculateDistance(address);
+    } catch (error) {
+      console.error("[handleLogistics] Could not calculate pickup distance:", error);
+    }
+
+    if (!distance) {
+      responses.push({
+        text: "Não consegui validar a rota automática para esse endereço. Revise os dados completos ou peça um especialista para confirmar a coleta.",
+      });
+      responses.push({ text: etapa10LogisticsPickupAddress(prompts) });
+      return { responses, nextState: state };
+    }
+
+    const pickupFee = calculatePickupFee(distance.distanceKm, feePerKm, feeBase);
 
     const newState: FlowState = {
       ...state,
@@ -657,15 +733,18 @@ export async function handleLogistics(
       awaitingReturnPreference: true,
     };
 
-    responses.push({ 
-      text: `Perfeito! E quando o serviço terminar, como prefere?\n\n*1* Vocês devolvem o carro no mesmo endereço\n*2* Eu mesmo venho buscar o carro` 
-    });
+    responses.push({ text: etapa10LogisticsReturnPreference(prompts) });
 
     return { responses, nextState: newState };
   }
 
   if (state.awaitingReturnPreference) {
-    const wantsReturn = /^(1|sim|s|quero|yes)$/i.test(input.toLowerCase());
+    const wantsReturn = /^(1|sim|s|quero|yes)$/i.test(normalized);
+    const wantsPickupAtStore = /^(2|não|nao|n|eu retiro|retirar)$/i.test(normalized);
+    if (!wantsReturn && !wantsPickupAtStore) {
+      responses.push({ text: etapa10LogisticsReturnPreference(prompts) });
+      return { responses, nextState: state };
+    }
     const newState: FlowState = {
       ...state,
       needsReturn: wantsReturn,
@@ -673,8 +752,7 @@ export async function handleLogistics(
       stage: "ETAPA8_PAYMENT",
     };
 
-    // Updated messages to match specification
-    responses.push({ text: wantsReturn ? "🔄 Devolução incluída no resumo." : "📍 Sem devolução, tudo certo." });
+    responses.push({ text: wantsReturn ? etapa10LogisticsWithReturn(prompts) : etapa10LogisticsWithoutReturn(prompts) });
 
     return { responses, nextState: newState };
   }
@@ -686,9 +764,13 @@ export async function handleLogistics(
       awaitingPickupAddress: true,
       pickupFee: 0,
     };
-    // Updated message to match specification
-    responses.push({ text: "🚚 Ótimo! Me envie o endereço completo onde o carro está para calcular a taxa de busca." });
+    responses.push({ text: etapa10LogisticsPickupAddress(prompts) });
     return { responses, nextState: newState };
+  }
+
+  if (!wantsClientLeads) {
+    responses.push({ text: etapa10Logistics(prompts) });
+    return { responses, nextState: state };
   }
 
   const newState: FlowState = {
@@ -698,8 +780,7 @@ export async function handleLogistics(
     stage: "ETAPA8_PAYMENT",
   };
 
-  // Updated message to match specification
-  responses.push({ text: "📍 Combinado! Você pode levar o carro até a loja quando puder." });
+  responses.push({ text: etapa10LogisticsClientLeads(prompts) });
 
   return { responses, nextState: newState };
 }
@@ -738,7 +819,7 @@ export async function handlePixChoice(
 
   if (input === "1" || /agora|pagar agora|imediato/i.test(input)) {
     // PIX agora - precisa enviar comprovante
-    const totalValue = Number(state.quoteMin ?? 0) + Number(state.upsellValue ?? 0) + Number(state.pickupFee ?? 0) - Number(state.couponDiscountApplied ?? 0) - Number(state.loyaltyDiscountApplied ?? 0);
+    const totalValue = calculateFlowTotal(state);
     const currentPaid = state.totalPaid ?? 0;
     const remainingValue = totalValue - currentPaid;
 
@@ -797,10 +878,8 @@ export async function handlePixChoice(
       stage: "ETAPA14_REMINDER",
     };
 
-    responses.push({ text: "Perfeito! Você pagará via PIX no dia do serviço." });
-    responses.push({
-      text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
-    });
+    responses.push({ text: "Perfeito. O PIX será realizado no dia do atendimento." });
+    responses.push({ text: reminderChoice(prompts) });
 
     return { responses, nextState: newState };
   }
@@ -812,14 +891,71 @@ export async function handlePixChoice(
 /**
  * Handler para upload de comprovante
  */
+/**
+ * Recebe o comprovante sem transformar uma imagem, URL ou resposta de IA em
+ * confirmação de pagamento. A integração atual não possui uma fonte de OCR ou
+ * PSP verificável; por isso todo comprovante segue para conferência humana.
+ */
 export async function handleReceiptUpload(
+  state: FlowState,
+  message: string,
+  responses: FlowResponse[],
+  _sessionId?: string
+): Promise<FlowResult> {
+  const prompts = await loadPromptMap();
+  const totalValue = calculateFlowTotal(state);
+  const candidate = message.trim();
+  const isDirectImageUrl = /^https?:\/\/[^\s]+\.(?:jpe?g|png|gif|webp)(?:\?[^\s]*)?$/i.test(candidate);
+  const isIncomingMediaMarker = /^\[(?:MÍDIA|MIDIA):(?:image|document|media)/i.test(candidate);
+
+  if (!isDirectImageUrl && !isIncomingMediaMarker) {
+    responses.push({ text: etapa8ReceiptUpload(totalValue, prompts) });
+    return { responses, nextState: state };
+  }
+
+  // A função retorna null enquanto não houver uma fonte que possa comprovar a
+  // transação. Mesmo que uma fonte futura identifique um valor, a imagem por si
+  // só não confirma a liquidação do PIX, portanto nunca avançamos a etapa aqui.
+  const extractedAmount = await analyzeReceiptImage(candidate);
+  const attempts = Math.min((state.receiptValidationAttempts ?? 0) + 1, 3);
+  const nextState: FlowState = {
+    ...state,
+    stage: "ETAPA8_RECEIPT_UPLOAD",
+    awaitingReceiptUpload: true,
+    receiptValidationAttempts: attempts,
+  };
+
+  if (extractedAmount !== null) {
+    responses.push({
+      text: "Recebemos o comprovante e os dados serão conferidos pela equipe. Por segurança, nenhum pagamento foi confirmado automaticamente. Responda *9* para solicitar a conferência humana.",
+    });
+  } else if (attempts >= 3) {
+    responses.push({
+      text: "Não foi possível validar esse comprovante automaticamente com segurança. Nenhum pagamento foi confirmado. Envie uma imagem nítida, com valor, data e identificação da transação, ou responda *9* para a equipe conferir manualmente.",
+    });
+  } else {
+    responses.push({ text: etapa8ReceiptError(prompts) });
+    responses.push({
+      text: "Por segurança, nenhum pagamento foi confirmado. Envie uma imagem nítida, com valor, data e identificação da transação, ou responda *9* para a conferência da equipe.",
+    });
+  }
+
+  return { responses, nextState };
+}
+
+/**
+ * Implementação histórica mantida privada apenas para referência de migração.
+ * Não é exportada nem chamada: o fluxo ativo nunca confirma pagamento a partir
+ * de valor extraído de URL, texto ou IA sem verificação transacional.
+ */
+async function handleReceiptUploadLegacyUnsafe(
   state: FlowState,
   message: string,
   responses: FlowResponse[],
   sessionId?: string
 ): Promise<FlowResult> {
   const prompts = await loadPromptMap();
-  const totalValue = Number(state.quoteMin ?? 0) + Number(state.upsellValue ?? 0) + Number(state.pickupFee ?? 0) - Number(state.couponDiscountApplied ?? 0) - Number(state.loyaltyDiscountApplied ?? 0);
+  const totalValue = calculateFlowTotal(state);
 
   // Verificar se mensagem contém URL de imagem
   if (message.match(/^(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp))/i) ||
@@ -882,10 +1018,8 @@ export async function handleReceiptUpload(
           testBotLogger.error("Erro ao gerar recibo", error as Error, { sessionId });
         }
 
-        responses.push({ text: `✅ *Pagamento confirmado!*\n\nValor do comprovante: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\nTotal pago: R$ ${(newState.totalPaid || 0).toFixed(2).replace('.', ',')}\n\nSeu agendamento está garantido.` });
-        responses.push({
-          text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
-        });
+        responses.push({ text: paymentConfirmation(receiptAmount, newState.totalPaid || 0, prompts) });
+        responses.push({ text: reminderChoice(prompts) });
 
         return { responses, nextState: newState };
       } else {
@@ -931,10 +1065,8 @@ export async function handleReceiptUpload(
             testBotLogger.error("Erro ao gerar recibo", error as Error, { sessionId });
           }
 
-          responses.push({ text: `✅ *Pagamento confirmado!*\n\nValor do comprovante: R$ ${receiptAmount.toFixed(2).replace('.', ',')}\nTotal pago: R$ ${(newTotalPaid || 0).toFixed(2).replace('.', ',')}\n\nSeu agendamento está garantido.` });
-          responses.push({
-            text: "🔔 Quer receber um lembrete 30 minutos antes do seu atendimento?\n\n*1* - Sim\n*2* - Não",
-          });
+          responses.push({ text: paymentConfirmation(receiptAmount, newTotalPaid || 0, prompts) });
+          responses.push({ text: reminderChoice(prompts) });
 
           return { responses, nextState: newState };
         } else {
@@ -1014,64 +1146,31 @@ ${etapa8Payment(true, prompts)}` });
   }
 
   if (isYes) {
-    // User confirmed summary - proceed to final confirmation
+    // O motor principal cria a reserva de forma atômica assim que receber este estado.
+    // Não antecipamos uma confirmação ao cliente antes de a agenda ter sido gravada.
     const newState: FlowState = {
       ...state,
       stage: "ETAPA16_CONFIRMATION",
     };
 
-    // Generate the final summary card before confirmation text
-    try {
-      const paymentMethod = state.paymentMethod || "—";
-      const customerName = resolveValidCustomerName(state.customerName) ?? "Cliente";
-      const serviceName = state.serviceLabel ?? "—";
-      const vehicle = vehicleDisplayFromFlow(state) || "—";
-      const date = state.dayLabel ?? state.dayDate ?? "—";
-      const time = state.startTime ?? "—";
-      const totalValue = Math.max(
-        0,
-        Number(state.quoteMin ?? 0) + Number(state.upsellValue ?? 0) + Number(state.pickupFee ?? 0) - Number(state.couponDiscountApplied ?? 0) - Number(state.loyaltyDiscountApplied ?? 0)
-      );
-
-      const summaryCardUrl = await generateSummaryCard({
-        customerName,
-        serviceName,
-        vehicle,
-        date,
-        time,
-        paymentMethod,
-        totalPrice: totalValue,
-        pickupAddress: state.pickupAddress ?? undefined,
-      });
-
-      if (summaryCardUrl) {
-        responses.push({ text: "", mediaUrl: summaryCardUrl, mediaType: "image" });
-      }
-    } catch (error) {
-      console.error("[handleSummaryConfirm] Error generating summary card:", error);
-    }
-
-    // Get business info for final confirmation
-    const settings = await prisma.settings.findUnique({ where: { id: "default" } });
-    const address = settings?.businessAddress ?? "Rua das Oficinas, 100 - São Paulo, SP";
-    const hours = formatHours(
-      settings?.businessHoursStart ?? "08:00",
-      settings?.businessHoursEnd ?? "18:00",
-      settings?.workingDays ?? "1,2,3,4,5,6"
-    );
-
-    responses.push({
-      text: `✅ *Agendamento confirmado!*\n\nSeu atendimento está reservado.\n\n📍 Endereço: *${address}*\n🕒 Horário: *${hours}*\n\nCancelamentos com até 2h de antecedência sem custo.\n\nPosso te ajudar com mais alguma coisa? 😊`,
-    });
-
     return { responses, nextState: newState };
   }
 
-  responses.push({ text: `Sem problemas! O que você quer alterar?
+  const isChangeSchedule = /^(2|alterar data|alterar horário|alterar horario|data|horário|horario)$/i.test(input);
+  if (isChangeSchedule) {
+    const newState: FlowState = {
+      ...state,
+      dayDate: undefined,
+      dayLabel: undefined,
+      startTime: undefined,
+      availableSlots: undefined,
+      stage: "ETAPA7_DAY",
+    };
+    responses.push({ text: `Perfeito. Vamos ajustar a data e o horário da sua reserva.\n\n${etapa7Day(prompts)}` });
+    return { responses, nextState: newState };
+  }
 
-*1* Sim, confirmar
-*2* Não, alterar algo
-*3* Trocar forma de pagamento` });
+  responses.push({ text: summaryReview(prompts) });
   const resetState: FlowState = {
     ...state,
     stage: "ETAPA15_SUMMARY_CONFIRM",
@@ -1099,7 +1198,7 @@ export async function handleFinalConfirm(
       date: state.dayLabel || state.dayDate || "Data não informada",
       time: state.startTime || state.periodLabel || "Horário não informado",
       paymentMethod: state.paymentMethod || "Pagamento não informado",
-      totalPrice: Math.max(0, Number(state.quoteMin ?? 0) + Number(state.pickupFee ?? 0) - Number(state.couponDiscountApplied ?? 0) - Number(state.loyaltyDiscountApplied ?? 0)),
+      totalPrice: calculateFlowTotal(state),
       pickupAddress: state.pickupAddress,
     };
 
@@ -1175,14 +1274,8 @@ async function loadPaymentContext() {
 /**
  * Handler para perguntas sobre serviço (dúvidas específicas)
  */
-export function buildAiDoubtFollowUpText(): string {
-  return [
-    "Posso te ajudar com mais alguma coisa?",
-    "",
-    "*1* Voltar para onde eu estava",
-    "*2* Ver menu principal",
-    "*3* Falar com o dono",
-  ].join("\n");
+export function buildAiDoubtFollowUpText(prompts?: PromptMap): string {
+  return aiFollowup(prompts);
 }
 
 export function resolveDoubtReturnStage(state: FlowState): FlowStage {
@@ -1280,8 +1373,9 @@ export async function handleServiceQuestion(
     });
 
     if (aiResponse) {
-      responses.push({ text: `🤖 *Resposta:*${aiResponse}` });
-      responses.push({ text: buildAiDoubtFollowUpText() });
+      const prompts = await loadPromptMap();
+      responses.push({ text: aiResponse });
+      responses.push({ text: buildAiDoubtFollowUpText(prompts) });
 
       const newState: FlowState = {
         ...state,
@@ -1292,7 +1386,7 @@ export async function handleServiceQuestion(
 
       return { responses, nextState: newState };
     } else {
-      responses.push({ text: "😕 Não consegui responder sua dúvida. Por favor, tente reformular ou digite 'menu' para voltar." });
+      responses.push({ text: "Não consegui responder com segurança agora. Reformule sua dúvida ou digite *menu* para ver as opções." });
       
       const newState: FlowState = {
         ...state,
@@ -1304,7 +1398,7 @@ export async function handleServiceQuestion(
     }
   } catch (err) {
     console.error("[handleServiceQuestion] Error:", err);
-    responses.push({ text: "😕 Ocorreu um erro ao processar sua dúvida. Por favor, digite 'menu' para voltar." });
+    responses.push({ text: "Tive uma instabilidade ao consultar essa informação. Digite *menu* para continuar ou escolha a opção *9* para falar com a equipe." });
     
     const newState: FlowState = {
       ...state,
@@ -1330,7 +1424,7 @@ export async function handleFAQ(
       ...state,
       awaitingServiceRecommendation: true,
     };
-    responses.push({ text: "🤔 Descreva em texto livre o que você precisa ou está procurando para o seu carro (ex: 'preciso de limpeza interna', 'tem manchas no estofado', 'quer dar brilho na pintura')." });
+    responses.push({ text: "Conte brevemente o que você busca para o veículo. Por exemplo: *limpeza interna*, *manchas no estofado* ou *mais brilho na pintura*." });
     return { responses, nextState: newState };
   }
 
@@ -1399,13 +1493,13 @@ export async function handleFAQ(
         const description = serviceDetail(matchedService, prompts);
         responses.push({ text: description });
         responses.push({
-          text: "Como deseja prosseguir?\n\n*1* 📅 Agendar agora\n*2* 🔄 Ver outros\n*3* 💬 Tenho dúvidas",
+          text: "Como prefere seguir?\n\n*1* 📅 Agendar este serviço\n*2* 🧭 Ver o menu principal\n*3* 💬 Tirar uma dúvida",
         });
         
         return { responses, nextState: newState };
       } else {
         // Couldn't find exact match, go to menu
-        responses.push({ text: "Não consegui identificar o serviço específico. Por favor, selecione a categoria desejada no menu principal." });
+        responses.push({ text: "Para manter a indicação precisa, escolha uma categoria no menu principal ou use a opção *9* para falar com a equipe." });
         
         const newState: FlowState = {
           ...state,
@@ -1435,7 +1529,7 @@ export async function handleFAQ(
       return { responses, nextState: newState };
     } else {
       // Invalid choice, show options again
-      responses.push({ text: "Por favor, escolha uma opção:\n\n*1* - Agendar com o serviço recomendado\n*2* - Voltar ao menu principal" });
+      responses.push({ text: "Escolha uma opção:\n\n*1* 📅 Agendar o serviço sugerido\n*2* 🧭 Voltar ao menu principal" });
       return { responses, nextState: state };
     }
   }
@@ -1444,7 +1538,7 @@ export async function handleFAQ(
   const userDescription = message.trim();
   
   if (userDescription.length < 10) {
-    responses.push({ text: "⚠️ A descrição é muito curta. Por favor, seja mais específico sobre o que você precisa, ou digite 'menu' para ver as categorias disponíveis." });
+    responses.push({ text: "Preciso de um pouco mais de contexto para recomendar o serviço certo. Conte o que incomoda no veículo ou digite *menu* para ver as categorias." });
     
     const newState: FlowState = {
       ...state,
@@ -1491,12 +1585,12 @@ export async function handleFAQ(
         awaitingServiceRecommendation: false,
       };
       
-      responses.push({ text: `🤖 *Recomendação da IA:*${aiResponse}` });
-      responses.push({ text: "\n\n*1* - Agendar com o serviço recomendado\n*2* - Voltar ao menu principal" });
+      responses.push({ text: `*Minha sugestão:*\n${aiResponse}` });
+      responses.push({ text: "\n\n*1* 📅 Agendar o serviço sugerido\n*2* 🧭 Voltar ao menu principal" });
       
       return { responses, nextState: newState };
     } else {
-      responses.push({ text: "😕 Não consegui identificar um serviço adequado com essa descrição. Por favor, tente ser mais específico ou digite 'menu' para ver as categorias disponíveis." });
+      responses.push({ text: "Ainda não consigo indicar um serviço com precisão. Descreva mais detalhes, use *menu* ou escolha a opção *9* para falar com a equipe." });
       
       const newState: FlowState = {
         ...state,
@@ -1508,7 +1602,7 @@ export async function handleFAQ(
     }
   } catch (err) {
     console.error("[handleFAQ] Error:", err);
-    responses.push({ text: "😕 Ocorreu um erro ao processar sua solicitação. Por favor, digite 'menu' para ver as categorias disponíveis." });
+    responses.push({ text: "Tive uma instabilidade ao analisar sua solicitação. Digite *menu* para ver as categorias ou escolha *9* para falar com a equipe." });
     
     const newState: FlowState = {
       ...state,

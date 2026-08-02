@@ -66,7 +66,7 @@ O que seu carro precisa hoje?
 {menu}
 ```
 
-**Menu real (8 categorias):** _(fonte: whatsapp-catalog.ts, linha 24)_
+**Menu real (8 categorias + atendimento humano):** _(fonte: whatsapp-service-catalog.ts)_
 ```
 *1* Lavagem
 *2* Polimento
@@ -76,9 +76,10 @@ O que seu carro precisa hoje?
 *6* Revitalização
 *7* Pacotes Premium
 *8* Ajuda na escolha
+*9* 👤 Falar com atendente
 ```
 
-**Resposta esperada:** Número da opção desejada
+**Resposta esperada:** Número da opção desejada. A opção *9* pausa o bot e cria uma solicitação na Central de Atendimento para a equipe assumir a conversa.
 
 ---
 

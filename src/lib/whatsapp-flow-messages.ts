@@ -356,8 +356,19 @@ export function etapa4AskYear(model: string, prompts?: PromptMap) {
   return renderPrompt(p(prompts), "etapa4_ask_year", { model });
 }
 
-export function etapa4VehicleConfirmation(model: string, year: string, color: string, condition: string) {
-  return `🚘 *Confirmando os dados do veículo*\n\nModelo: *${model || "—"}*\nAno: *${year || "—"}*\nCor: *${color || "—"}*\nEstado: *${condition || "—"}*\n\nEstá certo? (sim/não)`;
+export function etapa4VehicleConfirmation(
+  model: string,
+  year: string,
+  color: string,
+  condition: string,
+  prompts?: PromptMap
+) {
+  return renderPrompt(p(prompts), "vehicle_confirmation", {
+    model: model || "—",
+    year: year || "—",
+    color: color || "—",
+    condition: condition || "—",
+  });
 }
 
 export function vehicleModelNotUnderstood(prompts?: PromptMap) {
@@ -407,6 +418,122 @@ export function etapa5Quote(
 
 export function etapa6Upsell(service: string, complement: string, benefit: string, prompts?: PromptMap) {
   return renderPrompt(p(prompts), "etapa6_upsell", { service, complement, benefit });
+}
+
+// ─────────────────────────────────────────────────────────────
+// MENSAGENS DE CONTEXTO — VOZ CRM OFICIAL
+// ─────────────────────────────────────────────────────────────
+
+function money(value: number | undefined | null): string {
+  return `R$ ${(Number(value) || 0).toFixed(2).replace(".", ",")}`;
+}
+
+export function firstTimeBonusOffer(
+  name: string | undefined,
+  discountValue: number | undefined,
+  totalValue: number | undefined,
+  prompts?: PromptMap
+) {
+  return renderPrompt(p(prompts), "first_time_bonus_offer", {
+    name: name || "",
+    discount: money(discountValue),
+    discountValue: money(discountValue),
+    value: money(totalValue),
+    totalValue: money(totalValue),
+  });
+}
+
+export function firstTimeBonusApplied(totalValue: number | undefined, prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "first_time_bonus_applied", {
+    value: money(totalValue),
+    totalValue: money(totalValue),
+  });
+}
+
+export function firstTimeBonusDeclined(totalValue: number | undefined, prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "first_time_bonus_declined", {
+    value: money(totalValue),
+    totalValue: money(totalValue),
+  });
+}
+
+export function reminderChoice(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "reminder_choice", {});
+}
+
+export function paymentConfirmation(
+  receiptAmount: string | number,
+  totalPaid: string | number,
+  prompts?: PromptMap
+) {
+  return renderPrompt(p(prompts), "payment_confirmation", {
+    receiptAmount: typeof receiptAmount === "number" ? money(receiptAmount) : receiptAmount,
+    totalPaid: typeof totalPaid === "number" ? money(totalPaid) : totalPaid,
+  });
+}
+
+export function handoffAcknowledgement(name: string | null | undefined, prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "handoff_ack", { name: name ? `, *${name}*` : "" });
+}
+
+export function aiFollowup(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "ai_followup", {});
+}
+
+export function slotUnavailable(dayLabel: string, slots: string, prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "slot_unavailable", { dayLabel, slots });
+}
+
+export function vehicleColorRequest(vehicle: string, prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "vehicle_color_request", { vehicle });
+}
+
+export function vehicleConditionRequest(vehicle: string, prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "vehicle_condition_request", { vehicle });
+}
+
+export function vehicleColorInvalid(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "vehicle_color_invalid", {});
+}
+
+export function upsellOffer(
+  service: string,
+  complement: string,
+  benefit: string,
+  value: number | undefined,
+  prompts?: PromptMap
+) {
+  return renderPrompt(p(prompts), "upsell_offer", {
+    service,
+    complement,
+    benefit,
+    value: money(value),
+  });
+}
+
+export function upsellAdded(complement: string, prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "upsell_added", { complement });
+}
+
+export function couponCodeRequest(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "coupon_code_request", {});
+}
+
+export function couponApplied(
+  code: string,
+  discount: string,
+  value: string,
+  prompts?: PromptMap
+) {
+  return renderPrompt(p(prompts), "coupon_applied", { code, discount, value });
+}
+
+export function summaryReview(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "summary_review", {});
+}
+
+export function evaluationRequired(prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "evaluation_required", {});
 }
 
 import { generateCalendarLegend } from "./calendar-helper";

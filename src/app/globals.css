@@ -79,4 +79,30 @@
   .admin-shell table td {
     @apply text-slate-300;
   }
+
+  .sidebar-scrollbar {
+    scrollbar-color: rgba(212, 175, 55, 0.35) transparent;
+    scrollbar-width: thin;
+  }
+
+  .sidebar-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .sidebar-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .sidebar-scrollbar::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(212, 175, 55, 0.35);
+  }
+
+  .crm-filter-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .crm-filter-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }

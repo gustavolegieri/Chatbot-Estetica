@@ -166,7 +166,7 @@ export default function SistemaPage() {
     <div>
       <AdminHeader
         title="Sistema"
-        description="Controle completo do painel, prompts e saúde do bot"
+        description="Governança do painel, do fluxo oficial e da saúde operacional do bot."
         actions={
           <button onClick={loadSystem} className="btn-secondary">
             <RefreshCw className="mr-2 h-4 w-4" />
@@ -176,7 +176,7 @@ export default function SistemaPage() {
       />
 
       {message && (
-        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="mb-6 rounded-xl border border-amber-700/40 bg-amber-950/20 px-4 py-3 text-sm text-amber-200">
           {message}
         </div>
       )}
@@ -192,8 +192,8 @@ export default function SistemaPage() {
         <div className="card xl:col-span-7">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold">Status do sistema</h2>
-              <p className="text-sm text-slate-500">Visão geral das configurações, prompts e métricas do bot.</p>
+              <h2 className="text-lg font-semibold text-brand-100">Status do sistema</h2>
+              <p className="text-sm text-slate-400">Visão geral das configurações, prompts e métricas do bot.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -283,8 +283,8 @@ export default function SistemaPage() {
         <div className="card xl:col-span-5">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold">Prompt metadata</h2>
-              <p className="text-sm text-slate-500">Resumo dos prompts cadastrados e categorias.</p>
+              <h2 className="text-lg font-semibold text-brand-100">Governança de prompts</h2>
+              <p className="text-sm text-slate-400">Resumo dos prompts cadastrados e categorias.</p>
             </div>
             <div className="text-xs text-slate-400">
               Atualizado: {promptUpdatedAt ? new Date(promptUpdatedAt).toLocaleString("pt-BR") : "-"}
@@ -318,8 +318,8 @@ export default function SistemaPage() {
         <div className="card xl:col-span-12">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold">Acesso rápido</h2>
-              <p className="text-sm text-slate-500">Navegue direto para as áreas do painel que gerenciam o sistema.</p>
+              <h2 className="text-lg font-semibold text-brand-100">Acesso rápido</h2>
+              <p className="text-sm text-slate-400">Navegue direto para as áreas que governam a operação.</p>
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

@@ -1,16 +1,35 @@
 "use client";
 
 import { useState } from "react";
-import { Send, MessageCircle, Bot } from "lucide-react";
+import {
+  Bot,
+  CheckCircle2,
+  CircleAlert,
+  MessageCircle,
+  Radio,
+  Send,
+  TestTube2,
+  Workflow,
+  XCircle,
+} from "lucide-react";
+import { AdminHeader } from "@/components/layout/AdminHeader";
+
+interface TestResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+  dedup?: boolean;
+}
 
 export default function TestWebhookPage() {
   const [phone, setPhone] = useState("5511972851072");
-  const [text, setText] = useState("Oi");
+  const [text, setText] = useState("Olá");
   const [buttonId, setButtonId] = useState("");
   const [listId, setListId] = useState("");
-  const [pushName, setPushName] = useState("Teste");
+  const [pushName, setPushName] = useState("Teste CRM");
+  const [messageId, setMessageId] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [result, setResult] = useState<TestResult | null>(null);
 
   const handleTest = async () => {
     setLoading(true);
@@ -19,24 +38,27 @@ export default function TestWebhookPage() {
     try {
       const response = await fetch("/api/admin/test-webhook", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           phone,
           text,
           buttonId: buttonId || undefined,
           listId: listId || undefined,
           pushName,
+          messageId: messageId || undefined,
         }),
       });
-
       const data = await response.json();
-      setResult(data);
+      setResult({
+        success: Boolean(data.success),
+        message: data.message || data.error,
+        error: data.error,
+        dedup: data.dedup,
+      });
     } catch (error) {
       setResult({
         success: false,
-        message: "Erro ao fazer requisição: " + (error as Error).message
+        message: error instanceof Error ? error.message : "Erro ao fazer requisição",
       });
     } finally {
       setLoading(false);
@@ -44,122 +66,119 @@ export default function TestWebhookPage() {
   };
 
   return (
-    <div className="p-8 max-w-2xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-          <MessageCircle className="w-8 h-8" />
-          Testar Webhook WhatsApp
-        </h1>
-        <p className="text-gray-600">
-          Simule mensagens recebidas do WhatsApp para testar o bot usando seu próprio número
-        </p>
-      </div>
+    <div className="space-y-6">
+      <AdminHeader
+        title="Simulador de webhook"
+        description="Reproduza eventos recebidos pelo WhatsApp para validar o fluxo em um ambiente controlado."
+        actions={
+          <span className="inline-flex items-center gap-2 rounded-lg border border-brand-700/35 bg-brand-950/25 px-3 py-2 text-xs font-medium text-brand-200">
+            <TestTube2 className="h-4 w-4" />
+            Ambiente de testes
+          </span>
+        }
+      />
 
-      <div className="bg-white rounded-lg shadow p-6 space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Número de Telefone</label>
-          <input
-            type="text"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="5511972851072"
-            className="w-full border rounded px-3 py-2"
-          />
-          <p className="text-xs text-gray-500 mt-1">Formato: DDI + DDD + número (ex: 5511972851072)</p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Mensagem</label>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Digite a mensagem..."
-            rows={3}
-            className="w-full border rounded px-3 py-2"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Button ID (opcional)</label>
-            <input
-              type="text"
-              value={buttonId}
-              onChange={(e) => setButtonId(e.target.value)}
-              placeholder="1"
-              className="w-full border rounded px-3 py-2"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">List ID (opcional)</label>
-            <input
-              type="text"
-              value={listId}
-              onChange={(e) => setListId(e.target.value)}
-              placeholder="service_1"
-              className="w-full border rounded px-3 py-2"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Nome do Remetente (opcional)</label>
-          <input
-            type="text"
-            value={pushName}
-            onChange={(e) => setPushName(e.target.value)}
-            placeholder="Teste"
-            className="w-full border rounded px-3 py-2"
-          />
-        </div>
-
-        <button
-          onClick={handleTest}
-          disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
+      <section className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleTest();
+          }}
+          className="card space-y-5"
         >
-          {loading ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              Processando...
-            </>
-          ) : (
-            <>
-              <Send className="w-4 h-4" />
-              Enviar Mensagem de Teste
-            </>
-          )}
-        </button>
-      </div>
+          <div className="flex items-start gap-3 border-b border-surface-700 pb-5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-900/40 ring-1 ring-brand-700/40">
+              <Radio className="h-5 w-5 text-brand-300" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-brand-100">Evento de entrada</h2>
+              <p className="mt-1 text-sm text-slate-400">Os campos abaixo simulam o payload que chega pelo webhook oficial.</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label>
+              <span className="label">Número do cliente *</span>
+              <input type="text" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="5511972851072" className="input" required />
+              <span className="mt-1.5 block text-xs text-slate-500">DDI + DDD + número, somente dígitos.</span>
+            </label>
+            <label>
+              <span className="label">Nome exibido</span>
+              <input type="text" value={pushName} onChange={(event) => setPushName(event.target.value)} placeholder="Teste CRM" className="input" />
+            </label>
+          </div>
+
+          <label>
+            <span className="label">Mensagem recebida *</span>
+            <textarea value={text} onChange={(event) => setText(event.target.value)} placeholder="Digite a mensagem como o cliente enviaria..." rows={4} className="input resize-y" required />
+          </label>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <label>
+              <span className="label">Button ID</span>
+              <input type="text" value={buttonId} onChange={(event) => setButtonId(event.target.value)} placeholder="1" className="input" />
+            </label>
+            <label>
+              <span className="label">List ID</span>
+              <input type="text" value={listId} onChange={(event) => setListId(event.target.value)} placeholder="service_1" className="input" />
+            </label>
+            <label>
+              <span className="label">Message ID</span>
+              <input type="text" value={messageId} onChange={(event) => setMessageId(event.target.value)} placeholder="TESTE-001" className="input" />
+            </label>
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-surface-700 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs leading-5 text-slate-500">Use um Message ID para validar a deduplicação persistente do webhook.</p>
+            <button type="submit" disabled={loading} className="btn-primary min-w-48 gap-2">
+              {loading ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-surface-950 border-t-transparent" /> : <Send className="h-4 w-4" />}
+              {loading ? "Processando..." : "Simular mensagem"}
+            </button>
+          </div>
+        </form>
+
+        <aside className="space-y-4">
+          <div className="rounded-2xl border border-amber-700/40 bg-amber-950/20 p-5">
+            <div className="flex items-start gap-3">
+              <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+              <div>
+                <h2 className="font-semibold text-amber-200">Atenção operacional</h2>
+                <p className="mt-2 text-sm leading-6 text-amber-100/75">
+                  Esta simulação usa o motor real do bot. Dependendo da configuração, ela pode disparar a resposta do fluxo para o número informado.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="card p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-900/35 ring-1 ring-sky-700/40"><Workflow className="h-5 w-5 text-sky-400" /></div>
+              <div><h2 className="font-semibold text-brand-100">Cenários úteis</h2><p className="text-xs text-slate-500">Validações rápidas</p></div>
+            </div>
+            <ul className="mt-5 space-y-3 text-sm text-slate-400">
+              <li className="flex gap-3"><span className="text-brand-300">01</span><span><strong className="font-medium text-slate-200">Olá</strong> inicia a jornada de boas-vindas.</span></li>
+              <li className="flex gap-3"><span className="text-brand-300">02</span><span><strong className="font-medium text-slate-200">menu</strong> retorna ao menu oficial.</span></li>
+              <li className="flex gap-3"><span className="text-brand-300">03</span><span>Repita o mesmo Message ID para testar a deduplicação.</span></li>
+            </ul>
+          </div>
+        </aside>
+      </section>
 
       {result && (
-        <div className={`mt-4 p-4 rounded-lg ${result.success ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
-          <div className="flex items-center gap-2 mb-2">
-            {result.success ? (
-              <Bot className="w-5 h-5 text-green-600" />
-            ) : (
-              <div className="w-5 h-5 text-red-600">❌</div>
-            )}
-            <span className={`font-medium ${result.success ? "text-green-800" : "text-red-800"}`}>
-              {result.success ? "Sucesso" : "Erro"}
-            </span>
+        <section className={result.success ? "rounded-2xl border border-emerald-700/45 bg-emerald-950/25 p-5" : "rounded-2xl border border-red-700/45 bg-red-950/25 p-5"}>
+          <div className="flex items-start gap-3">
+            <div className={result.success ? "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-900/40 text-emerald-400" : "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-900/40 text-red-400"}>
+              {result.success ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className={result.success ? "font-semibold text-emerald-200" : "font-semibold text-red-200"}>{result.success ? "Evento processado" : "Falha no processamento"}</h2>
+                {result.dedup && <span className="rounded-full bg-surface-800 px-2 py-0.5 text-[11px] font-semibold text-brand-200">Deduplicado</span>}
+              </div>
+              <p className={result.success ? "mt-1 text-sm text-emerald-100/80" : "mt-1 text-sm text-red-100/80"}>{result.message}</p>
+            </div>
           </div>
-          <p className={result.success ? "text-green-700" : "text-red-700"}>
-            {result.message}
-          </p>
-        </div>
+        </section>
       )}
-
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="font-medium text-blue-800 mb-2">💡 Dicas de Teste</h3>
-        <ul className="text-sm text-blue-700 space-y-1">
-          <li>• Use &quot;menu&quot; para voltar ao menu principal</li>
-          <li>• Use &quot;Oi&quot; ou &quot;Olá&quot; para iniciar o fluxo de boas-vindas</li>
-          <li>• Verifique os logs do servidor para ver o processamento detalhado</li>
-          <li>• Use o modo de teste nas configurações para filtrar mensagens</li>
-        </ul>
-      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { HandoffStatus } from "@prisma/client";
 import { prisma } from "./prisma";
 import { sendText } from "./evolution-api";
 import { normalizePhone } from "./utils";
+import { loadPromptMap, renderPrompt } from "./bot-prompts";
 
 /** Cliente pediu falar com dono/atendente humano */
 export function wantsHumanHandoff(text: string): boolean {
@@ -38,15 +39,10 @@ export async function requestHumanHandoff(params: {
   });
 
   const name = params.clientName ? `, *${params.clientName}*` : "";
+  const prompts = await loadPromptMap();
   await sendText({
     number: phone,
-    text: [
-      `Entendi${name}! 😊`,
-      ``,
-      `Vou avisar nossa equipe — em breve alguém da *Garagem do Ka* entra em contato com você por aqui.`,
-      ``,
-      `_Enquanto isso, pode continuar escrevendo sua dúvida._`,
-    ].join("\n"),
+    text: renderPrompt(prompts, "handoff_ack", { name }),
     flowStage: "HANDOFF",
   });
 }

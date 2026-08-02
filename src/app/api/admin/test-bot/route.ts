@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { FlowState } from "@/lib/whatsapp-flow-types";
 import { processNumberedFlow, startFlow } from "@/lib/whatsapp-flow";
 import { v4 as uuidv4 } from "uuid";
+import { getCerebrasStatus, withCerebrasEnabled } from "@/lib/cerebras-ai";
+
+export const runtime = "nodejs";
 
 /**
  * API para o Test Bot - simula conversa completa com o bot
@@ -68,6 +71,7 @@ export async function POST(req: NextRequest) {
       
       return NextResponse.json({
         success: true,
+        ai: getCerebrasStatus(),
         sessionId: newSessionId,
         flowState: session.flowState,
         messages: session.messages,
@@ -114,20 +118,24 @@ export async function POST(req: NextRequest) {
           sendTextCallback: async (text: string) => {
             botResponses.push(text);
           },
+          onFlowStateChange: (flowState: FlowState) => {
+            // O motor pode substituir o objeto de estado internamente. O
+            // simulador mantém a referência mais recente sem persistir nada.
+            session.flowState = flowState;
+          },
           useRealAI,
           skipDb: true
         }
       };
 
-      if (!session.flowState.welcomed) {
-        await startFlow(msg);
-        session.flowState.welcomed = true;
-      } else {
-        await processNumberedFlow(msg, session.flowState);
-      }
-
-      // Atualizar estado do flow
-      session.flowState = session.flowState;
+      await withCerebrasEnabled(Boolean(useRealAI), async () => {
+        if (!session.flowState.welcomed) {
+          await startFlow(msg);
+          session.flowState.welcomed = true;
+        } else {
+          await processNumberedFlow(msg, session.flowState);
+        }
+      });
 
     } catch (error) {
       console.error("[Test Bot] Erro ao processar mensagem:", error);
@@ -148,6 +156,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      ai: getCerebrasStatus(),
       sessionId: session.id,
       flowState: session.flowState,
       messages: session.messages,

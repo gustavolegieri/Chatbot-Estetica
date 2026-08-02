@@ -48,6 +48,9 @@ function buildCategoriesFromServices(
 
   for (const [numStr, cat] of Object.entries(CATEGORIES)) {
     const num = Number(numStr);
+    // Uma categoria estática vazia não deve ocupar uma opção do menu. Ela
+    // continua podendo aparecer abaixo se houver serviço ativo nela no banco.
+    if (cat.keys.length === 0) continue;
     result[num] = {
       title: renderPrompt(prompts, `category_${num}`, {}) || cat.title,
       keys: [],
@@ -131,7 +134,7 @@ export function buildMainMenu(categories: WhatsAppCatalogContext["categories"], 
   const icons = ["💧", "✨", "🛡️", "🪑", "🔬", "🔄", "📦", "🤔"];
   for (let i = 1; i <= MAIN_MENU_CATEGORIES; i++) {
     const cat = categories[i];
-    if (!cat) continue;
+    if (!cat || cat.keys.length === 0) continue;
     lines.push(`*${i}* ${icons[i - 1] ?? "•"} ${cat.title}`);
   }
   // Add option 9 for human handoff
@@ -158,12 +161,24 @@ export function subMenuForCategoryCtx(
 export function getUpsellForKey(
   key: string,
   ctx: WhatsAppCatalogContext
-): { complement: string; benefit: string } | null {
+): { complement: string; benefit: string; value: number; durationMin: number } | null {
   const service = ctx.servicesByKey[key];
   if (service?.upsellService) {
+    const originalPrice = num(service.upsellService.price);
+    const discount = Math.max(0, num(service.upsellDiscount));
+    const value = Math.max(0, originalPrice - discount);
+
+    // Não ofereça complemento sem preço comercial configurado, nem um
+    // complemento cujo desconto deixaria o preço exibido zerado.
+    if (!Number.isFinite(originalPrice) || originalPrice <= 0 || value <= 0) {
+      return null;
+    }
+
     return {
       complement: service.upsellService.name,
       benefit: service.upsellBenefit ?? "aproveita a visita e deixa tudo pronto de uma vez.",
+      value,
+      durationMin: Math.max(0, service.upsellService.durationMin),
     };
   }
   return null;

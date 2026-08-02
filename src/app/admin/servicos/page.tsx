@@ -182,6 +182,16 @@ export default function ServicosPage() {
       .sort((a, b) => a.value - b.value);
   }, [filteredServices]);
 
+  const catalogMetrics = useMemo(
+    () => ({
+      total: services.length,
+      active: services.filter((service) => service.active).length,
+      whatsapp: services.filter((service) => service.showInWhatsApp && service.active).length,
+      categories: new Set(services.map((service) => resolveServiceCategoryNum(service))).size,
+    }),
+    [services]
+  );
+
   function openCreate(categoryNum = 1) {
     setEditing(null);
     setForm({ ...emptyForm, categoryNum: String(categoryNum) });
@@ -321,10 +331,12 @@ export default function ServicosPage() {
   return (
     <div className="space-y-6">
       <AdminHeader
-        title="Serviços"
-        description="Gerencie serviços, categorias, preços, disponibilidade no WhatsApp e ordem de exibição"
+        title="Catálogo de serviços"
+        eyebrow="Oferta e conversão"
+        icon={Wrench}
+        description="Organize preços, tempo de execução e a vitrine exibida pelo WhatsApp oficial."
         actions={
-          <button onClick={() => openCreate()} className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-brand-50 transition hover:bg-brand-500">
+          <button type="button" onClick={() => openCreate()} className="btn-primary">
             <Plus className="mr-2 inline h-4 w-4" />
             Novo serviço
           </button>
@@ -337,16 +349,24 @@ export default function ServicosPage() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-brand-800/30 bg-surface-900/80 p-4 shadow-gold-sm">
-        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="overflow-hidden rounded-2xl border border-white/[0.075] bg-surface-850/80 shadow-[0_16px_44px_rgba(0,0,0,0.16)]">
+        <div className="grid gap-px border-b border-white/[0.06] bg-white/[0.055] sm:grid-cols-2 xl:grid-cols-4">
+          <div className="bg-surface-850/80 px-4 py-4 sm:px-5"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">No catálogo</p><p className="mt-1 text-2xl font-semibold text-brand-100">{catalogMetrics.total}</p></div>
+          <div className="bg-surface-850/80 px-4 py-4 sm:px-5"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Ativos</p><p className="mt-1 text-2xl font-semibold text-emerald-300">{catalogMetrics.active}</p></div>
+          <div className="bg-surface-850/80 px-4 py-4 sm:px-5"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">No WhatsApp</p><p className="mt-1 text-2xl font-semibold text-brand-200">{catalogMetrics.whatsapp}</p></div>
+          <div className="bg-surface-850/80 px-4 py-4 sm:px-5"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Categorias usadas</p><p className="mt-1 text-2xl font-semibold text-slate-200">{catalogMetrics.categories}</p></div>
+        </div>
+        <div className="p-4 sm:p-5">
+        <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="font-serif text-lg font-semibold text-brand-200">Gestão completa</h2>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand-400/80">Vitrine comercial</p>
+            <h2 className="mt-1 font-serif text-xl font-semibold text-brand-100">Gestão completa</h2>
             <p className="text-sm text-slate-400">
-              Controle o que aparece no WhatsApp, a ordem dos serviços e os dados de cada item.
+              Controle a ordem do menu, a disponibilidade e os textos que vendem seus serviços.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <label className="flex min-w-[220px] items-center gap-2 rounded-xl border border-brand-800/30 bg-surface-800 px-3 py-2 text-sm text-slate-400">
+            <label className="flex min-w-[220px] flex-1 items-center gap-2 rounded-xl border border-white/[0.09] bg-surface-900/70 px-3 py-2 text-sm text-slate-400 lg:flex-none">
               <Search className="h-4 w-4" />
               <input
                 value={search}
@@ -358,7 +378,7 @@ export default function ServicosPage() {
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value as "all" | "active" | "inactive")}
-              className="rounded-xl border border-brand-800/30 bg-surface-800 px-3 py-2 text-sm text-brand-100"
+              className="rounded-xl border border-white/[0.09] bg-surface-900/70 px-3 py-2 text-sm text-brand-100 outline-none transition focus:border-brand-500"
             >
               <option value="all">Todos os status</option>
               <option value="active">Ativos</option>
@@ -367,7 +387,7 @@ export default function ServicosPage() {
             <select
               value={whatsappFilter}
               onChange={(event) => setWhatsappFilter(event.target.value as "all" | "show" | "hidden")}
-              className="rounded-xl border border-brand-800/30 bg-surface-800 px-3 py-2 text-sm text-brand-100"
+              className="rounded-xl border border-white/[0.09] bg-surface-900/70 px-3 py-2 text-sm text-brand-100 outline-none transition focus:border-brand-500"
             >
               <option value="all">WhatsApp / todos</option>
               <option value="show">Exibidos no WhatsApp</option>
@@ -387,11 +407,12 @@ export default function ServicosPage() {
             {groupedServices.map((group) => {
               const isExpanded = expandedCategories[group.value] ?? true;
               return (
-                <section key={group.value} className="overflow-hidden rounded-2xl border border-brand-800/20 bg-surface-800/70">
+                <section key={group.value} className="overflow-hidden rounded-2xl border border-white/[0.07] bg-surface-900/55">
+                  <div className="flex items-center justify-between gap-3 px-4 py-3.5">
                   <button
                     type="button"
                     onClick={() => toggleCategory(group.value)}
-                    className="flex w-full items-center justify-between px-4 py-3 text-left"
+                    className="flex min-w-0 flex-1 items-center text-left"
                   >
                     <div>
                       <div className="flex items-center gap-2">
@@ -402,18 +423,16 @@ export default function ServicosPage() {
                         {group.services.length} serviço(s) · {group.services.filter((item) => item.active).length} ativo(s)
                       </p>
                     </div>
+                  </button>
                     <button
                       type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        openCreate(group.value);
-                      }}
-                      className="rounded-xl border border-brand-700/30 bg-brand-900/40 px-3 py-2 text-sm text-brand-200 transition hover:bg-brand-800/70"
+                      onClick={() => openCreate(group.value)}
+                      className="shrink-0 rounded-xl border border-brand-700/30 bg-brand-900/40 px-3 py-2 text-sm font-medium text-brand-200 transition hover:border-brand-500/45 hover:bg-brand-800/70"
                     >
                       <Plus className="mr-1 inline h-4 w-4" />
                       Adicionar
                     </button>
-                  </button>
+                  </div>
 
                   {isExpanded && (
                     <div className="border-t border-brand-800/20 p-4">
@@ -424,7 +443,7 @@ export default function ServicosPage() {
                       ) : (
                         <div className="grid gap-3 lg:grid-cols-2">
                           {group.services.map((service) => (
-                            <div key={service.id} className="rounded-2xl border border-brand-800/20 bg-surface-900/70 p-4 shadow-sm">
+                            <div key={service.id} className="rounded-2xl border border-white/[0.07] bg-surface-850/85 p-4 transition hover:border-brand-500/20 hover:bg-surface-850">
                               <div className="flex items-start justify-between gap-3">
                                 <div>
                                   <div className="flex items-center gap-2">
@@ -444,16 +463,16 @@ export default function ServicosPage() {
                                   </p>
                                 </div>
                                 <div className="flex gap-2">
-                                  <button onClick={() => handleToggleActive(service)} className="rounded-lg border border-brand-700/30 p-2 text-brand-300 transition hover:bg-brand-900/50">
+                                  <button type="button" title={service.active ? "Desativar serviço" : "Ativar serviço"} aria-label={service.active ? "Desativar serviço" : "Ativar serviço"} onClick={() => handleToggleActive(service)} className="rounded-lg border border-brand-700/30 p-2 text-brand-300 transition hover:bg-brand-900/50">
                                     {service.active ? <CheckCircle2 className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
                                   </button>
-                                  <button onClick={() => openEdit(service)} className="rounded-lg border border-brand-700/30 p-2 text-brand-300 transition hover:bg-brand-900/50">
+                                  <button type="button" title="Editar serviço" aria-label="Editar serviço" onClick={() => openEdit(service)} className="rounded-lg border border-brand-700/30 p-2 text-brand-300 transition hover:bg-brand-900/50">
                                     <Pencil className="h-4 w-4" />
                                   </button>
-                                  <button onClick={() => handleDuplicate(service)} className="rounded-lg border border-brand-700/30 p-2 text-brand-300 transition hover:bg-brand-900/50">
+                                  <button type="button" title="Duplicar serviço" aria-label="Duplicar serviço" onClick={() => handleDuplicate(service)} className="rounded-lg border border-brand-700/30 p-2 text-brand-300 transition hover:bg-brand-900/50">
                                     <Copy className="h-4 w-4" />
                                   </button>
-                                  <button onClick={() => handleDelete(service)} className="rounded-lg border border-red-400/30 p-2 text-red-300 transition hover:bg-red-500/10">
+                                  <button type="button" title="Excluir serviço" aria-label="Excluir serviço" onClick={() => handleDelete(service)} className="rounded-lg border border-red-400/30 p-2 text-red-300 transition hover:bg-red-500/10">
                                     <Trash2 className="h-4 w-4" />
                                   </button>
                                 </div>
@@ -481,7 +500,7 @@ export default function ServicosPage() {
                                   onClick={() => handleToggleWhatsApp(service)}
                                   className="rounded-xl border border-brand-700/30 px-3 py-2 text-sm text-brand-100 transition hover:bg-brand-900/50"
                                 >
-                                  {service.showInWhatsApp ? <><Eye className="mr-1 inline h-4 w-4" /> Mostrar no WhatsApp</> : <><EyeOff className="mr-1 inline h-4 w-4" /> Ocultar</>}
+                                  {service.showInWhatsApp ? <><EyeOff className="mr-1 inline h-4 w-4" /> Ocultar do WhatsApp</> : <><Eye className="mr-1 inline h-4 w-4" /> Mostrar no WhatsApp</>}
                                 </button>
                               </div>
                             </div>
@@ -495,6 +514,7 @@ export default function ServicosPage() {
             })}
           </div>
         )}
+      </div>
       </div>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Editar serviço" : "Novo serviço"} size="lg">

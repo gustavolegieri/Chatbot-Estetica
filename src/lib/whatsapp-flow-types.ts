@@ -57,11 +57,19 @@ export interface FlowState {
   reminderEnabled?: boolean;
   quoteMin?: number;
   quoteMax?: number;
+  /**
+   * Define se quoteMin/quoteMax ainda representam o valor cheio. Estados
+   * antigos sem essa marca já continham o desconto no preço e continuam
+   * compatíveis como "discounted".
+   */
+  quoteDiscountMode?: "base" | "discounted";
   estimatedTime?: string;
   upsellLabel?: string;
   upsellAccepted?: boolean;
   upsellOffered?: boolean;
   upsellValue?: number;
+  /** Duração real do complemento aceito, para não encurtar a reserva. */
+  upsellDurationMin?: number;
   availableSlots?: string[];
   serviceDurationMin?: number;
   dayLabel?: string;
@@ -105,6 +113,8 @@ export interface FlowState {
   isFirstTimeCustomer?: boolean;
   firstTimeBonusApplied?: boolean;
   firstTimeBonusDiscount?: number;
+  /** Cupom interno que deu origem ao bônus de primeira compra, se houver. */
+  firstTimeBonusCouponId?: string;
 
   // Tracking de inatividade
   lastInteractionAt?: number;
@@ -112,6 +122,8 @@ export interface FlowState {
   // Cliente recorrente e fidelidade
   isReturningClient?: boolean;
   savedVehicle?: string | null;
+  /** Aguarda a decisão de reutilizar o veículo salvo no CRM. */
+  awaitingSavedVehicleChoice?: boolean;
   loyaltyPoints?: number;
   loyaltyDiscountApplied?: number;
 
@@ -122,6 +134,9 @@ export interface FlowState {
   awaitingReturnPreference?: boolean;
   awaitingServiceRecommendation?: boolean;
   serviceRecommendation?: string | null;
+  /** Opções exibidas após uma resposta contextual da IA. */
+  awaitingAiFollowup?: boolean;
+  aiFollowupReturnStage?: FlowStage;
 
   // Oferta de desconto (cancelamento)
   discountOffer?: {

@@ -48,10 +48,26 @@ export default function RelatoriosPage() {
 
   const summary = data?.summary ?? {};
   const isListReport = activeType === "clientes" || activeType === "agendamentos" || activeType === "financeiro";
+  const resultColumns = data?.items?.length ? Object.keys(data.items[0]).slice(0, 6) : [];
+
+  function displayValue(value: unknown) {
+    if (value === null || value === undefined || value === "") return "—";
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+  }
 
   return (
     <div className="space-y-6">
-      <AdminHeader title="Relatórios" description="Acompanhe as métricas do seu negócio" />
+      <AdminHeader
+        title="Relatórios"
+        description="Acompanhe as métricas comerciais, financeiras e de relacionamento da operação."
+        actions={
+          <button onClick={() => void fetchReport(activeType)} disabled={loading} className="btn-secondary gap-2">
+            <RefreshCw className={"h-4 w-4 " + (loading ? "animate-spin" : "")} />
+            Atualizar leitura
+          </button>
+        }
+      />
 
       {message && (
         <div className="flex items-center gap-3 rounded-xl border border-amber-700/50 bg-amber-950/30 px-5 py-4 text-amber-300 shadow-gold">
@@ -169,10 +185,29 @@ export default function RelatoriosPage() {
           <div className="flex justify-center py-12"><RefreshCw className="h-6 w-6 animate-spin text-brand-400" /></div>
         ) : data?.items?.length ? (
           <div className="overflow-x-auto">
-            <pre className="rounded-xl bg-surface-850 p-4 text-xs leading-relaxed text-slate-400">{
-              JSON.stringify(data.items.slice(0, 10), null, 2)
-            }</pre>
-            {data.items.length > 10 && <p className="mt-2 text-center text-xs text-slate-500">Mostrando 10 de {data.items.length}</p>}
+            <table className="w-full min-w-[640px] text-sm">
+              <thead>
+                <tr>
+                  {resultColumns.map((column) => (
+                    <th key={column} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      {column.replace(/([A-Z])/g, " $1").trim()}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.items.slice(0, 10).map((row, index) => (
+                  <tr key={index}>
+                    {resultColumns.map((column) => (
+                      <td key={column} className="max-w-[260px] truncate px-4 py-3 text-slate-300" title={displayValue(row[column])}>
+                        {displayValue(row[column])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {data.items.length > 10 && <p className="border-t border-surface-700 px-4 py-3 text-center text-xs text-slate-500">Mostrando 10 de {data.items.length} registros. Exporte CSV para a lista completa.</p>}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-slate-500">

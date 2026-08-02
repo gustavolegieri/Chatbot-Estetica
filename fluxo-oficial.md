@@ -46,6 +46,7 @@ Template dinâmico `{etapa2MainMenu}` baseado nas categorias do catálogo.
 - Se **categoria 8 (indeciso)**: pede modelo do veículo → `ETAPA3_UNDECIDED_VEHICLE`
 - Se **categoria com 1 serviço só**: vai direto para o detalhe (`activateService`)
 - Se **categoria com vários serviços**: mostra submenu → `ETAPA2_SUB`
+- Se **opção 9 (falar com atendente)**: cria solicitação para a equipe, pausa o bot e confirma a transferência ao cliente.
 
 ## 4. SUBMENU — `ETAPA2_SUB`
 
@@ -255,6 +256,10 @@ a etapa atual. Se o comportamento do bot destoar do fluxo acima, verifique estas
    (Cerebras) para responder a dúvida e depois reimprime o menu da etapa atual.
 5. Veículo + serviço detectados simultaneamente no texto livre, com nome já salvo, em
    `ETAPA2_MAIN_MENU`/`ETAPA2_SUB` → pula direto para `activateService`.
+
+### Camada de IA Cerebras
+
+A IA não substitui as regras de negócio, preços, agenda ou confirmação final. Ela atua como uma camada de qualidade para interpretar intenção, extrair dados de veículo e responder dúvidas em linguagem natural. Se estiver indisponível, o fluxo numérico continua normalmente. Quando o cliente pede uma pessoa, usa a opção *9* ou demonstra necessidade de atendimento humano, o bot cria o handoff e a Central de Atendimento assume a conversa.
 
 **Qualquer nova funcionalidade ou correção deve considerar essas 5 regras antes de mexer no
 `case` da etapa**, porque elas podem interceptar a mensagem antes de chegar lá.

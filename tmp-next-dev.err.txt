@@ -1,0 +1,57 @@
+ ⨯ ./src/components/layout/Sidebar.tsx
+Error: 
+
+Caused by:
+    0: Failed to read source code from C:\Users\legie\Desktop\chatbot-estetica\Chatbot-Estetica\src\components\layout\Sidebar.tsx
+    1: O sistema não pode encontrar o arquivo especificado. (os error 2)
+
+Import trace for requested module:
+./src/components/layout/Sidebar.tsx
+./src/app/admin/layout.tsx
+ ⨯ ./src/components/layout/Sidebar.tsx
+Error: 
+
+Caused by:
+    0: Failed to read source code from C:\Users\legie\Desktop\chatbot-estetica\Chatbot-Estetica\src\components\layout\Sidebar.tsx
+    1: O sistema não pode encontrar o arquivo especificado. (os error 2)
+
+Import trace for requested module:
+./src/components/layout/Sidebar.tsx
+./src/app/admin/layout.tsx
+Error [PrismaClientKnownRequestError]: 
+Invalid `prisma.appointment.count()` invocation:
+
+
+Timed out fetching a new connection from the connection pool. More info: http://pris.ly/d/connection-pool (Current connection pool timeout: 10, connection limit: 2)
+    at async GET (src\app\api\dashboard\route.ts:30:7)
+  28 |     blockedDatesCount,
+  29 |     activeServices,
+> 30 |   ] = await Promise.all([
+     |       ^
+  31 |     prisma.client.count(),
+  32 |     prisma.appointment.count(),
+  33 |     prisma.appointment.count({ {
+  code: 'P2024',
+  meta: [Object],
+  clientVersion: '6.19.3'
+}
+[Test Bot] Erro ao processar mensagem: Error [PrismaClientKnownRequestError]: 
+Invalid `prisma.whatsAppSession.update()` invocation:
+
+
+An operation failed because it depends on one or more records that were required but not found. No record was found for an update.
+    at async saveFlow (src\lib\whatsapp-flow.ts:783:3)
+    at async processNumberedFlowInternal (src\lib\whatsapp-flow.ts:1274:9)
+    at async eval (src\app\api\admin\test-bot\route.ts:131:11)
+    at async POST (src\app\api\admin\test-bot\route.ts:126:7)
+  781 |   }
+  782 |   console.log("[WhatsApp Flow] 💾 Salvando estado do fluxo:", { phone, stage: flow.stage, welcomed: flow.welcomed });
+> 783 |   await prisma.whatsAppSession.update({
+      |   ^
+  784 |     where: { phone: normalizePhone(phone) },
+  785 |     data: { metadata: flow as object },
+  786 |   }); {
+  code: 'P2025',
+  meta: [Object],
+  clientVersion: '6.19.3'
+}

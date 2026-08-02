@@ -1,4 +1,4 @@
-﻿/** Defaults dos prompts do bot — usados no seed e como fallback */
+/** Defaults dos prompts do bot — usados no seed e como fallback */
 
 export interface PromptDef {
   key: string;
@@ -8,458 +8,254 @@ export interface PromptDef {
   hint?: string;
 }
 
+/**
+ * Linguagem do atendimento WhatsApp da Garagem do Ka.
+ * Os templates são curtos para que o cliente sempre saiba o próximo passo.
+ */
 export const BOT_PROMPT_DEFAULTS: PromptDef[] = [
   {
     key: "etapa1_welcome",
     label: "Boas-vindas (etapa 1)",
     category: "fluxo",
     hint: "{businessName}, {address}, {hours}",
-    content: `Olá! Seja muito bem-vindo(a) à *{businessName}* 🚗✨
-
-Aqui você encontra estética automotiva premium, com atendimento simples de entender e orientado para resultado.
-
-O que fazemos por você:
-🔹 *Lavagem detalhada* — limpeza cuidadosa por dentro e por fora
-🔹 *Polimento técnico* — ajuda a recuperar brilho e aparência
-🔹 *Proteção de pintura* — vitrificação e cristalização
-🔹 *Higienização interior* — bancos, teto e acabamento
-🔹 *Detalhamentos completos* — cuidado mais profundo no veículo
-
-📍 {address}
-🕐 {hours}
-
-Para começar, me diga o seu *nome*.
-
-_Se preferir, responda com uma frase curta como "sou João"._`,
+    content: "Olá! Você está falando com a *{businessName}* 🚗\n\nSou a assistente virtual com IA da nossa equipe. Posso orientar o melhor cuidado para o seu veículo, informar uma estimativa e organizar seu agendamento.\n\nTrabalhamos com lavagem técnica, polimento, proteção de pintura, higienização interna e detalhamento automotivo.\n\n📍 {address}\n🕒 {hours}\n\nPara iniciar seu atendimento, como você prefere ser chamado(a)?",
   },
   {
     key: "etapa2_main_menu",
     label: "Menu principal (etapa 2)",
     category: "fluxo",
     hint: "{clientName}, {menu}",
-    content: `Que bom te ter aqui, *{clientName}*! 😊
-
-Me diga o que você precisa hoje. Se quiser, também pode escrever direto:
-*agendar*, *dúvida*, *menu* ou *falar com o dono*.
-
-{menu}`,
+    content: "Olá, *{clientName}*. Qual cuidado seu veículo precisa hoje?\n\nVocê pode descrever o caso em uma mensagem livre — nossa IA ajuda a indicar o serviço — ou escolher uma opção:\n\n{menu}\n\nPara falar diretamente com um especialista da equipe, responda *9*.\n_A qualquer momento, envie *menu* para recomeçar._",
   },
   {
     key: "service_action_menu",
     label: "Ações após detalhe do serviço",
     category: "fluxo",
-    content: `O que você quer fazer agora?
-
-*1* 📅 Quero agendar
-*2* 🔄 Ver outros serviços
-*3* 💬 Tenho uma dúvida
-*4* 👤 Falar com o dono
-
-_Digite só o número da opção._`,
+    content: "Como deseja seguir?\n\n*1* 📅 Agendar este serviço\n*2* ↩️ Ver outros serviços\n*3* 💬 Tirar uma dúvida\n*4* 👤 Falar com um especialista\n\n_Responda apenas com o número da opção._",
   },
   {
     key: "package_action_menu",
     label: "Ações — pacotes",
     category: "fluxo",
-    content: `*1* 📅 Agendar um pacote
-*2* 🔍 Comparar pacotes
-*3* 🔧 Ver serviços avulsos
-*4* 👤 Falar com o dono`,
+    content: "Como deseja seguir?\n\n*1* 📅 Agendar um pacote\n*2* 🔎 Comparar os pacotes\n*3* ↩️ Ver serviços avulsos\n*4* 👤 Falar com um especialista\n\n_Responda apenas com o número da opção._",
   },
   {
     key: "etapa4_vehicle",
     label: "Pedir modelo do veículo",
     category: "fluxo",
-    content: `Qual é o *modelo* do seu veículo? 🚗
-
-_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_
-
-_Ou envie modelo e ano juntos: *Civic 2021*_`,
+    content: "Para orientar valor e duração com mais precisão, informe o *modelo e ano* do veículo.\n\n_Exemplos: Civic 2021, Corolla 2019, Hilux 2020._",
   },
   {
     key: "etapa4_vehicle_has",
     label: "Veículo já informado",
     category: "fluxo",
-    content: `Perfeito — já tenho seu veículo anotado 🚗
-Vamos para o orçamento!`,
+    content: "Perfeito. Já localizei os dados do seu veículo no atendimento.\n\nAgora vou preparar a estimativa do serviço.",
   },
   {
     key: "etapa4_ask_year",
     label: "Pedir ano do veículo",
     category: "fluxo",
     hint: "{model}",
-    content: `Anotado: *{model}* 👍
-
-Qual o *ano* do veículo?
-
-_Exemplo: 2021, 2019, 2018_`,
+    content: "Anotado: *{model}*.\n\nQual é o *ano* do veículo?\n\n_Exemplo: 2021._",
   },
   {
     key: "vehicle_model_not_understood",
     label: "Modelo não entendido",
     category: "fluxo",
-    content: `Não identifiquei o modelo 😅
-
-Envie só o *modelo* do carro (marca/modelo):
-_Ex: Civic, Fiat Argo, Hilux SW4_`,
+    content: "Não consegui identificar o modelo do veículo.\n\nEnvie a marca e o modelo, por exemplo: _Honda Civic_, _Fiat Argo_ ou _Toyota Hilux_.",
   },
   {
     key: "vehicle_year_not_understood",
     label: "Ano não entendido",
     category: "fluxo",
-    content: `Preciso do *ano* com 4 dígitos 😊
-
-_Exemplo: 2021, 2019, 2015_`,
+    content: "Preciso do ano com quatro dígitos para seguir.\n\n_Exemplos: 2021, 2019 ou 2015._",
   },
   {
     key: "vehicle_not_understood",
     label: "Veículo não validado",
     category: "fluxo",
-    content: `Não consegui validar o veículo 😅
-
-Envie *modelo e ano*, por exemplo:
-_Civic 2021_
-_Hilux 2019_
-_Onix 2020_`,
+    content: "Não consegui validar os dados do veículo.\n\nEnvie modelo e ano em uma única mensagem.\n_Exemplo: Civic 2021._",
   },
   {
     key: "etapa5_quote",
     label: "Orçamento (etapa 5)",
     category: "fluxo",
     hint: "{name}, {vehicle}, {service}, {valueLine}, {time}, {pitch}",
-    content: `Aqui está o orçamento para você, *{name}*:
-
-━━━━━━━━━━━━━━━━━━━━
-🚗 Veículo: {vehicle}
-🔧 Serviço: {service}
-━━━━━━━━━━━━━━━━━━━━
-
-{pitch}
-
-{valueLine}
-⏱️ Tempo estimado: {time}
-
-_O valor exato confirmamos na avaliação presencial._
-
-Próximo passo:
-
-*1* 📅 Agendar agora
-*2* 🔄 Ver outro serviço
-*3* 💬 Tirar dúvidas antes`,
+    content: "*Proposta inicial para {name}*\n\n🚗 *Veículo:* {vehicle}\n🛠️ *Serviço:* {service}\n\n{pitch}\n\n{valueLine}\n🕒 *Tempo estimado:* {time}\n\n_Esta é uma estimativa. O valor final é confirmado após a avaliação presencial do veículo._\n\nComo deseja seguir?\n\n*1* 📅 Agendar agora\n*2* ↩️ Ver outro serviço\n*3* 💬 Tirar uma dúvida",
   },
   {
     key: "etapa6_upsell",
-    label: "Upsell (etapa 6)",
+    label: "Recomendação complementar (etapa 6)",
     category: "fluxo",
     hint: "{service}, {complement}, {benefit}",
-    content: `Uma sugestão rápida antes de agendar 💡
-
-Muitos clientes que fazem *{service}* aproveitam a visita e incluem *{complement}* no mesmo dia.
-
-Por quê faz sentido: {benefit}
-
-Sai mais em conta junto e você aproveita melhor a ida 😊
-
-*1* ✅ Boa ideia, incluir {complement}
-*2* ➡️ Não, seguir só com {service}`,
+    content: "*Recomendação técnica*\n\nPara potencializar o resultado de *{service}*, podemos incluir *{complement}* na mesma visita.\n\n*Benefício:* {benefit}\n\n*1* ✅ Incluir {complement}\n*2* ➡️ Seguir apenas com {service}",
   },
   {
     key: "etapa7_day",
     label: "Escolha de dia",
     category: "fluxo",
-    content: `Ótimo, vamos agendar! 📅
-
-Qual dia você prefere?
-
-*1* Segunda-feira
-*2* Terça-feira
-*3* Quarta-feira
-*4* Quinta-feira
-*5* Sexta-feira
-*6* Sábado
-
-_Ou escreva: *amanhã*, *sexta*, *15/06*_ 📆`,
+    content: "Vamos encontrar o melhor horário para você.\n\nEscolha o dia desejado:\n\n*1* Segunda-feira\n*2* Terça-feira\n*3* Quarta-feira\n*4* Quinta-feira\n*5* Sexta-feira\n*6* Sábado\n\n_Ou escreva uma data, como *amanhã*, *sexta* ou *15/06*._",
   },
   {
     key: "etapa7_time",
     label: "Horários disponíveis",
     category: "fluxo",
     hint: "{dayLabel}, {slots}, {durationLabel}",
-    content: `Horários disponíveis em *{dayLabel}*:
-
-_Seu serviço leva ~*{durationLabel}* — esse intervalo fica bloqueado na agenda._
-
-{slots}
-
-_Ou digite o horário, ex: *09:00*_`,
+    content: "*Horários disponíveis — {dayLabel}*\n\nO atendimento dura aproximadamente *{durationLabel}*. Esse período será reservado exclusivamente para o seu veículo.\n\n{slots}\n\n_Responda com o número do horário ou digite, por exemplo, *09:00*._",
   },
   {
     key: "etapa7_no_slots",
     label: "Sem horários no dia",
     category: "fluxo",
     hint: "{dayLabel}",
-    content: `Não há horários livres em *{dayLabel}* para a duração do seu serviço 😔
-
-Escolha outro dia:`,
+    content: "Não encontramos uma janela disponível em *{dayLabel}* para a duração deste serviço.\n\nVamos buscar outro dia:",
   },
   {
     key: "etapa8_payment",
     label: "Forma de pagamento",
     category: "fluxo",
     hint: "{options}",
-    content: `Quase lá! Só mais uma coisa 🎉
-
-Como você prefere pagar?
-
-{options}
-
-_Pagamento realizado no dia do serviço._`,
+    content: "*Forma de pagamento*\n\nEscolha como prefere pagar:\n\n{options}\n\n_O pagamento é alinhado de forma segura no atendimento._",
   },
   {
     key: "etapa8_payment_compact",
     label: "Forma de pagamento (compacto)",
     category: "fluxo",
     hint: "{options}",
-    content: `Como você prefere pagar?
-
-{options}`,
+    content: "Escolha a forma de pagamento:\n\n{options}",
   },
   {
     key: "etapa8_pix_block",
     label: "Dados PIX",
     category: "fluxo",
     hint: "{pixKey}, {pixHolder}, {pixBank}, {businessName}",
-    content: `━━━━━━━━━━━━━━━━━━━━
-💸 *Dados para PIX*
-━━━━━━━━━━━━━━━━━━━━
-🔑 *Chave:* {pixKey}
-👤 *Titular:* {pixHolder}
-{bankLine}
-━━━━━━━━━━━━━━━━━━━━
-_Envie o comprovante no dia do serviço 😊_`,
+    content: "*PIX — {businessName}*\n\n🔑 *Chave:* {pixKey}\n👤 *Beneficiário:* {pixHolder}\n{bankLine}\n\n_Confira os dados antes de concluir a transferência._",
   },
   {
     key: "etapa8_pix_choice",
     label: "Escolha de PIX",
     category: "fluxo",
     hint: "",
-    content: `💸 *Como você prefere pagar via PIX?*
-
-*1* PIX (Pagar agora)
-*2* PIX (Pagar na entrega)
-
-Escolha uma opção:`,
+    content: "*Pagamento via PIX*\n\n*1* PIX agora\n*2* PIX no dia do atendimento\n\n_Responda apenas com o número da opção._",
   },
   {
     key: "etapa8_receipt_upload",
     label: "Solicitação de comprovante",
     category: "fluxo",
     hint: "{value}",
-    content: `📸 *Por favor, envie o comprovante de pagamento*
-
-Valor a ser pago: *{value}*
-
-Você pode enviar uma foto ou print do comprovante PIX.`,
+    content: "Para solicitar a conferência do pagamento, envie uma foto ou print legível do comprovante.\n\n*Valor esperado:* {value}\n\n_A confirmação do pagamento é feita pela equipe antes da reserva ser concluída._",
   },
   {
     key: "etapa8_receipt_invalid",
     label: "Comprovante inválido",
     category: "fluxo",
     hint: "{expected}, {received}",
-    content: `❌ *Valor do comprovante não confere*
-
-Valor esperado: *{expected}*
-Valor encontrado: *{received}*
-
-Por favor, envie um comprovante com o valor correto.`,
+    content: "Não conseguimos validar o valor deste comprovante.\n\n*Valor esperado:* {expected}\n*Valor identificado:* {received}\n\nEnvie o comprovante correto ou fale com a equipe para receber ajuda.",
   },
   {
     key: "etapa8_receipt_error",
     label: "Erro ao ler comprovante",
     category: "fluxo",
     hint: "",
-    content: `❌ *Não foi possível ler o comprovante*
-
-Por favor, envie uma foto mais nítida do comprovante ou tente novamente.`,
+    content: "Não foi possível ler este comprovante com segurança.\n\nEnvie uma imagem mais nítida, mostrando valor, data e identificação da transação.",
   },
   {
     key: "etapa9_confirm",
-    label: "Confirmação final",
+    label: "Confirmação final (legado)",
     category: "fluxo",
     hint: "{name}, {vehicle}, {services}, {day}, {time}, {payment}, {value}, {address}, {pixBlock}",
-    content: `🎉 *Agendamento Confirmado!*
-
-Tudo certo, *{name}*! Seu agendamento está registrado. Aqui está o resumo completo:
-
-▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
-👤 *Cliente:* {name}
-🚗 *Veículo:* {vehicle}
-▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
-🔧 *Serviço(s):* {services}
-📅 *Data:* {day}
-🕐 *Horário:* {time}
-▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
-💳 *Pagamento:* {payment}
-💰 *Valor estimado:* {value}
-_↳ Valor exato confirmado na avaliação presencial_
-▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
-📍 *Onde nos encontrar:*
-{address}
-{pixBlock}
-▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
-📌 *O que acontece agora:*
-
-1️⃣ Você receberá uma confirmação no dia anterior
-2️⃣ No dia, é só chegar no horário combinado
-3️⃣ A gente cuida do resto — promessa 💎
-
-Dúvida de última hora? Manda mensagem aqui mesmo 😊
-
-⏰ *4h antes* enviamos lembrete — responda *CONFIRME* para garantir o horário.
-
-Te esperamos, *{name}*! Vai sair incrível 🚗✨`,
+    content: "✅ *Agendamento confirmado*\n\nOlá, *{name}*. Sua reserva foi registrada.\n\n*Dados do atendimento*\n👤 Cliente: {name}\n🚗 Veículo: {vehicle}\n🛠️ Serviço(s): {services}\n📅 Data: {day}\n🕒 Horário: {time}\n💳 Pagamento: {payment}\n💰 Valor estimado: R$ {value}\n\n📍 *Local:* {address}\n{pixBlock}\n\n_Enviaremos um lembrete antes do atendimento. Caso precise ajustar algo, responda por aqui._",
   },
   {
     key: "stale_return",
     label: "Retorno após inatividade",
     category: "fluxo",
     hint: "{name}, {contextLine}, {continueLine}",
-    content: `Oi{name}! 😊
-
-{contextLine}
-
-{continueLine}
-
-*1* ✅ Sim, continua!
-*2* 🔄 Quero começar do zero`,
+    content: "Olá{name}.\n\n{contextLine}\n\n{continueLine}\n\n*1* ✅ Continuar atendimento\n*2* ↩️ Começar novamente",
   },
   {
     key: "indecisive_vehicle",
     label: "Cliente indeciso — veículo",
     category: "fluxo",
-    content: `Sem problema — vou te ajudar a descobrir o melhor! 😊
-
-Qual o *modelo* do seu veículo?
-_Ex: Civic, Hilux, Onix — ou *Civic 2021*_`,
+    content: "Posso ajudar a encontrar a melhor solução.\n\nQual é o modelo e ano do seu veículo?\n_Exemplo: Civic 2021._",
   },
   {
     key: "indecisive_problem",
-    label: "Cliente indeciso — problema",
+    label: "Cliente indeciso — necessidade",
     category: "fluxo",
-    content: `Perfeito 🚗
-
-O que está acontecendo?
-
-*1* 🎨 Pintura opaca, riscada ou sem brilho
-*2* 🪑 Interior com cheiro ruim ou muito sujo
-*3* 🛡️ Quero proteger um carro novo ou recém-comprado
-*4* ✨ Quero um cuidado geral completo
-*5* 🔧 Outro problema`,
+    content: "Conte com a nossa orientação técnica. Qual situação descreve melhor o seu veículo?\n\n*1* ✨ Pintura opaca, riscada ou sem brilho\n*2* 🧼 Interior sujo, com manchas ou odores\n*3* 🛡️ Quero proteger um carro novo ou recém-adquirido\n*4* 🚗 Quero um cuidado completo\n*5* 💬 Outra necessidade",
   },
   {
     key: "invalid_menu",
     label: "Opção inválida",
     category: "fluxo",
     hint: "{menu}",
-    content: `Ops, essa opção não existe 😅
-
-Escolhe uma dessas:
-
-{menu}`,
+    content: "Não identifiquei essa opção. Selecione uma das alternativas abaixo:\n\n{menu}",
   },
   {
     key: "followup_recovery",
     label: "Follow-up por inatividade",
     category: "automacao",
     hint: "{name}",
-    content: `Oi{name}! 😊
-
-Ainda posso te ajudar com nossos serviços. É só responder aqui 🚗✨`,
+    content: "Olá{name}. Seu atendimento na Garagem do Ka continua disponível.\n\nQuando quiser, responda a esta mensagem para retomar ou envie *menu* para ver os serviços.",
   },
   {
     key: "reminder_4h",
     label: "Lembrete 4h antes",
     category: "automacao",
     hint: "{brand}, {name}, {service}, {duration}, {dateLabel}, {time}, {address}",
-    content: `⏰ *Lembrete — {brand}*
-
-Olá, *{name}*!
-
-Seu agendamento é *hoje*:
-🔧 *{service}* (~{duration})
-📅 {dateLabel} às *{time}*
-{addressLine}
-
-Responda *CONFIRME* para garantir seu horário ✅`,
+    content: "⏰ *Lembrete de atendimento — {brand}*\n\nOlá, *{name}*. Seu atendimento é hoje:\n\n🛠️ {service} (~{duration})\n📅 {dateLabel}, às *{time}*\n{addressLine}\n\nPara manter a reserva, responda *CONFIRME*.\n_Se precisar ajustar o horário, avise nossa equipe por aqui._",
   },
   {
     key: "reminder_30min",
     label: "Aviso 30min antes",
     category: "automacao",
     hint: "{name}, {service}, {time}",
-    content: `⚠️ *Confirmação urgente*
-
-Olá, *{name}*! Seu agendamento de *{service}* é às *{time}*.
-
-Responda *CONFIRME* agora — sem confirmação, o horário pode ser liberado.`,
+    content: "🚗 *Seu atendimento está próximo*\n\nOlá, *{name}*. O serviço *{service}* está reservado para *{time}*.\n\nSe houver qualquer imprevisto, responda por aqui para que a equipe possa ajudar.",
   },
   {
     key: "appointment_cancelled",
     label: "Cancelamento automático",
     category: "automacao",
     hint: "{name}, {dateLabel}, {time}, {service}, {reason}",
-    content: `Olá, *{name}*!
-
-Seu agendamento foi *cancelado*:
-📅 {dateLabel} às {time}
-🔧 {service}
-
-{reason}
-
-Para reagendar, envie *menu* aqui no WhatsApp 😊`,
+    content: "Olá, *{name}*.\n\nSeu agendamento foi cancelado:\n\n🛠️ {service}\n📅 {dateLabel}, às {time}\n\n{reason}\n\nPara escolher um novo horário, responda *menu*.",
   },
   {
     key: "appointment_thankyou",
     label: "Agradecimento pós-serviço",
     category: "automacao",
     hint: "{name}, {brand}, {service}",
-    content: `Olá, *{name}*! ✨
-
-Obrigado por confiar na *{brand}*!
-
-Seu serviço *{service}* foi concluído com sucesso 🚗
-
-Foi um prazer cuidar do seu veículo. Esperamos você em breve!`,
+    content: "Olá, *{name}*.\n\nO serviço *{service}* foi concluído. Obrigado por confiar seu veículo à *{brand}*.\n\nFoi um prazer cuidar de cada detalhe. Quando precisar, nossa equipe estará por aqui.",
   },
   {
     key: "category_1",
     label: "Categoria 1 — Lavagem",
     category: "categorias",
-    content: "Lavagem",
+    content: "Lavagem & cuidado externo",
   },
   {
     key: "category_2",
     label: "Categoria 2 — Polimento",
     category: "categorias",
-    content: "Polimento",
+    content: "Polimento & correção",
   },
   {
     key: "category_3",
     label: "Categoria 3 — Proteção",
     category: "categorias",
-    content: "Proteção & Brilho",
+    content: "Proteção de pintura",
   },
   {
     key: "category_4",
     label: "Categoria 4 — Interior",
     category: "categorias",
-    content: "Interior",
+    content: "Higienização interna",
   },
   {
     key: "category_5",
     label: "Categoria 5 — Detalhes",
     category: "categorias",
-    content: "Detalhes Especiais",
+    content: "Detalhes especiais",
   },
   {
     key: "category_6",
@@ -471,130 +267,204 @@ Foi um prazer cuidar do seu veículo. Esperamos você em breve!`,
     key: "category_7",
     label: "Categoria 7 — Pacotes",
     category: "categorias",
-    content: "Pacotes Premium",
+    content: "Pacotes premium",
   },
   {
     key: "category_8",
     label: "Categoria 8 — Ajuda",
     category: "categorias",
-    content: "Ajuda na escolha",
+    content: "Consultoria com IA",
   },
   {
     key: "etapa9_coupon",
     label: "Cupom de desconto",
     category: "fluxo",
-    content: `Você tem um cupom de desconto?
-
-Se sim, me envie o código agora.
-Se não, responda *não* para seguir para os pontos de fidelidade.`,
+    content: "Você possui um cupom de desconto?\n\nEnvie o código agora ou responda *não* para seguir sem cupom.",
   },
   {
     key: "etapa9_loyalty",
     label: "Pontos de fidelidade",
     category: "fluxo",
     hint: "{points}, {discountValue}",
-    content: `Você tem *{points}* pontos de fidelidade! 🎁
-
-Pode usar para ganhar *{discountValue}* de desconto.
-
-*1* ✅ Usar pontos
-*2* ❌ Não usar pontos`,
+    content: "Você tem *{points} pontos* disponíveis no programa de fidelidade.\n\nEles podem gerar *{discountValue}* de desconto neste atendimento.\n\n*1* ✅ Usar meus pontos\n*2* ➡️ Seguir sem usar",
   },
   {
     key: "etapa10_budget",
     label: "Confirmação de orçamento",
     category: "fluxo",
     hint: "{value}",
-    content: `━━━━━━━━━━━━━━━
-📋 **Seu orçamento**
-━━━━━━━━━━━━━━━
-💰 **Valor total: {value}**
-━━━━━━━━━━━━━━━
-
-Vamos confirmar o agendamento?
-
-*1* ✅ Sim, confirmar
-*2* ❌ Não, voltar ao menu`,
+    content: "*Resumo financeiro*\n\n💰 *Valor total estimado: {value}*\n\nPodemos avançar para a reserva do horário?\n\n*1* ✅ Confirmar e continuar\n*2* ↩️ Voltar ao menu",
   },
   {
     key: "etapa10_logistics",
-    label: "Logística - escolha",
+    label: "Logística — escolha",
     category: "fluxo",
-    content: `🚚 Como prefere?
-
-*1* - Deixe eu levo o carro até a estética
-*2* - A estética vai buscar o carro`,
+    content: "*Como o veículo chegará até nós?*\n\n*1* 🚗 Eu levo o veículo até a estética\n*2* 🚚 Solicitar coleta do veículo\n\n_Se escolher coleta, confirmaremos endereço e disponibilidade._",
   },
   {
     key: "etapa10_logistics_client_leads",
-    label: "Logística - cliente leva",
+    label: "Logística — cliente leva",
     category: "fluxo",
-    content: `📍 Combinado! Você pode levar o carro até a loja quando puder.`,
+    content: "Perfeito. Reserve o horário e leve seu veículo à Garagem do Ka no dia combinado.\n\nVamos concluir os próximos dados do atendimento.",
   },
   {
     key: "etapa10_logistics_pickup_address",
-    label: "Logística - endereço pickup",
+    label: "Logística — endereço de coleta",
     category: "fluxo",
-    content: `🚚 Ótimo! Me envie o endereço completo onde o carro está para calcular a taxa de busca.`,
+    content: "Para verificar a coleta, envie o endereço completo onde o veículo estará.\n\n_Informe rua, número, bairro, cidade e complemento, se houver._",
   },
   {
     key: "etapa10_logistics_return_preference",
-    label: "Logística - preferência entrega",
+    label: "Logística — preferência de devolução",
     category: "fluxo",
-    content: `Perfeito! E quando o serviço terminar, como prefere?
-
-*1* Vocês devolvem o carro no mesmo endereço
-*2* Eu mesmo venho buscar o carro`,
+    content: "Após o serviço, como prefere receber o veículo?\n\n*1* 🚚 Devolver no mesmo endereço\n*2* 🚗 Eu retiro na Garagem do Ka",
   },
   {
     key: "etapa10_logistics_with_return",
-    label: "Logística - com devolução",
+    label: "Logística — com devolução",
     category: "fluxo",
-    content: `🔄 Devolução incluída no resumo.`,
+    content: "Combinado. A devolução no endereço informado será considerada no resumo do atendimento.",
   },
   {
     key: "etapa10_logistics_without_return",
-    label: "Logística - sem devolução",
+    label: "Logística — sem devolução",
     category: "fluxo",
-    content: `📍 Sem devolução, tudo certo.`,
+    content: "Combinado. A retirada do veículo será feita na Garagem do Ka após a conclusão do serviço.",
   },
   {
     key: "etapa15_summary_confirm",
     label: "Resumo e confirmação",
     category: "fluxo",
     hint: "{name}, {service}, {vehicle}, {day}, {time}, {pickup}, {address}, {payment}, {reminder}, {value}",
-    content: `━━━━━━━━━━━━━━━
-📋 **RESUMO DO AGENDAMENTO**
-👤 {name}
-🧧 *{service}*
-🚘 {vehicle}
-📅 {day}
-⏰ {time}
-🚚 Leva e traz: {pickup}
-📍 Endereço: {address}
-💳 {payment}
-🔔 Lembrete: {reminder}
-💰 **{value}**
-━━━━━━━━━━━━━━━
-
-⏱️ Cancelamento até 2h antes sem custo.
-
-✅ Confirma? (sim/não)`,
+    content: "*Resumo do agendamento*\n\n👤 Cliente: {name}\n🛠️ Serviço: {service}\n🚗 Veículo: {vehicle}\n📅 Data: {day}\n🕒 Horário: {time}\n🚚 Coleta: {pickup}\n📍 Endereço: {address}\n💳 Pagamento: {payment}\n🔔 Lembrete: {reminder}\n💰 Valor estimado: {value}\n\n_Cancelamentos sem custo podem ser solicitados com até 2 horas de antecedência._\n\n✅ Confirma os dados? _Responda sim ou não._",
   },
   {
     key: "etapa16_confirmation",
     label: "Confirmação final",
     category: "fluxo",
     hint: "{address}, {hours}",
-    content: `✅ *Agendamento confirmado!*
+    content: "✅ *Reserva concluída*\n\nSeu atendimento está confirmado.\n\n📍 *Endereço:* {address}\n🕒 *Horário de atendimento:* {hours}\n\nEnviaremos um lembrete antes do horário reservado. Para alterar ou tirar uma dúvida, responda por aqui.",
+  },
 
-Seu atendimento está reservado.
-
-📍 Endereço: *{address}*
-🕒 Horário: *{hours}*
-
-Cancelamentos com até 2h de antecedência sem custo.
-
-Posso te ajudar com mais alguma coisa? 😊`,
+  // Estados adicionais para substituir mensagens client-facing antes fixas no código.
+  {
+    key: "first_time_bonus_offer",
+    label: "Bônus de primeira compra — oferta",
+    category: "fluxo",
+    hint: "{discount}",
+    content: "🎁 *Benefício de primeira visita*\n\nVocê tem um benefício exclusivo para o seu primeiro serviço.\n\n*Desconto estimado:* {discount}\n\n*1* ✅ Aplicar benefício\n*2* ➡️ Seguir sem desconto",
+  },
+  {
+    key: "first_time_bonus_applied",
+    label: "Bônus de primeira compra — aplicado",
+    category: "fluxo",
+    hint: "{value}",
+    content: "✅ Benefício aplicado com sucesso.\n\n*Novo valor estimado:* {value}\n\nVamos continuar com o seu agendamento.",
+  },
+  {
+    key: "first_time_bonus_declined",
+    label: "Bônus de primeira compra — recusado",
+    category: "fluxo",
+    hint: "{value}",
+    content: "Sem problemas. Seguiremos com a proposta original.\n\n*Valor estimado:* {value}\n\nVamos continuar com o seu agendamento.",
+  },
+  {
+    key: "reminder_choice",
+    label: "Escolha de lembrete",
+    category: "fluxo",
+    content: "Deseja receber um lembrete pelo WhatsApp antes do atendimento?\n\n*1* 🔔 Sim, quero receber\n*2* ➡️ Não preciso",
+  },
+  {
+    key: "payment_confirmation",
+    label: "Pagamento confirmado",
+    category: "fluxo",
+    hint: "{receiptAmount}, {totalPaid}",
+    content: "✅ *Pagamento confirmado*\n\n*Valor do comprovante:* {receiptAmount}\n*Total pago:* {totalPaid}\n\nSeu pagamento foi registrado. Agora confirme o resumo para concluir sua reserva.",
+  },
+  {
+    key: "handoff_ack",
+    label: "Transferência para atendimento humano",
+    category: "fluxo",
+    hint: "{name}",
+    content: "Perfeito{name}.\n\nSeu atendimento foi encaminhado para um especialista da Garagem do Ka. A assistente virtual ficará em pausa para que a equipe assuma a conversa por aqui.",
+  },
+  {
+    key: "ai_followup",
+    label: "Próximo passo após resposta da IA",
+    category: "fluxo",
+    content: "Posso ajudar em mais alguma etapa?\n\n*1* ↩️ Voltar para o atendimento\n*2* 🧭 Ver o menu principal\n*3* 👤 Falar com um especialista",
+  },
+  {
+    key: "slot_unavailable",
+    label: "Horário indisponível",
+    category: "fluxo",
+    hint: "{slots}",
+    content: "Esse horário acabou de ser reservado por outro cliente.\n\nPara manter sua experiência ágil, escolha uma das opções ainda disponíveis:\n\n{slots}",
+  },
+  {
+    key: "vehicle_confirmation",
+    label: "Confirmação dos dados do veículo",
+    category: "fluxo",
+    hint: "{model}, {year}, {color}, {condition}",
+    content: "*Confirme os dados do veículo*\n\n🚗 Modelo: {model}\n📅 Ano: {year}\n🎨 Cor: {color}\n🔎 Estado geral: {condition}\n\n_Está correto? Responda sim ou não._",
+  },
+  {
+    key: "vehicle_color_request",
+    label: "Pedir cor do veículo",
+    category: "fluxo",
+    hint: "{vehicle}",
+    content: "Anotado: *{vehicle}*.\n\nQual é a cor predominante do veículo?",
+  },
+  {
+    key: "vehicle_condition_request",
+    label: "Pedir estado do veículo",
+    category: "fluxo",
+    hint: "{vehicle}",
+    content: "Perfeito. Para refinar a estimativa de *{vehicle}*, como está o estado geral?\n\n_Exemplos: excelente, bom, normal ou precisa de atenção._",
+  },
+  {
+    key: "vehicle_color_invalid",
+    label: "Cor do veículo não entendida",
+    category: "fluxo",
+    content: "Não consegui identificar a cor. Informe novamente, por exemplo: *branco*, *prata*, *preto* ou *azul*.",
+  },
+  {
+    key: "upsell_offer",
+    label: "Oferta de serviço complementar",
+    category: "fluxo",
+    hint: "{complement}, {value}",
+    content: "*Sugestão para a mesma visita*\n\nAdicionar *{complement}* agora custa *{value}* a mais e permite finalizar o veículo em uma única entrega.\n\n*1* ✅ Incluir\n*2* ➡️ Seguir sem incluir",
+  },
+  {
+    key: "upsell_added",
+    label: "Serviço complementar incluído",
+    category: "fluxo",
+    hint: "{complement}",
+    content: "✅ *{complement}* foi incluído no seu atendimento.\n\nAgora vamos escolher a melhor data para a reserva.",
+  },
+  {
+    key: "coupon_code_request",
+    label: "Solicitação de código de cupom",
+    category: "fluxo",
+    content: "Perfeito. Envie o *código do cupom* exatamente como recebeu.\n\n_Exemplo: BEMVINDO10._",
+  },
+  {
+    key: "coupon_applied",
+    label: "Cupom aplicado",
+    category: "fluxo",
+    hint: "{code}, {discount}, {value}",
+    content: "✅ *Cupom {code} aplicado*\n\n💸 Desconto: {discount}\n💰 Novo valor estimado: {value}\n\nAgora vamos verificar seus pontos de fidelidade antes de escolher o pagamento.",
+  },
+  {
+    key: "summary_review",
+    label: "Revisão do resumo",
+    category: "fluxo",
+    content: "Confira o resumo do agendamento acima.\n\n*1* ✅ Confirmar reserva\n*2* ✏️ Alterar data ou horário\n*3* 💳 Alterar forma de pagamento",
+  },
+  {
+    key: "evaluation_required",
+    label: "Avaliação técnica necessária",
+    category: "fluxo",
+    content: "🔎 *Avaliação técnica necessária*\n\nPara este serviço, precisamos avaliar o veículo antes de informar valor e reservar o atendimento. Vou encaminhar sua conversa para um especialista.",
   },
 ];

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AdminHeader } from "@/components/layout/AdminHeader";
-import { Plus, Trash2, Gift, Percent, Tag, CalendarDays, CheckCircle2, AlertCircle } from "lucide-react";
+import { Plus, Trash2, Gift, Percent, Tag, CalendarDays, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 
 export default function FidelidadePage() {
   const [coupons, setCoupons] = useState<any[]>([]);
@@ -38,7 +38,22 @@ export default function FidelidadePage() {
 
   return (
     <div className="space-y-6">
-      <AdminHeader title="Fidelidade e Cupons" description="Crie descontos e promoções para seus clientes" />
+      <AdminHeader
+        title="Fidelidade e Cupons"
+        description="Crie benefícios que fortalecem o retorno e valorizam a base de clientes."
+        actions={
+          <div className="flex items-center gap-2">
+            <button onClick={() => void load()} className="btn-secondary gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Atualizar
+            </button>
+            <button onClick={() => setShowForm(!showForm)} className="btn-primary gap-2">
+              <Plus className="h-4 w-4" />
+              {showForm ? "Fechar criação" : "Novo cupom"}
+            </button>
+          </div>
+        }
+      />
 
       {msg && (
         <div className={`flex items-center gap-3 rounded-xl border px-5 py-4 shadow-gold ${
@@ -84,10 +99,6 @@ export default function FidelidadePage() {
           </div>
         </div>
       </div>
-
-      <button onClick={() => setShowForm(!showForm)} className="btn-primary gap-2 px-6 py-3">
-        <Plus className="h-4 w-4" /> {showForm ? "Fechar" : "Novo cupom"}
-      </button>
 
       {showForm && (
         <div className="card">

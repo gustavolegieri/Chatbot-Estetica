@@ -1,7 +1,25 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Send, RefreshCw, MessageSquare, Settings, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Bot,
+  BrainCircuit,
+  CalendarDays,
+  Check,
+  ChevronRight,
+  CircleAlert,
+  Gauge,
+  Loader2,
+  MessageCircle,
+  MoreHorizontal,
+  Paperclip,
+  RefreshCw,
+  SendHorizontal,
+  Sparkles,
+  Trash2,
+  UserRound,
+  X,
+} from "lucide-react";
 
 interface TestBotMessage {
   text: string;
@@ -24,8 +42,45 @@ interface FlowState {
   quoteMin?: number;
   quoteMax?: number;
   dayDate?: string;
+  dayLabel?: string;
   startTime?: string;
-  [key: string]: any;
+  paymentMethod?: string;
+  [key: string]: unknown;
+}
+
+interface AiStatus {
+  configured: boolean;
+  model: string;
+}
+
+const flowSteps = [
+  { keys: ["ETAPA1"], label: "Boas-vindas", detail: "Identificação do cliente" },
+  { keys: ["ETAPA2", "ETAPA3"], label: "Serviço", detail: "Descoberta e interesse" },
+  { keys: ["ETAPA4", "ETAPA5"], label: "Veículo & orçamento", detail: "Dados e proposta" },
+  { keys: ["ETAPA6", "ETAPA7", "ETAPA8"], label: "Agenda & pagamento", detail: "Horário e confirmação" },
+  { keys: ["ETAPA9", "ETAPA10", "ETAPA11", "ETAPA12", "ETAPA13", "ETAPA14", "ETAPA15", "ETAPA16"], label: "Pós-venda", detail: "Finalização e relacionamento" },
+];
+
+const quickMessages = ["Olá!", "Quero agendar", "Quais serviços vocês fazem?", "Quanto custa o polimento?"];
+
+function getCurrentStep(stage: string) {
+  const index = flowSteps.findIndex((step) => step.keys.some((key) => stage.startsWith(key)));
+  return index < 0 ? 0 : index;
+}
+
+function formatMoney(value?: number) {
+  if (typeof value !== "number") return "—";
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function formatTime(value: string) {
+  return new Date(value).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function parseMediaTag(text: string) {
+  const match = text.match(/^\[MÍDIA:\s*(image|video|document)\|([^\]]+)\]\s*([\s\S]*)$/i);
+  if (!match) return { cleanText: text };
+  return { cleanText: match[3].trim(), mediaType: match[1] as TestBotMessage["mediaType"], mediaUrl: match[2] };
 }
 
 export default function TestBotPage() {
@@ -34,344 +89,257 @@ export default function TestBotPage() {
   const [flowState, setFlowState] = useState<FlowState>({ stage: "ETAPA1_AWAITING_NAME" });
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [useRealAI, setUseRealAI] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const [useRealAI, setUseRealAI] = useState(true);
+  const [ai, setAi] = useState<AiStatus | null>(null);
+  const [showTechnical, setShowTechnical] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  const currentStep = useMemo(() => getCurrentStep(flowState.stage), [flowState.stage]);
+  const customerName = flowState.customerName || "Novo contato";
+  const vehicle = [flowState.vehicleModel, flowState.vehicleYear, flowState.vehicleColor].filter(Boolean).join(" · ") || "Ainda não informado";
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
 
-  const resetSession = async () => {
+  async function resetSession() {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
       const response = await fetch("/api/admin/test-bot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reset: true, sessionId }),
+        body: JSON.stringify({ reset: true, sessionId, useRealAI }),
       });
-
       const data = await response.json();
       if (data.success) {
         setSessionId(data.sessionId);
-        setMessages(data.messages);
+        setMessages(data.messages || []);
         setFlowState(data.flowState);
+        setAi(data.ai || null);
       }
     } catch (error) {
-      console.error("Erro ao resetar sessão:", error);
+      console.error("Erro ao iniciar sessão de teste:", error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
-  const parseMediaTag = (text: string): { cleanText: string; mediaUrl?: string; mediaType?: "image" | "video" | "document" } => {
-    const match = text.match(/^\[MÍDIA:\s*(image|video|document)\|([^\]]+)\]\s*([\s\S]*)$/i);
-    if (!match) return { cleanText: text };
-    return { cleanText: match[3].trim(), mediaType: match[1] as any, mediaUrl: match[2] };
-  };
+  useEffect(() => {
+    void resetSession();
+    // A sessão de teste deve ser criada apenas uma vez por abertura da tela.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const sendMessage = async () => {
-    if (!inputText.trim() || isLoading) return;
+  async function sendMessage(value = inputText) {
+    const text = value.trim();
+    if (!text || isLoading) return;
 
-    const userMessage: TestBotMessage = {
-      text: inputText,
-      sender: "user",
-      timestamp: new Date().toISOString(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
     setInputText("");
+    setMessages((previous) => [...previous, { text, sender: "user", timestamp: new Date().toISOString() }]);
     setIsLoading(true);
 
     try {
       const response = await fetch("/api/admin/test-bot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: inputText,
-          sessionId,
-          useRealAI,
-        }),
+        body: JSON.stringify({ text, sessionId, useRealAI }),
       });
-
       const data = await response.json();
-      if (data.success) {
-        setSessionId(data.sessionId);
-        setMessages(data.messages.map((m: TestBotMessage) => {
-          if (m.sender === "bot" && m.text.startsWith("[MÍDIA:")) {
-            const parsed = parseMediaTag(m.text);
-            return { ...m, text: parsed.cleanText, mediaUrl: parsed.mediaUrl, mediaType: parsed.mediaType };
-          }
-          return m;
-        }));
-        setFlowState(data.flowState);
-      }
+      if (!data.success) throw new Error(data.error || "Não foi possível processar a mensagem.");
+
+      setSessionId(data.sessionId);
+      setAi(data.ai || null);
+      setFlowState(data.flowState);
+      setMessages(
+        (data.messages as TestBotMessage[]).map((message) => {
+          if (message.sender !== "bot") return message;
+          const media = parseMediaTag(message.text);
+          return { ...message, text: media.cleanText, mediaUrl: media.mediaUrl, mediaType: media.mediaType };
+        })
+      );
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error);
-      setMessages((prev) => [
-        ...prev,
-        {
-          text: "❌ Erro ao processar mensagem",
-          sender: "bot",
-          timestamp: new Date().toISOString(),
-        },
+      setMessages((previous) => [
+        ...previous,
+        { text: "Não foi possível processar a mensagem agora. Tente novamente.", sender: "bot", timestamp: new Date().toISOString() },
       ]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
-
-  const deleteSession = async () => {
-    if (!sessionId) return;
-
+  async function deleteSession() {
+    if (!sessionId || isLoading) return;
+    setIsLoading(true);
     try {
-      await fetch(`/api/admin/test-bot?sessionId=${sessionId}`, {
-        method: "DELETE",
-      });
+      await fetch(`/api/admin/test-bot?sessionId=${sessionId}`, { method: "DELETE" });
       setSessionId(null);
       setMessages([]);
       setFlowState({ stage: "ETAPA1_AWAITING_NAME" });
-    } catch (error) {
-      console.error("Erro ao deletar sessão:", error);
+    } finally {
+      setIsLoading(false);
     }
-  };
-
-  // Inicializar sessão ao carregar a página
-  useEffect(() => {
-    resetSession();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Chat Principal */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
+    <div className="mx-auto max-w-[1640px] space-y-5 pb-8">
+      <header className="flex flex-col gap-4 rounded-2xl border border-brand-800/30 bg-surface-850 px-5 py-4 shadow-gold sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-400/20">
+            <MessageCircle className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold text-white">Central de fluxo WhatsApp</h1>
+              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400 ring-1 ring-emerald-400/20">Oficial</span>
+            </div>
+            <p className="mt-0.5 text-sm text-slate-400">Simule a jornada do cliente e acompanhe cada dado capturado pelo bot.</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={resetSession} disabled={isLoading} className="btn-secondary gap-2">
+            <RefreshCw className={isLoading ? "h-4 w-4 animate-spin" : "h-4 w-4"} /> Nova simulação
+          </button>
+          <button onClick={deleteSession} disabled={!sessionId || isLoading} title="Encerrar simulação" className="rounded-lg border border-surface-600 p-2.5 text-slate-400 transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40">
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </header>
+
+      <section className="overflow-hidden rounded-2xl border border-brand-800/25 bg-surface-850 shadow-gold">
+        <div className="flex flex-col gap-3 border-b border-surface-700 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
-            <MessageSquare className="w-6 h-6 text-blue-600" />
+            <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${useRealAI && ai?.configured ? "bg-brand-300/15 text-brand-300" : "bg-surface-700 text-slate-400"}`}>
+              <BrainCircuit className="h-5 w-5" />
+            </div>
             <div>
-              <h1 className="text-xl font-bold">Test Bot</h1>
-              <p className="text-sm text-gray-500">
-                Simule uma conversa completa com o bot WhatsApp
+              <p className="text-sm font-semibold text-white">Cerebras AI</p>
+              <p className="text-xs text-slate-400">
+                {ai === null ? "Verificando configuração…" : ai.configured ? `${ai.model} pronto para enriquecer o fluxo` : "Configure CEREBRAS_API_KEY para ativar a IA"}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowSettings(!showSettings)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition"
-              title="Configurações"
-            >
-              <Settings className="w-5 h-5 text-gray-600" />
-            </button>
-            <button
-              onClick={resetSession}
-              disabled={isLoading}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 transition"
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
-              Reset
-            </button>
-            <button
-              onClick={deleteSession}
-              disabled={!sessionId || isLoading}
-              className="p-2 hover:bg-red-100 rounded-lg transition text-red-600"
-              title="Limpar sessão"
-            >
-              <Trash2 className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={useRealAI}
+            onClick={() => setUseRealAI((enabled) => !enabled)}
+            className="flex items-center gap-3 self-start text-sm text-slate-300 lg:self-auto"
+          >
+            <span>Assistência inteligente</span>
+            <span className={`relative h-6 w-11 rounded-full transition ${useRealAI ? "bg-brand-400" : "bg-surface-600"}`}>
+              <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition ${useRealAI ? "left-6" : "left-1"}`} />
+            </span>
+          </button>
         </div>
 
-        {/* Configurações */}
-        {showSettings && (
-          <div className="bg-white border-b px-6 py-4">
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useRealAI}
-                  onChange={(e) => setUseRealAI(e.target.checked)}
-                  className="w-4 h-4"
-                />
-                <span className="text-sm">Usar IA real (Cerebras)</span>
-              </label>
-              <span className="text-xs text-gray-500">
-                Quando desligado, usa respostas determinísticas para testes
-              </span>
-            </div>
+        <div className="overflow-x-auto px-5 py-5">
+          <div className="flex min-w-[760px] items-start">
+            {flowSteps.map((step, index) => {
+              const state = index < currentStep ? "done" : index === currentStep ? "current" : "pending";
+              return (
+                <div key={step.label} className="flex min-w-0 flex-1 items-start last:flex-none">
+                  <div className="min-w-[112px]">
+                    <div className="flex items-center gap-2">
+                      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${state === "done" ? "bg-emerald-500 text-white" : state === "current" ? "bg-brand-300 text-surface-950 shadow-gold" : "bg-surface-700 text-slate-500"}`}>
+                        {state === "done" ? <Check className="h-4 w-4" /> : index + 1}
+                      </span>
+                      <span className={`text-sm font-medium ${state === "pending" ? "text-slate-500" : "text-white"}`}>{step.label}</span>
+                    </div>
+                    <p className="mt-1 pl-9 text-[11px] text-slate-500">{step.detail}</p>
+                  </div>
+                  {index < flowSteps.length - 1 && <div className={`mt-3 h-px flex-1 ${index < currentStep ? "bg-emerald-500" : "bg-surface-700"}`} />}
+                </div>
+              );
+            })}
           </div>
-        )}
+        </div>
+      </section>
 
-        {/* Área de Mensagens */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-4xl mx-auto space-y-4">
-            {messages.length === 0 ? (
-              <div className="text-center text-gray-500 py-12">
-                <MessageSquare className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                <p className="text-lg">Nenhuma mensagem ainda</p>
-                <p className="text-sm">Digite uma mensagem para começar a testar o bot</p>
+      <div className="grid gap-5 xl:grid-cols-[285px_minmax(460px,1fr)_315px]">
+        <aside className="order-2 space-y-4 xl:order-1">
+          <section className="overflow-hidden rounded-2xl border border-surface-700 bg-surface-850">
+            <div className="flex items-center justify-between border-b border-surface-700 px-4 py-3">
+              <p className="text-sm font-semibold text-white">Ficha do contato</p>
+              <MoreHorizontal className="h-4 w-4 text-slate-500" />
+            </div>
+            <div className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-300/15 text-brand-300"><UserRound className="h-5 w-5" /></div>
+                <div className="min-w-0"><p className="truncate font-medium text-white">{customerName}</p><p className="text-xs text-slate-500">Lead em atendimento</p></div>
               </div>
-            ) : (
-              messages.map((msg, index) => (
-                <div
-                  key={index}
-                  className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[70%] rounded-2xl px-4 py-3 ${msg.sender === "user" ? "bg-blue-500 text-white" : "bg-white shadow"}`}
-                  >
-                    {msg.mediaUrl && msg.mediaType === "image" && (
-                      <img
-                        src={msg.mediaUrl}
-                        alt="Mídia do bot"
-                        className="max-w-full h-auto rounded-lg mb-2"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    )}
-                    {msg.mediaUrl && msg.mediaType === "video" && (
-                      <video src={msg.mediaUrl} controls className="max-w-full h-auto rounded-lg mb-2" />
-                    )}
-                    {msg.mediaUrl && msg.mediaType === "document" && (
-                      <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer" className="block text-sm text-blue-600 underline mb-2">
-                        📎 {msg.text || "Documento"}
-                      </a>
-                    )}
-                    <p className="whitespace-pre-wrap break-words">{msg.text}</p>
-                    <p
-                      className={`text-xs mt-1 ${msg.sender === "user" ? "text-blue-100" : "text-gray-400"}`}
-                    >
-                      {new Date(msg.timestamp).toLocaleTimeString("pt-BR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                  </div>
-                </div>
-              ))
-            )}
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-white shadow rounded-2xl px-4 py-3">
-                  <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                    <div
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.1s" }}
-                    />
-                    <div
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.2s" }}
-                    />
-                  </div>
-                </div>
+              <div className="mt-5 space-y-4">
+                <Detail label="Serviço" value={flowState.serviceLabel || "Em descoberta"} />
+                <Detail label="Veículo" value={vehicle} />
+                <Detail label="Condição" value={flowState.vehicleCondition || "Não informada"} />
+                <Detail label="Pagamento" value={flowState.paymentMethod || "A definir"} />
               </div>
-            )}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-surface-700 bg-surface-850 p-4">
+            <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-brand-300" /><p className="text-sm font-semibold text-white">Oportunidade</p></div>
+            <div className="mt-4 rounded-xl bg-surface-800 p-3">
+              <p className="text-xs text-slate-500">Potencial estimado</p>
+              <p className="mt-1 text-xl font-semibold text-brand-200">{flowState.quoteMin ? `${formatMoney(flowState.quoteMin)}${flowState.quoteMax ? ` – ${formatMoney(flowState.quoteMax)}` : ""}` : "Aguardando orçamento"}</p>
+            </div>
+            <div className="mt-3 flex items-center justify-between text-xs"><span className="text-slate-500">Agendamento</span><span className="text-slate-200">{flowState.dayLabel || flowState.dayDate || "Não definido"}{flowState.startTime ? ` · ${flowState.startTime}` : ""}</span></div>
+          </section>
+        </aside>
+
+        <main className="order-1 flex min-h-[650px] flex-col overflow-hidden rounded-2xl border border-surface-700 bg-[#0b141a] shadow-2xl xl:order-2">
+          <div className="flex items-center justify-between border-b border-white/10 bg-[#202c33] px-5 py-3.5">
+            <div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300"><Bot className="h-5 w-5" /></div><div><p className="text-sm font-semibold text-white">Assistente Garagem do Ka</p><p className="flex items-center gap-1 text-xs text-emerald-300"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Fluxo ativo</p></div></div>
+            <MoreHorizontal className="h-5 w-5 text-slate-400" />
+          </div>
+
+          <div className="flex-1 space-y-3 overflow-y-auto bg-[radial-gradient(ellipse_at_center,_rgba(26,84,75,0.22),_transparent_68%)] px-4 py-5 sm:px-7">
+            <div className="mx-auto w-fit rounded-md bg-black/25 px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-slate-400">Ambiente de simulação</div>
+            {messages.length === 0 && !isLoading && <div className="mx-auto mt-16 max-w-sm text-center"><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400"><Sparkles className="h-6 w-6" /></div><h2 className="mt-4 font-medium text-white">Comece uma conversa</h2><p className="mt-1 text-sm leading-6 text-slate-400">Envie uma mensagem como se fosse um cliente. O CRM e as etapas acompanham a conversa em tempo real.</p></div>}
+            {messages.map((message, index) => <ChatBubble key={`${message.timestamp}-${index}`} message={message} />)}
+            {isLoading && <div className="flex items-end gap-2"><div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300"><Bot className="h-4 w-4" /></div><div className="rounded-xl rounded-bl-sm bg-[#202c33] px-4 py-3"><Loader2 className="h-4 w-4 animate-spin text-emerald-300" /></div></div>}
             <div ref={messagesEndRef} />
           </div>
-        </div>
 
-        {/* Input */}
-        <div className="bg-white border-t px-6 py-4">
-          <div className="max-w-4xl mx-auto flex gap-3">
-            <textarea
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Digite sua mensagem..."
-              className="flex-1 border rounded-lg px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={1}
-              disabled={isLoading}
-            />
-            <button
-              onClick={sendMessage}
-              disabled={!inputText.trim() || isLoading}
-              className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 transition flex items-center gap-2"
-            >
-              <Send className="w-4 h-4" />
-              Enviar
-            </button>
+          <div className="border-t border-white/10 bg-[#202c33] p-3 sm:p-4">
+            <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
+              {quickMessages.map((message) => <button key={message} onClick={() => void sendMessage(message)} disabled={isLoading} className="whitespace-nowrap rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-300 transition hover:border-emerald-400/30 hover:bg-emerald-400/10 hover:text-emerald-200 disabled:opacity-40">{message}</button>)}
+            </div>
+            <div className="flex items-end gap-2"><button title="Anexar mídia" className="mb-1 rounded-lg p-2 text-slate-400 transition hover:bg-white/5"><Paperclip className="h-5 w-5" /></button><textarea value={inputText} onChange={(event) => setInputText(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} rows={1} placeholder="Digite uma mensagem" disabled={isLoading} className="max-h-28 min-h-11 flex-1 resize-none rounded-xl border-0 bg-[#2a3942] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:ring-1 focus:ring-emerald-400/50" /><button onClick={() => void sendMessage()} disabled={!inputText.trim() || isLoading} title="Enviar mensagem" className="mb-1 rounded-xl bg-emerald-500 p-3 text-white transition hover:bg-emerald-400 disabled:bg-surface-600 disabled:text-slate-500"><SendHorizontal className="h-4 w-4" /></button></div>
           </div>
-        </div>
-      </div>
+        </main>
 
-      {/* Painel Lateral - Estado do Flow */}
-      <div className="w-96 bg-white border-l overflow-y-auto">
-        <div className="p-4 border-b">
-          <h2 className="font-bold text-lg">Estado do Flow</h2>
-          <p className="text-sm text-gray-500">FlowState em tempo real</p>
-        </div>
-        <div className="p-4">
-          <pre className="text-xs bg-gray-50 p-4 rounded-lg overflow-auto">
-            {JSON.stringify(flowState, null, 2)}
-          </pre>
-        </div>
+        <aside className="order-3 space-y-4">
+          <section className="rounded-2xl border border-surface-700 bg-surface-850 p-4">
+            <div className="flex items-center justify-between"><div className="flex items-center gap-2"><Gauge className="h-4 w-4 text-brand-300" /><p className="text-sm font-semibold text-white">Estado do fluxo</p></div><span className="rounded-md bg-brand-300/10 px-2 py-1 text-[10px] font-bold text-brand-200">ETAPA {currentStep + 1}/5</span></div>
+            <div className="mt-5"><p className="text-base font-medium text-white">{flowSteps[currentStep].label}</p><p className="mt-1 text-sm text-slate-400">{flowSteps[currentStep].detail}</p></div>
+            <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-surface-700"><div className="h-full rounded-full bg-gold-gradient transition-all" style={{ width: `${((currentStep + 1) / flowSteps.length) * 100}%` }} /></div>
+            <div className="mt-3 flex items-center justify-between text-xs"><span className="text-slate-500">Progresso da jornada</span><span className="text-brand-200">{Math.round(((currentStep + 1) / flowSteps.length) * 100)}%</span></div>
+          </section>
 
-        {/* Informações da Sessão */}
-        <div className="p-4 border-t">
-          <h3 className="font-semibold mb-2">Informações da Sessão</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Session ID:</span>
-              <span className="font-mono text-xs">{sessionId?.slice(0, 8)}...</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Etapa atual:</span>
-              <span className="font-medium">{flowState.stage}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Nome cliente:</span>
-              <span className="font-medium">{flowState.customerName || "—"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Serviço:</span>
-              <span className="font-medium">{flowState.serviceLabel || "—"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Veículo:</span>
-              <span className="font-medium">
-                {flowState.vehicleModel || flowState.vehicleYear
-                  ? `${flowState.vehicleModel || ""} ${flowState.vehicleYear || ""}`
-                  : "—"}
-              </span>
-            </div>
-            {flowState.quoteMin && (
-              <div className="flex justify-between">
-                <span className="text-gray-500">Orçamento:</span>
-                <span className="font-medium">
-                  R$ {flowState.quoteMin.toFixed(2)}
-                  {flowState.quoteMax && ` - R$ ${flowState.quoteMax.toFixed(2)}`}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
+          <section className="rounded-2xl border border-surface-700 bg-surface-850 p-4">
+            <button onClick={() => setShowTechnical((value) => !value)} className="flex w-full items-center justify-between text-left"><span className="flex items-center gap-2 text-sm font-semibold text-white"><CircleAlert className="h-4 w-4 text-slate-400" /> Dados técnicos</span><ChevronRight className={`h-4 w-4 text-slate-500 transition ${showTechnical ? "rotate-90" : ""}`} /></button>
+            {showTechnical && <><div className="mt-4 border-t border-surface-700 pt-4"><Detail label="Estado interno" value={flowState.stage} mono /><Detail label="Sessão" value={sessionId ? `${sessionId.slice(0, 12)}…` : "Criando…"} mono /></div><pre className="mt-4 max-h-64 overflow-auto rounded-lg bg-surface-900 p-3 text-[10px] leading-5 text-slate-400">{JSON.stringify(flowState, null, 2)}</pre></>}
+          </section>
 
-        {/* Dicas de Teste */}
-        <div className="p-4 border-t">
-          <h3 className="font-semibold mb-2">Dicas de Teste</h3>
-          <div className="space-y-2 text-sm text-gray-600">
-            <p>• Digite &quot;Oi&quot; para iniciar o fluxo</p>
-            <p>• Use números para selecionar opções</p>
-            <p>• &quot;menu&quot; volta ao menu principal</p>
-            <p>• Reset limpa o estado e recomeça</p>
-          </div>
-        </div>
+          {!ai?.configured && <section className="rounded-2xl border border-amber-400/20 bg-amber-400/5 p-4"><div className="flex gap-2"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" /><div><p className="text-sm font-medium text-amber-100">IA aguardando configuração</p><p className="mt-1 text-xs leading-5 text-amber-200/70">Adicione <code className="rounded bg-black/20 px-1">CEREBRAS_API_KEY</code> ao ambiente para respostas e análises inteligentes.</p></div></div></section>}
+        </aside>
       </div>
     </div>
   );
+}
+
+function Detail({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return <div><p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">{label}</p><p className={`mt-1 truncate text-sm text-slate-200 ${mono ? "font-mono text-xs" : ""}`}>{value}</p></div>;
+}
+
+function ChatBubble({ message }: { message: TestBotMessage }) {
+  const isCustomer = message.sender === "user";
+  return <div className={`flex ${isCustomer ? "justify-end" : "justify-start"}`}><div className={`max-w-[84%] rounded-xl px-3 py-2 shadow-sm sm:max-w-[75%] ${isCustomer ? "rounded-br-sm bg-[#005c4b] text-white" : "rounded-bl-sm bg-[#202c33] text-slate-100"}`}>
+    {message.mediaUrl && message.mediaType === "image" && <img src={message.mediaUrl} alt="Mídia enviada pelo bot" className="mb-2 max-h-72 w-full rounded-lg object-cover" />}
+    {message.mediaUrl && message.mediaType === "video" && <video src={message.mediaUrl} controls className="mb-2 max-h-72 w-full rounded-lg" />}
+    {message.mediaUrl && message.mediaType === "document" && <a href={message.mediaUrl} target="_blank" rel="noreferrer" className="mb-2 flex items-center gap-2 rounded-lg bg-black/15 p-2 text-xs underline"><Paperclip className="h-4 w-4" /> Abrir documento</a>}
+    {message.text && <p className="whitespace-pre-wrap break-words text-sm leading-5">{message.text}</p>}
+    <div className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${isCustomer ? "text-emerald-100/70" : "text-slate-500"}`}><span>{formatTime(message.timestamp)}</span>{isCustomer && <Check className="h-3 w-3" />}</div>
+  </div></div>;
 }

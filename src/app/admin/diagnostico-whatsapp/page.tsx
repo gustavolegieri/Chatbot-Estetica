@@ -1,7 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { CheckCircle, XCircle, AlertCircle, Wrench } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  CircleAlert,
+  Loader2,
+  Radio,
+  RefreshCw,
+  ShieldCheck,
+  Wrench,
+  XCircle,
+} from "lucide-react";
+import { AdminHeader } from "@/components/layout/AdminHeader";
 
 interface DiagnosticResult {
   name: string;
@@ -9,6 +20,30 @@ interface DiagnosticResult {
   message: string;
   details?: string;
 }
+
+const statusStyles = {
+  success: {
+    icon: CheckCircle2,
+    line: "border-emerald-700/40 bg-emerald-950/25",
+    iconBox: "bg-emerald-900/40 text-emerald-400 ring-emerald-700/40",
+    label: "Operacional",
+    labelClass: "bg-emerald-900/45 text-emerald-300",
+  },
+  warning: {
+    icon: AlertCircle,
+    line: "border-amber-700/40 bg-amber-950/20",
+    iconBox: "bg-amber-900/40 text-amber-400 ring-amber-700/40",
+    label: "Atenção",
+    labelClass: "bg-amber-900/45 text-amber-300",
+  },
+  error: {
+    icon: XCircle,
+    line: "border-red-700/40 bg-red-950/20",
+    iconBox: "bg-red-900/40 text-red-400 ring-red-700/40",
+    label: "Ação necessária",
+    labelClass: "bg-red-900/45 text-red-300",
+  },
+};
 
 export default function DiagnosticoWhatsAppPage() {
   const [results, setResults] = useState<DiagnosticResult[]>([]);
@@ -19,172 +54,220 @@ export default function DiagnosticoWhatsAppPage() {
     setResults([]);
 
     try {
-      // 1. Verificar configuração da API
       const configResponse = await fetch("/api/admin/diagnostico/config");
       const configData = await configResponse.json();
 
       setResults([
         {
-          name: "Configuração WASENDER_API_KEY",
+          name: "Credencial da WasenderAPI",
           status: configData.hasApiKey ? "success" : "error",
-          message: configData.hasApiKey ? "API Key configurada" : "API Key não configurada",
-          details: configData.hasApiKey ? "Chave presente nas variáveis de ambiente" : "Configure WASENDER_API_KEY no .env"
+          message: configData.hasApiKey ? "Chave de integração configurada" : "Chave de integração não configurada",
+          details: configData.hasApiKey
+            ? "A credencial foi encontrada de forma segura nas variáveis de ambiente."
+            : "Configure WASENDER_API_KEY no ambiente da aplicação.",
         },
         {
-          name: "Configuração WASENDER_BASE_URL",
+          name: "Endpoint de integração",
           status: configData.hasBaseUrl ? "success" : "warning",
-          message: configData.baseUrl || "Usando padrão",
-          details: configData.baseUrl || "https://wasenderapi.com/api"
-        }
+          message: configData.baseUrl || "Usando endpoint padrão",
+          details: configData.baseUrl || "https://wasenderapi.com/api",
+        },
       ]);
 
-      // 2. Testar conexão com a API
       if (configData.hasApiKey) {
         const testResponse = await fetch("/api/admin/diagnostico/test-connection");
         const testData = await testResponse.json();
 
-        setResults(prev => [...prev, {
-          name: "Conexão com WasenderAPI",
-          status: testData.success ? "success" : "error",
-          message: testData.success ? "Conexão estabelecida" : "Falha na conexão",
-          details: testData.message || testData.error
-        }]);
+        setResults((previous) => [
+          ...previous,
+          {
+            name: "Conexão com a WasenderAPI",
+            status: testData.success ? "success" : "error",
+            message: testData.success ? "Integração respondeu com sucesso" : "Não foi possível concluir a conexão",
+            details: testData.message || testData.error,
+          },
+        ]);
 
-        // 3. Verificar limite diário se houver erro 429
         if (!testData.success && testData.status === 429) {
-          setResults(prev => [...prev, {
-            name: "Limite Diário da API",
-            status: "warning",
-            message: "Limite diário pode ter sido atingido",
-            details: "A WasenderAPI tem limite de 50 mensagens/dia no plano de teste. Faça upgrade ou aguarde o reset diário."
-          }]);
+          setResults((previous) => [
+            ...previous,
+            {
+              name: "Capacidade de envio",
+              status: "warning",
+              message: "O limite diário da API pode ter sido alcançado",
+              details: "No plano de teste, a WasenderAPI limita a 50 mensagens por dia. Aguarde o reset ou faça upgrade do plano.",
+            },
+          ]);
         } else if (testData.success) {
-          setResults(prev => [...prev, {
-            name: "Limite Diário da API",
-            status: "success",
-            message: "API disponível",
-            details: "Limite diário: 50 mensagens (plano de teste)"
-          }]);
+          setResults((previous) => [
+            ...previous,
+            {
+              name: "Capacidade de envio",
+              status: "success",
+              message: "Canal disponível para novas mensagens",
+              details: "Monitore limites e taxas diretamente no provedor antes de campanhas em massa.",
+            },
+          ]);
         }
       }
 
-      // 3. Verificar configurações do WhatsApp
       const settingsResponse = await fetch("/api/admin/diagnostico/settings");
       const settingsData = await settingsResponse.json();
 
-      setResults(prev => [...prev, {
-        name: "Configurações do WhatsApp",
-        status: settingsData.whatsappEnabled ? "success" : "warning",
-        message: settingsData.whatsappEnabled ? "WhatsApp habilitado" : "WhatsApp desabilitado",
-        details: `Modo de teste: ${settingsData.testModeEnabled ? "Ativo" : "Inativo"}`
-      }]);
-
+      setResults((previous) => [
+        ...previous,
+        {
+          name: "Operação do WhatsApp",
+          status: settingsData.whatsappEnabled ? "success" : "warning",
+          message: settingsData.whatsappEnabled ? "Canal oficial habilitado" : "Canal desabilitado nas configurações",
+          details: `Modo de teste: ${settingsData.testModeEnabled ? "ativo" : "inativo"}.`,
+        },
+      ]);
     } catch (error) {
-      setResults(prev => [...prev, {
-        name: "Diagnóstico Geral",
-        status: "error",
-        message: "Erro ao executar diagnósticos",
-        details: (error as Error).message
-      }]);
+      setResults((previous) => [
+        ...previous,
+        {
+          name: "Execução do diagnóstico",
+          status: "error",
+          message: "Não foi possível concluir a verificação",
+          details: error instanceof Error ? error.message : "Erro inesperado",
+        },
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    runDiagnostics();
+    void runDiagnostics();
   }, []);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "success":
-        return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case "error":
-        return <XCircle className="w-5 h-5 text-red-600" />;
-      case "warning":
-        return <AlertCircle className="w-5 h-5 text-yellow-600" />;
-      default:
-        return <AlertCircle className="w-5 h-5 text-gray-600" />;
-    }
-  };
+  const summary = useMemo(
+    () => ({
+      ok: results.filter((result) => result.status === "success").length,
+      warnings: results.filter((result) => result.status === "warning").length,
+      errors: results.filter((result) => result.status === "error").length,
+    }),
+    [results],
+  );
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "success":
-        return "bg-green-50 border-green-200";
-      case "error":
-        return "bg-red-50 border-red-200";
-      case "warning":
-        return "bg-yellow-50 border-yellow-200";
-      default:
-        return "bg-gray-50 border-gray-200";
-    }
-  };
+  const operationState =
+    summary.errors > 0 ? "Atenção necessária" : summary.warnings > 0 ? "Operando com alertas" : results.length ? "Canal saudável" : "Aguardando leitura";
 
   return (
-    <div className="p-8 max-w-4xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-          <Wrench className="w-8 h-8" />
-          Diagnóstico WhatsApp
-        </h1>
-        <p className="text-gray-600">
-          Verifique a configuração e conexão do sistema WhatsApp
-        </p>
-      </div>
+    <div className="space-y-6">
+      <AdminHeader
+        title="Diagnóstico do WhatsApp"
+        description="Leitura segura da integração, disponibilidade e configuração do canal."
+        actions={
+          <button onClick={() => void runDiagnostics()} disabled={loading} className="btn-primary gap-2">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {loading ? "Verificando" : "Executar diagnóstico"}
+          </button>
+        }
+      />
 
-      <div className="mb-6">
-        <button
-          onClick={runDiagnostics}
-          disabled={loading}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
-        >
-          {loading ? "Executando..." : "Executar Diagnóstico"}
-        </button>
-      </div>
-
-      <div className="space-y-4">
-        {results.map((result, index) => (
-          <div
-            key={index}
-            className={`border rounded-lg p-4 ${getStatusColor(result.status)}`}
-          >
-            <div className="flex items-start gap-3">
-              {getStatusIcon(result.status)}
-              <div className="flex-1">
-                <h3 className="font-medium mb-1">{result.name}</h3>
-                <p className="text-sm">{result.message}</p>
-                {result.details && (
-                  <p className="text-xs mt-2 text-gray-600">{result.details}</p>
-                )}
+      <section className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
+        <div className="rounded-2xl border border-brand-700/35 bg-[radial-gradient(ellipse_at_top_left,_rgba(212,175,55,0.15),_transparent_54%),#1a1a1a] p-6 shadow-gold">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-900/50 ring-1 ring-brand-700/45">
+                <Radio className="h-5 w-5 text-brand-300" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-brand-300">Central de saúde do canal</p>
+                <h2 className="mt-1 text-xl font-semibold text-slate-100">{operationState}</h2>
+                <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">
+                  A verificação não exibe chaves ou dados sensíveis. Ela confirma apenas se a operação está pronta para atender clientes.
+                </p>
               </div>
             </div>
+            <ShieldCheck className="hidden h-7 w-7 text-brand-300 sm:block" />
           </div>
-        ))}
-      </div>
-
-      {results.length === 0 && !loading && (
-        <div className="text-center py-8 text-gray-500">
-          Clique em &quot;Executar Diagnóstico&quot; para verificar a configuração
+          <div className="mt-6 grid grid-cols-3 divide-x divide-brand-700/25 border-y border-brand-700/25 py-4">
+            <div className="px-3 first:pl-0">
+              <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Operacionais</p>
+              <p className="mt-1 text-xl font-semibold text-emerald-400">{summary.ok}</p>
+            </div>
+            <div className="px-3">
+              <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Alertas</p>
+              <p className="mt-1 text-xl font-semibold text-amber-400">{summary.warnings}</p>
+            </div>
+            <div className="px-3">
+              <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Falhas</p>
+              <p className="mt-1 text-xl font-semibold text-red-400">{summary.errors}</p>
+            </div>
+          </div>
         </div>
-      )}
 
-      <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="font-medium text-blue-800 mb-2">📋 Como Configurar WasenderAPI</h3>
-        <ol className="text-sm text-blue-700 space-y-2 list-decimal list-inside">
-          <li>Acesse https://wasenderapi.com e crie uma conta</li>
-          <li>Crie uma instância de WhatsApp</li>
-          <li>Obtenha a API Key no painel</li>
-          <li>Configure WASENDER_API_KEY no .env:</li>
-          <li className="ml-4 font-mono text-xs bg-blue-100 p-2 rounded">
-            WASENDER_API_KEY=sua_chave_aqui
-          </li>
-          <li>Opcionalmente, configure WASENDER_BASE_URL se necessário:</li>
-          <li className="ml-4 font-mono text-xs bg-blue-100 p-2 rounded">
-            WASENDER_BASE_URL=https://wasenderapi.com/api
-          </li>
-        </ol>
-      </div>
+        <aside className="card p-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-900/35 ring-1 ring-sky-700/40">
+              <Wrench className="h-5 w-5 text-sky-400" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-brand-100">Rotina recomendada</h2>
+              <p className="text-xs text-slate-500">Antes de abrir atendimento</p>
+            </div>
+          </div>
+          <ol className="mt-5 space-y-3 text-sm text-slate-400">
+            {[
+              "Confirme que o canal está habilitado.",
+              "Valide a integração após mudanças de credenciais.",
+              "Use o modo de teste antes de campanhas ou ajustes no fluxo.",
+            ].map((item, index) => (
+              <li key={item} className="flex gap-3">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-700 text-[10px] font-bold text-brand-200">{index + 1}</span>
+                <span className="leading-5">{item}</span>
+              </li>
+            ))}
+          </ol>
+        </aside>
+      </section>
+
+      <section className="card overflow-hidden p-0">
+        <div className="flex items-center justify-between border-b border-surface-700 px-5 py-4">
+          <div>
+            <h2 className="font-semibold text-brand-100">Checklist da integração</h2>
+            <p className="mt-1 text-sm text-slate-400">Resultados da última execução.</p>
+          </div>
+          {loading && <span className="inline-flex items-center gap-2 text-xs font-medium text-brand-300"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Em análise</span>}
+        </div>
+
+        {loading && results.length === 0 ? (
+          <div className="flex min-h-64 items-center justify-center">
+            <Loader2 className="h-7 w-7 animate-spin text-brand-300" />
+          </div>
+        ) : results.length ? (
+          <div className="divide-y divide-surface-700">
+            {results.map((result, index) => {
+              const style = statusStyles[result.status];
+              const Icon = style.icon;
+              return (
+                <article key={`${result.name}-${index}`} className="flex flex-col gap-4 px-5 py-5 transition hover:bg-surface-750/40 sm:flex-row sm:items-start">
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ${style.iconBox}`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-semibold text-slate-100">{result.name}</h3>
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${style.labelClass}`}>{style.label}</span>
+                    </div>
+                    <p className="mt-1.5 text-sm text-slate-300">{result.message}</p>
+                    {result.details && <p className="mt-2 text-xs leading-5 text-slate-500">{result.details}</p>}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
+            <CircleAlert className="h-10 w-10 text-surface-500" />
+            <p className="mt-3 text-sm font-medium text-slate-300">Nenhuma leitura disponível</p>
+            <p className="mt-1 text-xs text-slate-500">Execute o diagnóstico para conferir a operação.</p>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

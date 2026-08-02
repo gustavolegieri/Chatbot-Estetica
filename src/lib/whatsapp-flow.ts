@@ -1,9 +1,17 @@
 import { AppointmentStatus, Prisma } from "@prisma/client";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { addDays, format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { prisma } from "./prisma";
-import { sendText, sendMedia, sendList } from "./evolution-api";
-import { sendCalendarWithImageAndList, generateCalendarLegend } from "./calendar-helper";
+import {
+  sendText as sendTextRaw,
+  sendMedia as sendMediaRaw,
+} from "./evolution-api";
+import {
+  generateCalendarImageOnly,
+  sendCalendarWithImageAndList as sendCalendarWithImageAndListRaw,
+  generateCalendarLegend,
+} from "./calendar-helper";
 import {
   calculateEndTime,
   formatDurationLabel,
@@ -25,7 +33,7 @@ import {
   type WhatsAppCatalogContext,
 } from "./whatsapp-service-catalog";
 import { resolveValidCustomerName } from "./customer-name";
-import { requestHumanHandoff } from "./whatsapp-handoff";
+import { requestHumanHandoff, wantsHumanHandoff } from "./whatsapp-handoff";
 import {
   etapa1Welcome,
   etapa2MainMenu,
@@ -49,16 +57,30 @@ import {
   etapa10Budget,
   etapa10Logistics,
   etapa15SummaryConfirm,
-  etapa16Confirmation,
+  aiFollowup,
+  evaluationRequired,
+  couponApplied,
+  couponCodeRequest,
+  firstTimeBonusApplied,
+  firstTimeBonusDeclined,
+  firstTimeBonusOffer,
   formatHours,
+  handoffAcknowledgement,
   indecisiveProblemPrompt,
   indecisiveVehiclePrompt,
   packageActionText,
+  reminderChoice,
   invalidMenu,
   packageActionMenu,
   quotePitchForService,
   serviceActionMenu,
   serviceDetail,
+  slotUnavailable,
+  upsellAdded,
+  upsellOffer,
+  vehicleColorInvalid,
+  vehicleColorRequest,
+  vehicleConditionRequest,
   vehicleModelNotUnderstood,
   vehicleNotUnderstood,
   vehicleYearNotUnderstood,
@@ -104,6 +126,7 @@ import {
   handleFAQ,
   handleCancellationDetection,
   handleDiscountResponse,
+  calculateFlowTotal,
   initFunnelTracking,
   trackProgress,
   trackFunnelAbandonment,
@@ -116,19 +139,79 @@ import {
   answerCustomerDoubt,
   looksLikeQuestion,
 } from "./whatsapp-ai";
-import { canRedeem, findCouponByCode, redeemCoupon } from "./coupons";
+import { canRedeem, findCouponByCode } from "./coupons";
 
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+interface IncomingMessage {
+  phone: string;
+  text: string;
+  pushName?: string;
+  testMode?: {
+    sendTextCallback?: (text: string) => Promise<void>;
+    onFlowStateChange?: (flow: FlowState) => void;
+    useRealAI?: boolean;
+    skipDb?: boolean;
+  };
+}
+
+/**
+ * Mantém o modo de entrega vinculado à requisição atual. Assim, o mesmo motor
+ * de fluxo atende produção e o simulador sem que o painel dispare mensagens
+ * reais pela Wasender.
+ */
+const flowDeliveryContext = new AsyncLocalStorage<IncomingMessage["testMode"]>();
+
+async function sendText(params: Parameters<typeof sendTextRaw>[0]) {
+  const callback = flowDeliveryContext.getStore()?.sendTextCallback;
+  if (callback) {
+    await callback(params.text);
+    return { simulated: true };
+  }
+  return sendTextRaw(params);
+}
+
+async function sendMedia(params: Parameters<typeof sendMediaRaw>[0]) {
+  const callback = flowDeliveryContext.getStore()?.sendTextCallback;
+  if (callback) {
+    const mediaType = params.mediaType ?? "image";
+    await callback(`[MÍDIA: ${mediaType}|${params.mediaUrl}] ${params.caption ?? ""}`.trim());
+    return { simulated: true };
+  }
+  return sendMediaRaw(params);
+}
+
+async function sendCalendarWithImageAndList(params: { number: string; prompts?: unknown }) {
+  const callback = flowDeliveryContext.getStore()?.sendTextCallback;
+  if (!callback) {
+    return sendCalendarWithImageAndListRaw(params);
+  }
+
+  try {
+    const imageUrl = await generateCalendarImageOnly();
+    await callback(`[MÍDIA: image|${imageUrl}] ${generateCalendarLegend()}`);
+  } catch (error) {
+    console.warn("[WhatsApp Flow] Não foi possível gerar calendário para o simulador:", error);
+    await callback(generateCalendarLegend());
+  }
+
+  // A lista interativa da Wasender é representada pela orientação de escolha.
+  // A legenda já acompanha a mídia acima, portanto não a repetimos no painel.
+  const dayPrompt = etapa7Day(params.prompts as any);
+  const selectionPrompt = dayPrompt.replace(`${generateCalendarLegend()}\n\n`, "");
+  await callback(selectionPrompt);
+  return { simulated: true };
+}
 
 /**
  * Wrapper para sendText que suporta modo de teste
  */
 async function sendTextWrapper(msg: IncomingMessage, text: string) {
-  if (msg.testMode?.sendTextCallback) {
-    await msg.testMode.sendTextCallback(text);
-  } else {
+  await flowDeliveryContext.run(msg.testMode, async () => {
     await sendText({ number: msg.phone, text });
+  });
+  if (!msg.testMode?.sendTextCallback) {
     await delay(500);
   }
 }
@@ -138,18 +221,31 @@ async function sendTextWrapper(msg: IncomingMessage, text: string) {
  * Converte FlowResponse[] em chamadas de sendText/sendMedia e persiste o estado
  */
 async function handleHumanHandoffRequest(msg: IncomingMessage, flow: FlowState) {
+  const clientName = resolveValidCustomerName(flow.customerName) ?? resolveValidCustomerName(msg.pushName);
+
+  // O simulador precisa refletir a transferência sem criar pendência no CRM
+  // nem enviar mensagem a um telefone de teste.
+  if (msg.testMode?.skipDb) {
+    await sendTextWrapper(msg, handoffAcknowledgement(clientName));
+    return;
+  }
+
   const session = await prisma.whatsAppSession.findFirst({
     where: { phone: normalizePhone(msg.phone) },
     select: { id: true },
   });
 
-  const clientName = resolveValidCustomerName(flow.customerName) ?? resolveValidCustomerName(msg.pushName);
-
   if (session?.id) {
     await requestHumanHandoff({
       phone: msg.phone,
       sessionId: session.id,
-      reason: "menu option",
+      reason: [
+        "Solicitação pelo menu",
+        flow.serviceLabel ? `serviço: ${flow.serviceLabel}` : null,
+        `etapa: ${flow.stage}`,
+      ]
+        .filter(Boolean)
+        .join(" | "),
       clientName: clientName ?? undefined,
     });
     return;
@@ -157,7 +253,7 @@ async function handleHumanHandoffRequest(msg: IncomingMessage, flow: FlowState) 
 
   await sendText({
     number: msg.phone,
-    text: `Entendi${clientName ? `, *${clientName}*` : ""}! 😊\n\nVou avisar a equipe da *Garagem do Ka* para te atender por aqui.`,
+    text: handoffAcknowledgement(clientName),
   });
 }
 
@@ -166,12 +262,18 @@ async function executeCoreHandler(
   flow: FlowState,
   handler: (state: FlowState, message: string, responses: FlowResponse[], ...args: any[]) => Promise<FlowResult>,
   ...handlerArgs: any[]
-): Promise<void> {
+): Promise<FlowResult> {
   const responses: FlowResponse[] = [];
   const result = await handler(flow, msg.text, responses, ...handlerArgs);
 
-  // Persistir o novo estado (apenas se não estiver em modo de teste)
-  await saveFlow(msg.phone, result.nextState, msg.testMode?.skipDb);
+  // A criação final é atômica: não gravamos uma etapa intermediária de
+  // confirmação antes de a reserva realmente existir.
+  const deferFinalConfirmationPersistence =
+    flow.stage === "ETAPA15_SUMMARY_CONFIRM" &&
+    result.nextState.stage === "ETAPA16_CONFIRMATION";
+  if (!deferFinalConfirmationPersistence) {
+    await saveFlow(msg.phone, result.nextState, msg.testMode?.skipDb);
+  }
 
   // Enviar as respostas
   for (const response of result.responses) {
@@ -205,6 +307,8 @@ async function executeCoreHandler(
       console.error("[executeCoreHandler] Error tracking funnel:", error);
     }
   }
+
+  return result;
 }
 
 function flowMsg(wctx: WhatsAppCatalogContext) {
@@ -240,17 +344,6 @@ const CATALOG_DURATION_MIN: Record<string, number> = {
   higienizacao_couro_completa: 150,
   polimento_cotacao: 240,
 };
-
-interface IncomingMessage {
-  phone: string;
-  text: string;
-  pushName?: string;
-  testMode?: {
-    sendTextCallback?: (text: string) => Promise<void>;
-    useRealAI?: boolean;
-    skipDb?: boolean;
-  };
-}
 
 function parseFlow(raw: unknown): FlowState {
   if (!raw || typeof raw !== "object") {
@@ -464,12 +557,14 @@ async function goToVehicleStep(msg: IncomingMessage, flow: FlowState, wctx: What
     const next: FlowState = {
       ...flow,
       stage: "ETAPA4_VEHICLE",
-      vehicleRaw: flow.savedVehicle,
       vehicleModel: flow.savedVehicle,
-      vehicleColor: "não informado",
-      vehicleCondition: "bom",
+      vehicleRaw: undefined,
+      vehicleYear: undefined,
+      vehicleColor: undefined,
+      vehicleCondition: undefined,
       vehicleIsSuv: undefined,
       vehicleCollectStep: undefined,
+      awaitingSavedVehicleChoice: true,
     };
     await saveFlow(msg.phone, next);
     await sendText({
@@ -534,7 +629,7 @@ async function activateService(
     serviceKey,
     serviceLabel: item.label,
     dbServiceId: dbId,
-    stage: "ETAPA3_SERVICE_ACTION",
+    stage: serviceKey === "pacotes" ? "ETAPA3_PACKAGE_ACTION" : "ETAPA3_SERVICE_ACTION",
   });
 
   // Enviar imagem do serviço (se existir)
@@ -573,17 +668,39 @@ async function activateService(
   }
 }
 
+function dateLabel(date: Date, includeYear = false) {
+  return format(date, includeYear ? "dd/MM/yyyy (EEEE)" : "dd/MM (EEEE)", { locale: ptBR });
+}
+
+function validBusinessDay(date: Date) {
+  const today = new Date();
+  const dayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return date >= dayStart && date.getDay() !== 0;
+}
+
 function parseDayInput(input: string, num: number | null) {
+  const trimmed = input.trim();
+  const lower = trimmed.toLowerCase();
+
+  // A lista interativa oficial envia o selectedRowId em ISO (YYYY-MM-DD).
+  // Ele precisa ser interpretado antes de qualquer regex de DD/MM.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const parsedDate = parse(trimmed, "yyyy-MM-dd", new Date());
+    if (format(parsedDate, "yyyy-MM-dd") !== trimmed || !validBusinessDay(parsedDate)) return null;
+    return { dayDate: trimmed, dayLabel: dateLabel(parsedDate, true) };
+  }
+
   if (num && WEEKDAYS[num]) {
     const wd = WEEKDAYS[num];
     return { dayDate: nextWeekdayDate(wd.day), dayLabel: wd.label };
   }
-  const lower = input.toLowerCase();
+
   if (/amanh/.test(lower)) {
     const d = addDays(new Date(), 1);
+    if (!validBusinessDay(d)) return null;
     return {
       dayDate: format(d, "yyyy-MM-dd"),
-      dayLabel: format(d, "dd/MM (EEEE)", { locale: ptBR }),
+      dayLabel: dateLabel(d),
     };
   }
   const weekdayMap: Array<[RegExp, number, string]> = [
@@ -599,25 +716,51 @@ function parseDayInput(input: string, num: number | null) {
       return { dayDate: nextWeekdayDate(day), dayLabel: label };
     }
   }
-  const parsed = input.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/);
+  const parsed = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?$/);
   if (parsed) {
-    const day = parsed[1].padStart(2, "0");
-    const month = parsed[2].padStart(2, "0");
-    const year = parsed[3]
+    const day = Number(parsed[1]);
+    const month = Number(parsed[2]);
+    let year = parsed[3]
       ? parsed[3].length === 2
-        ? `20${parsed[3]}`
-        : parsed[3]
-      : String(new Date().getFullYear());
-    const dayDate = `${year}-${month}-${day}`;
-    const parsedDate = parse(dayDate, "yyyy-MM-dd", new Date());
-    const now = new Date();
-    if (parsedDate < new Date(now.getFullYear(), now.getMonth(), now.getDate())) return null;
-    if (parsedDate.getDay() === 0) return null;
+        ? Number(`20${parsed[3]}`)
+        : Number(parsed[3])
+      : new Date().getFullYear();
+    let parsedDate = new Date(year, month - 1, day);
+    if (parsedDate.getFullYear() !== year || parsedDate.getMonth() !== month - 1 || parsedDate.getDate() !== day) return null;
+    if (!parsed[3] && !validBusinessDay(parsedDate)) {
+      year += 1;
+      parsedDate = new Date(year, month - 1, day);
+    }
+    if (!validBusinessDay(parsedDate)) return null;
     return {
-      dayDate,
-      dayLabel: format(parsedDate, "dd/MM/yyyy (EEEE)", {
-        locale: ptBR,
-      }),
+      dayDate: format(parsedDate, "yyyy-MM-dd"),
+      dayLabel: dateLabel(parsedDate, true),
+    };
+  }
+
+  // Datas de dois dígitos acima de 8 são o dia do mês atual (ou do próximo
+  // mês, se este já passou). As opções 1–6 continuam significando o dia da
+  // semana exibido no menu oficial.
+  if (/^\d{1,2}$/.test(trimmed)) {
+    const day = Number(trimmed);
+    if (day < 7 || day > 31) return null;
+    const now = new Date();
+    let year = now.getFullYear();
+    let month = now.getMonth();
+    let parsedDate = new Date(year, month, day);
+    if (parsedDate.getMonth() !== month) return null;
+    if (!validBusinessDay(parsedDate)) {
+      month += 1;
+      if (month > 11) {
+        month = 0;
+        year += 1;
+      }
+      parsedDate = new Date(year, month, day);
+    }
+    if (parsedDate.getMonth() !== month || !validBusinessDay(parsedDate)) return null;
+    return {
+      dayDate: format(parsedDate, "yyyy-MM-dd"),
+      dayLabel: dateLabel(parsedDate, true),
     };
   }
   return null;
@@ -636,10 +779,13 @@ function isBadCondition(text: string) {
 
 function buildBudgetMessage(flow: FlowState) {
   const serviceValue = Number(flow.quoteMin ?? 0);
-  const complementValue = Number(flow.upsellAccepted ? (flow.quoteMax ?? 0) - serviceValue : 0);
+  const complementValue = flow.upsellAccepted ? Number(flow.upsellValue ?? 0) : 0;
   const pickupValue = Number(flow.pickupFee ?? 0);
-  const couponValue = Number(flow.couponDiscountApplied ?? 0);
-  const totalValue = Math.max(0, serviceValue + complementValue + pickupValue - couponValue);
+  const couponValue = flow.quoteDiscountMode === "base" ? Number(flow.couponDiscountApplied ?? 0) : 0;
+  const firstTimeBonus = flow.firstTimeBonusApplied && flow.quoteDiscountMode === "base"
+    ? Number(flow.firstTimeBonusDiscount ?? 0)
+    : 0;
+  const totalValue = calculateFlowTotal(flow);
 
   const lines = [
     "━━━━━━━━━━━━━━━",
@@ -657,6 +803,10 @@ function buildBudgetMessage(flow: FlowState) {
 
   if (couponValue > 0) {
     lines.push(`- Cupom: **- R$ ${couponValue.toFixed(2).replace(".", ",")}**`);
+  }
+
+  if (firstTimeBonus > 0) {
+    lines.push(`- Bônus de primeira visita: **- R$ ${firstTimeBonus.toFixed(2).replace(".", ",")}**`);
   }
 
   lines.push(`- **Total: R$ ${totalValue.toFixed(2).replace(".", ",")}**`);
@@ -683,7 +833,12 @@ async function loadContext(): Promise<FlowContext> {
 }
 
 async function saveFlow(phone: string, flow: FlowState, skipDb = false) {
-  if (skipDb) {
+  // O contexto de entrega também protege todas as gravações internas do
+  // simulador. Assim, etapas que chamam saveFlow sem repassar explicitamente
+  // o parâmetro não tentam atualizar uma sessão inexistente no banco.
+  const shouldSkipDb = skipDb || Boolean(flowDeliveryContext.getStore()?.skipDb);
+  if (shouldSkipDb) {
+    flowDeliveryContext.getStore()?.onFlowStateChange?.(flow);
     console.log("[WhatsApp Flow] 💾 Salvando estado do fluxo (modo de teste - sem persistência):", { phone, stage: flow.stage, welcomed: flow.welcomed });
     return;
   }
@@ -850,14 +1005,17 @@ async function applyCouponToFlowValue(params: {
   newMin = clampMoney(newMin);
   newMax = clampMoney(newMax);
 
-  const discountApplied = clampMoney((baseMin + baseMax) / 2 - (newMin + newMax) / 2);
+  // O total do fluxo usa a faixa inicial (`quoteMin`); o desconto precisa ser
+  // calculado sobre essa mesma base para manter o valor exibido e cobrado iguais.
+  const discountApplied = clampMoney(baseMin - newMin);
 
   return {
     flow: {
       ...flow,
-      quoteMin: newMin,
-      quoteMax: newMax,
+      // O orçamento permanece como valor-base. O total é composto uma única
+      // vez no resumo, pagamento e criação do agendamento.
       couponDiscountApplied: discountApplied,
+      quoteDiscountMode: "base",
     },
     discountApplied,
   };
@@ -898,10 +1056,10 @@ async function createAppointment(flow: FlowState, phone: string) {
     return { appointment: null, conflict: true };
   }
 
-  const baseValue = Number(flow.quoteMin ?? service.price);
-  const pickupFee = Number(flow.pickupFee ?? 0);
-  const couponDiscount = Number(flow.couponDiscountApplied ?? 0);
-  const finalValue = Math.max(0, baseValue + pickupFee - couponDiscount);
+  const finalValue = calculateFlowTotal({
+    ...flow,
+    quoteMin: flow.quoteMin ?? Number(service.price),
+  });
 
   // Determinar status de pagamento baseado no tipo de PIX e pagamentos parciais
   let paymentStatus = "PENDING";
@@ -1035,6 +1193,10 @@ async function sendQuote(msg: IncomingMessage, flow: FlowState, wctx: WhatsAppCa
 }
 
 export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState) {
+  return flowDeliveryContext.run(msg.testMode, () => processNumberedFlowInternal(msg, flow));
+}
+
+async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState) {
   const ctx = await loadContext();
   const wctx = await loadWhatsAppCatalog();
   const msgH = flowMsg(wctx);
@@ -1101,7 +1263,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     if (aiAnswer) {
       await sendText({
         number: msg.phone,
-        text: `${aiAnswer}\n\n${menuForStage(flow, wctx, msg.pushName)}`,
+        text: `${aiAnswer}\n\n${aiFollowup(prompts)}`,
       });
       return;
     }
@@ -1213,6 +1375,14 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     }
 
     case "ETAPA2_MAIN_MENU": {
+      // A opção 9 faz parte do menu oficial e não pode passar pelo limite das
+      // categorias (1–8). Sem esse tratamento, o cliente via uma opção que
+      // nunca acionava o atendimento humano.
+      if (input === "9") {
+        await handleHumanHandoffRequest(msg, flow);
+        return;
+      }
+
       if (wantsRefusal(input)) {
         const reset: FlowState = {
           stage: "ETAPA2_MAIN_MENU",
@@ -1249,7 +1419,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
           if (aiAnswer) {
             await sendText({
               number: msg.phone,
-              text: `${aiAnswer}\n\n${msgH.mainMenu(flow, msg.pushName)}`,
+              text: `${aiAnswer}\n\n${aiFollowup(prompts)}`,
             });
             return;
           }
@@ -1460,7 +1630,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
 
         await sendText({
           number: msg.phone,
-          text: `Por favor, responda apenas *sim* ou *não* para confirmar os dados do veículo.`,
+          text: `Para eu seguir com segurança, responda apenas *sim* ou *não* para confirmar os dados do veículo.`,
         });
         await sendText({
           number: msg.phone,
@@ -1468,7 +1638,8 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
             flow.vehicleModel ?? "",
             flow.vehicleYear ?? "",
             flow.vehicleColor ?? "",
-            flow.vehicleCondition ?? ""
+            flow.vehicleCondition ?? "",
+            prompts
           ),
         });
         return;
@@ -1495,7 +1666,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
           });
           await sendText({
             number: msg.phone,
-            text: `Anotado: ${model} ${year} 👍\n\nQual a cor do veículo?`,
+            text: vehicleColorRequest(`${model} ${year}`, prompts),
           });
         } else {
           await saveFlow(msg.phone, {
@@ -1521,7 +1692,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         });
         await sendText({
           number: msg.phone,
-          text: `Anotado: ${flow.vehicleModel} ${year} 👍\n\nQual a cor do veículo?`,
+          text: vehicleColorRequest(`${flow.vehicleModel ?? ""} ${year}`.trim(), prompts),
         });
         return;
       }
@@ -1531,7 +1702,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         if (!color || color.length < 2) {
           await sendText({
             number: msg.phone,
-            text: `Não entendi a cor 😊 Pode me dizer novamente? (ex: branco, prata, preto, azul)`,
+            text: vehicleColorInvalid(prompts),
           });
           return;
         }
@@ -1542,7 +1713,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         });
         await sendText({
           number: msg.phone,
-          text: `Anotado: ${flow.vehicleModel} ${flow.vehicleYear} ${color} 👍\n\nQual o estado geral do veículo? (excelente/bom/normal/ruim)`,
+          text: vehicleConditionRequest(`${flow.vehicleModel ?? ""} ${flow.vehicleYear ?? ""} ${color}`.trim(), prompts),
         });
         return;
       }
@@ -1562,7 +1733,8 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
             nextFlow.vehicleModel ?? "",
             nextFlow.vehicleYear ?? "",
             nextFlow.vehicleColor ?? "",
-            nextFlow.vehicleCondition ?? ""
+            nextFlow.vehicleCondition ?? "",
+            prompts
           ),
         });
         return;
@@ -1607,17 +1779,15 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       // Check if first-time customer for bonus (unificado com test-bot)
       if (!flow.firstTimeBonusApplied && !flow.couponCode) {
         try {
-          const existingCustomer = await prisma.client.findUnique({
-            where: { phone: msg.phone }
-          });
+          const eligibleForBonus = await isFirstTimeCustomer(normalizePhone(msg.phone));
 
-          if (!existingCustomer) {
+          if (eligibleForBonus) {
             flow.isFirstTimeCustomer = true;
 
             // Usar sistema de cupom como test-bot (mais robusto)
             const coupon = await findCouponByCode("PRIMEIRA10");
             if (coupon && coupon.active) {
-              flow.couponCode = "PRIMEIRA10";
+              flow.firstTimeBonusCouponId = coupon.id;
               flow.firstTimeBonusDiscount = coupon.type === "percent"
                 ? (flow.quoteMin ?? 0) * (Number(coupon.amount) / 100)
                 : Number(coupon.amount);
@@ -1630,7 +1800,12 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
             await saveFlow(msg.phone, flow);
             await sendText({
               number: msg.phone,
-              text: `🎁 *Bônus! Primeira vez: 10% de desconto*\n\nÉ sua primeira vez aqui! Ganhou *10% de desconto* no primeiro serviço.\n\n💰 Desconto: R$ ${(flow.firstTimeBonusDiscount ?? 0).toFixed(2).replace('.', ',')}\n\n*1* ✅ Quero o desconto\n*2* ❌ Não, obrigado`,
+              text: firstTimeBonusOffer(
+                flow.customerName,
+                flow.firstTimeBonusDiscount,
+                calculateFlowTotal({ ...flow, firstTimeBonusApplied: true, quoteDiscountMode: "base" }),
+                prompts
+              ),
             });
             return;
           } else {
@@ -1659,15 +1834,16 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         return;
       }
       flow.upsellLabel = upsell.complement;
+      flow.upsellValue = upsell.value;
       flow.upsellOffered = true;
       flow.stage = "ETAPA6_UPSELL";
       await saveFlow(msg.phone, flow);
       // Alinhado com test-bot: formato simples de upsell
       // Usar valor estimado baseado na diferença entre quoteMax e quoteMin
-      const upsellValue = (flow.quoteMax ?? 0) - (flow.quoteMin ?? 0);
+      const upsellValue = upsell.value;
       await sendText({
         number: msg.phone,
-        text: `✨ Que tal adicionar *${upsell.complement}*?\n\n💰 **R$ ${upsellValue.toFixed(2)}** a mais\n\n*1* - Sim, incluir\n*2* - Não, obrigado`,
+        text: upsellOffer(flow.serviceLabel ?? "seu serviço", upsell.complement, upsell.benefit, upsellValue, prompts),
       });
       return;
     }
@@ -1675,43 +1851,35 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     case "ETAPA5_FIRST_TIME_BONUS": {
       if (num === 1 || /sim|s|yes|quero|aceito/i.test(lower)) {
         flow.firstTimeBonusApplied = true;
-        // Apply discount to quote
-        if (flow.firstTimeBonusDiscount) {
-          const currentQuoteMin = flow.quoteMin ?? 0;
-          const currentQuoteMax = flow.quoteMax ?? 0;
-          flow.quoteMin = Math.max(0, currentQuoteMin - flow.firstTimeBonusDiscount);
-          flow.quoteMax = Math.max(0, currentQuoteMax - flow.firstTimeBonusDiscount);
-          flow.couponDiscountApplied = flow.firstTimeBonusDiscount;
-        }
+        flow.quoteDiscountMode = "base";
         await saveFlow(msg.phone, flow);
         await sendText({
           number: msg.phone,
-          text: `✅ *Desconto aplicado!*\n\nSeu bônus de primeira compra foi ativado.\n\n💰 Novo valor: R$ ${(flow.quoteMin ?? 0).toFixed(2).replace('.', ',')}\n\nVamos continuar com o agendamento?`,
+          text: firstTimeBonusApplied(calculateFlowTotal(flow), prompts),
         });
         // Continue to upsell or calendar
         if (flow.upsellOffered) {
           flow.stage = "ETAPA7_DAY";
           await saveFlow(msg.phone, flow);
           await sendCalendarWithImageAndList({ number: msg.phone, prompts });
-          await sendText({ number: msg.phone, text: generateCalendarLegend() });
         } else {
           const key = flow.serviceKey ?? "lavagem_detalhada";
           const upsell = getUpsellForKey(key, wctx) ?? getUpsellForKey("lavagem_detalhada", wctx);
           if (upsell) {
             flow.upsellLabel = upsell.complement;
+            flow.upsellValue = upsell.value;
             flow.upsellOffered = true;
             flow.stage = "ETAPA6_UPSELL";
             await saveFlow(msg.phone, flow);
-            const upsellValue = (flow.quoteMax ?? 0) - (flow.quoteMin ?? 0);
+            const upsellValue = upsell.value;
             await sendText({
               number: msg.phone,
-              text: `✨ Que tal adicionar *${upsell.complement}*?\n\n💰 **R$ ${upsellValue.toFixed(2)}** a mais\n\n*1* - Sim, incluir\n*2* - Não, obrigado`,
+              text: upsellOffer(flow.serviceLabel ?? "seu serviço", upsell.complement, upsell.benefit, upsellValue, prompts),
             });
           } else {
             flow.stage = "ETAPA7_DAY";
             await saveFlow(msg.phone, flow);
             await sendCalendarWithImageAndList({ number: msg.phone, prompts });
-            await sendText({ number: msg.phone, text: generateCalendarLegend() });
           }
         }
         return;
@@ -1720,35 +1888,35 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       if (num === 2 || /nao|não|n|no|nao quero/i.test(lower)) {
         flow.firstTimeBonusApplied = true;
         flow.firstTimeBonusDiscount = 0;
+        flow.firstTimeBonusCouponId = undefined;
         await saveFlow(msg.phone, flow);
         await sendText({
           number: msg.phone,
-          text: `Sem problema! Vamos continuar com o valor original.\n\n💰 Valor: R$ ${(flow.quoteMin ?? 0).toFixed(2).replace('.', ',')}`,
+          text: firstTimeBonusDeclined(calculateFlowTotal(flow), prompts),
         });
         // Continue to upsell or calendar
         if (flow.upsellOffered) {
           flow.stage = "ETAPA7_DAY";
           await saveFlow(msg.phone, flow);
           await sendCalendarWithImageAndList({ number: msg.phone, prompts });
-          await sendText({ number: msg.phone, text: generateCalendarLegend() });
         } else {
           const key = flow.serviceKey ?? "lavagem_detalhada";
           const upsell = getUpsellForKey(key, wctx) ?? getUpsellForKey("lavagem_detalhada", wctx);
           if (upsell) {
             flow.upsellLabel = upsell.complement;
+            flow.upsellValue = upsell.value;
             flow.upsellOffered = true;
             flow.stage = "ETAPA6_UPSELL";
             await saveFlow(msg.phone, flow);
-            const upsellValue = (flow.quoteMax ?? 0) - (flow.quoteMin ?? 0);
+            const upsellValue = upsell.value;
             await sendText({
               number: msg.phone,
-              text: `✨ Que tal adicionar *${upsell.complement}*?\n\n💰 **R$ ${upsellValue.toFixed(2)}** a mais\n\n*1* - Sim, incluir\n*2* - Não, obrigado`,
+              text: upsellOffer(flow.serviceLabel ?? "seu serviço", upsell.complement, upsell.benefit, upsellValue, prompts),
             });
           } else {
             flow.stage = "ETAPA7_DAY";
             await saveFlow(msg.phone, flow);
             await sendCalendarWithImageAndList({ number: msg.phone, prompts });
-            await sendText({ number: msg.phone, text: generateCalendarLegend() });
           }
         }
         return;
@@ -1776,7 +1944,7 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
           flow.upsellLabel = upsell.complement;
           await sendText({
             number: msg.phone,
-            text: `✅ Incluído! *${upsell.complement}* adicionado ao seu agendamento.`,
+            text: upsellAdded(upsell.complement, prompts),
           });
         }
       }
@@ -1790,7 +1958,6 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
       flow.stage = "ETAPA7_DAY";
       await saveFlow(msg.phone, flow);
       await sendCalendarWithImageAndList({ number: msg.phone, prompts });
-      await sendText({ number: msg.phone, text: generateCalendarLegend() });
       return;
     }
 
@@ -1824,7 +1991,11 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         if (looksLikeTimeAttempt) {
           await sendText({
             number: msg.phone,
-            text: `Esse horário não está disponível. Escolha um dos horários abaixo:\n\n${slots.map((slot, index) => `*${index + 1}* - ${slot}`).join("\n")}`,
+            text: slotUnavailable(
+              flow.dayLabel ?? flow.dayDate ?? "este dia",
+              slots.map((slot, index) => `*${index + 1}* — ${slot}`).join("\n"),
+              prompts
+            ),
           });
           return;
         }
@@ -1845,12 +2016,11 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
           await saveFlow(msg.phone, flow);
           await sendText({
             number: msg.phone,
-            text: `Esse horário acabou de ser reservado 😔\n\n${etapa7Time(
-              flow.dayLabel ?? flow.dayDate,
-              fresh,
-              formatDurationLabel(durationMin),
+            text: slotUnavailable(
+              flow.dayLabel ?? flow.dayDate ?? "este dia",
+              fresh.map((slot, index) => `*${index + 1}* — ${slot}`).join("\n"),
               prompts
-            )}`,
+            ),
           });
           return;
         }
@@ -1935,14 +2105,20 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
         flow.paymentMethod = "Cartão de débito";
         flow.stage = "ETAPA14_REMINDER";
         await saveFlow(msg.phone, flow);
-        await sendText({ number: msg.phone, text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa` });
+        await sendText({
+          number: msg.phone,
+          text: reminderChoice(prompts),
+        });
         return;
       }
       if (num === 2) {
         flow.paymentMethod = "Cartão de crédito";
         flow.stage = "ETAPA14_REMINDER";
         await saveFlow(msg.phone, flow);
-        await sendText({ number: msg.phone, text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa` });
+        await sendText({
+          number: msg.phone,
+          text: reminderChoice(prompts),
+        });
         return;
       }
       await sendText({
@@ -1969,60 +2145,16 @@ export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState)
     }
 
     case "ETAPA15_SUMMARY_CONFIRM": {
-      await executeCoreHandler(msg, flow, handleSummaryConfirm);
+      const result = await executeCoreHandler(msg, flow, handleSummaryConfirm);
+      if (result.nextState.stage === "ETAPA16_CONFIRMATION") {
+        await confirmFinal(msg, result.nextState, ctx, wctx);
+      }
       return;
     }
 
     case "ETAPA16_CONFIRMATION": {
-      // Após confirmação final, criar o agendamento
-      const result = await createAppointment(flow, msg.phone);
-      const appointment = result?.appointment;
-
-      if (result?.conflict) {
-        const durationMin = flow.serviceDurationMin ?? 60;
-        const fresh = await generateAvailableSlots(flow.dayDate ?? "", durationMin);
-        flow.availableSlots = fresh;
-        flow.startTime = undefined;
-        flow.periodLabel = undefined;
-        flow.stage = "ETAPA7_TIME";
-        await saveFlow(msg.phone, flow);
-        await sendText({
-          number: msg.phone,
-          text: `Esse horário acabou de ser reservado 😔\n\n${etapa7Time(
-            flow.dayLabel ?? flow.dayDate ?? "este dia",
-            fresh,
-            formatDurationLabel(durationMin),
-            wctx.prompts
-          )}`,
-        });
-        return;
-      }
-
-      // Se houver cupom aplicado, registrar redemption vinculado ao agendamento
-      if (appointment?.id && flow.couponCode) {
-        try {
-          const client = await prisma.client.findUnique({
-            where: { phone: normalizePhone(msg.phone) },
-          });
-
-          if (client?.id) {
-            await redeemCoupon(flow.couponCode, client.id, appointment.id);
-          }
-        } catch (err) {
-          console.error('[Cupon] Falha ao registrar redemption:', err);
-        }
-      }
-
-      // Enviar confirmação final usando o template oficial
-      await sendText({
-        number: msg.phone,
-        text: etapa16Confirmation(ctx.address, ctx.hours, prompts),
-      });
-
-      // Reset to initial state
-      flow.stage = "ETAPA1_AWAITING_NAME";
-      flow.customerName = undefined;
-      await saveFlow(msg.phone, flow);
+      // Compatibilidade com sessões iniciadas antes da confirmação atômica.
+      await confirmFinal(msg, flow, ctx, wctx);
       return;
     }
 
@@ -2082,10 +2214,10 @@ async function applyCouponPhase(
   const code = parseCouponCodeFromText(input) ?? null;
   if (!code) {
     // Se usuário só perguntar “tenho cupom?”, não tem código ainda
-    if (/\b(cupom|c[oó]digo|desconto)\b/i.test(input) && !flow.couponCode) {
-      await sendText({
-        number: msg.phone,
-        text: `Perfeito 😊 Me envie o *código do cupom* (ex: *AA*).`,
+      if (/\b(cupom|c[oó]digo|desconto)\b/i.test(input) && !flow.couponCode) {
+        await sendText({
+          number: msg.phone,
+          text: couponCodeRequest(wctx.prompts),
       });
     }
     return false;
@@ -2121,6 +2253,7 @@ async function applyCouponPhase(
   flow.couponId = coupon.id;
   flow.couponCode = code;
   flow.couponDiscountApplied = applied.discountApplied;
+  flow.quoteDiscountMode = applied.flow.quoteDiscountMode;
   flow.couponError = undefined;
 
   flow.quoteMin = applied.flow.quoteMin;
@@ -2129,19 +2262,12 @@ async function applyCouponPhase(
 
   const formattedCouponCode = code.toUpperCase();
   const formattedDiscount = applied.discountApplied > 0 ? `*R$ ${applied.discountApplied.toFixed(2).replace(".", ",")}*` : "*sem valor fixo*";
-  const finalValue = Math.max(0, (flow.quoteMin ?? 0));
+  const finalValue = calculateFlowTotal(flow);
   const formattedFinalValue = `*R$ ${finalValue.toFixed(2).replace(".", ",")}*`;
-  const couponName = formattedCouponCode;
 
   await sendText({
     number: msg.phone,
-    text: `✅ Cupom *${formattedCouponCode}* aplicado com sucesso!
-
-🎁 ${couponName}
-💸 Desconto aplicado: ${formattedDiscount}
-💰 Valor final do agendamento: ${formattedFinalValue}
-
-Agora escolha a forma de pagamento.`,
+    text: couponApplied(formattedCouponCode, formattedDiscount, formattedFinalValue, wctx.prompts),
   });
 
   return true;
@@ -2182,7 +2308,7 @@ async function handlePayment(
     await saveFlow(msg.phone, flow);
     await sendText({
       number: msg.phone,
-      text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa`,
+      text: reminderChoice(prompts),
     });
     return;
   }
@@ -2200,14 +2326,17 @@ async function handlePayment(
     await saveFlow(msg.phone, flow);
     await sendText({
       number: msg.phone,
-      text: `💸 Como você prefere pagar via PIX?\n\n1 PIX (Pagar agora)\n2 PIX (Pagar na entrega)`,
+      text: etapa8PixChoice(prompts),
     });
     return;
   }
 
   flow.stage = "ETAPA14_REMINDER";
   await saveFlow(msg.phone, flow);
-  await sendText({ number: msg.phone, text: `🔔 Quer receber um lembrete por WhatsApp 1h antes do horário agendado?\n\n*1* Sim, quero lembrete\n*2* Não precisa` });
+  await sendText({
+    number: msg.phone,
+    text: reminderChoice(prompts),
+  });
 }
 
 async function confirmFinal(
@@ -2217,9 +2346,10 @@ async function confirmFinal(
   wctx: WhatsAppCatalogContext,
   includePix = false
 ) {
-  const result = await createAppointment(flow, msg.phone);
-  const appointment = result?.appointment;
-
+  // O simulador percorre a mesma jornada sem gravar agenda, financeiro ou cupons.
+  const result = msg.testMode?.skipDb
+    ? { conflict: false }
+    : await createAppointment(flow, msg.phone);
   if (result?.conflict) {
     const durationMin = flow.serviceDurationMin ?? 60;
     const fresh = await generateAvailableSlots(flow.dayDate ?? "", durationMin);
@@ -2230,32 +2360,14 @@ async function confirmFinal(
     await saveFlow(msg.phone, flow);
     await sendText({
       number: msg.phone,
-      text: `Esse horário acabou de ser reservado 😔\n\n${etapa7Time(
+      text: slotUnavailable(
         flow.dayLabel ?? flow.dayDate ?? "este dia",
-        fresh,
-        formatDurationLabel(durationMin),
+        fresh.map((slot, index) => `*${index + 1}* — ${slot}`).join("\n"),
         wctx.prompts
-      )}`,
+      ),
     });
     return;
   }
-
-  // Se houver cupom aplicado, registrar redemption vinculado ao agendamento
-  if (appointment?.id && flow.couponCode) {
-    try {
-      // redeemCoupon exige clientId; buscar via phone é seguro
-      const client = await prisma.client.findUnique({
-        where: { phone: normalizePhone(msg.phone) },
-      });
-
-      if (client?.id) {
-        await redeemCoupon(flow.couponCode, client.id, appointment.id);
-      }
-    } catch (err) {
-      console.error('[Cupon] Falha ao registrar redemption:', err);
-    }
-  }
-
 
   const services = [
 
@@ -2266,9 +2378,7 @@ async function confirmFinal(
     .filter(Boolean)
     .join(" + ");
 
-  const totalValue = Math.max(0, Number(flow.quoteMin ?? 0) + Number(flow.pickupFee ?? 0) - Number(flow.couponDiscountApplied ?? 0));
-  const value = totalValue > 0 ? `R$ ${totalValue.toFixed(2).replace(".", ",")}` : "sob consulta";
-
+  const totalValue = calculateFlowTotal(flow);
   const name = clientDisplayName(flow, msg.pushName);
   const { prompts } = wctx;
   const confirmBody = etapa9Confirm(
@@ -2279,7 +2389,7 @@ async function confirmFinal(
       day: flow.dayLabel ?? flow.dayDate ?? "—",
       time: flow.startTime ?? flow.periodLabel ?? "—",
       payment: flow.paymentMethod ?? "—",
-      value: `${Math.max(0, (flow.quoteMin ?? 0) + (flow.pickupFee ?? 0)).toFixed(2).replace(".", ",")}`,
+      value: totalValue.toFixed(2).replace(".", ","),
       address: ctx.address || "nosso endereço",
       pixBlock: includePix ? etapa8PixBlock(ctx, prompts) : undefined,
     },
@@ -2298,7 +2408,7 @@ async function confirmFinal(
     text: `${confirmBody}\n\n━━━━━━━━━━━━━━━━━━━━\n\n${flowMsg(wctx).mainMenu(menuFlow, msg.pushName)}`,
   });
 
-  await saveFlow(msg.phone, menuFlow);
+  await saveFlow(msg.phone, menuFlow, msg.testMode?.skipDb);
 }
 
 /** Primeira interação: sempre etapa 1 */
@@ -2309,7 +2419,9 @@ export async function startFlow(msg: IncomingMessage) {
   console.log("[WhatsApp Flow] 📤 Enviando mensagem de boas-vindas");
   await sendTextWrapper(msg, etapa1Welcome(ctx, wctx.prompts));
   console.log("[WhatsApp Flow] 💾 Salvando estado com welcomed=true");
-  await saveFlow(msg.phone, { stage: "ETAPA1_AWAITING_NAME", welcomed: true }, !!msg.testMode);
+  const initialState: FlowState = { stage: "ETAPA1_AWAITING_NAME", welcomed: true };
+  await saveFlow(msg.phone, initialState, !!msg.testMode);
+  msg.testMode?.onFlowStateChange?.(initialState);
   console.log("[WhatsApp Flow] ✅ Flow de boas-vindas concluído");
 }
 
