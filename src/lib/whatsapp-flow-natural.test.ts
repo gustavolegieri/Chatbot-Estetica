@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { detectRequestedTimePreference, extractExplicitCustomerName } from "./whatsapp-flow";
+import { detectRequestedTimePreference, extractExplicitCustomerName, parseDayInput } from "./whatsapp-flow";
 import { initialRequestSummary } from "./whatsapp-flow-messages";
 import { wantsHumanHandoff } from "./whatsapp-handoff";
-import { wantsToSchedule } from "./whatsapp-intent";
+import { isAvailabilityRequest, wantsToSchedule } from "./whatsapp-intent";
 
 test("extracts the customer name and period from a complete first message", () => {
   const message = "Gustavo, meu Civic 2021 branco precisa de lavagem simples para sábado de manhã";
@@ -35,4 +35,27 @@ test("initial summary keeps the existing WhatsApp visual language", () => {
 test("free-text requests for a real person trigger handoff", () => {
   assert.equal(wantsHumanHandoff("isso aqui é só robô?"), true);
   assert.equal(wantsHumanHandoff("me chama um atendente"), true);
+});
+
+test("availability questions are routed to scheduling instead of generic doubts", () => {
+  assert.equal(isAvailabilityRequest("Tem horário pra hoje?"), true);
+  assert.equal(isAvailabilityRequest("Vocês têm alguma vaga amanhã de manhã?"), true);
+  assert.equal(isAvailabilityRequest("Qual o valor do polimento?"), false);
+});
+
+test("today is preserved as an explicit calendar date", () => {
+  const now = new Date();
+  const parsed = parseDayInput("tem horário para hoje", null);
+
+  if (now.getDay() === 0) {
+    assert.equal(parsed, null);
+    return;
+  }
+
+  const expected = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+  assert.equal(parsed?.dayDate, expected);
 });

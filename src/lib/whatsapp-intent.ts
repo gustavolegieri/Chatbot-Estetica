@@ -51,6 +51,31 @@ export function wantsToSchedule(text: string, num: number | null): boolean {
   );
 }
 
+/**
+ * Perguntas sobre vagas fazem parte do agendamento, mesmo quando estão
+ * escritas como dúvida (ex.: "tem horário para hoje?"). A disponibilidade
+ * real só pode ser calculada depois que o serviço e sua duração são conhecidos.
+ */
+export function isAvailabilityRequest(text: string): boolean {
+  const normalized = text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const mentionsSchedule = /\b(horario|horarios|vaga|vagas|agenda|disponibilidade|encaixe|encaixes)\b/.test(
+    normalized
+  );
+  const asksIfAvailable = /\b(tem|teria|ha|existe|disponivel|disponiveis|consegue|conseguem|pode|podem|algum|alguma)\b/.test(
+    normalized
+  );
+  const mentionsDate = /\b(hoje|amanha|segunda|terca|quarta|quinta|sexta|sabado)\b|\b\d{1,2}[\/-]\d{1,2}\b/.test(
+    normalized
+  );
+
+  return mentionsSchedule && (asksIfAvailable || mentionsDate || /qual(?: e| seria)? o? horario/.test(normalized));
+}
+
 export function wantsOtherServices(text: string, num: number | null, menuOption = 2): boolean {
   if (num === menuOption) return true;
   const t = text.toLowerCase();

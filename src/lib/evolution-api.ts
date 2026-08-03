@@ -250,13 +250,21 @@ async function uploadAudioBuffer(audio: Buffer): Promise<string> {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("WASENDER_API_KEY não configurada");
 
+  // O Edge TTS inicia o MP3 diretamente por um frame MPEG. O arquivo é
+  // reproduzível, mas o detector de tipo da WASender exige uma assinatura ID3.
+  const hasId3Header =
+    audio.length >= 3 && audio[0] === 0x49 && audio[1] === 0x44 && audio[2] === 0x33;
+  const normalizedAudio = hasId3Header
+    ? audio
+    : Buffer.concat([Buffer.from([0x49, 0x44, 0x33, 0x04, 0, 0, 0, 0, 0, 0]), audio]);
+
   const response = await fetch(`${WASENDER_BASE}/upload`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "audio/mpeg",
     },
-    body: new Uint8Array(audio),
+    body: new Uint8Array(normalizedAudio),
   });
   const body = (await response.json().catch(() => null)) as
     | { publicUrl?: string; message?: string }

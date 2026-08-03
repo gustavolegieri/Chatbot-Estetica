@@ -86,6 +86,7 @@ import {
 import {
   detectCategoryNum,
   detectServiceKey,
+  isAvailabilityRequest,
   isGreetingOrSmallTalk,
   onlyMenuNumber,
   wantsDoubt,
@@ -147,7 +148,7 @@ interface IncomingMessage {
   text: string;
   pushName?: string;
   testMode?: {
-    sendTextCallback?: (text: string) => Promise<void>;
+    sendTextCallback?: (text: string, metadata?: { voiceReply?: boolean }) => Promise<void>;
     onFlowStateChange?: (flow: FlowState) => void;
     useRealAI?: boolean;
     skipDb?: boolean;
@@ -164,7 +165,7 @@ const flowDeliveryContext = new AsyncLocalStorage<IncomingMessage["testMode"]>()
 async function sendText(params: Parameters<typeof sendTextRaw>[0]) {
   const callback = flowDeliveryContext.getStore()?.sendTextCallback;
   if (callback) {
-    await callback(params.text);
+    await callback(params.text, { voiceReply: params.voiceReply });
     return { simulated: true };
   }
   return sendTextRaw(params);
@@ -202,9 +203,13 @@ async function sendCalendarWithImageAndList(params: { number: string; prompts?: 
 /**
  * Wrapper para sendText que suporta modo de teste
  */
-async function sendTextWrapper(msg: IncomingMessage, text: string) {
+async function sendTextWrapper(
+  msg: IncomingMessage,
+  text: string,
+  options?: { voiceReply?: boolean }
+) {
   await flowDeliveryContext.run(msg.testMode, async () => {
-    await sendText({ number: msg.phone, text });
+    await sendText({ number: msg.phone, text, voiceReply: options?.voiceReply });
   });
   if (!msg.testMode?.sendTextCallback) {
     await delay(500);
@@ -987,7 +992,7 @@ function validBusinessDay(date: Date) {
   return date >= dayStart && date.getDay() !== 0;
 }
 
-function parseDayInput(input: string, num: number | null) {
+export function parseDayInput(input: string, num: number | null) {
   const trimmed = input.trim();
   const lower = trimmed.toLowerCase();
 
@@ -1002,6 +1007,15 @@ function parseDayInput(input: string, num: number | null) {
   if (num && WEEKDAYS[num]) {
     const wd = WEEKDAYS[num];
     return { dayDate: nextWeekdayDate(wd.day), dayLabel: wd.label };
+  }
+
+  if (/\bhoje\b/.test(lower)) {
+    const d = new Date();
+    if (!validBusinessDay(d)) return null;
+    return {
+      dayDate: format(d, "yyyy-MM-dd"),
+      dayLabel: dateLabel(d),
+    };
   }
 
   if (/amanh/.test(lower)) {
@@ -1073,6 +1087,41 @@ function parseDayInput(input: string, num: number | null) {
     };
   }
   return null;
+}
+
+function availabilityServiceSelectionText(
+  flow: FlowState,
+  wctx: WhatsAppCatalogContext,
+  pushName?: string
+): string {
+  const name = clientDisplayName(flow, pushName);
+  const date = flow.dayLabel ?? flow.dayDate;
+  return [
+    `Claro, *${name}*. ${date ? `Considerei *${date}*.` : "Vamos encontrar a melhor data para você."}`,
+    "",
+    "Para consultar os horários reais, primeiro preciso saber qual serviço você deseja — a duração muda conforme o cuidado escolhido.",
+    "",
+    buildMainMenu(wctx.categories, wctx.prompts),
+    "",
+    "_Você pode responder com o número ou escrever o nome do serviço._",
+  ].join("\n");
+}
+
+async function showAvailabilityServiceSelection(
+  msg: IncomingMessage,
+  flow: FlowState,
+  wctx: WhatsAppCatalogContext
+) {
+  const next: FlowState = {
+    ...flow,
+    stage: "ETAPA2_MAIN_MENU",
+    welcomed: true,
+    pendingInitialIntent: "schedule",
+  };
+  await saveFlow(msg.phone, next, !!msg.testMode);
+  msg.testMode?.onFlowStateChange?.(next);
+  await sendTextWrapper(msg, availabilityServiceSelectionText(next, wctx, msg.pushName));
+  await sendCalendarWithImageAndList({ number: msg.phone, prompts: wctx.prompts });
 }
 
 function isSuvLike(text: string) {
@@ -1828,6 +1877,52 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
     }
   }
 
+  // "Tem horário para hoje?" é um pedido de agenda, não uma dúvida genérica.
+  // Guardamos a data imediatamente, mas só consultamos slots depois de saber
+  // o serviço, pois cada opção bloqueia uma duração diferente na agenda.
+  if (!isShortMenuPick && isAvailabilityRequest(input)) {
+    const requestedDay = parseDayInput(input, null);
+    const mentionedService = detectServiceKey(input);
+    const selectedService =
+      mentionedService && mentionedService !== "indeciso"
+        ? mentionedService
+        : flow.serviceKey ?? flow.pendingServiceKey;
+    const availabilityFlow: FlowState = {
+      ...flow,
+      pendingInitialIntent: "schedule",
+      dayDate: requestedDay?.dayDate ?? flow.dayDate,
+      dayLabel: requestedDay?.dayLabel ?? flow.dayLabel,
+      requestedTimePreference:
+        detectRequestedTimePreference(input) ?? flow.requestedTimePreference,
+      serviceRequestContext: input.slice(0, 500),
+    };
+
+    if (!selectedService) {
+      await showAvailabilityServiceSelection(msg, availabilityFlow, wctx);
+      return;
+    }
+
+    if (!flow.serviceKey || flow.serviceKey !== selectedService) {
+      await saveFlow(msg.phone, availabilityFlow);
+      await activateService(msg, availabilityFlow, selectedService, wctx);
+      await sendCalendarWithImageAndList({ number: msg.phone, prompts });
+      return;
+    }
+
+    await saveFlow(msg.phone, availabilityFlow);
+    await sendCalendarWithImageAndList({ number: msg.phone, prompts });
+    if (availabilityFlow.stage === "ETAPA7_DAY" && availabilityFlow.dayDate) {
+      await proceedToTimeSelection(msg, availabilityFlow, wctx);
+      return;
+    }
+
+    await sendText({
+      number: msg.phone,
+      text: `Anotei sua preferência por *${availabilityFlow.dayLabel ?? availabilityFlow.dayDate ?? "esta data"}*. O serviço considerado é *${availabilityFlow.serviceLabel ?? wctx.catalog[selectedService]?.label ?? "o serviço escolhido"}*.\n\n${menuForStage(availabilityFlow, wctx, msg.pushName)}`,
+    });
+    return;
+  }
+
   // Small talk / confirmações neutras ("pera ai", "ok", "tá", "entendi") em stages intermediárias
   // → responde com lembrete gentil sem quebrar o estado atual
   if (
@@ -2026,6 +2121,22 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
       if (input === "9") {
         await handleHumanHandoffRequest(msg, flow);
         return;
+      }
+
+      // O calendário pode ser exibido enquanto ainda aguardamos o serviço.
+      // Se o cliente tocar em um dia, preserve a escolha e continue pedindo o
+      // serviço necessário para calcular os horários, em vez de perder o fluxo.
+      if (flow.pendingInitialIntent === "schedule" && !flow.serviceKey) {
+        const selectedDay = parseDayInput(input, null);
+        if (selectedDay) {
+          const next: FlowState = { ...flow, ...selectedDay };
+          await saveFlow(msg.phone, next);
+          await sendText({
+            number: msg.phone,
+            text: availabilityServiceSelectionText(next, wctx, msg.pushName),
+          });
+          return;
+        }
       }
 
       if (wantsRefusal(input)) {
@@ -3343,14 +3454,18 @@ export async function startFlow(msg: IncomingMessage) {
       pushName: msg.pushName,
       ctx,
     });
-    const initialDoubt = looksLikeQuestion(input) || analysis?.intent === "doubt";
+    const availabilityRequest = isAvailabilityRequest(input);
+    const availabilityDay = availabilityRequest ? parseDayInput(input, null) : null;
+    const initialDoubt =
+      !availabilityRequest && (looksLikeQuestion(input) || analysis?.intent === "doubt");
     const understoodSchedule =
-      !initialDoubt && (
+      availabilityRequest ||
+      (!initialDoubt && (
         analysis?.intent === "schedule" ||
         analysis?.intent === "service" ||
         wantsToSchedule(input, onlyNumber(input)) ||
         Boolean(serviceKey)
-      );
+      ));
     const returningName = resolveValidCustomerName(returningClient?.name);
     const savedVehicle = returningClient?.vehicleModel || returningClient?.vehiclePlate || null;
     const profileName = returningName ?? profileDisplayName(msg.pushName);
@@ -3384,7 +3499,8 @@ export async function startFlow(msg: IncomingMessage) {
         msg,
         profileName
           ? `${answer}\n\n${doubtResumePrompt(initialState)}`
-          : `${answer}\n\nPara personalizar o atendimento, como posso te chamar? 😊\n_Envie somente seu primeiro nome._`
+          : `${answer}\n\nPara personalizar o atendimento, como posso te chamar? 😊\n_Envie somente seu primeiro nome._`,
+        { voiceReply: true }
       );
       return;
     }
@@ -3397,11 +3513,25 @@ export async function startFlow(msg: IncomingMessage) {
         welcomed: true,
         isReturningClient: Boolean(returningName),
         savedVehicle,
+        pendingInitialIntent: availabilityRequest ? "schedule" : undefined,
+        dayDate: availabilityDay?.dayDate,
+        dayLabel: availabilityDay?.dayLabel,
+        requestedTimePreference: detectRequestedTimePreference(input),
+        serviceRequestContext: input.slice(0, 500),
       };
+
+      if (availabilityRequest && !serviceKey) {
+        await showAvailabilityServiceSelection(msg, namedState, wctx);
+        return;
+      }
+
       await saveFlow(msg.phone, namedState, !!msg.testMode);
       msg.testMode?.onFlowStateChange?.(namedState);
       if (serviceKey) {
         await activateService(msg, { ...namedState, serviceRequestContext: input.slice(0, 500) }, serviceKey, wctx);
+        if (availabilityRequest) {
+          await sendCalendarWithImageAndList({ number: msg.phone, prompts: wctx.prompts });
+        }
       } else {
         await sendTextWrapper(msg, flowMsg(wctx).mainMenu(namedState, msg.pushName));
       }
@@ -3429,9 +3559,24 @@ export async function startFlow(msg: IncomingMessage) {
     }
 
     console.log("[WhatsApp Flow] 📤 Enviando mensagem de boas-vindas");
+    const availabilityTarget = availabilityDay?.dayLabel ?? availabilityDay?.dayDate;
     await sendTextWrapper(
       msg,
-      understoodSchedule
+      availabilityRequest
+        ? [
+            availabilityTarget
+              ? `Posso verificar a agenda para *${availabilityTarget}*.`
+              : "Posso verificar a agenda para você.",
+            "",
+            serviceKey
+              ? `Já identifiquei o serviço *${wctx.catalog[serviceKey]?.label}*.`
+              : "Como cada serviço tem uma duração diferente, envie em uma única mensagem seu *primeiro nome* e o *serviço desejado*.",
+            "",
+            serviceKey
+              ? "Para continuar, como posso te chamar?"
+              : "Exemplo: _Gustavo, lavagem simples._",
+          ].join("\n")
+        : understoodSchedule
         ? initialScheduleNameRequest(serviceKey ? wctx.catalog[serviceKey]?.label : null, wctx.prompts)
         : etapa1Welcome(ctx, wctx.prompts)
     );
@@ -3442,9 +3587,15 @@ export async function startFlow(msg: IncomingMessage) {
       pendingInitialIntent: understoodSchedule ? (serviceKey ? "service" : "schedule") : undefined,
       pendingServiceKey: serviceKey,
       serviceRequestContext: understoodSchedule ? input.slice(0, 500) : undefined,
+      dayDate: availabilityDay?.dayDate,
+      dayLabel: availabilityDay?.dayLabel,
+      requestedTimePreference: detectRequestedTimePreference(input),
     };
     await saveFlow(msg.phone, initialState, !!msg.testMode);
     msg.testMode?.onFlowStateChange?.(initialState);
+    if (availabilityRequest) {
+      await sendCalendarWithImageAndList({ number: msg.phone, prompts: wctx.prompts });
+    }
     console.log("[WhatsApp Flow] ✅ Flow de boas-vindas concluído");
   });
 }
