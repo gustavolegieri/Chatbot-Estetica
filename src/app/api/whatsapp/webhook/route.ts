@@ -4,6 +4,8 @@ import { processWhatsAppMessage } from "@/lib/whatsapp-bot";
 import { prisma } from "@/lib/prisma";
 import { extractWasenderAudioMessage, transcribeWasenderAudio } from "@/lib/whatsapp-audio";
 import { sendText } from "@/lib/evolution-api";
+import { notifyPwaAboutWhatsAppMessage } from "@/lib/pwa-push";
+import { applyWasenderContactEvents } from "@/lib/wasender-contacts";
 
 // Tipagem para waitUntil do Next.js (disponível em edge runtime)
 interface WaitUntil {
@@ -187,6 +189,12 @@ export async function POST(req: NextRequest) {
   const event = payload.event as string | undefined;
   console.log("[Webhook] Evento recebido:", event);
 
+  if (event === "contacts.upsert" || event === "contacts.update") {
+    const updated = await applyWasenderContactEvents(payload.data);
+    console.log(`[Webhook] ${updated} contato(s) atualizado(s) pelo evento ${event}`);
+    return NextResponse.json({ ok: true, contactsUpdated: updated });
+  }
+
   const isMessageEvent =
     event === "messages.received" ||
     event === "messages.upsert" ||
@@ -326,6 +334,8 @@ export async function POST(req: NextRequest) {
       messageId,
       sourceType: audioMessage ? "audio" : "text",
     }, waitUntil);
+
+    await notifyPwaAboutWhatsAppMessage({ phone, body: processedText });
 
     console.log("[Webhook] processamento concluído");
   } catch (err) {

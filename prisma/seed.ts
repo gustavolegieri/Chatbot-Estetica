@@ -70,7 +70,8 @@ async function main() {
       workingDays: "1,2,3,4,5,6",
       lunchBreakStart: "12:00",
       lunchBreakEnd: "13:00",
-      sessionResetMin: 30,
+      sessionResetMin: 60,
+      reminder4hMin: 120,
       whatsappWelcomeMsg: "Olá! Bem-vindo à Garagem do Ka 🚗 Estética automotiva premium.",
     },
     create: {
@@ -84,7 +85,8 @@ async function main() {
       workingDays: "1,2,3,4,5,6",
       lunchBreakStart: "12:00",
       lunchBreakEnd: "13:00",
-      sessionResetMin: 30,
+      sessionResetMin: 60,
+      reminder4hMin: 120,
       whatsappWelcomeMsg: "Olá! Bem-vindo à Garagem do Ka 🚗 Estética automotiva premium.",
     },
   });

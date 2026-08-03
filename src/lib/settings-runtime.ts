@@ -5,8 +5,9 @@ export async function getRuntimeSettings() {
 }
 
 export async function getSessionResetMs(): Promise<number> {
-  const s = await getRuntimeSettings();
-  return (s?.sessionResetMin ?? 30) * 60 * 1000;
+  // Regra comercial fixa: toda conversa recomeça após uma hora sem interação.
+  // O campo legado permanece no banco para compatibilidade com instalações antigas.
+  return 60 * 60 * 1000;
 }
 
 export async function getFollowupIdleMs(): Promise<number> {

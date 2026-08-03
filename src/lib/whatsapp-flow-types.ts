@@ -1,5 +1,5 @@
-/** Sem interação por 30 min → atendimento reinicia (cron + próxima mensagem) */
-export const SESSION_RESET_MS = 30 * 60 * 1000;
+/** Sem interação por 1 hora → atendimento reinicia na próxima mensagem. */
+export const SESSION_RESET_MS = 60 * 60 * 1000;
 
 export type FlowStage =
   | "ETAPA1_AWAITING_NAME"

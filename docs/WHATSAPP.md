@@ -21,11 +21,11 @@ Upsell (1x) → Período → Dia → Pagamento → Confirmação
 
 **Interpretação livre:** o cliente pode enviar veículo e serviço na mesma mensagem (ex.: *Hilux preta 2021 com riscos, quero vitrificação*).
 
-**Sessão:** após **30 min** sem resposta (configurável em Configurações → `sessionResetMin`), o bot reinicia e reenvia as boas-vindas.
+**Sessão:** após **1 hora** sem resposta, o bot limpa a etapa anterior. Na próxima mensagem do cliente, sempre envia as boas-vindas completas antes de retomar o atendimento.
 
 **Handoff:** ao encerrar atendimento humano no painel, a *próxima mensagem* do cliente recebe boas-vindas + menu principal.
 
-**Confirmação de presença:** responda *CONFIRME* (não use o número `1` do menu). Lembrete 4h e aviso 30min antes do horário — enviados automaticamente pelo bot a cada mensagem recebida (sem depender de cron externo).
+**Confirmação de presença:** responda *CONFIRME* (não use o número `1` do menu). A confirmação padrão é enviada cerca de **2 horas antes** e o aviso final 30 minutos antes. Em produção, `/api/cron/reminders` deve ser chamado a cada 5 minutos por um agendador HTTP.
 
 **Fora do horário:** mensagens recebidas após o fechamento (ou fora dos dias de funcionamento) recebem aviso automático com horário de retorno.
 
@@ -130,9 +130,9 @@ GET https://seu-dominio/api/cron/followup?secret=SUA_CRON_SECRET
 Ou: `Authorization: Bearer SUA_CRON_SECRET`
 
 Esse endpoint executa (opcional — o bot também processa lembretes a cada mensagem recebida):
-- **Reset de sessão** (30 min) + reenvio de boas-vindas
+- **Reset de sessão** (1 hora) + reenvio de boas-vindas
 - **Follow-up** por inatividade (10 min, configurável)
-- **Lembrete 4h** antes do agendamento (`reminder_4h`)
+- **Confirmação 2h** antes do agendamento (`reminder_4h`, chave legada)
 - **Aviso 30 min** antes pedindo *CONFIRME* (`reminder_30min`)
 - **Auto-cancelamento** se não confirmar no prazo
 

@@ -6,41 +6,6 @@ import {
   appointmentStartsAt,
   sendConfirmationReceived,
 } from "./appointment-whatsapp";
-import type { FlowStage } from "./whatsapp-flow-types";
-
-/** Etapas em que "1" e "sim" são opções de menu — não confirmar agendamento */
-const STAGES_BLOCKING_CONFIRMATION: FlowStage[] = [
-  "ETAPA1_AWAITING_NAME",
-  "ETAPA2_MAIN_MENU",
-  "ETAPA2_SUB",
-  "ETAPA3_SERVICE_ACTION",
-  "ETAPA3_PACKAGE_ACTION",
-  "ETAPA3_UNDECIDED_VEHICLE",
-  "ETAPA3_UNDECIDED_PROBLEM",
-  "ETAPA4_VEHICLE",
-  "ETAPA5_QUOTE",
-  "ETAPA5_FIRST_TIME_BONUS",
-  "ETAPA6_UPSELL",
-  "ETAPA7_PERIOD",
-  "ETAPA7_DAY",
-  "ETAPA7_TIME",
-  "ETAPA7_CUSTOM_DAY",
-  "ETAPA8_PAYMENT",
-  "ETAPA8_PAYMENT_NO_PIX",
-  "ETAPA8_PAYMENT_CARD_TYPE",
-  "ETAPA8_PIX_CHOICE",
-  "ETAPA8_RECEIPT_UPLOAD",
-  "ETAPA9_COUPON",
-  "ETAPA9_LOYALTY",
-  "ETAPA9_REMINDER",
-  "ETAPA10_BUDGET",
-  "ETAPA10_LOGISTICS",
-  "ETAPA14_REMINDER",
-  "ETAPA15_SUMMARY_CONFIRM",
-  "ETAPA16_CONFIRMATION",
-  "ETAPA10_FAQ",
-  "ETAPA11_SERVICE_QUESTION",
-];
 
 export function isConfirmationMessage(text: string): boolean {
   const t = text.trim().toLowerCase();
@@ -51,13 +16,9 @@ export function isConfirmationMessage(text: string): boolean {
 export async function tryHandleAppointmentConfirmation(
   phone: string,
   text: string,
-  flowStage?: FlowStage
+  _flowStage?: string
 ): Promise<boolean> {
   if (!isConfirmationMessage(text)) return false;
-
-  if (flowStage && STAGES_BLOCKING_CONFIRMATION.includes(flowStage)) {
-    return false;
-  }
 
   const normalized = normalizePhone(phone);
   const client = await prisma.client.findUnique({ where: { phone: normalized } });

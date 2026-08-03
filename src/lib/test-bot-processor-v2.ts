@@ -214,7 +214,7 @@ export async function processTestFlow({
   session.lastInteractionAt = now;
 
   // Session timeout check
-  if (session.lastInteractionAt && now - session.lastInteractionAt > 30 * 60 * 1000) {
+  if (session.lastInteractionAt && now - session.lastInteractionAt > 60 * 60 * 1000) {
     resetSessionForNewStart(session);
     session.lastInteractionAt = now;
     responses.push({ text: buildWelcomeText() });

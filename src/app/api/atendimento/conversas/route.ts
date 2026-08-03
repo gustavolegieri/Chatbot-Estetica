@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const filter = searchParams.get("filter") ?? "all";
   const q = searchParams.get("q")?.trim().toLowerCase() ?? "";
 
-  const where =
+  const filterWhere =
     filter === "handoff"
       ? { handoffStatus: { in: [HandoffStatus.PENDING, HandoffStatus.IN_PROGRESS] } }
       : filter === "unread"
@@ -21,6 +21,14 @@ export async function GET(request: NextRequest) {
         : filter === "active"
           ? { lastMessageAt: { not: null } }
           : {};
+
+  const where = {
+    ...filterWhere,
+    inboxArchivedAt: null,
+    // Uma sessão só vira conversa depois que existe uma mensagem real.
+    // Isso evita contatos importados e sessões incompletas na caixa de entrada.
+    lastMessageAt: { not: null },
+  };
 
   const sessions = await prisma.whatsAppSession.findMany({
     where,

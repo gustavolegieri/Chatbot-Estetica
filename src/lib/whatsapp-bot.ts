@@ -19,7 +19,6 @@ import {
   requestHumanHandoff,
   wantsHumanHandoff,
 } from "./whatsapp-handoff";
-import { wantsToSchedule } from "./whatsapp-intent";
 
 interface IncomingMessage {
   phone: string;
@@ -36,14 +35,6 @@ function parseFlow(raw: unknown): FlowState {
     return { stage: "ETAPA1_AWAITING_NAME", welcomed: false };
   }
   return raw as FlowState;
-}
-
-async function saveFlow(phone: string, flow: FlowState) {
-  console.log("[WhatsApp Bot] 💾 Salvando estado do fluxo:", { phone, stage: flow.stage, welcomed: flow.welcomed });
-  await prisma.whatsAppSession.update({
-    where: { phone: normalizePhone(phone) },
-    data: { metadata: flow as any },
-  });
 }
 
 async function getOrCreateSession(phone: string, pushName?: string) {
@@ -66,6 +57,7 @@ async function getOrCreateSession(phone: string, pushName?: string) {
       phone: normalized,
       clientId: client?.id,
       metadata: { stage: "ETAPA1_AWAITING_NAME", welcomed: false } as object,
+      lastStage: "ETAPA1_AWAITING_NAME",
     },
     update: {},
     include: { client: true },
@@ -207,24 +199,6 @@ async function handleMessageInternal(msg: IncomingMessage) {
         return;
       }
 
-      // Se o usuário quer agendar, pular todo o processo de reset e ir direto para o menu principal
-      if (flowRef.current.stage === "STALE_RETURN" && wantsToSchedule(inboundText, null)) {
-        console.log("[WhatsApp Bot] Usuário quer agendar, pulando reset e indo para menu principal");
-        const name =
-          flowRef.current.customerName ?? session.client?.name ?? msg.pushName ?? "Cliente";
-        
-        // Forçar o estado para o menu principal
-        flowRef.current = {
-          stage: "ETAPA2_MAIN_MENU",
-          welcomed: true,
-          customerName: name
-        };
-        
-        await saveFlow(msg.phone, flowRef.current);
-        await goToMainMenu(msg.phone, name);
-        return;
-      }
-
       const resetResult = await applyWelcomeRestartIfNeeded(
         msg.phone,
         lastInteractionAt,
@@ -232,7 +206,10 @@ async function handleMessageInternal(msg: IncomingMessage) {
       );
 
       if (resetResult.shouldSendWelcome) {
-        await sendWelcomeFlow(msg.phone);
+        await sendWelcomeFlow(
+          msg.phone,
+          session.client?.name ?? msg.pushName ?? flowRef.current.customerName
+        );
         return;
       }
 

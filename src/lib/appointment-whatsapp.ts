@@ -1,4 +1,4 @@
-import { format, parse } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { Appointment, Client, Service } from "@prisma/client";
 import { loadPromptMap, renderPrompt } from "./bot-prompts";
@@ -8,9 +8,63 @@ import { formatDurationLabel } from "./appointments";
 
 type AptWithRelations = Appointment & { client: Client; service: Service };
 
+const BUSINESS_TIME_ZONE = "America/Sao_Paulo";
+
+function timeZoneOffsetMs(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const values = Object.fromEntries(
+    parts.filter((part) => part.type !== "literal").map((part) => [part.type, Number(part.value)])
+  );
+  return Date.UTC(
+    values.year,
+    values.month - 1,
+    values.day,
+    values.hour,
+    values.minute,
+    values.second
+  ) - date.getTime();
+}
+
+function businessDateTimeToUtc(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number
+): Date {
+  const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const firstResult = new Date(
+    utcGuess.getTime() - timeZoneOffsetMs(utcGuess, BUSINESS_TIME_ZONE)
+  );
+  return new Date(
+    utcGuess.getTime() - timeZoneOffsetMs(firstResult, BUSINESS_TIME_ZONE)
+  );
+}
+
 export function appointmentStartsAt(date: Date, startTime: string): Date {
-  const day = format(date, "yyyy-MM-dd");
-  return parse(`${day} ${startTime}`, "yyyy-MM-dd HH:mm", new Date());
+  const [hour = 0, minute = 0] = startTime.split(":").map(Number);
+  return businessDateTimeToUtc(
+    date.getUTCFullYear(),
+    date.getUTCMonth() + 1,
+    date.getUTCDate(),
+    hour,
+    minute
+  );
+}
+
+export function wasMessageSent(result: unknown): boolean {
+  if (!result || typeof result !== "object") return false;
+  const response = result as { error?: boolean; blocked?: boolean };
+  return !response.error && !response.blocked;
 }
 
 async function loadSettings() {
@@ -23,7 +77,7 @@ export async function sendAppointmentThankYou(apt: AptWithRelations) {
 
   const prompts = await loadPromptMap();
   const brand = settings.businessName ?? "Garagem do Ka";
-  await sendText({
+  const result = await sendText({
     number: apt.client.phone,
     text: renderPrompt(prompts, "appointment_thankyou", {
       name: apt.client.name,
@@ -31,7 +85,7 @@ export async function sendAppointmentThankYou(apt: AptWithRelations) {
       service: apt.service.name,
     }),
   });
-  return true;
+  return wasMessageSent(result);
 }
 
 export async function sendAppointmentCheckIn(apt: AptWithRelations) {
@@ -39,7 +93,7 @@ export async function sendAppointmentCheckIn(apt: AptWithRelations) {
   if (!settings?.whatsappEnabled || !apt.client.phone) return false;
 
   const prompts = await loadPromptMap();
-  await sendText({
+  const result = await sendText({
     number: apt.client.phone,
     text: renderPrompt(prompts, "appointment_checkin", {
       name: apt.client.name,
@@ -48,7 +102,7 @@ export async function sendAppointmentCheckIn(apt: AptWithRelations) {
       brand: settings.businessName ?? "Garagem do Ka",
     }),
   });
-  return true;
+  return wasMessageSent(result);
 }
 
 export async function sendAppointmentCancelledNotice(apt: AptWithRelations, reason: string) {
@@ -57,7 +111,7 @@ export async function sendAppointmentCancelledNotice(apt: AptWithRelations, reas
 
   const prompts = await loadPromptMap();
   const dateLabel = format(apt.date, "dd/MM (EEEE)", { locale: ptBR });
-  await sendText({
+  const result = await sendText({
     number: apt.client.phone,
     text: renderPrompt(prompts, "appointment_cancelled", {
       name: apt.client.name,
@@ -67,10 +121,10 @@ export async function sendAppointmentCancelledNotice(apt: AptWithRelations, reas
       reason,
     }),
   });
-  return true;
+  return wasMessageSent(result);
 }
 
-export async function sendReminder4h(apt: AptWithRelations) {
+export async function sendReminder2h(apt: AptWithRelations) {
   const settings = await loadSettings();
   if (!settings?.whatsappEnabled || !apt.client.phone) return false;
 
@@ -79,7 +133,7 @@ export async function sendReminder4h(apt: AptWithRelations) {
   const brand = settings.businessName ?? "Garagem do Ka";
   const duration = formatDurationLabel(apt.service.durationMin);
 
-  await sendText({
+  const result = await sendText({
     number: apt.client.phone,
     text: renderPrompt(prompts, "reminder_4h", {
       brand,
@@ -91,8 +145,11 @@ export async function sendReminder4h(apt: AptWithRelations) {
       addressLine: settings.businessAddress ? `📍 ${settings.businessAddress}` : "",
     }),
   });
-  return true;
+  return wasMessageSent(result);
 }
+
+/** Compatibilidade com integrações antigas. */
+export const sendReminder4h = sendReminder2h;
 
 export async function sendReminderCustom(apt: AptWithRelations, preference: string) {
   const settings = await loadSettings();
@@ -105,7 +162,7 @@ export async function sendReminderCustom(apt: AptWithRelations, preference: stri
 
   const timeText = preference === "30min" ? "30 minutos" : preference === "1hour" ? "1 hora" : "1 dia";
 
-  await sendText({
+  const result = await sendText({
     number: apt.client.phone,
     text: `🔔 Lembrete: Seu agendamento na ${brand} é em ${timeText}!\n\n` +
           `👤 ${apt.client.name}\n` +
@@ -114,7 +171,7 @@ export async function sendReminderCustom(apt: AptWithRelations, preference: stri
           `📍 ${settings.businessAddress || "Endereço"}\n\n` +
           `Mal podemos esperar pra deixar seu carro brilhando! ✨`,
   });
-  return true;
+  return wasMessageSent(result);
 }
 
 export async function sendConfirmWarning(apt: AptWithRelations) {
@@ -122,7 +179,7 @@ export async function sendConfirmWarning(apt: AptWithRelations) {
   if (!settings?.whatsappEnabled || !apt.client.phone) return false;
 
   const prompts = await loadPromptMap();
-  await sendText({
+  const result = await sendText({
     number: apt.client.phone,
     text: renderPrompt(prompts, "reminder_30min", {
       name: apt.client.name,
@@ -130,7 +187,7 @@ export async function sendConfirmWarning(apt: AptWithRelations) {
       time: apt.startTime,
     }),
   });
-  return true;
+  return wasMessageSent(result);
 }
 
 export async function sendConfirmationReceived(apt: AptWithRelations) {
@@ -139,7 +196,7 @@ export async function sendConfirmationReceived(apt: AptWithRelations) {
 
   const dateLabel = format(apt.date, "dd/MM (EEEE)", { locale: ptBR });
 
-  await sendText({
+  const result = await sendText({
     number: apt.client.phone,
     text: [
       `✅ *Presença confirmada!*`,
@@ -153,6 +210,6 @@ export async function sendConfirmationReceived(apt: AptWithRelations) {
       .filter(Boolean)
       .join("\n"),
   });
-  return true;
+  return wasMessageSent(result);
 }
 

@@ -31,18 +31,38 @@ export async function sendWelcomeFlow(phone: string, rawName?: string | null) {
   const wctx = await loadWhatsAppCatalog(true);
   const ctx = await loadWelcomeContext();
   const validName = resolveValidCustomerName(rawName);
+  const welcomeText = validName
+    ? [
+        `Olá, *${validName}*! Que bom ter você por aqui. 🚗`,
+        "",
+        `Você está falando com a *${ctx.businessName}*. Nossa assistente virtual organiza dúvidas, recomendações e agendamentos com a equipe.`,
+        "",
+        "Trabalhamos com lavagem técnica, polimento, proteção de pintura, higienização interna e detalhamento automotivo.",
+        "",
+        ctx.address ? `📍 ${ctx.address}` : "📍 Consulte nosso endereço por aqui",
+        `🕒 ${ctx.hours}`,
+        "",
+        etapa2MainMenu(validName, buildMainMenu(wctx.categories, wctx.prompts), wctx.prompts),
+      ].join("\n")
+    : etapa1Welcome(ctx, wctx.prompts);
+  const nextStage = validName ? "ETAPA2_MAIN_MENU" : "ETAPA1_AWAITING_NAME";
 
-  // Sempre reinicia do zero após 30 minutos de inatividade
+  // Sempre reinicia do zero após uma hora de inatividade.
   await sendText({
     number: normalized,
-    text: etapa1Welcome(ctx, wctx.prompts),
-    flowStage: "ETAPA1_AWAITING_NAME",
+    text: welcomeText,
+    flowStage: nextStage,
   });
   
   await prisma.whatsAppSession.update({
     where: { phone: normalized },
     data: {
-      metadata: { stage: "ETAPA1_AWAITING_NAME", welcomed: true } as object,
+      metadata: {
+        stage: nextStage,
+        welcomed: true,
+        customerName: validName ?? undefined,
+      } as object,
+      lastStage: nextStage,
       step: WhatsAppSessionStep.IDLE,
     },
   });

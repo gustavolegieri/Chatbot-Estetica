@@ -36,6 +36,7 @@ test("first doubt uses voice and availability keeps calendar date until service 
     });
     assert.equal(doubtReplies.length, 1);
     assert.equal(doubtReplies[0].voiceReply, true);
+    assert.match(doubtReplies[0].text, /você está falando com/i);
 
     let state: FlowState = {
       stage: "ETAPA1_AWAITING_NAME",

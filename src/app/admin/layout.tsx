@@ -7,10 +7,13 @@ import { GlobalSearch } from "@/components/layout/GlobalSearch";
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLogin = pathname === "/admin/login";
+  const isMobileApp = pathname.startsWith("/admin/mobile");
 
   if (isLogin) {
     return <div className="admin-shell">{children}</div>;
   }
+
+  if (isMobileApp) return <div className="min-h-dvh bg-[#07110d] text-slate-100">{children}</div>;
 
   return (
     <div className="admin-shell flex min-h-screen">

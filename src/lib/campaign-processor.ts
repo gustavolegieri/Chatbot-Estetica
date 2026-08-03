@@ -46,10 +46,26 @@ export async function startCampaignProcessing(campaignId: string, opts: Processo
         if (claimed.count === 0) continue; // lost race
 
         try {
+          const blocked = await prisma.blockedPhone.findUnique({ where: { phone: next.phone }, select: { id: true } });
+          if (blocked) throw new Error("Contato bloqueado antes do envio");
           const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
           const messageTemplate = campaign?.message ?? "";
           const message = messageTemplate.replace(/\{name\}/g, next.name ?? "Cliente");
           const res = await sendText({ number: next.phone, text: message, sender: "ADMIN" });
+          const response = res && typeof res === "object"
+            ? (res as { error?: boolean; blocked?: boolean; message?: string })
+            : null;
+          if (
+            !response ||
+            response.error ||
+            response.blocked
+          ) {
+            throw new Error(
+              typeof response?.message === "string"
+                ? response.message
+                : "A WASender não aceitou a mensagem"
+            );
+          }
 
           await prisma.campaignQueue.update({ where: { id: next.id }, data: { status: "SENT", sentAt: new Date() } });
           await prisma.campaign.update({ where: { id: campaignId }, data: { successCount: { increment: 1 } } });

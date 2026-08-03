@@ -24,6 +24,7 @@ export default function CampanhasPage() {
   const [selectorType, setSelectorType] = useState("all");
   const [days, setDays] = useState(30);
   const [serviceId, setServiceId] = useState("");
+  const [confirmedAuthorized, setConfirmedAuthorized] = useState(false);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
@@ -40,18 +41,19 @@ export default function CampanhasPage() {
 
   async function createCampaign() {
     if (!name.trim() || !message.trim()) { setMsg({ text: "Preencha o nome e a mensagem.", type: "error" }); return; }
+    if (!confirmedAuthorized) { setMsg({ text: "Confirme que o público pode receber esta comunicação.", type: "error" }); return; }
     setLoading(true); setMsg(null);
     const selector: any = { type: selectorType };
     if (selectorType === "inactive") selector.days = days;
     if (selectorType === "service") selector.serviceId = serviceId;
     try {
-      const res = await fetch("/api/campanhas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, message, selector }) });
+      const res = await fetch("/api/campanhas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, message, selector, confirmedAuthorized }) });
       const json = await res.json();
       if (!res.ok || !json.success) setMsg({ text: json.error || "Erro ao criar.", type: "error" });
       else {
         setMsg({ text: `✅ Campanha criada com ${json.data.recipients} destinatários!`, type: "success" });
         await loadCampaigns(); setShowForm(false);
-        setName(""); setMessage("Olá {name}, confira nossas novidades!"); setSelectorType("all"); setDays(30); setServiceId("");
+        setName(""); setMessage("Olá {name}, confira nossas novidades!"); setSelectorType("all"); setDays(30); setServiceId(""); setConfirmedAuthorized(false);
       }
     } catch { setMsg({ text: "Erro de conexão.", type: "error" }); }
     finally { setLoading(false); }
@@ -195,6 +197,10 @@ export default function CampanhasPage() {
               <p className="mb-2 text-xs text-slate-500">Use <code className="rounded bg-surface-700 px-1.5 py-0.5 text-xs font-mono text-brand-300">{`{name}`}</code> para incluir o nome</p>
               <textarea className="input h-28" value={message} onChange={(e) => setMessage(e.target.value)} />
             </div>
+            <label className="sm:col-span-2 flex items-start gap-3 rounded-xl border border-emerald-500/15 bg-emerald-500/[0.05] p-3 text-xs leading-5 text-slate-400">
+              <input type="checkbox" checked={confirmedAuthorized} onChange={(e) => setConfirmedAuthorized(e.target.checked)} className="mt-1 accent-emerald-500" />
+              Confirmo que este público possui autorização ou relacionamento legítimo com a empresa e poderá solicitar descadastro.
+            </label>
             <div className="sm:col-span-2 flex justify-end">
               <button className="btn-primary gap-2 px-6 py-3" onClick={() => void createCampaign()} disabled={loading}>
                 {loading ? <><Clock className="h-4 w-4 animate-spin" /> Criando...</> : <><Send className="h-4 w-4" /> Criar campanha</>}

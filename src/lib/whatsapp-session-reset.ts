@@ -13,7 +13,7 @@ export async function isSessionExpired(lastInteractionAt: Date): Promise<boolean
 
 /** Estado limpo — sem veículo, serviço ou etapa anterior */
 export function buildFreshFlowState(customerName?: string): FlowState {
-  // Sempre reinicia do zero após expiração de sessão (30 minutos)
+  // Sempre reinicia do zero após uma hora de inatividade.
   return {
     stage: "ETAPA1_AWAITING_NAME",
     welcomed: false,
@@ -27,6 +27,7 @@ export async function saveFreshFlow(phone: string) {
     data: {
       metadata: fresh as object,
       step: WhatsAppSessionStep.IDLE,
+      lastStage: fresh.stage,
     },
   });
   return fresh;
@@ -40,6 +41,7 @@ export async function markPendingWelcomeRestart(phone: string, customerName?: st
     data: {
       metadata: { ...fresh, pendingWelcomeRestart: true } as object,
       step: WhatsAppSessionStep.IDLE,
+      lastStage: fresh.stage,
     },
   });
 }
@@ -56,7 +58,7 @@ export function shouldRestartWithWelcome(
  * Reinicia atendimentos parados há mais de X min (apenas estado interno).
  * NÃO envia boas-vindas automaticamente - isso só acontece quando o cliente interage.
  * Chamar no cron a cada 5–10 min.
- * Sempre reinicia do zero após 30 minutos de inatividade.
+ * Sempre reinicia do zero após uma hora de inatividade.
  */
 export async function resetAllExpiredSessions(): Promise<{ reset: number; checked: number }> {
   const sessionResetMs = await getSessionResetMs();
@@ -99,7 +101,7 @@ export async function resetAllExpiredSessions(): Promise<{ reset: number; checke
 /**
  * Ao receber mensagem: reinicia se atendimento foi encerrado ou sessão expirou.
  * Usa lastInteractionAt *antes* de registrar a mensagem atual.
- * Sempre reinicia do zero após 30 minutos de inatividade.
+ * Sempre reinicia do zero após uma hora de inatividade.
  * Retorna true se deve enviar boas-vindas (caso contrário, apenas reseta estado).
  */
 export async function applyWelcomeRestartIfNeeded(

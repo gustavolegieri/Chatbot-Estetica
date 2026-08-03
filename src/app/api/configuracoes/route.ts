@@ -47,7 +47,8 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const data = updateSchema.parse(body);
+    const parsed = updateSchema.parse(body);
+    const data = { ...parsed, sessionResetMin: 60, reminder4hMin: 120 };
 
     const settings = await prisma.settings.upsert({
       where: { id: "default" },

@@ -18,6 +18,20 @@ model User {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   financialRecords FinancialRecord[]
+  pwaPushSubscriptions PwaPushSubscription[]
+}
+
+model PwaPushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Client {
@@ -162,8 +176,8 @@ model Settings {
   lunchBreakEnd         String?
   lunchBreakStart       String?
   reminder30minMin      Int            @default(30)
-  reminder4hMin         Int            @default(240)
-  sessionResetMin       Int            @default(30)
+  reminder4hMin         Int            @default(120)
+  sessionResetMin       Int            @default(60)
   pickupDeliveryEnabled Boolean        @default(true)
   pickupFeeBase         Decimal        @default(0) @db.Decimal(10, 2)
   pickupFeePerKm        Decimal        @default(2.50) @db.Decimal(10, 2)
@@ -294,6 +308,23 @@ model BlockedPhone {
   createdAt DateTime @default(now())
 }
 
+model WasenderContact {
+  id           String   @id @default(cuid())
+  phone        String   @unique
+  jid          String?
+  name         String?
+  notifyName   String?
+  verifiedName String?
+  profileUrl   String?
+  about        String?
+  lastSyncedAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([name])
+  @@index([lastSyncedAt])
+}
+
 model WhatsAppSession {
   id                   String              @id @default(cuid())
   clientId             String?
@@ -314,6 +345,7 @@ model WhatsAppSession {
   handoffStatus        HandoffStatus       @default(NONE)
   lastMessageAt        DateTime?
   lastMessagePreview   String?
+  inboxArchivedAt      DateTime?
   unreadCount          Int                 @default(0)
   abandonmentAt        DateTime?
   abandonmentReason    String?
@@ -328,6 +360,7 @@ model WhatsAppSession {
 
   @@index([handoffStatus])
   @@index([lastMessageAt])
+  @@index([inboxArchivedAt])
   @@index([updatedAt])
   @@index([processingLockedAt])
 }

@@ -215,9 +215,9 @@ export const BOT_PROMPT_DEFAULTS: PromptDef[] = [
   },
   {
     key: "reminder_4h",
-    label: "Lembrete 4h antes",
+    label: "Confirmação 2h antes",
     category: "automacao",
-    hint: "{brand}, {name}, {service}, {duration}, {dateLabel}, {time}, {address}",
+    hint: "{brand}, {name}, {service}, {duration}, {dateLabel}, {time}, {addressLine}",
     content: "⏰ *Lembrete de atendimento — {brand}*\n\nOlá, *{name}*. Seu atendimento é hoje:\n\n🛠️ {service} (~{duration})\n📅 {dateLabel}, às *{time}*\n{addressLine}\n\nPara manter a reserva, responda *CONFIRME*.\n_Se precisar ajustar o horário, avise nossa equipe por aqui._",
   },
   {

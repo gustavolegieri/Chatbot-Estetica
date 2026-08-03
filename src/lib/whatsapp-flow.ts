@@ -147,6 +147,8 @@ interface IncomingMessage {
   phone: string;
   text: string;
   pushName?: string;
+  initialWelcomePrefix?: string;
+  initialWelcomeConsumed?: boolean;
   testMode?: {
     sendTextCallback?: (text: string, metadata?: { voiceReply?: boolean }) => Promise<void>;
     onFlowStateChange?: (flow: FlowState) => void;
@@ -206,10 +208,17 @@ async function sendCalendarWithImageAndList(params: { number: string; prompts?: 
 async function sendTextWrapper(
   msg: IncomingMessage,
   text: string,
-  options?: { voiceReply?: boolean }
+  options?: { voiceReply?: boolean; includesWelcome?: boolean }
 ) {
+  let outgoingText = text;
+  if (msg.initialWelcomePrefix && !msg.initialWelcomeConsumed) {
+    msg.initialWelcomeConsumed = true;
+    if (!options?.includesWelcome) {
+      outgoingText = `${msg.initialWelcomePrefix}\n\n${text}`;
+    }
+  }
   await flowDeliveryContext.run(msg.testMode, async () => {
-    await sendText({ number: msg.phone, text, voiceReply: options?.voiceReply });
+    await sendText({ number: msg.phone, text: outgoingText, voiceReply: options?.voiceReply });
   });
   if (!msg.testMode?.sendTextCallback) {
     await delay(500);
@@ -1212,7 +1221,7 @@ async function saveFlow(phone: string, flow: FlowState, skipDb = false) {
   console.log("[WhatsApp Flow] 💾 Salvando estado do fluxo:", { phone, stage: flow.stage, welcomed: flow.welcomed });
   await prisma.whatsAppSession.update({
     where: { phone: normalizePhone(phone) },
-    data: { metadata: flow as object },
+    data: { metadata: flow as object, lastStage: flow.stage },
   });
   console.log("[WhatsApp Flow] ✅ Estado salvo com sucesso");
 }
@@ -3422,6 +3431,15 @@ export async function startFlow(msg: IncomingMessage) {
     console.log("[WhatsApp Flow] 🚀 Iniciando flow de boas-vindas");
     const ctx = await loadContext();
     const wctx = await loadWhatsAppCatalog();
+    msg.initialWelcomePrefix = [
+      `Olá! Você está falando com a *${ctx.businessName}* 🚗`,
+      "",
+      "Sou a assistente virtual da equipe. Posso esclarecer dúvidas, recomendar o cuidado ideal e organizar seu agendamento.",
+      "",
+      ctx.address ? `📍 ${ctx.address}` : "📍 Consulte nosso endereço por aqui",
+      `🕒 ${ctx.hours}`,
+    ].join("\n");
+    msg.initialWelcomeConsumed = false;
     const input = msg.text.trim();
     const combinedRequest = await extractCombinedInitialRequest(input, wctx, msg.pushName);
     if (combinedRequest) {
@@ -3578,7 +3596,8 @@ export async function startFlow(msg: IncomingMessage) {
           ].join("\n")
         : understoodSchedule
         ? initialScheduleNameRequest(serviceKey ? wctx.catalog[serviceKey]?.label : null, wctx.prompts)
-        : etapa1Welcome(ctx, wctx.prompts)
+        : etapa1Welcome(ctx, wctx.prompts),
+      { includesWelcome: !availabilityRequest && !understoodSchedule }
     );
     console.log("[WhatsApp Flow] 💾 Salvando estado com welcomed=true");
     const initialState: FlowState = {

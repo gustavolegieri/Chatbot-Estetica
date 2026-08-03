@@ -262,9 +262,9 @@ export default function SistemaPage() {
             <div className="rounded-xl border border-slate-700/30 bg-surface-900 p-4">
               <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Automação</p>
               <div className="mt-3 space-y-2 text-sm text-slate-200">
-                <p>Reset de sessão: {settings?.sessionResetMin} min</p>
+                <p>Reset de sessão: 60 min</p>
                 <p>Follow-up: {settings?.followupIdleMin} min</p>
-                <p>Lembrete 4h: {settings?.reminder4hMin} min</p>
+                <p>Confirmação antecipada: 120 min</p>
                 <p>Urgente 30min: {settings?.reminder30minMin} min</p>
               </div>
             </div>

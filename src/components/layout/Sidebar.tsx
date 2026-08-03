@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   Sparkles,
   Star,
+  Smartphone,
   TestTube,
   Users,
   Wrench,
@@ -35,6 +36,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "./BrandLogo";
+import { PwaInstallButton } from "@/components/pwa/PwaInstallButton";
 
 type NavItem = {
   href: string;
@@ -61,6 +63,7 @@ const navGroups: NavGroup[] = [
       { href: "/admin/clientes", label: "Clientes", icon: Users },
       { href: "/admin/pipeline", label: "Pipeline CRM", icon: Columns3 },
       { href: "/admin/agendamentos", label: "Agenda", icon: Calendar },
+      { href: "/admin/mobile", label: "Aplicativo mobile", icon: Smartphone },
     ],
   },
   {
@@ -280,6 +283,7 @@ export function Sidebar() {
         </nav>
 
         <div className="shrink-0 border-t border-white/[0.06] bg-black/20 p-3">
+          <PwaInstallButton compact className="mb-2" />
           <div className="mb-2 flex items-center gap-3 rounded-xl px-3 py-2.5">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-900/50 text-xs font-bold text-brand-200 ring-1 ring-brand-700/30">
               {user?.name?.slice(0, 1).toUpperCase() ?? "G"}

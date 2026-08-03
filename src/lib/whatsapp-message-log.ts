@@ -34,6 +34,8 @@ export async function logWhatsAppMessage(params: LogMessageParams) {
       data: {
         lastMessageAt: message.createdAt,
         lastMessagePreview: preview,
+        // Uma nova mensagem reabre automaticamente conversas arquivadas.
+        inboxArchivedAt: null,
         ...(params.direction === MessageDirection.INBOUND
           ? { unreadCount: { increment: 1 } }
           : {}),
