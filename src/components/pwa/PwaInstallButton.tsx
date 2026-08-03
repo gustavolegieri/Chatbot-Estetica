@@ -19,9 +19,11 @@ export function PwaInstallButton({ compact = false, className }: { compact?: boo
   const [prompt, setPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [secureContext, setSecureContext] = useState(true);
 
   useEffect(() => {
     setInstalled(isStandalone());
+    setSecureContext(window.isSecureContext);
     const handlePrompt = (event: Event) => {
       event.preventDefault();
       setPrompt(event as BeforeInstallPromptEvent);
@@ -78,8 +80,9 @@ export function PwaInstallButton({ compact = false, className }: { compact?: boo
               <button type="button" onClick={() => setShowHelp(false)} className="rounded-full p-2 text-slate-500 hover:bg-white/5 hover:text-white" aria-label="Fechar"><X className="h-5 w-5" /></button>
             </div>
             <h2 className="mt-4 text-lg font-bold text-white">Instalar Garagem do Ka</h2>
+            {!secureContext && <p className="mt-2 rounded-xl border border-amber-500/15 bg-amber-500/[0.06] px-3 py-2.5 text-sm leading-6 text-amber-200">A instalação está bloqueada porque esta página foi aberta por HTTP. No celular, use o endereço publicado com <strong>HTTPS</strong>.</p>}
             <p className="mt-2 text-sm leading-6 text-slate-400">No iPhone, abra esta página no Safari, toque em <strong className="text-slate-200">Compartilhar</strong> e depois em <strong className="text-slate-200">Adicionar à Tela de Início</strong>.</p>
-            <p className="mt-3 text-sm leading-6 text-slate-400">No Android ou computador, abra o menu do Chrome e selecione <strong className="text-slate-200">Instalar aplicativo</strong>.</p>
+            <p className="mt-3 text-sm leading-6 text-slate-400">No Android, abra no Chrome e toque em <strong className="text-slate-200">Instalar aplicativo</strong> ou <strong className="text-slate-200">Adicionar à tela inicial</strong>.</p>
             <div className="mt-5 flex items-center gap-2 rounded-xl bg-white/[0.04] px-3 py-2.5 text-xs text-slate-400"><Share className="h-4 w-4 text-brand-300" /> O aplicativo abrirá direto na central mobile.</div>
           </div>
         </div>
