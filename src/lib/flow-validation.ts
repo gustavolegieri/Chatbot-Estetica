@@ -32,18 +32,25 @@ export function normalizeVehicleConditionValue(value: string | null | undefined)
 }
 
 export function buildVehicleCollectionPrompt(data: VehicleCollectionData): string {
-  const lines = [
-    "🚘 *Dados do veículo*",
-    "",
-    data.model ? `Modelo: ${data.model}` : "📌 Modelo: (ainda não informado)",
-    data.year ? `Ano: ${data.year}` : "📅 Ano: (ainda não informado)",
-    "",
-    "Envie os dados que faltam, por exemplo:",
-    "Modelo: Honda Civic",
-    "Ano: 2020",
-  ];
+  const known = [data.model, data.year, data.color, data.condition]
+    .filter(Boolean)
+    .join(" · ");
+  const missing = [
+    !data.model && "modelo",
+    !data.year && "ano",
+    !data.color && "cor",
+    !data.condition && "estado geral",
+  ]
+    .filter(Boolean)
+    .join(", ");
 
-  return lines.join("\n");
+  return [
+    "🚘 *Dados do veículo*",
+    known ? `Já entendi: ${known}` : "Envie tudo em uma única mensagem:",
+    missing ? `Em uma única mensagem, informe: ${missing}.` : "Todos os dados foram identificados.",
+    "Exemplo: Civic 2021, preto, bom estado.",
+    "Não precisa seguir um formato exato.",
+  ].join("\n");
 }
 
 export function buildVehicleConfirmationPrompt(data: VehicleCollectionData): string {
@@ -53,14 +60,15 @@ export function buildVehicleConfirmationPrompt(data: VehicleCollectionData): str
   const condition = data.condition || "—";
 
   return [
-    "🚘 *Confirmando os dados do veículo*",
+    "🚘 *Confira seu veículo*",
     "",
-    `Modelo: ${model}`,
-    `Ano: ${year}`,
-    `Cor: ${color}`,
-    `Estado: ${condition}`,
+    `${model} · ${year}`,
+    `${color} · ${condition}`,
     "",
-    "Confirma esses dados? (sim/não)",
+    "*1* — Está correto, ver estimativa",
+    "*2* — Quero corrigir",
+    "",
+    "Você também pode corrigir direto, por exemplo: a cor é branca.",
   ].join("\n");
 }
 

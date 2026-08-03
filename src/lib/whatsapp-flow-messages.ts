@@ -371,6 +371,31 @@ export function etapa4VehicleConfirmation(
   });
 }
 
+export function initialScheduleNameRequest(service?: string | null, prompts?: PromptMap) {
+  return renderPrompt(p(prompts), "initial_schedule_name_request", {
+    serviceLine: service ? ` o serviço *${service}*` : "",
+  });
+}
+
+export function initialRequestSummary(
+  data: {
+    name: string;
+    vehicle: string;
+    service: string;
+    date?: string | null;
+    period?: string | null;
+  },
+  prompts?: PromptMap
+) {
+  return renderPrompt(p(prompts), "initial_request_summary", {
+    name: data.name,
+    vehicle: data.vehicle,
+    service: data.service,
+    dateLine: data.date ? `📅 *Data:* ${data.date}` : "📅 *Data:* a escolher",
+    periodLine: data.period ? `🕒 *Preferência:* ${data.period}` : "🕒 *Horário:* a escolher",
+  });
+}
+
 export function vehicleModelNotUnderstood(prompts?: PromptMap) {
   return renderPrompt(p(prompts), "vehicle_model_not_understood", {});
 }
@@ -399,7 +424,9 @@ export function etapa5Quote(
 ) {
   const hasValue = min > 0 && max > 0;
   const valueLine = hasValue
-    ? `💰 *R$ ${min} a R$ ${max}*`
+    ? min === max
+      ? `💰 *R$ ${min}*`
+      : `💰 *R$ ${min} a R$ ${max}*`
     : `💰 *Valor sob consulta — confirmado na avaliação*`;
 
   return renderPrompt(p(prompts), "etapa5_quote", {
@@ -496,6 +523,15 @@ export function vehicleColorInvalid(prompts?: PromptMap) {
   return renderPrompt(p(prompts), "vehicle_color_invalid", {});
 }
 
+export function vehicleMissingDetails(
+  known: string,
+  missing: string,
+  example: string,
+  prompts?: PromptMap
+) {
+  return renderPrompt(p(prompts), "vehicle_missing_details", { known, missing, example });
+}
+
 export function upsellOffer(
   service: string,
   complement: string,
@@ -550,7 +586,14 @@ export function etapa7Time(dayLabel: string, slots: string[], durationLabel: str
   if (slots.length === 0) {
     return etapa7NoSlots(dayLabel, prompts);
   }
-  const slotLines = slots.slice(0, 14).map((s, i) => `*${i + 1}* — ${s}`).join("\n");
+  const columnSize = Math.ceil(slots.length / 2);
+  const slotLines = slots.length > 8
+    ? slots.slice(0, columnSize).map((slot, index) => {
+        const rightIndex = index + columnSize;
+        const right = slots[rightIndex] ? `   •   *${rightIndex + 1}* — ${slots[rightIndex]}` : "";
+        return `*${index + 1}* — ${slot}${right}`;
+      }).join("\n")
+    : slots.map((slot, index) => `*${index + 1}* — ${slot}`).join("\n");
   return renderPrompt(p(prompts), "etapa7_time", {
     dayLabel,
     slots: slotLines,

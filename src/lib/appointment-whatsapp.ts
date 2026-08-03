@@ -34,6 +34,23 @@ export async function sendAppointmentThankYou(apt: AptWithRelations) {
   return true;
 }
 
+export async function sendAppointmentCheckIn(apt: AptWithRelations) {
+  const settings = await loadSettings();
+  if (!settings?.whatsappEnabled || !apt.client.phone) return false;
+
+  const prompts = await loadPromptMap();
+  await sendText({
+    number: apt.client.phone,
+    text: renderPrompt(prompts, "appointment_checkin", {
+      name: apt.client.name,
+      service: apt.service.name,
+      vehicle: apt.client.vehicleModel ?? "seu veículo",
+      brand: settings.businessName ?? "Garagem do Ka",
+    }),
+  });
+  return true;
+}
+
 export async function sendAppointmentCancelledNotice(apt: AptWithRelations, reason: string) {
   const settings = await loadSettings();
   if (!settings?.whatsappEnabled || !apt.client.phone) return false;

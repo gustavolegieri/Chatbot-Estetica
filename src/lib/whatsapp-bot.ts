@@ -28,6 +28,7 @@ interface IncomingMessage {
   listId?: string;
   pushName?: string;
   messageId?: string;
+  sourceType?: "text" | "audio";
 }
 
 function parseFlow(raw: unknown): FlowState {
@@ -131,6 +132,7 @@ async function handleMessageInternal(msg: IncomingMessage) {
       sessionId: session.id,
       clientId: session.clientId,
       getStage: () => flowRef.current.stage,
+      replyWithAudio: msg.sourceType === "audio",
     },
     async () => {
       const inboundText = msg.text.trim() || msg.buttonId || msg.listId || "";
@@ -142,7 +144,7 @@ async function handleMessageInternal(msg: IncomingMessage) {
           clientId: session.clientId,
           direction: MessageDirection.INBOUND,
           sender: MessageSender.CLIENT,
-          body: inboundText,
+          body: msg.sourceType === "audio" ? `🎙️ ${inboundText}` : inboundText,
           flowStage: flowRef.current.stage,
         });
       }
@@ -206,7 +208,7 @@ async function handleMessageInternal(msg: IncomingMessage) {
       }
 
       // Se o usuário quer agendar, pular todo o processo de reset e ir direto para o menu principal
-      if (wantsToSchedule(inboundText, null)) {
+      if (flowRef.current.stage === "STALE_RETURN" && wantsToSchedule(inboundText, null)) {
         console.log("[WhatsApp Bot] Usuário quer agendar, pulando reset e indo para menu principal");
         const name =
           flowRef.current.customerName ?? session.client?.name ?? msg.pushName ?? "Cliente";
@@ -268,6 +270,7 @@ export async function processWhatsAppMessage(msg: IncomingMessage, waitUntil?: (
       pushName: msg.pushName,
       buttonId: msg.buttonId,
       listId: msg.listId,
+      sourceType: msg.sourceType,
     },
     async (merged) => {
       console.log("[WhatsApp Bot] handleMessageInternal sendo chamado via debounce:", { phone: merged.phone, text: merged.text });

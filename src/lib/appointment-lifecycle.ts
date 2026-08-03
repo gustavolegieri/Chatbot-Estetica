@@ -2,6 +2,7 @@ import { AppointmentStatus } from "@prisma/client";
 import type { Appointment, Client, Service } from "@prisma/client";
 import {
   sendAppointmentCancelledNotice,
+  sendAppointmentCheckIn,
   sendAppointmentThankYou,
 } from "./appointment-whatsapp";
 
@@ -15,6 +16,10 @@ export async function onAppointmentStatusChange(
 
   if (updated.status === AppointmentStatus.COMPLETED) {
     await sendAppointmentThankYou(updated);
+  }
+
+  if (updated.status === AppointmentStatus.IN_PROGRESS) {
+    await sendAppointmentCheckIn(updated);
   }
 
   if (

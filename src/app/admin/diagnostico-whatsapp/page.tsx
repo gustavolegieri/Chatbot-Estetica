@@ -72,6 +72,22 @@ export default function DiagnosticoWhatsAppPage() {
           message: configData.baseUrl || "Usando endpoint padrão",
           details: configData.baseUrl || "https://wasenderapi.com/api",
         },
+        {
+          name: "Transcrição de áudios",
+          status: configData.hasGroqKey ? "success" : "error",
+          message: configData.hasGroqKey ? "Groq Whisper configurado" : "Chave da Groq não configurada",
+          details: configData.hasGroqKey
+            ? "Áudios recebidos podem ser transcritos e enviados ao fluxo inteligente."
+            : "Configure GROQ_API_KEY no ambiente para ativar o entendimento de áudios.",
+        },
+        {
+          name: "Respostas em voz",
+          status: configData.voiceRepliesEnabled ? "success" : "warning",
+          message: configData.voiceRepliesEnabled ? "Voz brasileira habilitada" : "Respostas em voz desabilitadas",
+          details: configData.voiceRepliesEnabled
+            ? `Voz atual: ${configData.ttsVoice}. Há fallback automático para texto.`
+            : "Defina WHATSAPP_VOICE_REPLIES_ENABLED=true para ativar o recurso.",
+        },
       ]);
 
       if (configData.hasApiKey) {

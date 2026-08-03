@@ -19,6 +19,7 @@ const STAGES_BLOCKING_CONFIRMATION: FlowStage[] = [
   "ETAPA3_UNDECIDED_PROBLEM",
   "ETAPA4_VEHICLE",
   "ETAPA5_QUOTE",
+  "ETAPA5_FIRST_TIME_BONUS",
   "ETAPA6_UPSELL",
   "ETAPA7_PERIOD",
   "ETAPA7_DAY",
@@ -26,12 +27,24 @@ const STAGES_BLOCKING_CONFIRMATION: FlowStage[] = [
   "ETAPA7_CUSTOM_DAY",
   "ETAPA8_PAYMENT",
   "ETAPA8_PAYMENT_NO_PIX",
+  "ETAPA8_PAYMENT_CARD_TYPE",
+  "ETAPA8_PIX_CHOICE",
+  "ETAPA8_RECEIPT_UPLOAD",
+  "ETAPA9_COUPON",
+  "ETAPA9_LOYALTY",
+  "ETAPA9_REMINDER",
+  "ETAPA10_BUDGET",
+  "ETAPA10_LOGISTICS",
+  "ETAPA14_REMINDER",
+  "ETAPA15_SUMMARY_CONFIRM",
+  "ETAPA16_CONFIRMATION",
   "ETAPA10_FAQ",
+  "ETAPA11_SERVICE_QUESTION",
 ];
 
 export function isConfirmationMessage(text: string): boolean {
   const t = text.trim().toLowerCase();
-  return /^(confirme|confirmo|confirmar|confirmado|sim|ok|okay)$/.test(t);
+  return /^(confirme|confirmar agendamento|confirmo o agendamento)$/.test(t);
 }
 
 /** Responde CONFIRME para agendamento pendente de confirmação */

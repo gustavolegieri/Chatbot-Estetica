@@ -11,16 +11,26 @@ export interface ParsedVehicle {
 
 const COLORS = [
   "preto",
+  "preta",
   "branco",
+  "branca",
   "prata",
+  "prateado",
+  "prateada",
   "cinza",
   "vermelho",
+  "vermelha",
   "azul",
   "verde",
   "bege",
   "marrom",
   "dourado",
   "champagne",
+  "grafite",
+  "amarelo",
+  "laranja",
+  "roxo",
+  "vinho",
 ];
 
 const SUV_HINTS =

@@ -37,6 +37,11 @@ export default function ClientesPage() {
   const [editing, setEditing] = useState<Client | null>(null);
   const [form, setForm] = useState(emptyForm);
 
+  useEffect(() => {
+    const initialSearch = new URLSearchParams(window.location.search).get("search");
+    if (initialSearch) setSearch(initialSearch);
+  }, []);
+
   const load = useCallback(async () => {
     const res = await fetch(`/api/clientes?search=${encodeURIComponent(search)}`);
     const data = await res.json();

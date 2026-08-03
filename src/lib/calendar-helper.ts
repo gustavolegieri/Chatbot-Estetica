@@ -68,18 +68,9 @@ export async function generateCalendarImageOnlyForTest(testDate: string | null):
  */
 export function generateCalendarLegend(): string {
   return [
-    "📅 *Escolha o dia*",
+    "📅 *Escolha o melhor dia no calendário*",
     "",
-    "Toque na lista acima para ver os dias disponíveis ou",
-    "digite o número do dia desejado (ex: 16 para dia 16).",
-    "",
-    "✅ Legenda:",
-    "🟢 Mais disponível  🟡 Médio  🔴 Mais movimentado",
-    "🚫 Domingos: fechado",
-    "📍 Hoje: destacado em azul",
-    "",
-    "💬 *Digite o número do dia* (ex: 16)",
-    "🔙 *0* para voltar ao menu",
+    "Toque em *Ver dias* ou envie a data desejada, por exemplo: *16/08*.",
   ].join("\n");
 }
 

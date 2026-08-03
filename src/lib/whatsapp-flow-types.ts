@@ -52,7 +52,7 @@ export interface FlowState {
   vehicleCondition?: string;
   vehicleIsSuv?: boolean;
   /** Coleta em duas etapas: modelo → ano */
-  vehicleCollectStep?: "model" | "year" | "color" | "condition";
+  vehicleCollectStep?: "details" | "model" | "year" | "color" | "condition";
   vehicleConfirmed?: boolean;
   reminderEnabled?: boolean;
   quoteMin?: number;
@@ -83,6 +83,18 @@ export interface FlowState {
   resumeStage?: FlowStage;
   /** Próxima mensagem do cliente deve receber boas-vindas (ex.: após handoff encerrado) */
   pendingWelcomeRestart?: boolean;
+  /** Intenção entendida antes de o cliente informar o nome. */
+  pendingInitialIntent?: "schedule" | "service" | "doubt";
+  /** Serviço citado na primeira mensagem, preservado durante a identificação. */
+  pendingServiceKey?: string;
+  /** Confirma, em um único bloco, os dados extraídos da primeira mensagem. */
+  awaitingInitialRequestConfirmation?: boolean;
+  /** Cliente pediu para corrigir algum item do resumo inicial. */
+  awaitingInitialRequestCorrection?: boolean;
+  /** Preferência de período entendida na conversa, antes da escolha do horário. */
+  requestedTimePreference?: "morning" | "afternoon" | "evening";
+  /** Contexto livre usado para tornar a apresentação do serviço mais natural. */
+  serviceRequestContext?: string;
 
   // Cupom
   couponCode?: string;
@@ -124,6 +136,10 @@ export interface FlowState {
   savedVehicle?: string | null;
   /** Aguarda a decisão de reutilizar o veículo salvo no CRM. */
   awaitingSavedVehicleChoice?: boolean;
+  /** Após uma reserva, aguarda uma nova mensagem antes de iniciar outro atendimento. */
+  awaitingPostConfirmationReturn?: boolean;
+  /** Na retomada, pergunta se o atendimento será para o mesmo veículo. */
+  awaitingReturningVehicleChoice?: boolean;
   loyaltyPoints?: number;
   loyaltyDiscountApplied?: number;
 
@@ -134,6 +150,8 @@ export interface FlowState {
   awaitingReturnPreference?: boolean;
   awaitingServiceRecommendation?: boolean;
   serviceRecommendation?: string | null;
+  /** Chave validada do catálogo sugerida pela IA; nunca aceita texto livre. */
+  serviceRecommendationKey?: string | null;
   /** Opções exibidas após uma resposta contextual da IA. */
   awaitingAiFollowup?: boolean;
   aiFollowupReturnStage?: FlowStage;

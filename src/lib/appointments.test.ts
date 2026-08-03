@@ -40,9 +40,32 @@ test("parseTimeSelection accepts numeric indices and free-text clock times", () 
   ];
 
   assert.equal(parseTimeSelection("14", slots), "16:30");
+  assert.equal(parseTimeSelection("09", slots), "09:00");
   assert.equal(parseTimeSelection("16:30", slots), "16:30");
   assert.equal(parseTimeSelection("16h30", slots), "16:30");
   assert.equal(parseTimeSelection("as 16:30", slots), "16:30");
   assert.equal(parseTimeSelection("16:45", slots), null);
   assert.equal(parseTimeSelection("amanhã", slots), null);
+});
+
+test("buildAvailableSlotsForDay uses service duration until midnight and removes occupied times", () => {
+  const slots = buildAvailableSlotsForDay({
+    dateStr: "2027-08-16",
+    durationMin: 60,
+    settings: {
+      businessHoursStart: "08:00",
+      businessHoursEnd: "00:00",
+      lunchBreakStart: null,
+      lunchBreakEnd: null,
+      slotDurationMin: 30,
+      workingDays: "1,2,3,4,5,6",
+    },
+    existingAppointments: [{ startTime: "11:00", endTime: "12:00" }],
+    now: new Date("2027-08-15T08:00:00"),
+  });
+
+  assert.deepEqual(slots, [
+    "08:00", "09:00", "10:00", "12:00", "13:00", "14:00", "15:00", "16:00",
+    "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00",
+  ]);
 });

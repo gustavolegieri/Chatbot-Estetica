@@ -8,7 +8,7 @@ import {
   UNDECIDED_TO_KEY,
   type CatalogItem,
 } from "./whatsapp-catalog";
-import { loadPromptMap, renderPrompt, type PromptMap } from "./bot-prompts";
+import { getDefaultPromptMap, loadPromptMap, renderPrompt, type PromptMap } from "./bot-prompts";
 import { resolveServiceCategoryNum } from "./service-category";
 
 export interface WhatsAppCatalogContext {
@@ -97,14 +97,20 @@ export async function loadWhatsAppCatalog(force = false): Promise<WhatsAppCatalo
     return wctxMock as WhatsAppCatalogContext;
   }
 
-  const [services, prompts] = await Promise.all([
-    prisma.service.findMany({
-      where: { active: true, showInWhatsApp: true },
-      include: { upsellService: true },
-      orderBy: [{ categoryNum: "asc" }, { menuOrder: "asc" }, { name: "asc" }],
-    }),
-    loadPromptMap(force),
-  ]);
+  let services: Array<Service & { upsellService?: Service | null }> = [];
+  let prompts: PromptMap = getDefaultPromptMap();
+  try {
+    [services, prompts] = await Promise.all([
+      prisma.service.findMany({
+        where: { active: true, showInWhatsApp: true },
+        include: { upsellService: true },
+        orderBy: [{ categoryNum: "asc" }, { menuOrder: "asc" }, { name: "asc" }],
+      }),
+      loadPromptMap(force),
+    ]);
+  } catch (error) {
+    console.error("[WhatsApp Catalog] Banco indisponível; usando catálogo oficial local.", error);
+  }
 
 
   const catalog: Record<string, CatalogItem> = { ...CATALOG };

@@ -19,7 +19,7 @@ test("isValidCustomerName rejects menu-like, empty and nonsense input", () => {
   assert.equal(isValidCustomerName("Gustavo"), true);
 });
 
-test("buildVehicleCollectionPrompt asks for the missing field and preserves collected data", () => {
+test("buildVehicleCollectionPrompt asks for every missing detail in one message", () => {
   const prompt = buildVehicleCollectionPrompt({
     model: "Honda Civic",
     year: null,
@@ -28,6 +28,9 @@ test("buildVehicleCollectionPrompt asks for the missing field and preserves coll
   });
 
   assert.match(prompt, /ano/i);
+  assert.match(prompt, /cor/i);
+  assert.match(prompt, /estado geral/i);
+  assert.match(prompt, /única mensagem/i);
   assert.match(prompt, /Honda Civic/i);
 });
 
@@ -42,7 +45,9 @@ test("buildVehicleConfirmationPrompt and buildCalendarPrompt render the new stru
   assert.match(confirmation, /Honda Civic/i);
   assert.match(confirmation, /2020/i);
   assert.match(confirmation, /Preto/i);
-  assert.match(confirmation, /sim\/não/i);
+  assert.match(confirmation, /Está correto/i);
+  assert.match(confirmation, /Quero corrigir/i);
+  assert.match(confirmation, /cor é branca/i);
 
   const calendar = buildCalendarPrompt(new Date("2026-07-01T12:00:00Z"));
   assert.match(calendar, /Julho 2026/i);

@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processWhatsAppMessage } from "@/lib/whatsapp-bot";
 import { prisma } from "@/lib/prisma";
+import { extractWasenderAudioMessage, transcribeWasenderAudio } from "@/lib/whatsapp-audio";
+import { sendText } from "@/lib/evolution-api";
 
 // Tipagem para waitUntil do Next.js (disponível em edge runtime)
 interface WaitUntil {
@@ -235,12 +237,14 @@ export async function POST(req: NextRequest) {
   const messageId = msgKey.id as string | undefined;
   console.log("[Webhook] messageId recebido:", messageId, "tipo:", typeof messageId);
 
-  const text = extractText(msg);
+  const originalText = extractText(msg);
+  const audioMessage = extractWasenderAudioMessage(msg);
   const { buttonId, listId } = extractInteractive(msg);
   const pushName = (msg.pushName ?? msg.notifyName ?? "") as string;
 
   console.log("[Webhook] Conteúdo da mensagem:", {
-    text: text?.substring(0, 50),
+    text: originalText?.substring(0, 50),
+    hasAudio: Boolean(audioMessage),
     buttonId,
     listId,
     pushName
@@ -267,7 +271,7 @@ export async function POST(req: NextRequest) {
     markerCreated = await markMessageAsProcessed(
       messageId,
       phone,
-      text || buttonId || listId || "",
+      originalText || buttonId || listId || (audioMessage ? "[Áudio recebido]" : ""),
       sessionId,
       clientId
     );
@@ -280,6 +284,30 @@ export async function POST(req: NextRequest) {
 
   try {
     console.log("[Webhook] Iniciando processamento da mensagem");
+
+    let processedText = originalText || buttonId || listId || "";
+    if (audioMessage) {
+      if (!messageId) {
+        throw new Error("Áudio recebido sem identificador de mensagem");
+      }
+      try {
+        processedText = await transcribeWasenderAudio({ messageId, audio: audioMessage });
+        console.log("[Webhook] Áudio transcrito com sucesso:", processedText.substring(0, 120));
+      } catch (audioError) {
+        console.error("[Webhook] Falha ao processar áudio:", audioError);
+        await sendText({
+          number: phone,
+          text: "Recebi seu áudio, mas não consegui transcrevê-lo agora. Pode tentar novamente ou enviar a mensagem em texto?",
+          flowStage: "AUDIO_TRANSCRIPTION_FALLBACK",
+        });
+        return NextResponse.json({ ok: true, audioProcessed: false });
+      }
+    }
+
+    if (!processedText.trim()) {
+      console.log("[Webhook] Mensagem sem conteúdo processável, ignorando");
+      return NextResponse.json({ ok: true });
+    }
     
     let waitUntil: ((promise: Promise<unknown>) => void) | undefined;
     try {
@@ -291,11 +319,12 @@ export async function POST(req: NextRequest) {
     
     await processWhatsAppMessage({
       phone,
-      text: text || buttonId || listId || "",
+      text: processedText,
       buttonId,
       listId,
       pushName: pushName || undefined,
       messageId,
+      sourceType: audioMessage ? "audio" : "text",
     }, waitUntil);
 
     console.log("[Webhook] processamento concluído");

@@ -10,6 +10,7 @@ import {
   Calendar,
   CalendarOff,
   ChevronDown,
+  Columns3,
   DollarSign,
   Download,
   Gift,
@@ -58,6 +59,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/admin/atendimento", label: "Central de atendimento", icon: Headphones, badge: true },
       { href: "/admin/clientes", label: "Clientes", icon: Users },
+      { href: "/admin/pipeline", label: "Pipeline CRM", icon: Columns3 },
       { href: "/admin/agendamentos", label: "Agenda", icon: Calendar },
     ],
   },

@@ -13,6 +13,9 @@ export function wantsHumanHandoff(text: string): boolean {
     /preciso falar (com )?(algu[eé]m|voc[eê]|o dono|humano)/.test(t) ||
     /(passa|passar|transferir|chama) (pro|para o|o )?(dono|atendente|gerente|humano)/.test(t) ||
     /n[aã]o [eé] (bot|rob[oô]|m[aá]quina)/.test(t) ||
+    /(isso aqui|aqui|voc[eê]) [eé] s[oó] (bot|rob[oô]|m[aá]quina)/.test(t) ||
+    /tem (algu[eé]m|uma pessoa|atendente) (a[ií]|por a[ií]|humano)/.test(t) ||
+    /me chama (um|uma|o|a)?\s*(atendente|pessoa|humano)/.test(t) ||
     /atendimento humano|humano por favor|falar com humano/.test(t) ||
     /^(atendente|humano|dono|gerente)$/.test(t)
   );

@@ -30,6 +30,7 @@
     "jose": "^6.0.11",
     "lucide-react": "^0.513.0",
     "mcp-handler": "^1.1.0",
+    "msedge-tts": "^2.0.7",
     "next": "^15.3.3",
     "node-fetch": "^3.3.2",
     "nodemailer": "^9.0.3",

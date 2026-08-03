@@ -19,6 +19,7 @@ import {
   couponApplied,
   couponCodeRequest,
   etapa2MainMenu,
+  etapa4Vehicle,
   etapa8Payment,
   etapa8ReceiptError,
   etapa8ReceiptInvalid,
@@ -61,7 +62,9 @@ export type { FlowState, FlowStage };
 export interface FlowResponse {
   text: string;
   mediaUrl?: string;
-  mediaType?: "image" | "video" | "document";
+  mediaType?: "image" | "video" | "audio" | "document";
+  /** Resposta conversacional que pode ser enviada como voz. */
+  voiceReply?: boolean;
 }
 
 export interface FlowResult {
@@ -492,14 +495,24 @@ export async function handleCouponStep(
   const skip = shouldSkipCouponPrompt(input);
   const prompts = await loadPromptMap();
 
-  if (skip) {
-    const newState: FlowState = {
-      ...state,
-      stage: "ETAPA9_LOYALTY",
-    };
-    const loyaltyPoints = state.loyaltyPoints ?? 0;
-    const discountValue = Math.floor(loyaltyPoints / 100) * 10; // 100 pontos = R$ 10
+  const advanceAfterCoupon = (next: FlowState) => {
+    const loyaltyPoints = next.loyaltyPoints ?? 0;
+    const discountValue = Math.floor(loyaltyPoints / 100) * 10;
+    if (discountValue <= 0) {
+      const budgetState: FlowState = { ...next, stage: "ETAPA10_BUDGET" };
+      const totalValue = calculateFlowTotal(budgetState);
+      responses.push({
+        text: etapa10Budget(`R$ ${totalValue.toFixed(2).replace(".", ",")}`, prompts),
+      });
+      return budgetState;
+    }
+    const loyaltyState: FlowState = { ...next, stage: "ETAPA9_LOYALTY" };
     responses.push({ text: etapa9Loyalty(loyaltyPoints, discountValue, prompts) });
+    return loyaltyState;
+  };
+
+  if (skip) {
+    const newState = advanceAfterCoupon(state);
     return { responses, nextState: newState };
   }
 
@@ -578,11 +591,7 @@ export async function handleCouponStep(
 
   responses.push({ text: couponApplied(formattedCouponCode, formattedDiscount, formattedFinalValue, prompts) });
 
-  const loyaltyPoints = state.loyaltyPoints ?? 0;
-  const discountValue = Math.floor(loyaltyPoints / 100) * 10; // 100 pontos = R$ 10
-  responses.push({ text: etapa9Loyalty(loyaltyPoints, discountValue, prompts) });
-
-  return { responses, nextState: newState };
+  return { responses, nextState: advanceAfterCoupon(newState) };
 }
 
 /**
@@ -753,6 +762,7 @@ export async function handleLogistics(
     };
 
     responses.push({ text: wantsReturn ? etapa10LogisticsWithReturn(prompts) : etapa10LogisticsWithoutReturn(prompts) });
+    responses.push({ text: etapa8Payment(true, prompts) });
 
     return { responses, nextState: newState };
   }
@@ -781,6 +791,7 @@ export async function handleLogistics(
   };
 
   responses.push({ text: etapa10LogisticsClientLeads(prompts) });
+  responses.push({ text: etapa8Payment(true, prompts) });
 
   return { responses, nextState: newState };
 }
@@ -1374,7 +1385,7 @@ export async function handleServiceQuestion(
 
     if (aiResponse) {
       const prompts = await loadPromptMap();
-      responses.push({ text: aiResponse });
+      responses.push({ text: aiResponse, voiceReply: true });
       responses.push({ text: buildAiDoubtFollowUpText(prompts) });
 
       const newState: FlowState = {
@@ -1419,7 +1430,7 @@ export async function handleFAQ(
   responses: FlowResponse[]
 ): Promise<FlowResult> {
   // Check if this is the first interaction (asking for description)
-  if (!state.awaitingServiceRecommendation) {
+  if (!state.awaitingServiceRecommendation && !state.serviceRecommendation) {
     const newState: FlowState = {
       ...state,
       awaitingServiceRecommendation: true,
@@ -1431,13 +1442,30 @@ export async function handleFAQ(
   // Check if user is responding to AI recommendation (1 = schedule, 2 = menu)
   if (state.serviceRecommendation) {
     const choice = message.trim();
-    if (choice === "1") {
+    const normalizedChoice = choice
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    const wantsRecommendedService =
+      choice === "1" ||
+      /^(sim|quero|pode ser|vamos nessa|agendar|quero agendar|agendar esse|agendar este|esse mesmo|essa mesma)$/.test(
+        normalizedChoice
+      );
+    if (wantsRecommendedService) {
       // User wants to schedule with recommended service
       const wctx = await loadWhatsAppCatalog(true);
       const aiResponse = state.serviceRecommendation.toLowerCase();
       
       // Try to find a matching service in the catalog
       let matchedService: any = null;
+
+      // A recomendação persistida só é utilizada se corresponder a uma chave
+      // real e ativa do catálogo. O texto livre da IA nunca vira serviço.
+      if (state.serviceRecommendationKey && wctx.catalog[state.serviceRecommendationKey]) {
+        const service = wctx.catalog[state.serviceRecommendationKey];
+        const { key: _, ...serviceWithoutKey } = service;
+        matchedService = { key: state.serviceRecommendationKey, ...serviceWithoutKey };
+      }
       
       // First, try to extract service name if AI response starts with "Recomendo:"
       const recommendedMatch = aiResponse.match(/recomendo:?\s*([^.:—–-]+)/i);
@@ -1480,21 +1508,30 @@ export async function handleFAQ(
       }
       
       if (matchedService) {
+        const prompts = await loadPromptMap();
+        const customerName = resolveValidCustomerName(state.customerName) ?? "Cliente";
         const newState: FlowState = {
           ...state,
           serviceKey: matchedService.key,
           serviceLabel: matchedService.label,
+          dbServiceId: wctx.dbServiceIdByKey[matchedService.key],
           serviceRecommendation: null,
+          serviceRecommendationKey: null,
           awaitingServiceRecommendation: false,
-          stage: "ETAPA3_SERVICE_ACTION",
+          stage: "ETAPA4_VEHICLE",
+          vehicleCollectStep: "details",
         };
-        
-        const prompts = await loadPromptMap();
-        const description = serviceDetail(matchedService, prompts);
-        responses.push({ text: description });
-        responses.push({
-          text: "Como prefere seguir?\n\n*1* 📅 Agendar este serviço\n*2* 🧭 Ver o menu principal\n*3* 💬 Tirar uma dúvida",
-        });
+
+        if (state.savedVehicle) {
+          newState.awaitingSavedVehicleChoice = true;
+          responses.push({
+            text: `Perfeito, *${customerName}*. Vamos agendar *${matchedService.label}*.\n\nEncontrei este veículo salvo no seu cadastro: *${state.savedVehicle}*.\n\nDeseja usá-lo neste atendimento?\n*1* — Sim\n*2* — Não, informar outro veículo`,
+          });
+        } else {
+          responses.push({
+            text: `Perfeito, *${customerName}*. Vamos agendar *${matchedService.label}*.\n\n${etapa4Vehicle(false, prompts)}`,
+          });
+        }
         
         return { responses, nextState: newState };
       } else {
@@ -1504,6 +1541,7 @@ export async function handleFAQ(
         const newState: FlowState = {
           ...state,
           serviceRecommendation: null,
+          serviceRecommendationKey: null,
           awaitingServiceRecommendation: false,
           stage: "ETAPA2_MAIN_MENU",
         };
@@ -1513,11 +1551,12 @@ export async function handleFAQ(
         
         return { responses, nextState: newState };
       }
-    } else if (choice === "2") {
+    } else if (choice === "2" || /^(menu|voltar|voltar ao menu|menu principal)$/.test(normalizedChoice)) {
       // User wants to go back to menu
       const newState: FlowState = {
         ...state,
         serviceRecommendation: null,
+        serviceRecommendationKey: null,
         awaitingServiceRecommendation: false,
         stage: "ETAPA2_MAIN_MENU",
       };
@@ -1578,10 +1617,19 @@ export async function handleFAQ(
       wctx,
     });
 
-    if (aiResponse) {
+    const normalizeCatalogText = (value: string) =>
+      value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const normalizedRecommendation = normalizeCatalogText(aiResponse ?? "");
+    const recommendedEntry = Object.entries(wctx.catalog)
+      .filter(([key]) => key !== "indeciso")
+      .sort(([, a], [, b]) => b.label.length - a.label.length)
+      .find(([, service]) => normalizedRecommendation.includes(normalizeCatalogText(service.label)));
+
+    if (aiResponse && recommendedEntry) {
       const newState: FlowState = {
         ...state,
         serviceRecommendation: aiResponse,
+        serviceRecommendationKey: recommendedEntry[0],
         awaitingServiceRecommendation: false,
       };
       
@@ -1594,6 +1642,8 @@ export async function handleFAQ(
       
       const newState: FlowState = {
         ...state,
+        serviceRecommendation: null,
+        serviceRecommendationKey: null,
         awaitingServiceRecommendation: false,
         stage: "ETAPA2_MAIN_MENU",
       };
@@ -1606,6 +1656,8 @@ export async function handleFAQ(
     
     const newState: FlowState = {
       ...state,
+      serviceRecommendation: null,
+      serviceRecommendationKey: null,
       awaitingServiceRecommendation: false,
       stage: "ETAPA2_MAIN_MENU",
     };

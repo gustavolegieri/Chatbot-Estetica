@@ -24,6 +24,7 @@ import { getMessageLogContext } from "./whatsapp-message-context";
 import { logWhatsAppMessage } from "./whatsapp-message-log";
 import { prisma } from "./prisma";
 import crypto from "crypto";
+import { isVoiceReplyEligible, synthesizeVoiceReply } from "./whatsapp-voice";
 
 const WASENDER_BASE = process.env.WASENDER_BASE_URL || "https://wasenderapi.com/api";
 
@@ -33,6 +34,8 @@ interface SendTextParams {
   skipBotLog?: boolean;
   sender?: "BOT" | "ADMIN";
   flowStage?: string;
+  /** Força resposta em voz para uma mensagem conversacional, como uma dúvida. */
+  voiceReply?: boolean;
 }
 
 interface SendMediaParams {
@@ -40,7 +43,7 @@ interface SendMediaParams {
   mediaUrl: string;
   caption?: string;
   filename?: string;
-  mediaType?: "image" | "video" | "document";
+  mediaType?: "image" | "video" | "audio" | "document";
 }
 
 interface ButtonOption {
@@ -154,7 +157,7 @@ export async function wasenderFetch(body: object, attempt = 1): Promise<unknown>
     to: phoneField,
     textLength: textField?.length || 0,
     textPreview: textField?.substring(0, 50) || "",
-    hasMedia: !!(body as any).imageUrl || !!(body as any).videoUrl || !!(body as any).documentUrl
+    hasMedia: !!(body as any).imageUrl || !!(body as any).videoUrl || !!(body as any).audioUrl || !!(body as any).documentUrl
   });
 
   const response = await fetch(`${WASENDER_BASE}/send-message`, {
@@ -243,6 +246,43 @@ export async function wasenderFetch(body: object, attempt = 1): Promise<unknown>
   return result;
 }
 
+async function uploadAudioBuffer(audio: Buffer): Promise<string> {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("WASENDER_API_KEY não configurada");
+
+  const response = await fetch(`${WASENDER_BASE}/upload`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "audio/mpeg",
+    },
+    body: new Uint8Array(audio),
+  });
+  const body = (await response.json().catch(() => null)) as
+    | { publicUrl?: string; message?: string }
+    | null;
+  if (!response.ok || !body?.publicUrl) {
+    throw new Error(body?.message || `Falha no upload do áudio (${response.status})`);
+  }
+  return body.publicUrl;
+}
+
+async function trySendVoiceReply(number: string, text: string): Promise<boolean> {
+  if (!isVoiceReplyEligible(text)) return false;
+  try {
+    const audio = await synthesizeVoiceReply(text);
+    const audioUrl = await uploadAudioBuffer(audio);
+    const result = (await wasenderFetch({
+      to: toE164(number),
+      audioUrl,
+    })) as { error?: boolean } | null;
+    return !result?.error;
+  } catch (error) {
+    console.warn("[WhatsApp Voice] Não foi possível enviar a resposta em áudio; usando texto:", error);
+    return false;
+  }
+}
+
 /** Envia mensagem de texto simples */
 export async function sendText({
   number,
@@ -250,6 +290,7 @@ export async function sendText({
   skipBotLog,
   sender = "BOT",
   flowStage,
+  voiceReply,
 }: SendTextParams) {
   if (!isValidPrivateRecipient(number)) {
     console.warn("[WasenderAPI] ⛔ Envio bloqueado (não é chat privado):", number);
@@ -259,13 +300,22 @@ export async function sendText({
   const whatsappNumber = toE164(number);
 
   try {
-    const result = await wasenderFetch({
-      to: whatsappNumber,
-      text,
-    });
+    const ctx = getMessageLogContext();
+    const shouldTryVoice =
+      sender === "BOT" &&
+      !ctx?.voiceReplySent &&
+      Boolean(voiceReply || ctx?.replyWithAudio);
+    const voiceSent = shouldTryVoice ? await trySendVoiceReply(number, text) : false;
+    if (voiceSent && ctx) ctx.voiceReplySent = true;
+
+    const result = voiceSent
+      ? { success: true, type: "audio" }
+      : await wasenderFetch({
+          to: whatsappNumber,
+          text,
+        });
 
     if (!skipBotLog) {
-      const ctx = getMessageLogContext();
       const msgSender: MessageSender = sender === "ADMIN" ? MessageSender.ADMIN : MessageSender.BOT;
       await logWhatsAppMessage({
         phone: number,
@@ -339,6 +389,8 @@ export async function sendMedia({
     payload.imageUrl = absoluteUrl;
   } else if (mediaType === "video") {
     payload.videoUrl = absoluteUrl;
+  } else if (mediaType === "audio") {
+    payload.audioUrl = absoluteUrl;
   } else {
     payload.documentUrl = absoluteUrl;
   }

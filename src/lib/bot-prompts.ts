@@ -29,9 +29,16 @@ export async function loadPromptMap(force = false): Promise<PromptMap> {
     return map;
   }
 
-  const rows = await prisma.botPrompt.findMany();
   const map = defaultMap();
-  for (const row of rows) map[row.key] = row.content;
+  try {
+    const rows = await prisma.botPrompt.findMany();
+    for (const row of rows) map[row.key] = row.content;
+  } catch (error) {
+    // O atendimento continua com os templates oficiais locais durante uma
+    // indisponibilidade momentânea do banco. Assim o cliente nunca recebe um
+    // erro técnico e o painel pode ser testado sem depender da rede externa.
+    console.error("[Bot Prompts] Banco indisponível; usando templates oficiais locais.", error);
+  }
 
   cache = { map, loadedAt: Date.now() };
   return map;

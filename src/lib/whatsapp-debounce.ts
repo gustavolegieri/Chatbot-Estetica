@@ -11,6 +11,7 @@ interface PendingMessage {
   pushName?: string;
   buttonId?: string;
   listId?: string;
+  sourceType?: "text" | "audio";
   timer: ReturnType<typeof setTimeout>;
 }
 
@@ -20,6 +21,7 @@ interface IncomingPayload {
   pushName?: string;
   buttonId?: string;
   listId?: string;
+  sourceType?: "text" | "audio";
 }
 
 // Estado em memória para debounce (aceitável pois é apenas para agrupar mensagens rápidas)
@@ -126,6 +128,7 @@ export function enqueueWhatsAppMessage(
     if (msg.pushName) existing.pushName = msg.pushName;
     if (msg.buttonId) existing.buttonId = msg.buttonId;
     if (msg.listId) existing.listId = msg.listId;
+    if (msg.sourceType) existing.sourceType = msg.sourceType;
   } else {
     pending.set(key, {
       phone: msg.phone,
@@ -133,6 +136,7 @@ export function enqueueWhatsAppMessage(
       pushName: msg.pushName,
       buttonId: msg.buttonId,
       listId: msg.listId,
+      sourceType: msg.sourceType,
       timer: setTimeout(() => { /* substituído abaixo */ }, DEBOUNCE_MS),
     });
   }
@@ -163,6 +167,7 @@ export function enqueueWhatsAppMessage(
           pushName: entry.pushName,
           buttonId: entry.buttonId,
           listId: entry.listId,
+          sourceType: entry.sourceType,
         });
         resolve();
       } catch (error) {

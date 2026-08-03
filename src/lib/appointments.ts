@@ -82,12 +82,16 @@ export function buildAvailableSlotsForDay({
   const [startH, startM] = settings.businessHoursStart.split(":").map(Number);
   const [endH, endM] = settings.businessHoursEnd.split(":").map(Number);
   const dayStartMin = startH * 60 + startM;
-  const dayEndMin = endH * 60 + endM;
+  // 00:00 representa o fim do dia quando usado como horário de fechamento.
+  const dayEndMin = endH === 0 && endM === 0 ? 24 * 60 : endH * 60 + endM;
 
   if (dayStartMin >= dayEndMin) return [];
 
   const slots: string[] = [];
-  const step = Math.max(1, Number(settings.slotDurationMin) || 30);
+  // Cada nova opção começa após a duração real do atendimento. Assim, um
+  // serviço de 60 min gera 08:00, 09:00, 10:00... e um horário já reservado
+  // desaparece sem criar encaixes que se sobreponham.
+  const step = Math.max(1, durationMin);
   const isToday = format(date, "yyyy-MM-dd") === format(now, "yyyy-MM-dd");
   const nowMin = now.getHours() * 60 + now.getMinutes();
 
@@ -168,6 +172,13 @@ export function parseTimeInput(text: string): string | null {
 
 export function parseTimeSelection(userInput: string, availableSlots: string[]): string | null {
   const trimmed = userInput.trim();
+
+  // "09" é uma forma natural de pedir 09:00. Números sem zero à esquerda
+  // continuam funcionando como índice da lista.
+  if (/^0\d$/.test(trimmed)) {
+    const candidate = `${trimmed}:00`;
+    return availableSlots.includes(candidate) ? candidate : null;
+  }
 
   if (/^\d+$/.test(trimmed)) {
     const index = parseInt(trimmed, 10) - 1;

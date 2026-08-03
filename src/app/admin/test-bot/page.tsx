@@ -142,7 +142,7 @@ export default function TestBotPage() {
       const response = await fetch("/api/admin/test-bot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, sessionId, useRealAI }),
+        body: JSON.stringify({ text, sessionId, useRealAI, flowState, messages }),
       });
       const data = await response.json();
       if (!data.success) throw new Error(data.error || "Não foi possível processar a mensagem.");
@@ -281,7 +281,11 @@ export default function TestBotPage() {
             <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-brand-300" /><p className="text-sm font-semibold text-white">Oportunidade</p></div>
             <div className="mt-4 rounded-xl bg-surface-800 p-3">
               <p className="text-xs text-slate-500">Potencial estimado</p>
-              <p className="mt-1 text-xl font-semibold text-brand-200">{flowState.quoteMin ? `${formatMoney(flowState.quoteMin)}${flowState.quoteMax ? ` – ${formatMoney(flowState.quoteMax)}` : ""}` : "Aguardando orçamento"}</p>
+              <p className="mt-1 text-xl font-semibold text-brand-200">{flowState.quoteMin
+                ? flowState.quoteMax && flowState.quoteMax !== flowState.quoteMin
+                  ? `${formatMoney(flowState.quoteMin)} – ${formatMoney(flowState.quoteMax)}`
+                  : formatMoney(flowState.quoteMin)
+                : "Aguardando orçamento"}</p>
             </div>
             <div className="mt-3 flex items-center justify-between text-xs"><span className="text-slate-500">Agendamento</span><span className="text-slate-200">{flowState.dayLabel || flowState.dayDate || "Não definido"}{flowState.startTime ? ` · ${flowState.startTime}` : ""}</span></div>
           </section>
@@ -333,13 +337,24 @@ function Detail({ label, value, mono = false }: { label: string; value: string; 
   return <div><p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">{label}</p><p className={`mt-1 truncate text-sm text-slate-200 ${mono ? "font-mono text-xs" : ""}`}>{value}</p></div>;
 }
 
+function WhatsAppText({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*\n]+\*\*|\*[^*\n]+\*|_[^_\n]+_|`[^`\n]+`)/g);
+  return <p className="whitespace-pre-wrap break-words text-sm leading-5">{parts.map((part, index) => {
+    if (/^\*\*[^*\n]+\*\*$/.test(part)) return <strong key={index}>{part.slice(2, -2)}</strong>;
+    if (/^\*[^*\n]+\*$/.test(part)) return <strong key={index}>{part.slice(1, -1)}</strong>;
+    if (/^_[^_\n]+_$/.test(part)) return <em key={index}>{part.slice(1, -1)}</em>;
+    if (/^`[^`\n]+`$/.test(part)) return <code key={index} className="rounded bg-black/20 px-1 py-0.5 text-[0.92em]">{part.slice(1, -1)}</code>;
+    return part;
+  })}</p>;
+}
+
 function ChatBubble({ message }: { message: TestBotMessage }) {
   const isCustomer = message.sender === "user";
   return <div className={`flex ${isCustomer ? "justify-end" : "justify-start"}`}><div className={`max-w-[84%] rounded-xl px-3 py-2 shadow-sm sm:max-w-[75%] ${isCustomer ? "rounded-br-sm bg-[#005c4b] text-white" : "rounded-bl-sm bg-[#202c33] text-slate-100"}`}>
     {message.mediaUrl && message.mediaType === "image" && <img src={message.mediaUrl} alt="Mídia enviada pelo bot" className="mb-2 max-h-72 w-full rounded-lg object-cover" />}
     {message.mediaUrl && message.mediaType === "video" && <video src={message.mediaUrl} controls className="mb-2 max-h-72 w-full rounded-lg" />}
     {message.mediaUrl && message.mediaType === "document" && <a href={message.mediaUrl} target="_blank" rel="noreferrer" className="mb-2 flex items-center gap-2 rounded-lg bg-black/15 p-2 text-xs underline"><Paperclip className="h-4 w-4" /> Abrir documento</a>}
-    {message.text && <p className="whitespace-pre-wrap break-words text-sm leading-5">{message.text}</p>}
+    {message.text && <WhatsAppText text={message.text} />}
     <div className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${isCustomer ? "text-emerald-100/70" : "text-slate-500"}`}><span>{formatTime(message.timestamp)}</span>{isCustomer && <Check className="h-3 w-3" />}</div>
   </div></div>;
 }

@@ -33,13 +33,28 @@ interface TestBotSession {
   updatedAt: string;
 }
 
-// Em memória (para desenvolvimento - em produção usar Redis ou banco)
-const testSessions = new Map<string, TestBotSession>();
+type TestBotGlobal = typeof globalThis & {
+  testBotSessions?: Map<string, TestBotSession>;
+};
+
+// Mantém as simulações durante recompilações do Next.js em desenvolvimento.
+// O estado enviado pelo painel também recupera a conversa caso outra instância
+// serverless receba a mensagem seguinte.
+const testBotGlobal = globalThis as TestBotGlobal;
+const testSessions = testBotGlobal.testBotSessions ?? new Map<string, TestBotSession>();
+testBotGlobal.testBotSessions = testSessions;
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { text, sessionId, useRealAI = false, reset = false } = body;
+    const {
+      text,
+      sessionId,
+      useRealAI = false,
+      reset = false,
+      flowState: recoveredFlowState,
+      messages: recoveredMessages,
+    } = body;
 
     if (!text && !reset) {
       return NextResponse.json(
@@ -58,11 +73,18 @@ export async function POST(req: NextRequest) {
       const newSessionId = uuidv4();
       const newPhone = `test-${newSessionId}`;
       
+      const safeRecoveredMessages = Array.isArray(recoveredMessages)
+        ? recoveredMessages.slice(-100)
+        : [];
+
       session = {
         id: newSessionId,
         phone: newPhone,
-        messages: [],
-        flowState: { stage: "ETAPA1_AWAITING_NAME" },
+        messages: safeRecoveredMessages,
+        flowState:
+          recoveredFlowState && typeof recoveredFlowState === "object" && typeof recoveredFlowState.stage === "string"
+            ? recoveredFlowState
+            : { stage: "ETAPA1_AWAITING_NAME" },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };

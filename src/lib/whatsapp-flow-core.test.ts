@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildAiDoubtFollowUpText, calculateFlowTotal, handleReceiptUpload, resolveDoubtReturnStage } from './whatsapp-flow-core';
+import { applyCouponToFlowValue, buildAiDoubtFollowUpText, calculateFlowTotal, handleCouponStep, handleFAQ, handleLogistics, handleReceiptUpload, resolveDoubtReturnStage } from './whatsapp-flow-core';
 import { etapa8Payment } from './whatsapp-flow-messages';
 import type { FlowState } from './whatsapp-flow-types';
+import { CATALOG } from './whatsapp-catalog';
+import { getDefaultPromptMap } from './bot-prompts';
 
 test('buildAiDoubtFollowUpText uses the official AI follow-up prompt', () => {
   const text = buildAiDoubtFollowUpText();
@@ -61,6 +63,31 @@ test('calculateFlowTotal preserves the total for legacy states with an already d
   assert.equal(total, 90);
 });
 
+test('percentage coupon uses quoteMin consistently across a price range', () => {
+  const applied = applyCouponToFlowValue({
+    coupon: { type: 'percent', amount: 10 },
+    flow: { stage: 'ETAPA9_COUPON', quoteMin: 100, quoteMax: 200 },
+  });
+
+  assert.equal(applied.discountApplied, 10);
+  assert.equal(calculateFlowTotal(applied.flow), 90);
+});
+
+test('first-visit coupon is not subtracted twice', () => {
+  const total = calculateFlowTotal({
+    stage: 'ETAPA15_SUMMARY_CONFIRM',
+    quoteMin: 100,
+    quoteDiscountMode: 'base',
+    couponId: 'coupon-1',
+    couponCode: 'PRIMEIRA10',
+    couponDiscountApplied: 10,
+    firstTimeBonusApplied: true,
+    firstTimeBonusDiscount: 10,
+  });
+
+  assert.equal(total, 90);
+});
+
 test('receipt upload never marks payment as confirmed from a URL or simulated value', async () => {
   (globalThis as Record<string, unknown>).__BB_USE_PROMPT_FALLBACK__ = true;
 
@@ -83,5 +110,83 @@ test('receipt upload never marks payment as confirmed from a URL or simulated va
     assert.match(responses.map((response) => response.text).join('\n'), /nenhum pagamento foi confirmado/i);
   } finally {
     delete (globalThis as Record<string, unknown>).__BB_USE_PROMPT_FALLBACK__;
+  }
+});
+
+test('coupon step skips the loyalty question when the client has no usable points', async () => {
+  (globalThis as Record<string, unknown>).__BB_USE_PROMPT_FALLBACK__ = true;
+  try {
+    const responses: Array<{ text: string }> = [];
+    const result = await handleCouponStep(
+      { stage: 'ETAPA9_COUPON', quoteMin: 100, loyaltyPoints: 0 },
+      'nao',
+      responses,
+    );
+
+    const text = responses.map((response) => response.text).join('\n');
+    assert.equal(result.nextState.stage, 'ETAPA10_BUDGET');
+    assert.match(text, /Resumo financeiro/i);
+    assert.doesNotMatch(text, /0 pontos/i);
+  } finally {
+    delete (globalThis as Record<string, unknown>).__BB_USE_PROMPT_FALLBACK__;
+  }
+});
+
+test('logistics immediately shows payment choices when the client brings the vehicle', async () => {
+  (globalThis as Record<string, unknown>).__BB_USE_PROMPT_FALLBACK__ = true;
+  try {
+    const responses: Array<{ text: string }> = [];
+    const result = await handleLogistics(
+      { stage: 'ETAPA10_LOGISTICS', quoteMin: 100 },
+      '1',
+      responses,
+    );
+
+    const text = responses.map((response) => response.text).join('\n');
+    assert.equal(result.nextState.stage, 'ETAPA8_PAYMENT');
+    assert.match(text, /forma de pagamento/i);
+    assert.match(text, /PIX/i);
+    assert.match(text, /Cartão \(na loja\)/i);
+  } finally {
+    delete (globalThis as Record<string, unknown>).__BB_USE_PROMPT_FALLBACK__;
+  }
+});
+
+test('accepting an AI recommendation advances directly to vehicle data', async () => {
+  const runtime = globalThis as Record<string, unknown>;
+  runtime.__BB_USE_PROMPT_FALLBACK__ = true;
+  runtime.__BB_WCTX_MOCK__ = {
+    catalog: { higienizacao_tecido: CATALOG.higienizacao_tecido },
+    categories: {},
+    servicesByKey: {},
+    dbServiceIdByKey: { higienizacao_tecido: 'service-higienizacao-tecido' },
+    prompts: getDefaultPromptMap(),
+  };
+
+  try {
+    const responses: Array<{ text: string }> = [];
+    const result = await handleFAQ(
+      {
+        stage: 'ETAPA10_FAQ',
+        customerName: 'Gustavo',
+        awaitingServiceRecommendation: false,
+        serviceRecommendation: 'Recomendo: Higienização dos Bancos de Tecido - remove as manchas.',
+        serviceRecommendationKey: 'higienizacao_tecido',
+      },
+      '1',
+      responses,
+    );
+
+    const text = responses.map((response) => response.text).join('\n');
+    assert.equal(result.nextState.stage, 'ETAPA4_VEHICLE');
+    assert.equal(result.nextState.serviceKey, 'higienizacao_tecido');
+    assert.equal(result.nextState.serviceRecommendation, null);
+    assert.match(text, /Vamos agendar.*Higienização dos Bancos de Tecido/i);
+    assert.match(text, /dados do veículo/i);
+    assert.doesNotMatch(text, /Conte brevemente o que você busca/i);
+    assert.doesNotMatch(text, /Agendar este serviço/i);
+  } finally {
+    delete runtime.__BB_USE_PROMPT_FALLBACK__;
+    delete runtime.__BB_WCTX_MOCK__;
   }
 });

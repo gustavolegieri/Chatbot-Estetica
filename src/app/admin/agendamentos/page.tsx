@@ -59,6 +59,14 @@ export default function AgendamentosPage() {
     notes: "",
   });
 
+  useEffect(() => {
+    const date = new URLSearchParams(window.location.search).get("date");
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date ?? "")) {
+      setFilterDate(date!);
+      setFilterDateBr(isoToBrDate(date!));
+    }
+  }, []);
+
   const load = useCallback(async () => {
     const [aptRes, cliRes, svcRes] = await Promise.all([
       fetch(`/api/agendamentos?date=${filterDate}`),

@@ -46,7 +46,7 @@ export function detectServiceKey(text: string): string | null {
 export function wantsToSchedule(text: string, num: number | null): boolean {
   if (num === 1) return true;
   const t = text.toLowerCase().trim();
-  return /agendar|agendamento|marcar|reservar|quero marcar|vamos agendar|bora agendar|fazer agendamento|quero agendar|1\s*[-–]?\s*agendar/i.test(
+  return /agendar|agendamento|marcar|reservar|quero marcar|vamos agendar|bora agendar|fazer agendamento|quero agendar|quero .+ mesmo|pode ser (?:essa|esse|essa mesma|esse mesmo)|essa mesmo|essa mesma|esse mesmo|vamos nessa|quero esse|quero essa|confirmo esse|confirmo essa|1\s*[-–]?\s*agendar/i.test(
     t
   );
 }

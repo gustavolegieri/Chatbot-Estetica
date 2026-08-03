@@ -161,6 +161,11 @@ export default function AtendimentoPage() {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const phone = new URLSearchParams(window.location.search).get("phone");
+    if (phone) setSelectedPhone(phone);
+  }, []);
+
   const loadOverview = useCallback(async () => {
     const res = await fetch("/api/atendimento/overview");
     const data = await res.json();
