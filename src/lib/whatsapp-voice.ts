@@ -25,15 +25,21 @@ export function sanitizeTextForSpeech(input: string): string {
     .slice(0, MAX_SPOKEN_CHARACTERS);
 }
 
-export function isVoiceReplyEligible(text: string): boolean {
+export function isVoiceReplyEligible(text: string, options?: { force?: boolean }): boolean {
   if (!voiceRepliesEnabled()) return false;
+  const spoken = sanitizeTextForSpeech(text);
+  if (spoken.length < 8 || spoken.length > MAX_SPOKEN_CHARACTERS) return false;
+
+  // Respostas explicitamente marcadas como dúvida devem virar áudio mesmo
+  // quando mencionam pagamento, horários ou outras palavras operacionais.
+  if (options?.force) return true;
+
   const numberedOptions = text.match(/^\s*\*?\d{1,2}\*?\s*(?:[—–-]|[📅🧭👤✅↩️💬💳💵])/gm)?.length ?? 0;
   if (numberedOptions >= 2) return false;
   if (/horários disponíveis|forma de pagamento|agendamento confirmado|resumo do agendamento/i.test(text)) {
     return false;
   }
-  const spoken = sanitizeTextForSpeech(text);
-  return spoken.length >= 8 && spoken.length <= MAX_SPOKEN_CHARACTERS;
+  return true;
 }
 
 function escapeXml(value: string): string {
@@ -64,9 +70,13 @@ export async function synthesizeVoiceReply(text: string): Promise<Buffer> {
   const chunks: Buffer[] = [];
   return new Promise<Buffer>((resolve, reject) => {
     audioStream.on("data", (chunk: Buffer | Uint8Array) => chunks.push(Buffer.from(chunk)));
-    audioStream.on("error", reject);
+    audioStream.on("error", (error) => {
+      tts.close();
+      reject(error);
+    });
     audioStream.on("end", () => {
       const audio = Buffer.concat(chunks);
+      tts.close();
       if (!audio.length) {
         reject(new Error("O serviço de voz não retornou áudio"));
         return;

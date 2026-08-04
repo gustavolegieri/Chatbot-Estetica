@@ -72,6 +72,16 @@ function getApiKey(): string | null {
   return process.env.WASENDER_API_KEY ?? null;
 }
 
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 8_000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 /**
  * Converte um caminho relativo (ex: /uploads/foto.jpg) em URL pública absoluta,
  * já que a WasenderAPI exige uma URL acessível externamente para envio de mídia.
@@ -99,10 +109,15 @@ function toAbsoluteMediaUrl(url: string): string {
 // Fila persistente no banco para mensagens que falharam por rate limit
 // Substitui o Map em memória que não funciona em serverless
 // Processamento é feito pelo cron job em /api/cron/process-message-queue
-async function addToQueue(phone: string, body: object, isDailyLimit: boolean = false) {
+async function addToQueue(
+  phone: string,
+  body: object,
+  isDailyLimit = false,
+  delayMs = 5_000
+) {
   try {
     const phoneDigits = phone.replace(/\D/g, "");
-  const scheduledFor = new Date(Date.now() + 5_000); // 5 segundos no futuro
+    const scheduledFor = new Date(Date.now() + Math.max(1_000, Math.min(delayMs, 60_000)));
     // Gerar hash do conteúdo para deduplicação
     const bodyStr = JSON.stringify(body);
     const bodyHash = crypto.createHash("md5").update(`${phoneDigits}:${bodyStr}`).digest("hex");
@@ -141,7 +156,7 @@ async function addToQueue(phone: string, body: object, isDailyLimit: boolean = f
   }
 }
 
-export async function wasenderFetch(body: object, attempt = 1): Promise<unknown> {
+export async function wasenderFetch(body: object): Promise<unknown> {
   const apiKey = getApiKey();
 
   if (!apiKey) {
@@ -160,22 +175,33 @@ export async function wasenderFetch(body: object, attempt = 1): Promise<unknown>
     hasMedia: !!(body as any).imageUrl || !!(body as any).videoUrl || !!(body as any).audioUrl || !!(body as any).documentUrl
   });
 
-  const response = await fetch(`${WASENDER_BASE}/send-message`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(`${WASENDER_BASE}/send-message`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    const phone = (body as { to?: string }).to;
+    if (phone) {
+      await addToQueue(phone, body, false, 5_000);
+      console.warn("[WasenderAPI] Falha rápida de rede; mensagem preservada na fila:", error);
+      return { queued: true, reason: "network_error" };
+    }
+    throw error;
+  }
 
-  if (response.status === 429 && attempt <= 3) {
-    let waitMs = 30_000; // Reduzido de 62s para 30s para alta disponibilidade
+  if (response.status === 429) {
+    let waitMs = 5_000;
     let isDailyLimit = false;
     
     try {
       const json = await response.clone().json() as { retry_after?: number; message?: string };
-      if (json.retry_after) waitMs = Math.min(json.retry_after * 1000, 30_000); // Max 30s
+      if (json.retry_after) waitMs = Math.min(json.retry_after * 1000, 60_000);
       
       if (json.message?.toLowerCase().includes("daily") || json.message?.toLowerCase().includes("trial cap")) {
         isDailyLimit = true;
@@ -185,20 +211,13 @@ export async function wasenderFetch(body: object, attempt = 1): Promise<unknown>
     if (isDailyLimit) {
       console.error("[WasenderAPI] ❌ Limite diário da API atingido - mensagens não serão enfileiradas");
       console.error("[WasenderAPI] 💡 Faça upgrade para plano pago ou aguarde o reset diário");
-      return { error: true, status: 429, message: "Limite diário da API atingido" };
+      return { error: true, status: 429, message: "Limite diário da API atingido", isDailyLimit: true };
     }
 
-    if (attempt < 3) {
-      console.warn(`[WasenderAPI] ⏳ Rate limit temporário — aguardando ${waitMs / 1000}s para retry (tentativa ${attempt}/3)`);
-      await new Promise((resolve) => setTimeout(resolve, waitMs));
-      return wasenderFetch(body, attempt + 1);
-    }
-
-    console.warn(`[WasenderAPI] ⚠️ Rate limit persistente após ${attempt} tentativas — adicionando à fila persistente`);
     const phone = (body as any).to;
     if (phone) {
-      await addToQueue(phone, body, false);
-      console.log("[WasenderAPI] 📤 Mensagem adicionada à fila persistente devido a rate limit");
+      await addToQueue(phone, body, false, waitMs);
+      console.log("[WasenderAPI] Rate limit temporário; mensagem enfileirada sem bloquear o webhook");
       return { queued: true, reason: "rate_limit" };
     }
 
@@ -225,9 +244,13 @@ export async function wasenderFetch(body: object, attempt = 1): Promise<unknown>
       } catch { /* ignora */ }
     }
     
-    // Não lançar erro em casos de rate limit temporário ou erro temporário
-    if (response.status >= 500 || response.status === 429) {
-      console.warn("[WasenderAPI] ⚠️ Erro temporário, continuando fluxo");
+    if (response.status >= 500) {
+      const phone = (body as { to?: string }).to;
+      if (phone) {
+        await addToQueue(phone, body, false, 5_000);
+        console.warn("[WasenderAPI] Erro temporário; mensagem preservada na fila");
+        return { queued: true, reason: `http_${response.status}` };
+      }
       return { error: true, status: response.status, message: text };
     }
     throw new Error(`WasenderAPI error: ${response.status} - ${text}`);
@@ -258,14 +281,14 @@ async function uploadAudioBuffer(audio: Buffer): Promise<string> {
     ? audio
     : Buffer.concat([Buffer.from([0x49, 0x44, 0x33, 0x04, 0, 0, 0, 0, 0, 0]), audio]);
 
-  const response = await fetch(`${WASENDER_BASE}/upload`, {
+  const response = await fetchWithTimeout(`${WASENDER_BASE}/upload`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "audio/mpeg",
     },
     body: new Uint8Array(normalizedAudio),
-  });
+  }, 10_000);
   const body = (await response.json().catch(() => null)) as
     | { publicUrl?: string; message?: string }
     | null;
@@ -275,8 +298,8 @@ async function uploadAudioBuffer(audio: Buffer): Promise<string> {
   return body.publicUrl;
 }
 
-async function trySendVoiceReply(number: string, text: string): Promise<boolean> {
-  if (!isVoiceReplyEligible(text)) return false;
+async function trySendVoiceReply(number: string, text: string, force = false): Promise<boolean> {
+  if (!isVoiceReplyEligible(text, { force })) return false;
   try {
     const audio = await synthesizeVoiceReply(text);
     const audioUrl = await uploadAudioBuffer(audio);
@@ -309,11 +332,12 @@ export async function sendText({
 
   try {
     const ctx = getMessageLogContext();
+    const explicitVoiceReply = voiceReply === true;
     const shouldTryVoice =
       sender === "BOT" &&
       !ctx?.voiceReplySent &&
-      Boolean(voiceReply || ctx?.replyWithAudio);
-    const voiceSent = shouldTryVoice ? await trySendVoiceReply(number, text) : false;
+      Boolean(explicitVoiceReply || (voiceReply !== false && ctx?.replyWithAudio));
+    const voiceSent = shouldTryVoice ? await trySendVoiceReply(number, text, explicitVoiceReply) : false;
     if (voiceSent && ctx) ctx.voiceReplySent = true;
 
     const result = voiceSent

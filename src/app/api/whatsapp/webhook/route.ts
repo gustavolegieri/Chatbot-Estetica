@@ -6,11 +6,10 @@ import { extractWasenderAudioMessage, transcribeWasenderAudio } from "@/lib/what
 import { sendText } from "@/lib/evolution-api";
 import { notifyPwaAboutWhatsAppMessage } from "@/lib/pwa-push";
 import { applyWasenderContactEvents } from "@/lib/wasender-contacts";
+import { isWasenderMessageTooOld } from "@/lib/wasender-timestamp";
 
-// Tipagem para waitUntil do Next.js (disponível em edge runtime)
-interface WaitUntil {
-  (promise: Promise<unknown>): void;
-}
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 /** Verifica assinatura enviada pela WasenderAPI no header X-Webhook-Signature */
 function verifySignature(req: NextRequest, rawBody: string): boolean {
@@ -76,46 +75,8 @@ function extractPhone(msgKey: Record<string, unknown>): string | null {
   return null;
 }
 
-// Timestamp de corte para ignorar mensagens antigas (deploy atual)
-// Definido como agora para evitar processar mensagens acumuladas
-const DEPLOY_TIMESTAMP = new Date(); // Timestamp atual do deploy
-
-// Deduplicação persistida no banco de dados (Prisma)
-// Substitui o Map em memória que não funciona em serverless
-async function isMessageProcessed(messageId: string): Promise<boolean> {
-  try {
-    const existing = await prisma.whatsAppMessage.findUnique({
-      where: { wasenderMessageId: messageId }
-    });
-    return existing !== null;
-  } catch (error) {
-    // Se houver erro na consulta, assume que não foi processado
-    // para não bloquear o processamento
-    console.error("[Webhook] Erro ao verificar mensagem processada:", error);
-    return false;
-  }
-}
-
-// Verifica se a mensagem é muito antiga (antes do deploy atual)
-function isMessageTooOld(messageTimestamp?: number | string): boolean {
-  if (!messageTimestamp) return false;
-  
-  try {
-    const msgTime = new Date(typeof messageTimestamp === 'string' ? parseInt(messageTimestamp) : messageTimestamp);
-    // Ignorar mensagens mais de 5 minutos antes do deploy
-    const cutoffTime = new Date(DEPLOY_TIMESTAMP.getTime() - 5 * 60 * 1000);
-    
-    if (msgTime < cutoffTime) {
-      console.log("[Webhook] Mensagem muito antiga ignorada:", msgTime.toISOString(), "(cutoff:", cutoffTime.toISOString() + ")");
-      return true;
-    }
-  } catch (error) {
-    console.error("[Webhook] Erro ao verificar timestamp da mensagem:", error);
-  }
-  
-  return false;
-}
-
+// A Wasender pode entregar o epoch em segundos ou milissegundos. Interpretar
+// segundos como ms fazia mensagens válidas parecerem ser de 1970.
 async function markMessageAsProcessed(
   messageId: string,
   phone: string,
@@ -234,10 +195,10 @@ export async function POST(req: NextRequest) {
   
   console.log("[Webhook] Telefone extraído:", phone);
 
-  // Verificar se a mensagem é muito antiga (antes do deploy atual)
+  // Aceita timestamp em segundos ou milissegundos e ignora apenas eventos 24h+.
   const messageTimestamp = msgKey.timestamp as number | string | undefined;
-  if (isMessageTooOld(messageTimestamp)) {
-    console.log("[Webhook] Ignorando mensagem antiga antes do deploy");
+  if (isWasenderMessageTooOld(messageTimestamp)) {
+    console.log("[Webhook] Ignorando mensagem com mais de 24 horas");
     return NextResponse.json({ ok: true });
   }
 
@@ -313,7 +274,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (!processedText.trim()) {
-      console.log("[Webhook] Mensagem sem conteúdo processável, ignorando");
+      console.log("[Webhook] Mensagem sem conteúdo textual processável");
+      await sendText({
+        number: phone,
+        text: "Recebi sua mensagem. No momento consigo entender melhor *texto* e *áudio*. Se enviou uma foto ou documento, escreva em uma frase o que deseja analisar.",
+        flowStage: "UNSUPPORTED_MESSAGE_FALLBACK",
+      });
       return NextResponse.json({ ok: true });
     }
     
@@ -335,7 +301,9 @@ export async function POST(req: NextRequest) {
       sourceType: audioMessage ? "audio" : "text",
     }, waitUntil);
 
-    await notifyPwaAboutWhatsAppMessage({ phone, body: processedText });
+    await notifyPwaAboutWhatsAppMessage({ phone, body: processedText }).catch((error) => {
+      console.error("[Webhook] Falha isolada ao notificar PWA:", error);
+    });
 
     console.log("[Webhook] processamento concluído");
   } catch (err) {
@@ -343,6 +311,7 @@ export async function POST(req: NextRequest) {
     if (markerCreated && messageId) {
       await deleteMessageProcessingMarker(messageId);
     }
+    return NextResponse.json({ ok: false, retry: true }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });

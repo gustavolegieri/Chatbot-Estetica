@@ -10,14 +10,14 @@ interface LogMessageParams {
   sender: MessageSender;
   body: string;
   flowStage?: string | null;
+  wasenderMessageId?: string | null;
 }
 
 export async function logWhatsAppMessage(params: LogMessageParams) {
   const phone = normalizePhone(params.phone);
   const preview = params.body.slice(0, 120);
 
-  const message = await prisma.whatsAppMessage.create({
-    data: {
+  const data = {
       phone,
       sessionId: params.sessionId ?? undefined,
       clientId: params.clientId ?? undefined,
@@ -25,8 +25,19 @@ export async function logWhatsAppMessage(params: LogMessageParams) {
       sender: params.sender,
       body: params.body,
       flowStage: params.flowStage ?? undefined,
-    },
-  });
+      wasenderMessageId: params.wasenderMessageId ?? undefined,
+    };
+
+  // O webhook cria primeiro um marcador atômico para deduplicação. Quando o
+  // fluxo processa a mensagem, atualizamos esse mesmo registro com a sessão,
+  // transcrição e etapa corretas, em vez de criar uma segunda linha no CRM.
+  const message = params.wasenderMessageId
+    ? await prisma.whatsAppMessage.upsert({
+        where: { wasenderMessageId: params.wasenderMessageId },
+        create: data,
+        update: data,
+      })
+    : await prisma.whatsAppMessage.create({ data });
 
   if (params.sessionId) {
     await prisma.whatsAppSession.update({

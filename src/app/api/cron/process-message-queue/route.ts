@@ -119,6 +119,59 @@ export async function POST(req: NextRequest) {
         // Converter o JSON de volta para objeto para enviar à API
         const body = typeof msg.body === 'string' ? JSON.parse(msg.body) : msg.body;
         const result = await wasenderFetch(body);
+
+        const delivery = result as {
+          queued?: boolean;
+          error?: boolean;
+          status?: number;
+          message?: string;
+          isDailyLimit?: boolean;
+        } | null;
+
+        if (delivery?.isDailyLimit) {
+          await prisma.outboundMessageQueue.updateMany({
+            where: { processedAt: null, phone: msg.phone },
+            data: {
+              isDailyLimit: true,
+              claimedBy: null,
+              error: delivery.message ?? "Limite diário",
+            },
+          });
+          console.error("[Cron] Limite diário atingido - interrompendo processamento");
+          break;
+        }
+
+        if (delivery?.queued) {
+          const nextAttempts = msg.attempts + 1;
+          if (nextAttempts < msg.maxAttempts) {
+            await prisma.outboundMessageQueue.update({
+              where: { id: msg.id },
+              data: {
+                attempts: nextAttempts,
+                scheduledFor: new Date(Date.now() + 15_000),
+                claimedBy: null,
+                error: "Aguardando nova tentativa de entrega",
+              },
+            });
+            failed++;
+          } else {
+            await prisma.outboundMessageQueue.update({
+              where: { id: msg.id },
+              data: {
+                attempts: nextAttempts,
+                processedAt: now,
+                claimedBy: null,
+                error: "Máximo de tentativas atingido",
+              },
+            });
+            skipped++;
+          }
+          continue;
+        }
+
+        if (delivery?.error) {
+          throw new Error(delivery.message || `Falha de entrega (${delivery.status ?? "sem status"})`);
+        }
         
         // Marcar como processada e limpar claimedBy
         await prisma.outboundMessageQueue.update({
@@ -131,20 +184,6 @@ export async function POST(req: NextRequest) {
         
         console.log(`[Cron] ✅ Mensagem ${msg.id} enviada com sucesso`);
         processed++;
-        
-        // Verificar se o resultado indica limite diário
-        if (result && typeof result === 'object' && 'error' in result && (result as any).isDailyLimit) {
-          console.error("[Cron] ❌ Limite diário atingido - interrompendo processamento");
-          // Marcar mensagens restantes como limite diário
-          await prisma.outboundMessageQueue.updateMany({
-            where: {
-              processedAt: null,
-              phone: msg.phone
-            },
-            data: { isDailyLimit: true }
-          });
-          break;
-        }
         
       } catch (err) {
         console.error(`[Cron] ❌ Erro ao processar mensagem ${msg.id}:`, err);
@@ -169,7 +208,7 @@ export async function POST(req: NextRequest) {
         }
         
         // Incrementar tentativas e reagendar se não excedeu o máximo
-        if (msg.attempts < msg.maxAttempts) {
+        if (msg.attempts + 1 < msg.maxAttempts) {
           const nextAttempt = new Date(Date.now() + 35000); // 35 segundos no futuro
           await prisma.outboundMessageQueue.update({
             where: { id: msg.id },

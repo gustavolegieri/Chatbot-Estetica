@@ -210,18 +210,20 @@ async function sendTextWrapper(
   text: string,
   options?: { voiceReply?: boolean; includesWelcome?: boolean }
 ) {
-  let outgoingText = text;
-  if (msg.initialWelcomePrefix && !msg.initialWelcomeConsumed) {
-    msg.initialWelcomeConsumed = true;
-    if (!options?.includesWelcome) {
-      outgoingText = `${msg.initialWelcomePrefix}\n\n${text}`;
-    }
-  }
   await flowDeliveryContext.run(msg.testMode, async () => {
-    await sendText({ number: msg.phone, text: outgoingText, voiceReply: options?.voiceReply });
+    if (msg.initialWelcomePrefix && !msg.initialWelcomeConsumed) {
+      msg.initialWelcomeConsumed = true;
+      if (!options?.includesWelcome) {
+        // Em uma pergunta enviada por áudio, a saudação continua em texto e a
+        // voz fica reservada para a resposta útil logo em seguida.
+        await sendText({ number: msg.phone, text: msg.initialWelcomePrefix, voiceReply: false });
+        if (!msg.testMode?.sendTextCallback) await delay(120);
+      }
+    }
+    await sendText({ number: msg.phone, text, voiceReply: options?.voiceReply });
   });
   if (!msg.testMode?.sendTextCallback) {
-    await delay(500);
+    await delay(120);
   }
 }
 
@@ -300,10 +302,10 @@ async function executeCoreHandler(
     }
     if (response.text) {
       if (msg.testMode?.sendTextCallback) {
-        await msg.testMode.sendTextCallback(response.text);
+        await msg.testMode.sendTextCallback(response.text, { voiceReply: response.voiceReply });
       } else {
         await sendText({ number: msg.phone, text: response.text, voiceReply: response.voiceReply });
-        await delay(500); // Pequeno delay entre mensagens
+        await delay(120);
       }
     }
   }
@@ -977,16 +979,16 @@ async function activateService(
           caption: item.label,
           mediaType,
         });
-        await delay(800);
+        await delay(300);
       }
 
-      await delay(500);
+      await delay(150);
       await sendText({ number: msg.phone, text: detailText });
     } catch (err) {
       console.error("[Midia] Erro ao enviar mídia do serviço:", err);
     }
   } else {
-    await delay(500);
+    await delay(150);
     await sendText({ number: msg.phone, text: detailText });
   }
 }
@@ -1129,7 +1131,14 @@ async function showAvailabilityServiceSelection(
   };
   await saveFlow(msg.phone, next, !!msg.testMode);
   msg.testMode?.onFlowStateChange?.(next);
-  await sendTextWrapper(msg, availabilityServiceSelectionText(next, wctx, msg.pushName));
+  if (looksLikeQuestion(msg.text)) {
+    await sendTextWrapper(
+      msg,
+      "Claro. Posso verificar a agenda para você. Primeiro preciso saber qual serviço deseja, porque a duração muda os horários disponíveis.",
+      { voiceReply: true }
+    );
+  }
+  await sendTextWrapper(msg, availabilityServiceSelectionText(next, wctx, msg.pushName), { voiceReply: false });
   await sendCalendarWithImageAndList({ number: msg.phone, prompts: wctx.prompts });
 }
 
@@ -1828,23 +1837,27 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
       aiFollowupReturnStage: undefined,
     };
 
-    const followupAnalysis = await analyzeWhatsAppMessage({
-      text: input,
-      stage: resumedFlow.stage,
-      pushName: msg.pushName,
-      customerName: resumedFlow.customerName,
-      ctx,
-    });
+    const followupQuestionByRule = looksLikeQuestion(input);
+    const followupAnalysis = followupQuestionByRule
+      ? null
+      : await analyzeWhatsAppMessage({
+          text: input,
+          stage: resumedFlow.stage,
+          pushName: msg.pushName,
+          customerName: resumedFlow.customerName,
+          ctx,
+        });
 
-    if (looksLikeQuestion(input) || followupAnalysis?.intent === "doubt") {
+    if (followupQuestionByRule || followupAnalysis?.intent === "doubt") {
       const contextualFlow = rememberDoubtService(input, resumedFlow, wctx);
       await saveFlow(msg.phone, contextualFlow);
       const answer = await buildCustomerDoubtAnswer(input, contextualFlow, ctx, wctx, followupAnalysis?.reply);
       await sendText({
         number: msg.phone,
-        text: `${answer}\n\n${doubtResumePrompt(contextualFlow)}`,
+        text: answer,
         voiceReply: true,
       });
+      await sendText({ number: msg.phone, text: doubtResumePrompt(contextualFlow), voiceReply: false });
       return;
     }
 
@@ -1880,7 +1893,7 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
       await saveFlow(msg.phone, cancellationResult.nextState);
       for (const response of cancellationResult.responses) {
         await sendText({ number: msg.phone, text: response.text });
-        await delay(500);
+        await delay(120);
       }
       return;
     }
@@ -1909,6 +1922,16 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
     if (!selectedService) {
       await showAvailabilityServiceSelection(msg, availabilityFlow, wctx);
       return;
+    }
+
+    if (looksLikeQuestion(input)) {
+      const requestedDate = availabilityFlow.dayLabel ?? availabilityFlow.dayDate ?? "a data desejada";
+      const serviceLabel = availabilityFlow.serviceLabel ?? wctx.catalog[selectedService]?.label ?? "o serviço escolhido";
+      await sendText({
+        number: msg.phone,
+        text: `Claro. Vou consultar os horários reais para ${requestedDate}, considerando o tempo de ${serviceLabel}.`,
+        voiceReply: true,
+      });
     }
 
     if (!flow.serviceKey || flow.serviceKey !== selectedService) {
@@ -1952,18 +1975,20 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
   if (
     !isShortMenuPick &&
     !num &&
-    flow.stage !== "ETAPA10_FAQ" &&
     flow.stage !== "ETAPA1_AWAITING_NAME"
   ) {
-    const analysis = await analyzeWhatsAppMessage({
-      text: input,
-      stage: flow.stage,
-      pushName: msg.pushName,
-      customerName: flow.customerName,
-      ctx,
-    });
+    const questionByRule = looksLikeQuestion(input);
+    const analysis = questionByRule
+      ? null
+      : await analyzeWhatsAppMessage({
+          text: input,
+          stage: flow.stage,
+          pushName: msg.pushName,
+          customerName: flow.customerName,
+          ctx,
+        });
 
-    if (looksLikeQuestion(input) || analysis?.intent === "doubt") {
+    if (questionByRule || analysis?.intent === "doubt") {
       const contextualFlow = rememberDoubtService(input, flow, wctx);
       if (contextualFlow.pendingServiceKey !== flow.pendingServiceKey) {
         await saveFlow(msg.phone, contextualFlow);
@@ -1971,9 +1996,10 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
       const answer = await buildCustomerDoubtAnswer(input, contextualFlow, ctx, wctx, analysis?.reply);
       await sendText({
         number: msg.phone,
-        text: `${answer}\n\n${doubtResumePrompt(contextualFlow)}`,
+        text: answer,
         voiceReply: true,
       });
+      await sendText({ number: msg.phone, text: doubtResumePrompt(contextualFlow), voiceReply: false });
       return;
     }
   }
@@ -2025,14 +2051,17 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
       const serviceKey = detectedServiceKey && detectedServiceKey !== "indeciso"
         ? detectedServiceKey
         : flow.pendingServiceKey;
-      const analysis = await analyzeWhatsAppMessage({
-        text: input,
-        stage: flow.stage,
-        pushName: msg.pushName,
-        ctx,
-      });
+      const questionByRule = looksLikeQuestion(input);
+      const analysis = questionByRule
+        ? null
+        : await analyzeWhatsAppMessage({
+            text: input,
+            stage: flow.stage,
+            pushName: msg.pushName,
+            ctx,
+          });
 
-      if (looksLikeQuestion(input) || analysis?.intent === "doubt") {
+      if (questionByRule || analysis?.intent === "doubt") {
         const next = rememberDoubtService(input, {
           ...flow,
           pendingInitialIntent: "doubt",
@@ -2041,8 +2070,13 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
         const answer = await buildCustomerDoubtAnswer(input, next, ctx, wctx, analysis?.reply);
         await sendText({
           number: msg.phone,
-          text: `${answer}\n\nPara personalizar o atendimento, como posso te chamar? 😊\n_Envie somente seu primeiro nome._`,
+          text: answer,
           voiceReply: true,
+        });
+        await sendText({
+          number: msg.phone,
+          text: "Para personalizar o atendimento, como posso te chamar? 😊\n_Envie somente seu primeiro nome._",
+          voiceReply: false,
         });
         return;
       }
@@ -3410,7 +3444,7 @@ async function confirmFinal(
     awaitingPostConfirmationReturn: true,
   };
 
-  await delay(600);
+  await delay(180);
   await sendText({
     number: msg.phone,
     text: confirmBody,
@@ -3466,16 +3500,19 @@ export async function startFlow(msg: IncomingMessage) {
     const serviceKey = detectedServiceKey && detectedServiceKey !== "indeciso"
       ? detectedServiceKey
       : undefined;
-    const analysis = await analyzeWhatsAppMessage({
-      text: input,
-      stage: "ETAPA1_AWAITING_NAME",
-      pushName: msg.pushName,
-      ctx,
-    });
+    const questionByRule = looksLikeQuestion(input);
+    const analysis = questionByRule
+      ? null
+      : await analyzeWhatsAppMessage({
+          text: input,
+          stage: "ETAPA1_AWAITING_NAME",
+          pushName: msg.pushName,
+          ctx,
+        });
     const availabilityRequest = isAvailabilityRequest(input);
     const availabilityDay = availabilityRequest ? parseDayInput(input, null) : null;
     const initialDoubt =
-      !availabilityRequest && (looksLikeQuestion(input) || analysis?.intent === "doubt");
+      !availabilityRequest && (questionByRule || analysis?.intent === "doubt");
     const understoodSchedule =
       availabilityRequest ||
       (!initialDoubt && (
@@ -3513,12 +3550,12 @@ export async function startFlow(msg: IncomingMessage) {
       msg.testMode?.onFlowStateChange?.(initialState);
 
       const answer = await buildCustomerDoubtAnswer(input, initialState, ctx, wctx, analysis?.reply);
+      await sendTextWrapper(msg, answer, { voiceReply: true });
       await sendTextWrapper(
         msg,
         profileName
-          ? `${answer}\n\n${doubtResumePrompt(initialState)}`
-          : `${answer}\n\nPara personalizar o atendimento, como posso te chamar? 😊\n_Envie somente seu primeiro nome._`,
-        { voiceReply: true }
+          ? doubtResumePrompt(initialState)
+          : "Para personalizar o atendimento, como posso te chamar? 😊\n_Envie somente seu primeiro nome._"
       );
       return;
     }
@@ -3546,6 +3583,14 @@ export async function startFlow(msg: IncomingMessage) {
       await saveFlow(msg.phone, namedState, !!msg.testMode);
       msg.testMode?.onFlowStateChange?.(namedState);
       if (serviceKey) {
+        if (availabilityRequest && looksLikeQuestion(input)) {
+          const requestedDate = namedState.dayLabel ?? namedState.dayDate ?? "a data desejada";
+          await sendTextWrapper(
+            msg,
+            `Claro. Vou consultar a agenda para ${requestedDate}, considerando o tempo de ${wctx.catalog[serviceKey]?.label ?? "serviço escolhido"}.`,
+            { voiceReply: true }
+          );
+        }
         await activateService(msg, { ...namedState, serviceRequestContext: input.slice(0, 500) }, serviceKey, wctx);
         if (availabilityRequest) {
           await sendCalendarWithImageAndList({ number: msg.phone, prompts: wctx.prompts });
@@ -3571,13 +3616,21 @@ export async function startFlow(msg: IncomingMessage) {
         msg,
         savedVehicle
           ? `Olá, *${returningName}*! Que bom ter você de volta 😊\n\nEste atendimento será para o mesmo veículo, *${savedVehicle}*?\n\n*1* ✅ Sim, o mesmo veículo\n*2* 🚗 Não, quero informar outro\n\n_Você também pode responder com suas palavras._`
-          : flowMsg(wctx).mainMenu(returningState, msg.pushName)
+          : flowMsg(wctx).mainMenu(returningState, msg.pushName),
+        { includesWelcome: true }
       );
       return;
     }
 
     console.log("[WhatsApp Flow] 📤 Enviando mensagem de boas-vindas");
     const availabilityTarget = availabilityDay?.dayLabel ?? availabilityDay?.dayDate;
+    if (availabilityRequest && looksLikeQuestion(input)) {
+      await sendTextWrapper(
+        msg,
+        "Claro. Posso verificar a agenda para você. Para mostrar horários reais, preciso primeiro do serviço desejado.",
+        { voiceReply: true }
+      );
+    }
     await sendTextWrapper(
       msg,
       availabilityRequest
@@ -3597,7 +3650,7 @@ export async function startFlow(msg: IncomingMessage) {
         : understoodSchedule
         ? initialScheduleNameRequest(serviceKey ? wctx.catalog[serviceKey]?.label : null, wctx.prompts)
         : etapa1Welcome(ctx, wctx.prompts),
-      { includesWelcome: !availabilityRequest && !understoodSchedule }
+      { includesWelcome: !availabilityRequest && !understoodSchedule, voiceReply: false }
     );
     console.log("[WhatsApp Flow] 💾 Salvando estado com welcomed=true");
     const initialState: FlowState = {

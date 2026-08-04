@@ -1,4 +1,4 @@
-const CACHE_NAME = "garagem-ka-pwa-v1";
+const CACHE_NAME = "garagem-ka-pwa-v2";
 const APP_SHELL = [
   "/admin/mobile",
   "/admin/login",

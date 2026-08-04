@@ -2,7 +2,9 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
 const DEFAULT_MODEL = "gpt-oss-120b";
-const CEREBRAS_TIMEOUT_MS = 8_000;
+// Mantém o atendimento responsivo: após 6s o fluxo usa o fallback seguro do
+// catálogo em vez de deixar o cliente esperando indefinidamente.
+const CEREBRAS_TIMEOUT_MS = 6_000;
 const cerebrasRuntime = new AsyncLocalStorage<{ enabled: boolean }>();
 
 export function withCerebrasEnabled<T>(enabled: boolean, callback: () => Promise<T>): Promise<T> {

@@ -242,14 +242,15 @@ REGRAS DE OPERAÇÃO:
 /** Detecta se mensagem livre parece uma pergunta/dúvida */
 export function looksLikeQuestion(text: string): boolean {
   const t = text.trim().toLowerCase();
-  if (t.length < 8) return false;
+  if (t.length < 2) return false;
   if (/^(oi|olá|ola|bom dia|boa tarde|boa noite|menu|voltar)\b/.test(t)) return false;
+  if (t.includes("?")) return true;
+  if (t.length < 5) return false;
   return (
-    t.includes("?") ||
     /^(como|quanto|qual|quais|onde|quando|por que|porque|vocês|voces|tem |dá |da |posso |consigo )/.test(
       t
     ) ||
-    /dúvida|duvida|pergunta|gostaria de saber|queria saber|me explica|funciona|aceita|atende/.test(t) ||
+    /dúvida|duvida|pergunta|gostaria de saber|queria saber|quero saber|preciso saber|me explica|me fale|me fala|pode me explicar|poderia explicar|informações|informacoes|detalhes|funciona|aceita|atende/.test(t) ||
     /\b(preço|preco|valor|custa|custo|demora|duração|duracao|garantia|inclui|pagamento|pix|cartão|cartao|motor|proteção|protecao)\b/.test(t)
   );
 }

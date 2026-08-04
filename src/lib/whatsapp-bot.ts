@@ -6,7 +6,6 @@ import { goToMainMenu, processNumberedFlow, startFlow } from "./whatsapp-flow";
 import { enqueueWhatsAppMessage } from "./whatsapp-debounce";
 import { tryHandleAppointmentConfirmation } from "./appointment-confirmation";
 import { applyWelcomeRestartIfNeeded } from "./whatsapp-session-reset";
-import { sendWelcomeFlow } from "./whatsapp-welcome";
 import { resolveValidCustomerName } from "./customer-name";
 import { getBusinessHoursStatus, afterHoursMessage } from "./business-hours";
 import { runAppointmentRemindersFromBot } from "./appointment-reminders-runner";
@@ -138,6 +137,7 @@ async function handleMessageInternal(msg: IncomingMessage) {
           sender: MessageSender.CLIENT,
           body: msg.sourceType === "audio" ? `🎙️ ${inboundText}` : inboundText,
           flowStage: flowRef.current.stage,
+          wasenderMessageId: msg.messageId,
         });
       }
 
@@ -206,10 +206,9 @@ async function handleMessageInternal(msg: IncomingMessage) {
       );
 
       if (resetResult.shouldSendWelcome) {
-        await sendWelcomeFlow(
-          msg.phone,
-          session.client?.name ?? msg.pushName ?? flowRef.current.customerName
-        );
+        // A própria entrada do fluxo envia a saudação e continua processando a
+        // mensagem atual. Assim uma dúvida após 1h não é descartada.
+        await startFlow(msg);
         return;
       }
 
@@ -248,6 +247,7 @@ export async function processWhatsAppMessage(msg: IncomingMessage, waitUntil?: (
       buttonId: msg.buttonId,
       listId: msg.listId,
       sourceType: msg.sourceType,
+      messageId: msg.messageId,
     },
     async (merged) => {
       console.log("[WhatsApp Bot] handleMessageInternal sendo chamado via debounce:", { phone: merged.phone, text: merged.text });

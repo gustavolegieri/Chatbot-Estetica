@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Smartphone } from "lucide-react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
+import { AdminWorkspaceTabs } from "@/components/layout/AdminWorkspaceTabs";
 import { PwaInstallButton } from "@/components/pwa/PwaInstallButton";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +24,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <Sidebar />
       <main className="min-w-0 flex-1 overflow-x-hidden p-4 pt-20 sm:p-6 sm:pt-20 lg:p-8 lg:pt-8">
         <GlobalSearch />
+        <AdminWorkspaceTabs />
         {children}
       </main>
       <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 rounded-2xl border border-brand-500/20 bg-[#0b1712]/95 p-2.5 shadow-2xl shadow-black/50 backdrop-blur-xl lg:hidden">

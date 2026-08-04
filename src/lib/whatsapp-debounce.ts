@@ -1,19 +1,11 @@
 import { normalizePhone } from "./utils";
 import { prisma } from "./prisma";
 
-// Reduzido para 500ms para plano gratuito WASender API (1 msg/minuto)
-const DEBOUNCE_MS = 500;
-const LOCK_TIMEOUT_MS = 15_000;
-
-interface PendingMessage {
-  phone: string;
-  texts: string[];
-  pushName?: string;
-  buttonId?: string;
-  listId?: string;
-  sourceType?: "text" | "audio";
-  timer: ReturnType<typeof setTimeout>;
-}
+// Um atendimento com IA, voz e mídia pode ultrapassar 15 segundos. O lock só
+// é considerado abandonado depois de um minuto para impedir estados paralelos.
+const LOCK_STALE_MS = 60_000;
+const LOCK_WAIT_MS = 25_000;
+const LOCK_RETRY_MS = 180;
 
 interface IncomingPayload {
   phone: string;
@@ -22,23 +14,20 @@ interface IncomingPayload {
   buttonId?: string;
   listId?: string;
   sourceType?: "text" | "audio";
+  messageId?: string;
 }
 
-// Estado em memória para debounce (aceitável pois é apenas para agrupar mensagens rápidas)
-const pending = new Map<string, PendingMessage>();
+// Serializa imediatamente as mensagens dentro da mesma instância. Diferente
+// do debounce antigo, nenhuma mensagem é substituída e toda Promise termina.
+const localChains = new Map<string, Promise<void>>();
 
-/**
- * Tenta adquirir lock distribuído no banco para evitar processamento paralelo
- * entre diferentes instâncias serverless.
- * 
- * @returns true se o lock foi adquirido, false se já estava em uso
- */
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 async function acquireLock(phone: string): Promise<boolean> {
   const normalized = normalizePhone(phone);
   const now = new Date();
-  const staleThreshold = new Date(now.getTime() - LOCK_TIMEOUT_MS);
+  const staleThreshold = new Date(now.getTime() - LOCK_STALE_MS);
 
-  // 1. Tenta adquirir lock atomicamente numa sessão já existente
   const result = await prisma.whatsAppSession.updateMany({
     where: {
       phone: normalized,
@@ -49,24 +38,14 @@ async function acquireLock(phone: string): Promise<boolean> {
     },
     data: { processingLockedAt: now },
   });
+  if (result.count > 0) return true;
 
-  if (result.count > 0) {
-    console.log("[Lock] Lock adquirido com sucesso para", normalized);
-    return true; // conseguiu o lock numa sessão existente
-  }
-
-  // 2. count === 0: ou está locked por outra instância, ou a sessão ainda não existe
   const exists = await prisma.whatsAppSession.findUnique({
     where: { phone: normalized },
     select: { phone: true },
   });
+  if (exists) return false;
 
-  if (exists) {
-    console.log("[Lock] Mensagem ignorada — outra instância já está processando", normalized);
-    return false; // estava locked de verdade
-  }
-
-  // 3. Telefone novo: tenta criar, mas trata corrida contra outro create concorrente
   try {
     await prisma.whatsAppSession.create({
       data: {
@@ -75,116 +54,74 @@ async function acquireLock(phone: string): Promise<boolean> {
         metadata: { stage: "ETAPA1_AWAITING_NAME", welcomed: false } as object,
       },
     });
-    console.log("[Lock] Lock adquirido com sucesso (nova sessão) para", normalized);
     return true;
-  } catch (error: any) {
-    if (error.code === "P2002") {
-      // outra instância criou a sessão entre o findUnique e o create — perdeu a corrida
-      console.log("[Lock] Mensagem ignorada — outra instância criou a sessão primeiro", normalized);
-      return false;
-    }
-    console.error("[Lock] Erro ao criar nova sessão:", error);
-    return false;
+  } catch (error: unknown) {
+    if ((error as { code?: string })?.code === "P2002") return false;
+    throw error;
   }
 }
 
-/**
- * Libera o lock distribuído no banco.
- */
-async function releaseLock(phone: string): Promise<void> {
-  const normalized = normalizePhone(phone);
+async function acquireLockWithRetry(phone: string): Promise<void> {
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  let lastError: unknown;
 
+  while (Date.now() < deadline) {
+    try {
+      if (await acquireLock(phone)) return;
+    } catch (error) {
+      lastError = error;
+    }
+    await wait(LOCK_RETRY_MS);
+  }
+
+  const cause = lastError instanceof Error ? `: ${lastError.message}` : "";
+  throw new Error(`Atendimento ocupado por mais de ${LOCK_WAIT_MS / 1000}s${cause}`);
+}
+
+async function releaseLock(phone: string): Promise<void> {
   try {
     await prisma.whatsAppSession.update({
-      where: { phone: normalized },
+      where: { phone: normalizePhone(phone) },
       data: { processingLockedAt: null },
     });
-    console.log("[Lock] Lock liberado para", normalized);
   } catch (error) {
-    console.error("[Lock] Erro ao liberar lock:", error);
+    console.error("[WhatsApp Queue] Não foi possível liberar o lock:", error);
+  }
+}
+
+async function processSerialized(
+  msg: IncomingPayload,
+  handler: (payload: IncomingPayload) => Promise<void>
+) {
+  await acquireLockWithRetry(msg.phone);
+  try {
+    await handler(msg);
+  } finally {
+    await releaseLock(msg.phone);
   }
 }
 
 /**
- * Agrupa mensagens rápidas em uma só (anti-flood).
- * Responde uma única vez após 500ms sem novas mensagens.
- * Usa a última mensagem recebida em vez de juntar com espaço.
- * 
- * SERVERLESS COMPATIBLE: Usa waitUntil() para garantir execução do timer
- * mesmo após a resposta HTTP ser enviada (Vercel específico).
+ * Processa todas as mensagens em ordem, sem atraso artificial e sem descartar
+ * entradas concorrentes. O lock local ordena a instância atual e o lock no
+ * banco coordena instâncias serverless diferentes.
  */
 export function enqueueWhatsAppMessage(
   msg: IncomingPayload,
-  handler: (merged: IncomingPayload) => Promise<void>,
+  handler: (payload: IncomingPayload) => Promise<void>,
   waitUntil?: (promise: Promise<unknown>) => void
 ): Promise<void> {
   const key = normalizePhone(msg.phone);
-  const existing = pending.get(key);
+  const previous = localChains.get(key) ?? Promise.resolve();
+  const task = previous
+    .catch(() => undefined)
+    .then(() => processSerialized(msg, handler));
 
-  if (existing) {
-    clearTimeout(existing.timer);
-    // Substitui o texto anterior pelo novo (em vez de acumular)
-    existing.texts = [msg.text];
-    if (msg.pushName) existing.pushName = msg.pushName;
-    if (msg.buttonId) existing.buttonId = msg.buttonId;
-    if (msg.listId) existing.listId = msg.listId;
-    if (msg.sourceType) existing.sourceType = msg.sourceType;
-  } else {
-    pending.set(key, {
-      phone: msg.phone,
-      texts: [msg.text],
-      pushName: msg.pushName,
-      buttonId: msg.buttonId,
-      listId: msg.listId,
-      sourceType: msg.sourceType,
-      timer: setTimeout(() => { /* substituído abaixo */ }, DEBOUNCE_MS),
-    });
-  }
+  localChains.set(key, task);
+  void task.finally(() => {
+    if (localChains.get(key) === task) localChains.delete(key);
+  }).catch(() => undefined);
 
-  const entry = pending.get(key)!;
-  clearTimeout(entry.timer);
-
-  const completionPromise = new Promise<void>(async (resolve, reject) => {
-    const processMessage = async () => {
-      pending.delete(key);
-
-      const mergedText = entry.texts[entry.texts.length - 1]?.trim() || "";
-      if (!mergedText && !entry.buttonId && !entry.listId) {
-        resolve();
-        return;
-      }
-
-      const lockAcquired = await acquireLock(entry.phone);
-      if (!lockAcquired) {
-        resolve();
-        return;
-      }
-
-      try {
-        await handler({
-          phone: entry.phone,
-          text: mergedText || entry.buttonId || entry.listId || "",
-          pushName: entry.pushName,
-          buttonId: entry.buttonId,
-          listId: entry.listId,
-          sourceType: entry.sourceType,
-        });
-        resolve();
-      } catch (error) {
-        reject(error);
-      } finally {
-        await releaseLock(entry.phone);
-      }
-    };
-
-    entry.timer = setTimeout(() => {
-      processMessage().catch(reject);
-    }, DEBOUNCE_MS);
-  });
-
-  if (waitUntil) {
-    waitUntil(completionPromise);
-  }
-
-  return completionPromise;
+  waitUntil?.(task);
+  return task;
 }

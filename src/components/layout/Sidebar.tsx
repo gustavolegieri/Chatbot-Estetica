@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
+  Activity,
   BarChart3,
   Bell,
   Calendar,
@@ -14,13 +15,16 @@ import {
   DollarSign,
   Download,
   Gift,
+  Gauge,
   Headphones,
   Image as ImageIcon,
   Layers,
+  Lightbulb,
   LogOut,
   Menu,
   MessageSquare,
   QrCode,
+  RotateCcw,
   SearchCheck,
   Send,
   Settings,
@@ -54,7 +58,11 @@ type NavGroup = {
 const navGroups: NavGroup[] = [
   {
     label: "Visão geral",
-    items: [{ href: "/admin/dashboard", label: "Dashboard", icon: BarChart3 }],
+    items: [
+      { href: "/admin/dashboard", label: "Dashboard", icon: BarChart3 },
+      { href: "/admin/operacao", label: "Central de ação", icon: Gauge },
+      { href: "/admin/insights", label: "Insights do negócio", icon: Lightbulb },
+    ],
   },
   {
     label: "Relacionamento",
@@ -62,6 +70,7 @@ const navGroups: NavGroup[] = [
       { href: "/admin/atendimento", label: "Central de atendimento", icon: Headphones, badge: true },
       { href: "/admin/clientes", label: "Clientes", icon: Users },
       { href: "/admin/pipeline", label: "Pipeline CRM", icon: Columns3 },
+      { href: "/admin/retencao", label: "Retenção de clientes", icon: RotateCcw },
       { href: "/admin/agendamentos", label: "Agenda", icon: Calendar },
       { href: "/admin/mobile", label: "Aplicativo mobile", icon: Smartphone },
     ],
@@ -80,6 +89,7 @@ const navGroups: NavGroup[] = [
   {
     label: "WhatsApp e IA",
     items: [
+      { href: "/admin/whatsapp", label: "Central WhatsApp", icon: Activity },
       { href: "/admin/fluxo", label: "Fluxo WhatsApp", icon: Workflow },
       { href: "/admin/bot/prompts", label: "Inteligência do bot", icon: Sparkles },
       { href: "/admin/notificacoes", label: "Notificações", icon: Bell },

@@ -31,6 +31,8 @@ test("prepares conversational text for Brazilian Portuguese voice", () => {
   assert.doesNotMatch(spoken, /Agendar|Voltar|🚗|\*/);
   assert.equal(isVoiceReplyEligible("O polimento leva aproximadamente três horas."), true);
   assert.equal(isVoiceReplyEligible("*1* — Agendar\n*2* — Voltar"), false);
+  assert.equal(isVoiceReplyEligible("Forma de pagamento: PIX ou cartão."), false);
+  assert.equal(isVoiceReplyEligible("Forma de pagamento: PIX ou cartão.", { force: true }), true);
 });
 
 test("decrypts Wasender audio and sends its temporary URL to Groq", async () => {

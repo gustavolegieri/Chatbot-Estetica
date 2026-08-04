@@ -27,7 +27,7 @@ export async function GET() {
     whatsappAppointments,
     blockedDatesCount,
     activeServices,
-  ] = await Promise.all([
+  ] = await prisma.$transaction([
     prisma.client.count(),
     prisma.appointment.count(),
     prisma.appointment.count({
@@ -54,6 +54,7 @@ export async function GET() {
     prisma.financialRecord.groupBy({
       by: ["serviceId"],
       where: { type: "INCOME", date: { gte: monthStart, lte: monthEnd }, serviceId: { not: null } },
+      orderBy: { serviceId: "asc" },
       _sum: { amount: true },
     }),
     prisma.whatsAppSession.count({ where: { updatedAt: { gte: weekAgo } } }),
