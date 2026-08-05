@@ -1,0 +1,1 @@
+ALTER TABLE public.clothing_images ADD COLUMN IF NOT EXISTS diagnosis_id uuid;

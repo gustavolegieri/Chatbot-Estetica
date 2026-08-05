@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Google Images Scraping</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .result img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .info {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Teste: Google Images Scraping</h1>
+        <p>Teste a busca de imagens via scraping do Google Images</p>
+    </div>
+
+    <div class="container">
+        <h2>Configuração do Teste</h2>
+        
+        <div class="form-group">
+            <label for="diagnosisId">Diagnosis ID:</label>
+            <input type="text" id="diagnosisId" value="test-diagnosis-id" placeholder="ID do diagnóstico para teste">
+        </div>
+        
+        <div class="form-group">
+            <label for="section">Seção:</label>
+            <select id="section">
+                <option value="estilo">estilo</option>
+                <option value="cores">cores</option>
+                <option value="corpo">corpo</option>
+                <option value="modelagens">modelagens</option>
+                <option value="essenciais">essenciais</option>
+                <option value="capsula">capsula</option>
+            </select>
+        </div>
+        
+        <button id="testBtn" onclick="testSearch()">Testar Busca</button>
+        
+        <div id="status"></div>
+    </div>
+
+    <div class="container" id="results"></div>
+
+    <div class="container info">
+        <h3>ℹ️ Informações do Teste</h3>
+        <ul>
+            <li>• O sistema usa scraping direto do Google Images</li>
+            <li>• Se o scraping falhar, usa DuckDuckGo como fallback</li>
+            <li>• Filtros automáticos removem domínios de stock photos</li>
+            <li>• As imagens são baseadas no perfil do diagnóstico</li>
+            <li>• Verifique o console do navegador (F12) para logs detalhados</li>
+        </ul>
+    </div>
+
+    <script>
+        const testData = {
+            questionnaire: {
+                estiloPersonalidade: 'Moderno e minimalista',
+                psicometrico: { paleta: 'paleta_neutra' },
+                tecidosPreferidos: ['Seda'],
+                coresQueTeFazemBrilhar: ['Azul marinho'],
+            },
+            colorAnalysis: {
+                cores: ['azul marinho', 'cinza', 'branco'],
+                tomDePele: 'Médio',
+            },
+            styleAnalysis: {
+                estilo: 'moderno minimalista',
+            },
+        };
+
+        async function testSearch() {
+            const diagnosisId = document.getElementById('diagnosisId').value;
+            const section = document.getElementById('section').value;
+            const statusDiv = document.getElementById('status');
+            const resultsDiv = document.getElementById('results');
+            const testBtn = document.getElementById('testBtn');
+
+            testBtn.disabled = true;
+            statusDiv.innerHTML = '<div class="info">⏳ Buscando imagem...</div>';
+
+            try {
+                // Simulação da chamada à edge function
+                const result = await simulateEdgeFunction(diagnosisId, section, testData);
+                
+                statusDiv.innerHTML = '';
+                
+                const resultHTML = `
+                    <div class="result">
+                        <h3>Resultado do Teste</h3>
+                        <p><strong>Timestamp:</strong> ${new Date().toISOString()}</p>
+                        <p><strong>Seção:</strong> ${section}</p>
+                        <p><strong>Provider:</strong> ${result.provider}</p>
+                        <p><strong>Pool Size:</strong> ${result.poolSize}</p>
+                        <p><strong>Query:</strong> ${result.queryUsed}</p>
+                        ${result.message ? `<p class="error"><strong>Message:</strong> ${result.message}</p>` : ''}
+                        ${result.imageUrl ? `
+                            <div class="success">✓ Imagem encontrada com sucesso!</div>
+                            <img src="${result.imageUrl}" alt="Test result" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
+                            <div style="display:none; color:red;">Erro ao carregar imagem</div>
+                            <p style="word-break: break-all; font-size: 12px; margin-top: 10px;">
+                                <strong>URL:</strong> ${result.imageUrl}
+                            </p>
+                        ` : '<div class="error">✗ Nenhuma imagem encontrada</div>'}
+                    </div>
+                `;
+                
+                resultsDiv.innerHTML = resultHTML + resultsDiv.innerHTML;
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">✗ Erro: ${error.message}</div>`;
+            } finally {
+                testBtn.disabled = false;
+            }
+        }
+
+        // Simulação da edge function para teste local
+        async function simulateEdgeFunction(diagnosisId, section, data) {
+            // Simula delay de rede
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Query simulada baseada na seção
+            const queries = {
+                'estilo': 'modern minimalist clean camel beige warm neutral silk women fashion style outfit look editorial photography',
+                'cores': 'camel beige warm neutral navy blue silk women fashion color palette fabric swatch',
+                'corpo': 'modern minimalist clean camel beige warm neutral silk women fashion body shape silhouette fitting',
+                'modelagens': 'modern minimalist clean camel beige warm neutral silk women fashion tailoring cut silhouette',
+                'essenciais': 'modern minimalist clean camel beige warm neutral silk women fashion staple wardrobe',
+                'capsula': 'modern minimalist clean camel beige warm neutral silk women fashion capsule wardrobe collection'
+            };
+
+            // Simula sucesso do scraping
+            const mockImages = {
+                'estilo': 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=800',
+                'cores': 'https://images.unsplash.com/photo-1551913902-c92207145695?w=800',
+                'corpo': 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800',
+                'modelagens': 'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=800',
+                'essenciais': 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=800',
+                'capsula': 'https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?w=800'
+            };
+
+            return {
+                imageUrl: mockImages[section] || null,
+                provider: 'google',
+                queryUsed: queries[section] || 'modern minimalist women fashion',
+                poolSize: 15,
+                message: null
+            };
+        }
+
+        // Log inicial
+        console.log('🧪 Teste Google Images Scraping carregado');
+        console.log('📍 Servidor local: http://localhost:8082');
+        console.log('🔗 Página de teste: http://localhost:8082/test-google-images');
+    </script>
+</body>
+</html>

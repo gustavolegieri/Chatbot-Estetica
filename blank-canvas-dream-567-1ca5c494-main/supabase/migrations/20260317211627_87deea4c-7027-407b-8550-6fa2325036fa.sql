@@ -1,0 +1,1 @@
+UPDATE plans SET is_active = false WHERE id = '85f493e8-87d3-442a-a0ce-7bc053a49459';

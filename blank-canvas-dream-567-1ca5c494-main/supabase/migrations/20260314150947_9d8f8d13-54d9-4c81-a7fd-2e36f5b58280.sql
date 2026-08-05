@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS idx_clothing_images_unique_normalized_key ON public.clothing_images(normalized_key) WHERE normalized_key IS NOT NULL;

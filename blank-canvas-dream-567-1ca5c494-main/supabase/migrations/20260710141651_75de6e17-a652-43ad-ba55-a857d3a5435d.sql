@@ -1,0 +1,1 @@
+UPDATE public.diagnoses SET status='failed', processing_step='failed', final_diagnosis = COALESCE(final_diagnosis,'{}'::jsonb) || jsonb_build_object('error','Processamento travado — liberado pelo suporte. Você pode iniciar um novo diagnóstico.','code','stuck_released') WHERE id='71098775-9845-43ba-bf94-1336a04215b9';

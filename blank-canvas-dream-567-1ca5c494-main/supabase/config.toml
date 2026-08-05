@@ -1,0 +1,22 @@
+project_id = "vuptrdbizivuqwyrcebu"
+
+[functions.pexels-search-image]
+verify_jwt = false
+
+[functions.duckduckgo-search-image]
+verify_jwt = false
+
+[functions.unsplash-search-image]
+verify_jwt = false
+
+[functions.pixabay-search-image]
+verify_jwt = false
+
+[functions.diagnosis-image-search]
+verify_jwt = false
+
+[functions.admin-analyze-diagnosis]
+verify_jwt = false
+
+[functions.admin-save-audit-rule]
+verify_jwt = false

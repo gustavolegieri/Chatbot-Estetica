@@ -1,0 +1,1 @@
+DELETE FROM diagnosis_section_images; DELETE FROM image_usage_history; DELETE FROM clothing_images;

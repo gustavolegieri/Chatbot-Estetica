@@ -1,0 +1,1 @@
+ALTER TABLE public.plans ADD COLUMN looks_per_month integer NOT NULL DEFAULT 3;

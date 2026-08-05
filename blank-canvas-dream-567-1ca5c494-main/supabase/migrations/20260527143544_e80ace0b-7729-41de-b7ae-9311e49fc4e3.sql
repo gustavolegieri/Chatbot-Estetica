@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.get_user_plan_access(uuid) FROM anon, PUBLIC;
