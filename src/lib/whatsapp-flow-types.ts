@@ -95,6 +95,12 @@ export interface FlowState {
   requestedTimePreference?: "morning" | "afternoon" | "evening";
   /** Contexto livre usado para tornar a apresentação do serviço mais natural. */
   serviceRequestContext?: string;
+  /** Inteligência transversal usada pelo WhatsApp, PWA e CRM. */
+  aiIntelligence?: import("./conversation-intelligence").ConversationIntelligence;
+  /** Variante estável usada para medir conversão da abertura do atendimento. */
+  abWelcomeVariant?: "A" | "B";
+  /** Aguarda nota pós-atendimento enviada automaticamente pelo gestor de reputação. */
+  awaitingPostServiceRating?: boolean;
 
   // Cupom
   couponCode?: string;

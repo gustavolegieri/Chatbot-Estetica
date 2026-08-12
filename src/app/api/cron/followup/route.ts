@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { processAppointmentRemindersAndAutoCancel } from "@/lib/appointment-reminders";
 import { sendIdleSessionRecoveries } from "@/lib/whatsapp-followup";
 import { resetAllExpiredSessions } from "@/lib/whatsapp-session-reset";
+import { sendAutomaticReviewRequests } from "@/lib/reputation-automation";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,8 @@ export async function GET(request: NextRequest) {
     const reset = await resetAllExpiredSessions();
     const followup = await sendIdleSessionRecoveries();
     const reminders = await processAppointmentRemindersAndAutoCancel();
-    return NextResponse.json({ ok: true, ...reset, ...followup, reminders });
+    const reputation = await sendAutomaticReviewRequests();
+    return NextResponse.json({ ok: true, ...reset, ...followup, reminders, reputation });
   } catch (error) {
     console.error("[Cron/Followup] Erro não tratado, processo NÃO deve cair:", error);
     return NextResponse.json({ success: false, error: String(error) }, { status: 200 });

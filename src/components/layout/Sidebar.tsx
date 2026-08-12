@@ -7,6 +7,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   BarChart3,
+  BrainCircuit,
   Bell,
   Calendar,
   CalendarOff,
@@ -89,6 +90,8 @@ const navGroups: NavGroup[] = [
   {
     label: "WhatsApp e IA",
     items: [
+      { href: "/admin/flow-intelligence", label: "Flow Intelligence", icon: Workflow },
+      { href: "/admin/automacoes-ia", label: "Automações com IA", icon: BrainCircuit },
       { href: "/admin/whatsapp", label: "Central WhatsApp", icon: Activity },
       { href: "/admin/fluxo", label: "Fluxo WhatsApp", icon: Workflow },
       { href: "/admin/bot/prompts", label: "Inteligência do bot", icon: Sparkles },

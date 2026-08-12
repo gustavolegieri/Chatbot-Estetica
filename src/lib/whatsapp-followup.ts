@@ -45,7 +45,7 @@ export async function sendIdleSessionRecoveries() {
       await prisma.whatsAppSession.update({
         where: { id: session.id },
         data: {
-          metadata: { ...buildRecoveryMeta(meta, name), recoverySent: true },
+          metadata: { ...buildRecoveryMeta(meta, name), recoverySent: true } as object,
         },
       });
       sent++;

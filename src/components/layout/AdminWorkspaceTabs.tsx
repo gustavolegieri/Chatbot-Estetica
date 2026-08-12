@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Bot,
+  BrainCircuit,
   CalendarDays,
   Columns3,
   Gauge,
@@ -13,6 +14,7 @@ import {
   Megaphone,
   MessageCircleMore,
   RotateCcw,
+  Workflow,
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
@@ -26,6 +28,8 @@ const tabs: Array<{ href: string; label: string; icon: LucideIcon; health?: bool
   { href: "/admin/pipeline", label: "CRM", icon: Columns3 },
   { href: "/admin/insights", label: "Insights", icon: Lightbulb },
   { href: "/admin/retencao", label: "Retenção", icon: RotateCcw },
+  { href: "/admin/automacoes-ia", label: "IA", icon: BrainCircuit },
+  { href: "/admin/flow-intelligence", label: "Flow", icon: Workflow },
   { href: "/admin/clientes", label: "Clientes", icon: UsersRound },
   { href: "/admin/campanhas", label: "Campanhas", icon: Megaphone },
   { href: "/admin/whatsapp", label: "WhatsApp & IA", icon: Bot, health: true },

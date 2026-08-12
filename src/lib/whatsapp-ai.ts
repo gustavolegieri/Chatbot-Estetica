@@ -2,6 +2,7 @@
 import type { FlowStage, FlowState } from "./whatsapp-flow-types";
 import type { FlowContext } from "./whatsapp-flow-messages";
 import type { WhatsAppCatalogContext } from "./whatsapp-service-catalog";
+import { intelligencePromptContext } from "./conversation-intelligence";
 import {
   analyzeIntentAIV2,
   analyzeIndecisiveClient,
@@ -215,6 +216,7 @@ ${ctx.pixKey ? "- Aceita PIX, cartão e dinheiro" : "- Aceita cartão e dinheiro
 ${flow.serviceLabel ? `- Serviço em discussão: ${flow.serviceLabel}` : ""}
 ${flow.estimatedTime ? `- Tempo estimado do serviço atual: ${flow.estimatedTime}` : ""}
 ${flow.quoteMin ? `- Faixa de preço atual: R$${flow.quoteMin} a R$${flow.quoteMax}` : ""}
+${intelligencePromptContext(flow.aiIntelligence)}
 
 REGRAS DE OPERAÇÃO:
 - Não invente preço, desconto, disponibilidade, prazo, garantia ou política. A agenda e os valores finais só são confirmados pelo fluxo/equipe.

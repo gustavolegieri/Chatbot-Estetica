@@ -7,6 +7,7 @@ import {
   Bell,
   BellRing,
   Bot,
+  BrainCircuit,
   CalendarDays,
   CarFront,
   Check,
@@ -38,11 +39,12 @@ import {
   X,
 } from "lucide-react";
 import { WhatsAppChatThread, type ChatMessage } from "@/components/atendimento/WhatsAppChatThread";
+import { AiOperationsPanel } from "@/components/admin/AiOperationsPanel";
 import { PwaInstallButton } from "@/components/pwa/PwaInstallButton";
 import { cn, formatPhone } from "@/lib/utils";
 import { todayIsoLocal } from "@/lib/date-br";
 
-type TabId = "chats" | "agenda" | "contacts" | "campaigns" | "settings";
+type TabId = "chats" | "agenda" | "contacts" | "ai" | "campaigns" | "settings";
 
 interface Conversation {
   id: string;
@@ -56,6 +58,7 @@ interface Conversation {
   flowStageLabel: string;
   serviceLabel?: string;
   vehicleRaw?: string;
+  ai?: { leadScore: number; urgency: string; sentiment: string; nextAction: string; needsHuman: boolean } | null;
 }
 
 interface ConversationDetail {
@@ -84,6 +87,7 @@ interface ConversationDetail {
     vehicleRaw?: string;
     dayLabel?: string;
     startTime?: string;
+    aiIntelligence?: { leadScore: number; urgency: string; sentiment: string; nextAction: string; summary: string; confidence: number; needsHuman: boolean };
   };
   messages: ChatMessage[];
   appointments: Appointment[];
@@ -427,8 +431,11 @@ export default function MobileAdminPage() {
     const offlineHandler = () => setOnline(false);
     window.addEventListener("online", onlineHandler);
     window.addEventListener("offline", offlineHandler);
-    const phone = new URLSearchParams(window.location.search).get("phone");
+    const params = new URLSearchParams(window.location.search);
+    const phone = params.get("phone");
+    const requestedTab = params.get("tab");
     if (phone) setSelectedPhone(phone);
+    if (requestedTab && ["chats", "agenda", "contacts", "ai", "campaigns", "settings"].includes(requestedTab)) setTab(requestedTab as TabId);
     return () => {
       window.removeEventListener("online", onlineHandler);
       window.removeEventListener("offline", offlineHandler);
@@ -687,6 +694,18 @@ export default function MobileAdminPage() {
                 {detail?.session.client?.email && <p className="flex items-center gap-3 break-all text-slate-400"><ContactRound className="h-4 w-4 shrink-0 text-brand-300" />{detail.session.client.email}</p>}
                 {detail?.session.client?.address && <p className="text-xs leading-5 text-slate-500">{detail.session.client.address}</p>}
               </div>
+              {detail?.flow.aiIntelligence && (
+                <div className="mt-4 rounded-2xl border border-violet-400/15 bg-gradient-to-br from-violet-500/[0.09] to-sky-500/[0.04] p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-400/10 text-violet-200"><BrainCircuit className="h-5 w-5" /></span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-semibold text-white">Leitura inteligente</h3><span className="rounded-full bg-violet-400/10 px-2 py-0.5 text-[10px] font-bold text-violet-200">Score {detail.flow.aiIntelligence.leadScore}</span>{detail.flow.aiIntelligence.needsHuman && <span className="rounded-full bg-rose-400/10 px-2 py-0.5 text-[10px] font-bold text-rose-200">Prioridade humana</span>}</div>
+                      <p className="mt-2 text-xs leading-5 text-slate-300">{detail.flow.aiIntelligence.summary}</p>
+                      <p className="mt-2 text-[11px] leading-5 text-slate-500"><strong className="text-slate-300">Próxima ação:</strong> {detail.flow.aiIntelligence.nextAction}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <h3 className="mt-6 text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500">Agendamentos do cliente</h3>
               <div className="mt-2 space-y-2">
                 {(detail?.appointments ?? []).length ? detail?.appointments.map((appointment) => (
@@ -710,7 +729,7 @@ export default function MobileAdminPage() {
       <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-[#10231a]/95 px-4 pb-3 backdrop-blur-xl" style={{ paddingTop: "max(0.9rem, env(safe-area-inset-top))" }}>
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-black/25 ring-1 ring-brand-500/20"><span className="h-9 w-9 bg-contain bg-center bg-no-repeat" style={{ backgroundImage: "url('/logo-garagem-do-ka.png')" }} /></span>
-          <div className="min-w-0 flex-1"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand-300/70">Garagem do Ka</p><h1 className="truncate text-lg font-bold text-white">{tab === "chats" ? "Conversas" : tab === "agenda" ? "Agenda" : tab === "contacts" ? "Contatos" : tab === "campaigns" ? "Campanhas" : "Aplicativo"}</h1></div>
+          <div className="min-w-0 flex-1"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand-300/70">Garagem do Ka</p><h1 className="truncate text-lg font-bold text-white">{tab === "chats" ? "Conversas" : tab === "agenda" ? "Agenda" : tab === "contacts" ? "Contatos" : tab === "ai" ? "Copiloto IA" : tab === "campaigns" ? "Campanhas" : "Aplicativo"}</h1></div>
           <span className={cn("flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold", online ? "bg-emerald-400/10 text-emerald-300" : "bg-amber-400/10 text-amber-300")}>{online ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}{online ? "Online" : "Offline"}</span>
           <button type="button" onClick={() => void refresh()} className="rounded-full p-2 text-slate-400 hover:bg-white/5 hover:text-white" aria-label="Atualizar"><RefreshCw className={cn("h-5 w-5", refreshing && "animate-spin")} /></button>
         </div>
@@ -735,7 +754,7 @@ export default function MobileAdminPage() {
           {conversations.length ? conversations.map((conversation) => (
             <button key={conversation.id} type="button" onClick={() => openChat(conversation.phone)} className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition active:bg-white/[0.05] sm:hover:bg-white/[0.035]">
               <Avatar name={conversation.clientName} online={conversation.lastMessageAt ? Date.now() - new Date(conversation.lastMessageAt).getTime() < 15 * 60_000 : false} />
-              <span className="min-w-0 flex-1 border-b border-transparent"><span className="flex items-center gap-2"><strong className="min-w-0 flex-1 truncate text-[15px] text-slate-100">{conversation.clientName}</strong><span className={cn("text-[11px]", conversation.unreadCount > 0 ? "font-bold text-emerald-300" : "text-slate-600")}>{relativeMessageTime(conversation.lastMessageAt)}</span></span><span className="mt-1 flex items-center gap-2"><span className="min-w-0 flex-1 truncate text-[13px] text-slate-500">{conversation.lastMessagePreview || conversation.flowStageLabel}</span>{conversation.botPaused && <Pause className="h-3.5 w-3.5 text-violet-300" />}{conversation.unreadCount > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-bold text-[#06100c]">{conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}</span>}</span>{(conversation.vehicleRaw || conversation.serviceLabel) && <span className="mt-1.5 flex items-center gap-1.5 truncate text-[10px] text-slate-600"><CarFront className="h-3 w-3" />{conversation.vehicleRaw || conversation.serviceLabel}</span>}</span>
+              <span className="min-w-0 flex-1 border-b border-transparent"><span className="flex items-center gap-2"><strong className="min-w-0 flex-1 truncate text-[15px] text-slate-100">{conversation.clientName}</strong>{conversation.ai?.needsHuman && <span className="rounded-full bg-rose-400/10 px-1.5 py-0.5 text-[8px] font-bold uppercase text-rose-200">prioridade</span>}{conversation.ai && conversation.ai.leadScore >= 75 && !conversation.ai.needsHuman && <span className="rounded-full bg-violet-400/10 px-1.5 py-0.5 text-[8px] font-bold uppercase text-violet-200">quente</span>}<span className={cn("text-[11px]", conversation.unreadCount > 0 ? "font-bold text-emerald-300" : "text-slate-600")}>{relativeMessageTime(conversation.lastMessageAt)}</span></span><span className="mt-1 flex items-center gap-2"><span className="min-w-0 flex-1 truncate text-[13px] text-slate-500">{conversation.lastMessagePreview || conversation.flowStageLabel}</span>{conversation.botPaused && <Pause className="h-3.5 w-3.5 text-violet-300" />}{conversation.unreadCount > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-bold text-[#06100c]">{conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}</span>}</span>{(conversation.vehicleRaw || conversation.serviceLabel) && <span className="mt-1.5 flex items-center gap-1.5 truncate text-[10px] text-slate-600"><CarFront className="h-3 w-3" />{conversation.vehicleRaw || conversation.serviceLabel}</span>}</span>
             </button>
           )) : <div className="px-6 py-20 text-center"><MessageCircle className="mx-auto h-10 w-10 text-slate-700" /><p className="mt-3 text-sm font-semibold text-slate-400">Nenhuma conversa encontrada</p><p className="mt-1 text-xs text-slate-600">As mensagens recebidas pela WASender aparecerão aqui.</p></div>}
         </section>
@@ -781,6 +800,12 @@ export default function MobileAdminPage() {
         </section>
       )}
 
+      {!loading && tab === "ai" && (
+        <section className="p-4">
+          <AiOperationsPanel compact />
+        </section>
+      )}
+
       {!loading && tab === "campaigns" && (
         <section className="space-y-4 p-4">
           <div className="rounded-2xl border border-amber-500/15 bg-amber-500/[0.045] p-4">
@@ -819,16 +844,17 @@ export default function MobileAdminPage() {
         </section>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto grid w-full max-w-3xl grid-cols-5 border-t border-white/[0.07] bg-[#0b1712]/95 px-1 pt-2 backdrop-blur-xl" style={{ paddingBottom: "max(0.55rem, env(safe-area-inset-bottom))" }}>
+      <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto grid w-full max-w-3xl grid-cols-6 border-t border-white/[0.07] bg-[#0b1712]/95 px-1 pt-2 backdrop-blur-xl" style={{ paddingBottom: "max(0.55rem, env(safe-area-inset-bottom))" }}>
         {[
           { id: "chats" as const, label: "Conversas", icon: MessageCircle, badge: conversations.reduce((total, item) => total + item.unreadCount, 0) },
           { id: "agenda" as const, label: "Agenda", icon: CalendarDays, badge: 0 },
           { id: "contacts" as const, label: "Contatos", icon: ContactRound, badge: 0 },
+          { id: "ai" as const, label: "IA", icon: BrainCircuit, badge: conversations.filter((item) => item.ai?.needsHuman).length },
           { id: "campaigns" as const, label: "Campanhas", icon: Megaphone, badge: 0 },
           { id: "settings" as const, label: "Ajustes", icon: Menu, badge: 0 },
         ].map((item) => {
           const Icon = item.icon;
-          return <button key={item.id} type="button" onClick={() => { setTab(item.id); setSearch(""); }} className={cn("relative flex flex-col items-center justify-center gap-1 rounded-xl py-1.5 text-[10px] font-semibold transition", tab === item.id ? "text-emerald-300" : "text-slate-600")}><span className={cn("relative rounded-xl px-4 py-1", tab === item.id && "bg-emerald-500/10")}><Icon className="h-5 w-5" />{item.badge > 0 && <span className="absolute right-1 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[8px] font-bold text-[#06100c]">{item.badge > 99 ? "99+" : item.badge}</span>}</span>{item.label}</button>;
+          return <button key={item.id} type="button" onClick={() => { setTab(item.id); setSearch(""); }} className={cn("relative flex flex-col items-center justify-center gap-1 rounded-xl py-1.5 text-[9px] font-semibold transition sm:text-[10px]", tab === item.id ? "text-emerald-300" : "text-slate-600")}><span className={cn("relative rounded-xl px-3 py-1 sm:px-4", tab === item.id && "bg-emerald-500/10")}><Icon className="h-5 w-5" />{item.badge > 0 && <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[8px] font-bold text-[#06100c]">{item.badge > 99 ? "99+" : item.badge}</span>}</span>{item.label}</button>;
         })}
       </nav>
     </main>

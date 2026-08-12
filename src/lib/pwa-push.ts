@@ -38,44 +38,71 @@ function configureWebPush() {
   return keys;
 }
 
+async function sendPushPayload(payload: Record<string, unknown>, urgency: "very-low" | "low" | "normal" | "high" = "normal") {
+  if (!configureWebPush()) return { sent: 0, configured: false };
+  const subscriptions = await prisma.pwaPushSubscription.findMany();
+  if (!subscriptions.length) return { sent: 0, configured: true };
+
+  let sent = 0;
+  await Promise.allSettled(subscriptions.map(async (subscription) => {
+    try {
+      await webpush.sendNotification({
+        endpoint: subscription.endpoint,
+        keys: { p256dh: subscription.p256dh, auth: subscription.auth },
+      }, JSON.stringify({ icon: "/pwa/icon-192.png", ...payload }), { TTL: 120, urgency });
+      sent += 1;
+    } catch (error) {
+      const statusCode = typeof error === "object" && error && "statusCode" in error ? Number(error.statusCode) : 0;
+      if (statusCode === 404 || statusCode === 410) {
+        await prisma.pwaPushSubscription.delete({ where: { id: subscription.id } }).catch(() => undefined);
+      }
+    }
+  }));
+  return { sent, configured: true };
+}
+
+export async function notifyPwaOperationalAlert(input: {
+  title: string;
+  body: string;
+  tag: string;
+  url?: string;
+  urgency?: "very-low" | "low" | "normal" | "high";
+}) {
+  try {
+    return await sendPushPayload({
+      title: input.title,
+      body: input.body.trim().slice(0, 180),
+      tag: input.tag,
+      url: input.url || "/admin/mobile?tab=ai",
+    }, input.urgency || "normal");
+  } catch (error) {
+    console.error("[PWA Push] Falha ao enviar alerta operacional", error);
+    return { sent: 0, configured: true };
+  }
+}
+
 export async function notifyPwaAboutWhatsAppMessage(input: { phone: string; body: string }) {
   if (!configureWebPush()) return { sent: 0, configured: false };
 
   try {
-    const [subscriptions, conversation] = await Promise.all([
-      prisma.pwaPushSubscription.findMany(),
-      prisma.whatsAppSession.findUnique({ where: { phone: input.phone }, include: { client: true } }),
-    ]);
-    if (!subscriptions.length) return { sent: 0, configured: true };
+    const conversation = await prisma.whatsAppSession.findUnique({ where: { phone: input.phone }, include: { client: true } });
 
     const metadata = conversation?.metadata && typeof conversation.metadata === "object" && !Array.isArray(conversation.metadata)
       ? conversation.metadata as Record<string, unknown>
       : {};
     const name = conversation?.client?.name || (typeof metadata.customerName === "string" ? metadata.customerName : null) || "Novo cliente";
-    const payload = JSON.stringify({
-      title: name,
+    const ai = metadata.aiIntelligence && typeof metadata.aiIntelligence === "object" && !Array.isArray(metadata.aiIntelligence)
+      ? metadata.aiIntelligence as Record<string, unknown>
+      : null;
+    const priority = ai?.needsHuman === true || ai?.urgency === "critical" || ai?.urgency === "high";
+    const score = typeof ai?.leadScore === "number" ? ai.leadScore : null;
+    const title = priority ? `Prioridade · ${name}` : score !== null && score >= 75 ? `Lead quente · ${name}` : name;
+    return await sendPushPayload({
+      title,
       body: input.body.trim().slice(0, 180) || "Nova mensagem recebida",
       tag: `conversation-${input.phone}`,
       url: `/admin/mobile?phone=${encodeURIComponent(input.phone)}`,
-      icon: "/pwa/icon-192.png",
-    });
-
-    let sent = 0;
-    await Promise.allSettled(subscriptions.map(async (subscription) => {
-      try {
-        await webpush.sendNotification({
-          endpoint: subscription.endpoint,
-          keys: { p256dh: subscription.p256dh, auth: subscription.auth },
-        }, payload, { TTL: 120, urgency: "high" });
-        sent += 1;
-      } catch (error) {
-        const statusCode = typeof error === "object" && error && "statusCode" in error ? Number(error.statusCode) : 0;
-        if (statusCode === 404 || statusCode === 410) {
-          await prisma.pwaPushSubscription.delete({ where: { id: subscription.id } }).catch(() => undefined);
-        }
-      }
-    }));
-    return { sent, configured: true };
+    }, priority ? "high" : "normal");
   } catch (error) {
     console.error("[PWA Push] Falha ao notificar aplicativos", error);
     return { sent: 0, configured: true };

@@ -23,6 +23,7 @@ test("first doubt uses voice and availability keeps calendar date until service 
   };
 
   try {
+    const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
     const doubtReplies: Array<{ text: string; voiceReply?: boolean }> = [];
     await startFlow({
       phone: "5511000000001",
@@ -115,13 +116,13 @@ test("first doubt uses voice and availability keeps calendar date until service 
     await processNumberedFlow(
       {
         phone: "5511000000002",
-        text: "2026-08-05",
+        text: futureDate,
         pushName: "Gustavo",
         testMode,
       },
       state
     );
-    assert.equal(state.dayDate, "2026-08-05");
+    assert.equal(state.dayDate, futureDate);
     assert.ok(availabilityReplies.some((text) => /saber qual serviço/i.test(text)));
 
     availabilityReplies.length = 0;
@@ -136,7 +137,7 @@ test("first doubt uses voice and availability keeps calendar date until service 
     );
     assert.equal(state.stage, "ETAPA3_SERVICE_ACTION");
     assert.equal(state.serviceKey, "lavagem_simples");
-    assert.equal(state.dayDate, "2026-08-05");
+    assert.equal(state.dayDate, futureDate);
   } finally {
     (prisma.settings as any).findUnique = originalSettingsFindUnique;
     (prisma.appointment as any).findMany = originalAppointmentFindMany;

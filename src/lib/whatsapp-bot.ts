@@ -18,6 +18,7 @@ import {
   requestHumanHandoff,
   wantsHumanHandoff,
 } from "./whatsapp-handoff";
+import { analyzeConversationRules, analyzeConversationWithAI } from "./conversation-intelligence";
 
 interface IncomingMessage {
   phone: string;
@@ -139,6 +140,33 @@ async function handleMessageInternal(msg: IncomingMessage) {
           flowStage: flowRef.current.stage,
           wasenderMessageId: msg.messageId,
         });
+
+        const ruleIntelligence = analyzeConversationRules(inboundText, flowRef.current.aiIntelligence);
+        const needsDeepAnalysis =
+          ruleIntelligence.confidence < 80 ||
+          ruleIntelligence.objection !== "none" ||
+          ruleIntelligence.intent === "complaint" ||
+          inboundText.length > 80;
+        const intelligence = needsDeepAnalysis
+          ? await analyzeConversationWithAI(inboundText, flowRef.current, ruleIntelligence)
+          : ruleIntelligence;
+        flowRef.current = { ...flowRef.current, aiIntelligence: intelligence };
+        flow = flowRef.current;
+        await prisma.whatsAppSession.update({
+          where: { id: session.id },
+          data: { metadata: flowRef.current as object, lastStage: flowRef.current.stage },
+        });
+
+        if (intelligence.needsHuman && !wantsHumanHandoff(inboundText)) {
+          const name = flowRef.current.customerName ?? session.client?.name ?? msg.pushName;
+          await requestHumanHandoff({
+            phone: msg.phone,
+            sessionId: session.id,
+            reason: `IA detectou ${intelligence.urgency === "critical" ? "situação crítica" : "reclamação prioritária"}: ${intelligence.summary}`,
+            clientName: name,
+          });
+          return;
+        }
       }
 
       if (wantsHumanHandoff(inboundText)) {

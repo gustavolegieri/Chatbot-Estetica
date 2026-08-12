@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { invalidatePromptCache, seedBotPrompts } from "@/lib/bot-prompts";
 import { BOT_PROMPT_DEFAULTS } from "@/lib/bot-prompt-defaults";
 import { getCerebrasStatus } from "@/lib/cerebras-ai";
+import { logAudit } from "@/lib/audit";
 
 export async function GET() {
   const session = await getSession();
@@ -50,9 +51,16 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Conteúdo inválido" }, { status: 400 });
     }
 
+    const previous = await prisma.botPrompt.findUnique({ where: { key } });
     const prompt = await prisma.botPrompt.update({
       where: { key },
       data: { content: content.trim() },
+    });
+    await logAudit({
+      userId: session.userId,
+      action: "FLOW_PROMPT_VERSION_CREATED",
+      resource: `bot-prompt:${key}`,
+      data: { key, label: previous?.label ?? prompt.label, previousContent: previous?.content ?? "", content: prompt.content, updatedAt: prompt.updatedAt.toISOString() },
     });
     invalidatePromptCache();
     return NextResponse.json({ success: true, data: prompt });
@@ -84,10 +92,12 @@ export async function POST(request: NextRequest) {
       const def = BOT_PROMPT_DEFAULTS.find((p) => p.key === key);
       if (!def) return NextResponse.json({ success: false, error: "Prompt padrão não encontrado" }, { status: 404 });
 
+      const previous = await prisma.botPrompt.findUnique({ where: { key } });
       const prompt = await prisma.botPrompt.update({
         where: { key },
         data: { content: def.content },
       });
+      await logAudit({ userId: session.userId, action: "FLOW_PROMPT_RESET", resource: `bot-prompt:${key}`, data: { key, label: prompt.label, previousContent: previous?.content ?? "", content: prompt.content } });
       invalidatePromptCache();
       return NextResponse.json({ success: true, data: prompt });
     }

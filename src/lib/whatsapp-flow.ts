@@ -1682,6 +1682,23 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
     flow = hydratedFlow;
   }
 
+  if (flow.awaitingPostServiceRating) {
+    const rating = Number.parseInt(input, 10);
+    if (![1, 2, 3, 4, 5].includes(rating)) {
+      await sendText({ number: msg.phone, text: "Para registrar sua avaliação, responda somente com uma nota de *1 a 5*. Se preferir, também pode explicar o que aconteceu." });
+      return;
+    }
+    const next: FlowState = { ...flow, awaitingPostServiceRating: false };
+    await saveFlow(msg.phone, next);
+    if (rating <= 3) {
+      await sendText({ number: msg.phone, text: `Obrigado pela sinceridade. Registrei sua nota ${rating} e vou chamar a equipe para entender o que podemos melhorar.`, voiceReply: true });
+      await handleHumanHandoffRequest(msg, next);
+      return;
+    }
+    await sendText({ number: msg.phone, text: `Muito obrigado pela avaliação de *${rating} estrelas*! Ficamos felizes em cuidar do seu veículo. Sua opinião ajuda a Garagem do Ka a evoluir.`, voiceReply: true });
+    return;
+  }
+
   if (flow.awaitingInitialRequestConfirmation || flow.awaitingInitialRequestCorrection) {
     if (flow.awaitingInitialRequestConfirmation && isNaturalConfirmation(input)) {
       const next: FlowState = {
@@ -3465,10 +3482,14 @@ export async function startFlow(msg: IncomingMessage) {
     console.log("[WhatsApp Flow] 🚀 Iniciando flow de boas-vindas");
     const ctx = await loadContext();
     const wctx = await loadWhatsAppCatalog();
+    const normalizedDigits = normalizePhone(msg.phone);
+    const abWelcomeVariant: "A" | "B" = Number(normalizedDigits.slice(-1) || "0") % 2 === 0 ? "A" : "B";
     msg.initialWelcomePrefix = [
       `Olá! Você está falando com a *${ctx.businessName}* 🚗`,
       "",
-      "Sou a assistente virtual da equipe. Posso esclarecer dúvidas, recomendar o cuidado ideal e organizar seu agendamento.",
+      abWelcomeVariant === "A"
+        ? "Sou a assistente virtual da equipe. Posso esclarecer dúvidas, recomendar o cuidado ideal e organizar seu agendamento."
+        : "Vou cuidar do seu atendimento do começo ao fim: entendo o que seu veículo precisa, indico o serviço e encontro um bom horário para você.",
       "",
       ctx.address ? `📍 ${ctx.address}` : "📍 Consulte nosso endereço por aqui",
       `🕒 ${ctx.hours}`,
@@ -3535,12 +3556,14 @@ export async function startFlow(msg: IncomingMessage) {
             pendingServiceKey: serviceKey,
             isReturningClient: Boolean(returningName),
             savedVehicle,
+            abWelcomeVariant,
           }
         : {
             stage: "ETAPA1_AWAITING_NAME",
             welcomed: true,
             pendingInitialIntent: "doubt",
             pendingServiceKey: serviceKey,
+            abWelcomeVariant,
           };
 
       if (profileName) {
@@ -3573,6 +3596,7 @@ export async function startFlow(msg: IncomingMessage) {
         dayLabel: availabilityDay?.dayLabel,
         requestedTimePreference: detectRequestedTimePreference(input),
         serviceRequestContext: input.slice(0, 500),
+        abWelcomeVariant,
       };
 
       if (availabilityRequest && !serviceKey) {
@@ -3662,6 +3686,7 @@ export async function startFlow(msg: IncomingMessage) {
       dayDate: availabilityDay?.dayDate,
       dayLabel: availabilityDay?.dayLabel,
       requestedTimePreference: detectRequestedTimePreference(input),
+      abWelcomeVariant,
     };
     await saveFlow(msg.phone, initialState, !!msg.testMode);
     msg.testMode?.onFlowStateChange?.(initialState);

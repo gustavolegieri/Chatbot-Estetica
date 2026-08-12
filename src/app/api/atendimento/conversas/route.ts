@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
       flowStageLabel: flowStageLabel(flow.stage),
       serviceLabel: flow.serviceLabel,
       vehicleRaw: flow.vehicleRaw,
+      ai: flow.aiIntelligence ?? null,
       updatedAt: s.updatedAt,
     };
   });
