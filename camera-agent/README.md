@@ -9,6 +9,8 @@ Este agente roda no computador da estética. A webcam é processada localmente e
 
 Instale a webcam em local alto e protegido, apontando para a passagem do portão. A imagem precisa mostrar aproximadamente 2 m antes e 2 m depois do portão.
 
+Na instalação com a câmera dentro da garagem olhando para a rua, mantenha a rua na parte superior da imagem e o interior da garagem na parte inferior. Use `GATE_FLIP_VERTICAL=false`: o carro entrando cresce na imagem e cruza primeiro `GATE_OUTSIDE_LINE`, depois `GATE_INSIDE_LINE`; na saída, a ordem é inversa.
+
 O programa desenha duas linhas virtuais:
 
 ```text
@@ -30,7 +32,7 @@ A ordem das linhas define a direção. Pessoas são ignoradas; o modelo acompanh
 
 Na primeira execução, os modelos leves de detecção e OCR são baixados automaticamente. A prévia mostra as duas linhas, a caixa do veículo e a placa reconhecida. Ajuste `GATE_OUTSIDE_LINE` e `GATE_INSIDE_LINE` até que uma fique antes e a outra depois do portão. Pressione `Q` para fechar.
 
-Para uma leitura confiável, use imagem 1080p, boa iluminação e posicione a webcam de modo que a placa dianteira ou traseira ocupe pelo menos 100 pixels de largura. Evite ângulo muito lateral, reflexo direto e contraluz.
+Para uma leitura confiável, o agente solicita imagem 1920×1080, boa iluminação e a placa dianteira ou traseira deve ocupar pelo menos 100 pixels de largura. Evite ângulo muito lateral, reflexo direto e contraluz. Se as linhas não coincidirem com a passagem física, ajuste `GATE_OUTSIDE_LINE` e `GATE_INSIDE_LINE` observando a prévia.
 
 ## Regras de segurança operacional
 

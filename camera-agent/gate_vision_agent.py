@@ -36,6 +36,8 @@ CONFIDENCE = float(os.getenv("GATE_CONFIDENCE", "0.55"))
 OUTSIDE_LINE = float(os.getenv("GATE_OUTSIDE_LINE", "0.42"))
 INSIDE_LINE = float(os.getenv("GATE_INSIDE_LINE", "0.62"))
 PROCESS_FPS = max(1.0, float(os.getenv("GATE_PROCESS_FPS", "5")))
+CAMERA_WIDTH = max(640, int(os.getenv("GATE_CAMERA_WIDTH", "1920")))
+CAMERA_HEIGHT = max(480, int(os.getenv("GATE_CAMERA_HEIGHT", "1080")))
 HEARTBEAT_SECONDS = max(30.0, float(os.getenv("GATE_HEARTBEAT_SECONDS", "60")))
 TRACK_TTL_SECONDS = max(2.0, float(os.getenv("GATE_TRACK_TTL_SECONDS", "6")))
 EVENT_COOLDOWN_SECONDS = max(10.0, float(os.getenv("GATE_EVENT_COOLDOWN_SECONDS", "25")))
@@ -135,6 +137,9 @@ class GateVisionAgent:
             except Exception as error:
                 print(f"[Portao IA] OCR de placa indisponivel: {error}")
         self.capture = cv2.VideoCapture(camera_source())
+        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
+        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+        self.capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         if not self.capture.isOpened():
             raise RuntimeError("Não foi possível abrir a webcam. Revise GATE_CAMERA_SOURCE.")
         self.tracks: dict[int, TrackMemory] = {}
@@ -301,7 +306,10 @@ class GateVisionAgent:
         cv2.putText(frame, state_label, (width - 220, 30), cv2.FONT_HERSHEY_SIMPLEX, .65, (255, 255, 255), 2)
 
     def run(self) -> None:
-        print("[Portão IA] Agente iniciado. Pressione Q na prévia para encerrar.")
+        print(
+            f"[Portão IA] Agente iniciado em {self.frame_width}x{self.frame_height}. "
+            "Pressione Q na prévia para encerrar."
+        )
         frame_counter, fps_started = 0, time.monotonic()
         while True:
             ok, frame = self.capture.read()
