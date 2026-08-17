@@ -11,6 +11,7 @@ import {
   Bell,
   Calendar,
   CalendarOff,
+  Cctv,
   ChevronDown,
   Columns3,
   DollarSign,
@@ -101,6 +102,7 @@ const navGroups: NavGroup[] = [
   {
     label: "Operação",
     items: [
+      { href: "/admin/gate-vision", label: "Portão IA", icon: Cctv },
       { href: "/admin/midia", label: "Galeria e mídia", icon: ImageIcon },
       { href: "/admin/horarios", label: "Horários", icon: Calendar },
       { href: "/admin/feriados", label: "Datas bloqueadas", icon: CalendarOff },

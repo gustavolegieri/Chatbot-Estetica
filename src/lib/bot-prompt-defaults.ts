@@ -57,7 +57,7 @@ export const BOT_PROMPT_DEFAULTS: PromptDef[] = [
     key: "etapa4_vehicle",
     label: "Dados completos do veículo",
     category: "fluxo",
-    content: "Para calcular uma estimativa mais precisa, envie os dados do veículo *em uma única mensagem*:\n\n🚗 modelo e ano\n🎨 cor\n🔎 estado geral\n\n_Exemplo: Civic 2021, preto, bom estado._\n\nNão precisa seguir um formato exato — pode escrever do seu jeito.",
+    content: "Para calcular a estimativa e identificar seu veículo automaticamente na chegada, envie os *dados do veículo em uma única mensagem*:\n\n🚗 modelo e ano\n🔠 placa\n🎨 cor\n🔎 estado geral\n\n_Exemplo: Civic 2021, placa BRA2E19, preto, bom estado._\n\nNão precisa seguir um formato exato — pode escrever do seu jeito.",
   },
   {
     key: "etapa4_vehicle_has",
@@ -88,7 +88,7 @@ export const BOT_PROMPT_DEFAULTS: PromptDef[] = [
     key: "vehicle_not_understood",
     label: "Veículo não validado",
     category: "fluxo",
-    content: "Não consegui identificar os dados do veículo nessa mensagem.\n\nEnvie tudo junto, do seu jeito:\n_Exemplo: Civic 2021, preto, bom estado._",
+    content: "Não consegui identificar todos os dados do veículo nessa mensagem.\n\nEnvie tudo junto, do seu jeito:\n_Exemplo: Civic 2021, placa BRA2E19, preto, bom estado._",
   },
   {
     key: "etapa5_quote",
@@ -433,8 +433,8 @@ export const BOT_PROMPT_DEFAULTS: PromptDef[] = [
     key: "vehicle_confirmation",
     label: "Confirmação dos dados do veículo",
     category: "fluxo",
-    hint: "{model}, {year}, {color}, {condition}",
-    content: "*Só para confirmar o veículo*\n\n🚗 {model} — {year}\n🎨 {color}\n🔎 {condition}\n\n*1* ✅ Está correto, ver estimativa\n*2* ✏️ Quero corrigir\n\n_Se preferir, já escreva a correção. Ex.: “a cor é branca”._",
+    hint: "{model}, {year}, {plate}, {color}, {condition}",
+    content: "*Só para confirmar o veículo*\n\n🚗 {model} — {year}\n🔠 Placa: *{plate}*\n🎨 {color}\n🔎 {condition}\n\n*1* ✅ Está correto, ver estimativa\n*2* ✏️ Quero corrigir\n\n_Se preferir, já escreva a correção. Ex.: “a placa é BRA2E19”._",
   },
   {
     key: "vehicle_missing_details",

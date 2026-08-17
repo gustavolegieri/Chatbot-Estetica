@@ -18,7 +18,7 @@ const STEPS = [
   { id: 'undecided_problem', name: '6. Cliente Indeciso - Problema', type: 'undecided_problem', description: 'Identifica problema e recomenda serviço' },
   { id: 'package_action', name: '7. Ações com Pacotes', type: 'package_action', description: 'Opções após selecionar pacote' },
   { id: 'service_action', name: '8. Ações Após Serviço', type: 'service_action', description: 'Opções após selecionar serviço' },
-  { id: 'vehicle_collection', name: '9. Coleta de Veículo', type: 'vehicle_collection', description: 'Coleta modelo, ano, cor e estado' },
+  { id: 'vehicle_collection', name: '9. Coleta de Veículo', type: 'vehicle_collection', description: 'Coleta modelo, ano, placa, cor e estado' },
   { id: 'quote', name: '10. Orçamento', type: 'quote', description: 'Exibe preço estimado do serviço' },
   { id: 'first_time_bonus', name: '11. Bônus Primeira Vez', type: 'first_time_bonus', description: 'Oferece desconto de 10% para novos clientes' },
   { id: 'upsell', name: '12. Upsell', type: 'upsell', description: 'Oferece serviços complementares' },
@@ -66,6 +66,7 @@ async function createTestFlowState(stage: string): Promise<FlowState> {
     serviceLabel: 'Polimento Completo',
     vehicleModel: 'Toyota Corolla',
     vehicleYear: '2022',
+    vehiclePlate: 'BRA2E19',
     vehicleColor: 'Branco',
     vehicleCondition: 'bom',
     dbServiceId: 'test-service-id',
@@ -132,7 +133,7 @@ async function testIndividualStep(phone: string, stepId: string) {
       text = subMenuForCategoryCtx(1, wctx);
     } else if (step.type === 'undecided_vehicle') {
       // 5. CLIENTE INDECISO - VEÍCULO
-      text = 'Qual é o modelo do seu veículo? 🚗\n\n_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_';
+      text = 'Envie os dados do veículo em uma mensagem: modelo, ano, placa, cor e estado.\n\n_Exemplo: Civic 2021, placa BRA2E19, preto, bom estado._';
     } else if (step.type === 'undecided_problem') {
       // 6. CLIENTE INDECISO - PROBLEMA
       text = 'Perfeito 🚗\n\nO que está acontecendo?\n\n1 🎨 Pintura opaca, riscada ou sem brilho\n2 🪑 Interior com cheiro ruim ou muito sujo\n3 🛡️ Quero proteger um carro novo ou recém-comprado\n4 ✨ Quero um cuidado geral completo\n5 🔧 Outro problema';
@@ -149,7 +150,7 @@ async function testIndividualStep(phone: string, stepId: string) {
       }
     } else if (step.type === 'vehicle_collection') {
       // 9. COLETA DE VEÍCULO
-      text = 'Qual é o modelo do seu veículo? 🚗\n\n_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_';
+      text = 'Envie os dados do veículo em uma mensagem: modelo, ano, placa, cor e estado.\n\n_Exemplo: Civic 2021, placa BRA2E19, preto, bom estado._';
     } else if (step.type === 'quote') {
       // 10. ORÇAMENTO
       const firstService = Object.values(wctx.catalog)[0];
@@ -367,7 +368,7 @@ async function runSequence(sessionId: string, phone: string) {
         text = subMenuForCategoryCtx(1, wctx);
       } else if (step.type === 'undecided_vehicle') {
         // 5. CLIENTE INDECISO - VEÍCULO
-        text = 'Qual é o modelo do seu veículo? 🚗\n\n_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_';
+        text = 'Envie os dados do veículo em uma mensagem: modelo, ano, placa, cor e estado.\n\n_Exemplo: Civic 2021, placa BRA2E19, preto, bom estado._';
       } else if (step.type === 'undecided_problem') {
         // 6. CLIENTE INDECISO - PROBLEMA
         text = 'Perfeito 🚗\n\nO que está acontecendo?\n\n1 🎨 Pintura opaca, riscada ou sem brilho\n2 🪑 Interior com cheiro ruim ou muito sujo\n3 🛡️ Quero proteger um carro novo ou recém-comprado\n4 ✨ Quero um cuidado geral completo\n5 🔧 Outro problema';
@@ -384,7 +385,7 @@ async function runSequence(sessionId: string, phone: string) {
         }
       } else if (step.type === 'vehicle_collection') {
         // 9. COLETA DE VEÍCULO
-        text = 'Qual é o modelo do seu veículo? 🚗\n\n_Exemplos: Civic, Corolla, Hilux, Onix, Compass, HB20_';
+        text = 'Envie os dados do veículo em uma mensagem: modelo, ano, placa, cor e estado.\n\n_Exemplo: Civic 2021, placa BRA2E19, preto, bom estado._';
       } else if (step.type === 'quote') {
         // 10. ORÇAMENTO
         const firstService = Object.values(wctx.catalog)[0];

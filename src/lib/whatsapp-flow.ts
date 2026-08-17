@@ -98,6 +98,7 @@ import { isValidCustomerName } from "./flow-validation";
 import {
   isValidVehicle,
   looksLikePersonName,
+  parsePlateFromText,
   parseVehicleMessage,
   parseVehicleMessageSmart,
   parseYearFromText,
@@ -423,6 +424,7 @@ function initialRequestSummaryText(flow: FlowState, wctx: WhatsAppCatalogContext
     {
       name: clientDisplayName(flow),
       vehicle: [flow.vehicleModel, flow.vehicleYear].filter(Boolean).join(" ") +
+        `${flow.vehiclePlate ? ` · placa ${flow.vehiclePlate}` : ""}` +
         `${flow.vehicleColor ? `, ${flow.vehicleColor}` : ""}` +
         `${flow.vehicleCondition && flow.vehicleCondition !== "normal" ? `, ${flow.vehicleCondition}` : ""}`,
       service: flow.serviceLabel ?? (flow.serviceKey ? wctx.catalog[flow.serviceKey]?.label : null) ?? "a definir",
@@ -465,7 +467,8 @@ async function extractCombinedInitialRequest(
   const vehicleModel = directVehicle?.model ?? smartVehicle?.model?.trim();
   const vehicleYear = directVehicle?.year ?? smartVehicle?.year;
   const vehicleColor = directVehicle?.color || smartVehicle?.color;
-  if (!vehicleModel || !vehicleYear || !vehicleColor) return null;
+  const vehiclePlate = parsePlateFromText(input) ?? smartVehicle?.plate;
+  if (!vehicleModel || !vehicleYear || !vehicleColor || !vehiclePlate) return null;
 
   const parsedDay = parseDayInput(input, null);
   const condition = normalizeConditionValue(smartVehicle?.condition || input);
@@ -479,6 +482,7 @@ async function extractCombinedInitialRequest(
     pendingServiceKey: serviceKey,
     vehicleRaw: `${vehicleModel} ${vehicleYear}`,
     vehicleModel,
+    vehiclePlate,
     vehicleYear,
     vehicleColor,
     vehicleCondition: condition,
@@ -514,6 +518,7 @@ async function applyInitialRequestCorrection(
     service: next.serviceKey,
     model: next.vehicleModel,
     year: next.vehicleYear,
+    plate: next.vehiclePlate,
     color: next.vehicleColor,
     condition: next.vehicleCondition,
     date: next.dayDate,
@@ -547,6 +552,7 @@ async function applyInitialRequestCorrection(
     service: next.serviceKey,
     model: next.vehicleModel,
     year: next.vehicleYear,
+    plate: next.vehiclePlate,
     color: next.vehicleColor,
     condition: next.vehicleCondition,
     date: next.dayDate,
@@ -565,6 +571,7 @@ function storeVehicle(flow: FlowState, text: string): FlowState {
     ...flow,
     vehicleRaw: p.summary,
     vehicleModel: normalizedModel || flow.vehicleModel,
+    vehiclePlate: p.plate || flow.vehiclePlate,
     vehicleYear: p.year || flow.vehicleYear,
     vehicleColor: p.color || flow.vehicleColor,
     vehicleCondition: normalizedCondition,
@@ -575,11 +582,11 @@ function storeVehicle(flow: FlowState, text: string): FlowState {
 }
 
 function hasVehicleInFlow(flow: FlowState) {
-  // Verifica campos estruturados (exige todos os 4)
-  if (flow.vehicleModel && flow.vehicleYear && flow.vehicleColor && flow.vehicleCondition) return true;
+  // A placa é obrigatória para permitir a identificação automática no portão.
+  if (flow.vehicleModel && flow.vehicleYear && flow.vehiclePlate && flow.vehicleColor && flow.vehicleCondition) return true;
   
   // Verifica vehicleRaw APENAS se já tem cor e condição (requisito mínimo)
-  if (flow.vehicleRaw && isValidVehicle(flow.vehicleRaw) && flow.vehicleColor && flow.vehicleCondition) return true;
+  if (flow.vehicleRaw && isValidVehicle(flow.vehicleRaw) && flow.vehiclePlate && flow.vehicleColor && flow.vehicleCondition) return true;
   
   return false;
 }
@@ -591,6 +598,7 @@ function beginVehicleCollection(flow: FlowState, reset = false): FlowState {
     vehicleCollectStep: "details",
     vehicleRaw: reset ? undefined : flow.vehicleRaw,
     vehicleModel: reset ? undefined : flow.vehicleModel,
+    vehiclePlate: reset ? undefined : flow.vehiclePlate,
     vehicleYear: reset ? undefined : flow.vehicleYear,
     vehicleColor: reset ? undefined : flow.vehicleColor,
     vehicleCondition: reset ? undefined : flow.vehicleCondition,
@@ -598,12 +606,13 @@ function beginVehicleCollection(flow: FlowState, reset = false): FlowState {
   };
 }
 
-type VehicleField = "model" | "year" | "color" | "condition";
+type VehicleField = "model" | "year" | "plate" | "color" | "condition";
 
 function missingVehicleFields(flow: FlowState): VehicleField[] {
   const missing: VehicleField[] = [];
   if (!flow.vehicleModel) missing.push("model");
   if (!flow.vehicleYear) missing.push("year");
+  if (!flow.vehiclePlate) missing.push("plate");
   if (!flow.vehicleColor) missing.push("color");
   if (!flow.vehicleCondition) missing.push("condition");
   return missing;
@@ -612,6 +621,7 @@ function missingVehicleFields(flow: FlowState): VehicleField[] {
 function vehicleKnownLabel(flow: FlowState) {
   const details = [
     [flow.vehicleModel, flow.vehicleYear].filter(Boolean).join(" "),
+    flow.vehiclePlate ? `placa ${flow.vehiclePlate}` : null,
     flow.vehicleColor,
     flow.vehicleCondition,
   ].filter(Boolean);
@@ -623,12 +633,14 @@ function vehicleMissingCopy(flow: FlowState, prompts?: Record<string, string>) {
   const labels: Record<VehicleField, string> = {
     model: "modelo",
     year: "ano",
+    plate: "placa",
     color: "cor",
     condition: "estado geral",
   };
   const examples: Record<VehicleField, string> = {
     model: "Civic",
     year: "2021",
+    plate: "BRA2E19",
     color: "preto",
     condition: "bom estado",
   };
@@ -656,6 +668,7 @@ async function mergeVehicleDetails(flow: FlowState, input: string) {
   const next: FlowState = {
     ...flow,
     vehicleModel: model,
+    vehiclePlate: parsed.plate || flow.vehiclePlate,
     vehicleYear: parsed.year || flow.vehicleYear,
     vehicleColor: parsed.color || flow.vehicleColor,
     vehicleCondition: condition,
@@ -668,7 +681,7 @@ async function mergeVehicleDetails(flow: FlowState, input: string) {
   next.vehicleCollectStep = hasVehicleInFlow(next) ? undefined : "details";
 
   const recognized = Boolean(
-    candidateModel || parsed.year || parsed.color || parsed.condition
+    candidateModel || parsed.year || parsed.plate || parsed.color || parsed.condition
   );
   return { next, recognized };
 }
@@ -691,7 +704,7 @@ function buildContactAnswer(ctx: FlowContext) {
 }
 
 async function hydrateReturningClientData(flow: FlowState, phone: string) {
-  if (flow.savedVehicle && flow.loyaltyPoints != null) return flow;
+  if (flow.savedVehicle && flow.savedVehiclePlate !== undefined && flow.loyaltyPoints != null) return flow;
 
   if (flowDeliveryContext.getStore()?.skipDb) {
     return { ...flow, loyaltyPoints: flow.loyaltyPoints ?? 0 };
@@ -713,6 +726,7 @@ async function hydrateReturningClientData(flow: FlowState, phone: string) {
     return {
       ...flow,
       savedVehicle: client.vehicleModel || client.vehiclePlate || null,
+      savedVehiclePlate: client.vehiclePlate || null,
       loyaltyPoints: client.appointments.length * 10,
     };
   } catch (error) {
@@ -868,6 +882,7 @@ async function goToVehicleStep(msg: IncomingMessage, flow: FlowState, wctx: What
       ...flow,
       stage: "ETAPA4_VEHICLE",
       vehicleModel: saved.model || flow.savedVehicle,
+      vehiclePlate: flow.savedVehiclePlate || saved.plate || undefined,
       vehicleRaw: saved.summary || flow.savedVehicle,
       vehicleYear: saved.year || undefined,
       vehicleColor: undefined,
@@ -879,7 +894,7 @@ async function goToVehicleStep(msg: IncomingMessage, flow: FlowState, wctx: What
     await saveFlow(msg.phone, next);
     await sendText({
       number: msg.phone,
-      text: `Veículo salvo encontrado: *${flow.savedVehicle}*.
+      text: `Veículo salvo encontrado: *${flow.savedVehicle}${flow.savedVehiclePlate ? ` · ${flow.savedVehiclePlate}` : ""}*.
 
 Deseja usar esse veículo novamente?
 *1* — Sim
@@ -1581,11 +1596,14 @@ async function createAppointment(flow: FlowState, phone: string) {
       },
     });
 
-    const vehicleModel = vehicleDisplayFromFlow(flow).trim();
-    if (vehicleModel) {
+    const vehicleModel = [flow.vehicleModel, flow.vehicleYear].filter(Boolean).join(" ").trim();
+    if (vehicleModel || flow.vehiclePlate) {
       await tx.client.update({
         where: { id: client.id },
-        data: { vehicleModel },
+        data: {
+          vehicleModel: vehicleModel || undefined,
+          vehiclePlate: flow.vehiclePlate || undefined,
+        },
       });
     }
 
@@ -1675,7 +1693,7 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
   const isShortMenuPick = num !== null && input.length <= 2;
 
   const hydratedFlow = await hydrateReturningClientData(flow, msg.phone);
-  if (hydratedFlow.savedVehicle !== flow.savedVehicle || hydratedFlow.loyaltyPoints !== flow.loyaltyPoints) {
+  if (hydratedFlow.savedVehicle !== flow.savedVehicle || hydratedFlow.savedVehiclePlate !== flow.savedVehiclePlate || hydratedFlow.loyaltyPoints !== flow.loyaltyPoints) {
     flow = hydratedFlow;
     await saveFlow(msg.phone, flow);
   } else {
@@ -1760,7 +1778,7 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
     await saveFlow(msg.phone, next);
     await sendText({
       number: msg.phone,
-      text: `Olá, *${clientDisplayName(next, msg.pushName)}*! Que bom falar com você novamente.\n\nO novo atendimento será para o mesmo veículo, *${next.savedVehicle ?? vehicleDisplayFromFlow(next)}*?\n\n*1* ✅ Sim, o mesmo veículo\n*2* 🚗 Não, quero informar outro`,
+      text: `Olá, *${clientDisplayName(next, msg.pushName)}*! Que bom falar com você novamente.\n\nO novo atendimento será para o mesmo veículo, *${next.savedVehicle ?? vehicleDisplayFromFlow(next)}${next.savedVehiclePlate ? ` · ${next.savedVehiclePlate}` : ""}*?\n\n*1* ✅ Sim, o mesmo veículo\n*2* 🚗 Não, quero informar outro`,
     });
     return;
   }
@@ -1783,8 +1801,10 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
         ...flow,
         awaitingReturningVehicleChoice: false,
         savedVehicle: null,
+        savedVehiclePlate: null,
         vehicleRaw: undefined,
         vehicleModel: undefined,
+        vehiclePlate: undefined,
         vehicleYear: undefined,
         vehicleColor: undefined,
         vehicleCondition: undefined,
@@ -1799,7 +1819,7 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
 
     await sendText({
       number: msg.phone,
-      text: `Vamos usar *${flow.savedVehicle ?? vehicleDisplayFromFlow(flow)}* neste atendimento?\n\n*1* ✅ Sim, o mesmo veículo\n*2* 🚗 Não, informar outro`,
+      text: `Vamos usar *${flow.savedVehicle ?? vehicleDisplayFromFlow(flow)}${flow.savedVehiclePlate ? ` · ${flow.savedVehiclePlate}` : ""}* neste atendimento?\n\n*1* ✅ Sim, o mesmo veículo\n*2* 🚗 Não, informar outro`,
     });
     return;
   }
@@ -2408,6 +2428,7 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
               ? etapa4VehicleConfirmation(
                   next.vehicleModel ?? "",
                   next.vehicleYear ?? "",
+                  next.vehiclePlate ?? "",
                   next.vehicleColor ?? "",
                   next.vehicleCondition ?? "",
                   prompts
@@ -2455,7 +2476,7 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
         }
 
         const correction = await mergeVehicleDetails(flow, input);
-        const changed = ["vehicleModel", "vehicleYear", "vehicleColor", "vehicleCondition"].some(
+        const changed = ["vehicleModel", "vehicleYear", "vehiclePlate", "vehicleColor", "vehicleCondition"].some(
           (field) => correction.next[field as keyof FlowState] !== flow[field as keyof FlowState]
         );
         if (correction.recognized && changed) {
@@ -2466,6 +2487,7 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
               ? etapa4VehicleConfirmation(
                   correction.next.vehicleModel ?? "",
                   correction.next.vehicleYear ?? "",
+                  correction.next.vehiclePlate ?? "",
                   correction.next.vehicleColor ?? "",
                   correction.next.vehicleCondition ?? "",
                   prompts
@@ -2480,6 +2502,7 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
           text: `Escolha *1* para confirmar, *2* para informar outro veículo ou escreva diretamente o dado que deseja corrigir.\n\n${etapa4VehicleConfirmation(
             flow.vehicleModel ?? "",
             flow.vehicleYear ?? "",
+            flow.vehiclePlate ?? "",
             flow.vehicleColor ?? "",
             flow.vehicleCondition ?? "",
             prompts
@@ -2501,6 +2524,7 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
           ? etapa4VehicleConfirmation(
               collected.next.vehicleModel ?? "",
               collected.next.vehicleYear ?? "",
+              collected.next.vehiclePlate ?? "",
               collected.next.vehicleColor ?? "",
               collected.next.vehicleCondition ?? "",
               prompts
@@ -3450,9 +3474,11 @@ async function confirmFinal(
     stage: "ETAPA2_MAIN_MENU",
     customerName: resolveValidCustomerName(flow.customerName) ?? undefined,
     welcomed: true,
-    savedVehicle: vehicleDisplayFromFlow(flow),
+    savedVehicle: [flow.vehicleModel, flow.vehicleYear].filter(Boolean).join(" ") || flow.vehicleRaw,
+    savedVehiclePlate: flow.vehiclePlate,
     vehicleRaw: flow.vehicleRaw,
     vehicleModel: flow.vehicleModel,
+    vehiclePlate: flow.vehiclePlate,
     vehicleYear: flow.vehicleYear,
     vehicleColor: flow.vehicleColor,
     vehicleCondition: flow.vehicleCondition,
@@ -3544,6 +3570,7 @@ export async function startFlow(msg: IncomingMessage) {
       ));
     const returningName = resolveValidCustomerName(returningClient?.name);
     const savedVehicle = returningClient?.vehicleModel || returningClient?.vehiclePlate || null;
+    const savedVehiclePlate = returningClient?.vehiclePlate || null;
     const profileName = returningName ?? profileDisplayName(msg.pushName);
 
     if (initialDoubt) {
@@ -3556,6 +3583,7 @@ export async function startFlow(msg: IncomingMessage) {
             pendingServiceKey: serviceKey,
             isReturningClient: Boolean(returningName),
             savedVehicle,
+            savedVehiclePlate,
             abWelcomeVariant,
           }
         : {
@@ -3591,6 +3619,7 @@ export async function startFlow(msg: IncomingMessage) {
         welcomed: true,
         isReturningClient: Boolean(returningName),
         savedVehicle,
+        savedVehiclePlate,
         pendingInitialIntent: availabilityRequest ? "schedule" : undefined,
         dayDate: availabilityDay?.dayDate,
         dayLabel: availabilityDay?.dayLabel,
@@ -3632,6 +3661,7 @@ export async function startFlow(msg: IncomingMessage) {
         welcomed: true,
         isReturningClient: true,
         savedVehicle,
+        savedVehiclePlate,
         awaitingReturningVehicleChoice: Boolean(savedVehicle),
       };
       await saveFlow(msg.phone, returningState, !!msg.testMode);
@@ -3639,7 +3669,7 @@ export async function startFlow(msg: IncomingMessage) {
       await sendTextWrapper(
         msg,
         savedVehicle
-          ? `Olá, *${returningName}*! Que bom ter você de volta 😊\n\nEste atendimento será para o mesmo veículo, *${savedVehicle}*?\n\n*1* ✅ Sim, o mesmo veículo\n*2* 🚗 Não, quero informar outro\n\n_Você também pode responder com suas palavras._`
+          ? `Olá, *${returningName}*! Que bom ter você de volta 😊\n\nEste atendimento será para o mesmo veículo, *${savedVehicle}${savedVehiclePlate ? ` · ${savedVehiclePlate}` : ""}*?\n\n*1* ✅ Sim, o mesmo veículo\n*2* 🚗 Não, quero informar outro\n\n_Você também pode responder com suas palavras._`
           : flowMsg(wctx).mainMenu(returningState, msg.pushName),
         { includesWelcome: true }
       );

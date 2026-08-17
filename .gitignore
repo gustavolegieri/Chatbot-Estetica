@@ -37,3 +37,8 @@ next-env.d.ts
 # prisma
 /prisma/migrations/**/migration_lock.toml
 .env*
+!camera-agent/.env.example
+
+# Python do agente local da webcam
+__pycache__/
+*.py[cod]

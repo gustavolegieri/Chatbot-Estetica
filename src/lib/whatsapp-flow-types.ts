@@ -47,6 +47,7 @@ export interface FlowState {
   packageKey?: string;
   vehicleRaw?: string;
   vehicleModel?: string;
+  vehiclePlate?: string;
   vehicleYear?: string;
   vehicleColor?: string;
   vehicleCondition?: string;
@@ -140,6 +141,7 @@ export interface FlowState {
   // Cliente recorrente e fidelidade
   isReturningClient?: boolean;
   savedVehicle?: string | null;
+  savedVehiclePlate?: string | null;
   /** Aguarda a decisão de reutilizar o veículo salvo no CRM. */
   awaitingSavedVehicleChoice?: boolean;
   /** Após uma reserva, aguarda uma nova mensagem antes de iniciar outro atendimento. */

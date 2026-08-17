@@ -1,6 +1,7 @@
 export interface ParsedVehicle {
   raw: string;
   model: string;
+  plate: string;
   year: string;
   color: string;
   condition: string;
@@ -49,6 +50,27 @@ import { isGreetingOrSmallTalk } from "./whatsapp-intent";
 
 const NOT_A_NAME =
   /agendamento|agendar|marcar|reservar|menu|lavagem|polimento|vitrifica|higieniza|cristaliza|pacote|serviço|servico|obrigad|valeu|bom dia|boa tarde|quero|preciso|horário|horario|pagamento|pix|^\d+$/i;
+
+export function normalizeVehiclePlate(value: string): string {
+  return value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7);
+}
+
+export function isValidVehiclePlate(value: string): boolean {
+  const plate = normalizeVehiclePlate(value);
+  return /^[A-Z]{3}(?:\d{4}|\d[A-Z]\d{2})$/.test(plate);
+}
+
+export function parsePlateFromText(text: string): string | null {
+  const explicit = text.match(/\bplaca\s*:?[\s-]*([a-z]{3}[\s-]?\d[a-z0-9]\d{2})\b/i)?.[1];
+  const compact = text.match(/\b[a-z]{3}-?\d[a-z0-9]\d{2}\b/gi) ?? [];
+  const spacedOld = text.match(/\b[A-Z]{3}\s\d{4}\b/g) ?? [];
+  const candidates = [explicit, ...compact, ...spacedOld].filter((value): value is string => Boolean(value));
+  for (const candidate of candidates) {
+    const plate = normalizeVehiclePlate(candidate);
+    if (isValidVehiclePlate(plate)) return plate;
+  }
+  return null;
+}
 
 export function parseYearFromText(text: string): string | null {
   const m = text.match(/\b(19[89]\d|20[0-2]\d)\b/);
@@ -102,6 +124,7 @@ export function parseVehicleMessage(text: string): ParsedVehicle {
   const raw = text.trim();
   const lower = raw.toLowerCase();
   let year = parseYearFromText(raw) ?? "";
+  const plate = parsePlateFromText(raw) ?? "";
   let color = "";
   let condition = "";
 
@@ -124,6 +147,7 @@ export function parseVehicleMessage(text: string): ParsedVehicle {
 
   let model = raw;
   if (year) model = model.replace(year, "");
+  if (plate) model = model.replace(new RegExp(`${plate.slice(0, 3)}[\\s-]?${plate.slice(3)}`, "i"), "");
   if (color) model = model.replace(new RegExp(color, "i"), "");
   model = cleanModelText(model);
 
@@ -135,6 +159,7 @@ export function parseVehicleMessage(text: string): ParsedVehicle {
   return {
     raw,
     model,
+    plate,
     year,
     color,
     condition,
@@ -165,11 +190,12 @@ export function looksLikePersonName(text: string): boolean {
 export function vehicleDisplayFromFlow(flow: {
   vehicleRaw?: string;
   vehicleModel?: string;
+  vehiclePlate?: string;
   vehicleYear?: string;
   vehicleColor?: string;
 }): string {
   if (flow.vehicleModel && flow.vehicleYear) {
-    return `${flow.vehicleModel} ${flow.vehicleYear}`;
+    return `${flow.vehicleModel} ${flow.vehicleYear}${flow.vehiclePlate ? ` · ${flow.vehiclePlate}` : ""}`;
   }
   if (flow.vehicleRaw && isValidVehicle(flow.vehicleRaw)) return flow.vehicleRaw;
   const parts = [flow.vehicleModel, flow.vehicleYear].filter(Boolean);
@@ -183,6 +209,7 @@ export function mergeVehicleIntoFlow(
   return {
     raw: incoming.raw || existing.raw || "",
     model: incoming.model || existing.model || "",
+    plate: incoming.plate || existing.plate || "",
     year: incoming.year || existing.year || "",
     color: incoming.color || existing.color || "",
     condition: incoming.condition || existing.condition || "",
@@ -214,6 +241,7 @@ export async function parseVehicleMessageSmart(text: string): Promise<ParsedVehi
     return {
       raw: parsed.raw,
       model: ai.model || parsed.model,
+      plate: parsed.plate,
       year: ai.year || parsed.year,
       color: ai.color || parsed.color,
       condition: ai.condition || parsed.condition,
@@ -231,7 +259,7 @@ export function vehicleQuickSummary(vehicle: Partial<ParsedVehicle>): string {
 }
 
 export function detectVehicleCompletion(vehicle: Partial<ParsedVehicle>): boolean {
-  return Boolean(vehicle.model && vehicle.year && vehicle.color);
+  return Boolean(vehicle.model && vehicle.year && vehicle.plate && vehicle.color);
 }
 
 export function mergeVehicleIntoFlowSmart(
@@ -244,6 +272,7 @@ export function mergeVehicleIntoFlowSmart(
 export function buildVehicleNextStepMessage(vehicle: Partial<ParsedVehicle>): string {
   if (!vehicle.model) return "Me diga o modelo do veículo para continuar.";
   if (!vehicle.year) return `Agora me diga o ano do ${vehicle.model}.`;
+  if (!vehicle.plate) return `Qual é a placa do ${vehicle.model}?`;
   if (!vehicle.color) return `Qual é a cor do ${vehicle.model}?`;
   return `Perfeito — já tenho os dados do veículo: ${vehicleDisplay(vehicle)}.`;
 }

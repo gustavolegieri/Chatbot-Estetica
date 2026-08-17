@@ -32,7 +32,16 @@ export async function loadPromptMap(force = false): Promise<PromptMap> {
   const map = defaultMap();
   try {
     const rows = await prisma.botPrompt.findMany();
-    for (const row of rows) map[row.key] = row.content;
+    for (const row of rows) {
+      // Prompts antigos podem estar persistidos no banco. A placa passou a ser
+      // obrigatória para a identificação automática no portão, portanto uma
+      // versão antiga não pode remover essa informação crítica do fluxo.
+      const requiresPlateCopy = ["etapa4_vehicle", "vehicle_not_understood"].includes(row.key);
+      const requiresPlateVariable = row.key === "vehicle_confirmation";
+      if (requiresPlateCopy && !/\bplaca\b/i.test(row.content)) continue;
+      if (requiresPlateVariable && !row.content.includes("{plate}")) continue;
+      map[row.key] = row.content;
+    }
   } catch (error) {
     // O atendimento continua com os templates oficiais locais durante uma
     // indisponibilidade momentânea do banco. Assim o cliente nunca recebe um

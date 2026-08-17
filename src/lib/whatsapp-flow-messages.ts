@@ -359,6 +359,7 @@ export function etapa4AskYear(model: string, prompts?: PromptMap) {
 export function etapa4VehicleConfirmation(
   model: string,
   year: string,
+  plate: string,
   color: string,
   condition: string,
   prompts?: PromptMap
@@ -366,6 +367,7 @@ export function etapa4VehicleConfirmation(
   return renderPrompt(p(prompts), "vehicle_confirmation", {
     model: model || "—",
     year: year || "—",
+    plate: plate || "—",
     color: color || "—",
     condition: condition || "—",
   });
