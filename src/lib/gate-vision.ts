@@ -60,14 +60,16 @@ function businessDayRange(now = new Date()) {
 
 export function classifyGateCrossing(
   centroidY: number[],
-  outsideLine = 0.42,
-  insideLine = 0.62
+  gateLine = 0.58,
+  hysteresis = 0.025
 ): GateEventType | null {
-  if (centroidY.length < 2 || outsideLine >= insideLine) return null;
+  if (centroidY.length < 2 || hysteresis <= 0 || gateLine <= hysteresis || gateLine >= 1 - hysteresis) return null;
+  const outsideLimit = gateLine - hysteresis;
+  const insideLimit = gateLine + hysteresis;
   const first = centroidY[0];
   const last = centroidY[centroidY.length - 1];
-  if (first <= outsideLine && last >= insideLine) return "ENTER";
-  if (first >= insideLine && last <= outsideLine) return "EXIT";
+  if (first <= outsideLimit && last >= insideLimit) return "ENTER";
+  if (first >= insideLimit && last <= outsideLimit) return "EXIT";
   return null;
 }
 
@@ -417,7 +419,7 @@ export function simulateGateVision() {
   const entryTrack = [0.18, 0.31, 0.43, 0.52, 0.64, 0.73];
   const exitTrack = [...entryTrack].reverse();
   return {
-    lines: { outside: 0.42, inside: 0.62 },
+    boundary: { gateLine: 0.58, hysteresis: 0.025 },
     events: [
       { type: classifyGateCrossing(entryTrack), label: "Lavagem iniciada", confidence: 0.94, plate: "BRA2E19", plateConfidence: 0.91, positions: entryTrack },
       { type: classifyGateCrossing(exitTrack), label: "Finalização", confidence: 0.96, plate: "BRA2E19", plateConfidence: 0.93, positions: exitTrack },

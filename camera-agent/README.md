@@ -9,15 +9,15 @@ Este agente roda no computador da estética. A webcam é processada localmente e
 
 Instale a webcam em local alto e protegido, apontando para a passagem do portão. A imagem precisa mostrar aproximadamente 2 m antes e 2 m depois do portão.
 
-Na instalação com a câmera dentro da garagem olhando para a rua, mantenha a rua na parte superior da imagem e o interior da garagem na parte inferior. Use `GATE_FLIP_VERTICAL=false`: o carro entrando cresce na imagem e cruza primeiro `GATE_OUTSIDE_LINE`, depois `GATE_INSIDE_LINE`; na saída, a ordem é inversa.
+Na instalação com a câmera dentro da garagem olhando para a rua, mantenha a rua na parte superior da imagem e o interior da garagem na parte inferior. Use `GATE_FLIP_VERTICAL=false`. Posicione `GATE_LINE` exatamente sobre a risca física do portão: cruzou para baixo, entrou e inicia a lavagem; cruzou para cima, saiu e finaliza.
 
-O programa desenha duas linhas virtuais:
+O programa desenha uma única linha virtual:
 
 ```text
-RUA ─── linha FORA ─── portão ─── linha DENTRO ─── GARAGEM
+RUA / RAMPA ───────── RISCA DO PORTÃO ───────── GARAGEM
 ```
 
-A ordem das linhas define a direção. Pessoas são ignoradas; o modelo acompanha apenas carro, moto, ônibus e caminhão.
+A direção do cruzamento define entrada ou saída. Pessoas são ignoradas; o modelo acompanha apenas carro, moto, ônibus e caminhão. Uma margem invisível pequena evita eventos repetidos quando a caixa do veículo oscila sobre a risca.
 
 ## Instalação no Windows
 
@@ -30,9 +30,13 @@ A ordem das linhas define a direção. Pessoas são ignoradas; o modelo acompanh
 7. Na Vercel, crie `GATE_VISION_DEVICE_TOKEN` com o mesmo token.
 8. Inicie com `python gate_vision_agent.py`.
 
-Na primeira execução, os modelos leves de detecção e OCR são baixados automaticamente. A prévia mostra as duas linhas, a caixa do veículo e a placa reconhecida. Ajuste `GATE_OUTSIDE_LINE` e `GATE_INSIDE_LINE` até que uma fique antes e a outra depois do portão. Pressione `Q` para fechar.
+## Validação segura
 
-Para uma leitura confiável, o agente solicita imagem 1920×1080, boa iluminação e a placa dianteira ou traseira deve ocupar pelo menos 100 pixels de largura. Evite ângulo muito lateral, reflexo direto e contraluz. Se as linhas não coincidirem com a passagem física, ajuste `GATE_OUTSIDE_LINE` e `GATE_INSIDE_LINE` observando a prévia.
+Antes do uso real, execute `python validate_gate_system.py --camera-seconds 6`. O teste verifica placas antigas e Mercosul sob diferentes ângulos, perspectiva, luz, desfoque, ruído e distância; simula entrada e saída na rampa; procura falsos positivos; e abre a webcam sem enviar nenhum evento ao servidor. Para testar apenas os cenários sintéticos, use `python validate_gate_system.py --skip-camera`.
+
+Na primeira execução, os modelos leves de detecção e OCR são baixados automaticamente. A prévia mostra a risca do portão, a caixa do veículo e a placa reconhecida. Ajuste `GATE_LINE` até a linha da tela coincidir com a risca física do portão. Pressione `Q` para fechar.
+
+Para uma leitura confiável, o agente solicita imagem 1920×1080, boa iluminação e a placa dianteira ou traseira deve ocupar pelo menos 100 pixels de largura. Evite ângulo muito lateral, reflexo direto e contraluz. Se a linha não coincidir com a passagem física, ajuste `GATE_LINE` observando a prévia.
 
 ## Regras de segurança operacional
 
