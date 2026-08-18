@@ -16,12 +16,18 @@ from av import VideoFrame
 
 
 class LatestFrameHub:
-    def __init__(self, target_width: int = 960) -> None:
+    def __init__(self, target_width: int = 960, fps: float = 8.0) -> None:
         self.target_width = max(480, min(1280, target_width))
+        self.minimum_interval = 1 / max(2.0, min(15.0, fps))
+        self.last_update_at = 0.0
         self._lock = threading.Lock()
         self._frame: Any | None = None
 
     def update(self, frame: Any) -> None:
+        now = time.monotonic()
+        if now - self.last_update_at < self.minimum_interval:
+            return
+        self.last_update_at = now
         height, width = frame.shape[:2]
         if width > self.target_width:
             frame = cv2.resize(
@@ -75,7 +81,7 @@ class GateWebRtcPublisher:
         self.device_id = device_id
         self.device_token = device_token
         self.fps = fps
-        self.hub = LatestFrameHub(width)
+        self.hub = LatestFrameHub(width, fps)
         self.peers: dict[str, RTCPeerConnection] = {}
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self._thread_main, name="gate-webrtc", daemon=True)

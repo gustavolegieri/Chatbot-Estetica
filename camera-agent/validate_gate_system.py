@@ -23,6 +23,7 @@ from gate_vision_agent import (
     VEHICLE_CLASSES,
     GateVisionAgent,
     coerce_plate_candidate,
+    resolve_plate_against_expected,
 )
 
 
@@ -70,6 +71,7 @@ TRACK_SCENARIOS: list[tuple[str, list[float], str | None]] = [
 ]
 
 NEGATIVE_PLATE_CANDIDATES = ["BRASIL1", "COROLLA", "PORTAO1", "GARAGEM", "1234567", "AAAAAAA"]
+NOISY_VALID_PLATE_CANDIDATES = ["FFEG4B58", "FEG4B58B"]
 
 
 def plate_canvas(text: str) -> np.ndarray:
@@ -206,17 +208,24 @@ def run_false_positive_validation() -> list[dict[str, Any]]:
     ]
 
 
+def run_noisy_candidate_validation() -> list[dict[str, Any]]:
+    return [
+        {"candidate": candidate, "detected": coerce_plate_candidate(candidate), "passed": coerce_plate_candidate(candidate)[0] == "FEG4B58" if coerce_plate_candidate(candidate) else False}
+        for candidate in NOISY_VALID_PLATE_CANDIDATES
+    ]
+
+
 def run_async_ocr_validation() -> dict[str, Any]:
     agent = object.__new__(GateVisionAgent)
     agent.ocr = object()
     agent.ocr_executor = ThreadPoolExecutor(max_workers=1)
     emitted: list[tuple[str, str]] = []
 
-    def slow_read(_frame: Any, _box: tuple[int, int, int, int]) -> tuple[str, float]:
-        time.sleep(.35)
+    def slow_read(_crop: Any) -> tuple[str, float]:
+        time.sleep(.25)
         return "BRA2E19", .91
 
-    agent.read_plate = slow_read
+    agent.read_plate_region = slow_read
     agent.emit_event = lambda crossing, track_id, _memory, _frame: emitted.append((crossing, str(track_id)))
     memory = TrackMemory(last_box=(0, 0, 120, 80))
     frame = np.zeros((100, 140, 3), dtype=np.uint8)
@@ -224,7 +233,9 @@ def run_async_ocr_validation() -> dict[str, Any]:
     agent.queue_crossing("ENTER", 7, memory, frame, time.monotonic())
     scheduling_ms = (time.perf_counter() - started) * 1000
     pending_before_ocr = not emitted and memory.pending_crossing == "ENTER"
-    time.sleep(.42)
+    time.sleep(.65)
+    agent.flush_pending_crossing(7, memory, time.monotonic())
+    time.sleep(.32)
     agent.flush_pending_crossing(7, memory, time.monotonic())
     agent.ocr_executor.shutdown(wait=True)
     passed = scheduling_ms < 100 and pending_before_ocr and emitted == [("ENTER", "7")] and memory.plate == "BRA2E19"
@@ -233,6 +244,28 @@ def run_async_ocr_validation() -> dict[str, Any]:
         "schedulingMilliseconds": round(scheduling_ms, 2),
         "pendingBeforeOcr": pending_before_ocr,
         "emitted": emitted,
+        "plate": memory.plate,
+    }
+
+
+def run_plate_consensus_validation() -> dict[str, Any]:
+    memory = TrackMemory()
+    wrong_rejected = not memory.add_plate_read(("FEG4B59", .74)) and not memory.plate
+    first_correct_waits = not memory.add_plate_read(("FEG4B58", .83)) and not memory.plate
+    second_correct_confirms = memory.add_plate_read(("FEG4B58", .87)) and memory.plate == "FEG4B58"
+
+    high = TrackMemory()
+    high.add_plate_read(("BRA2E19", .93))
+    high_confidence_fallback = high.add_plate_read(None, allow_single=True) and high.plate == "BRA2E19"
+    agenda_correction = resolve_plate_against_expected("TEG4B58", {"FEG4B58", "BRA2E19"}) == "FEG4B58"
+    ambiguous_not_changed = resolve_plate_against_expected("TEG4B58", {"FEG4B58", "GEG4B58"}) == "TEG4B58"
+    return {
+        "passed": wrong_rejected and first_correct_waits and second_correct_confirms and high_confidence_fallback and agenda_correction and ambiguous_not_changed,
+        "wrongSingleRejected": wrong_rejected,
+        "correctRequiredConsensus": first_correct_waits and second_correct_confirms,
+        "highConfidenceFallback": high_confidence_fallback,
+        "agendaCorrection": agenda_correction,
+        "ambiguousPlateNotChanged": ambiguous_not_changed,
         "plate": memory.plate,
     }
 
@@ -291,19 +324,23 @@ def main() -> int:
     ocr = run_ocr_validation(reader)
     tracking = run_tracking_validation()
     false_positives = run_false_positive_validation()
+    noisy_candidates = run_noisy_candidate_validation()
     async_ocr = run_async_ocr_validation()
+    plate_consensus = run_plate_consensus_validation()
     box_stability = run_box_stability_validation()
     camera = None if args.skip_camera else run_camera_validation(reader, max(1, args.camera_seconds))
     report = {
         "ocr": {"passed": sum(item["passed"] for item in ocr), "total": len(ocr), "scenarios": ocr},
         "tracking": {"passed": sum(item["passed"] for item in tracking), "total": len(tracking), "scenarios": tracking},
         "falsePositives": {"passed": sum(item["passed"] for item in false_positives), "total": len(false_positives), "scenarios": false_positives},
+        "noisyPlateCandidates": {"passed": sum(item["passed"] for item in noisy_candidates), "total": len(noisy_candidates), "scenarios": noisy_candidates},
         "asyncOcr": async_ocr,
+        "plateConsensus": plate_consensus,
         "boxStability": box_stability,
         "camera": camera,
     }
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    return 0 if all(item["passed"] for item in ocr + tracking + false_positives) and async_ocr["passed"] and box_stability["passed"] else 1
+    return 0 if all(item["passed"] for item in ocr + tracking + false_positives + noisy_candidates) and async_ocr["passed"] and plate_consensus["passed"] and box_stability["passed"] else 1
 
 
 if __name__ == "__main__":

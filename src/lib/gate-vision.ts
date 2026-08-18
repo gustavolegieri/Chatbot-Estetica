@@ -61,6 +61,24 @@ function businessDayRange(now = new Date()) {
   return { start, end: new Date(start.getTime() + 24 * 60 * 60_000) };
 }
 
+async function expectedGatePlates(now = new Date()) {
+  const { start } = businessDayRange(now);
+  const end = new Date(start.getTime() + 31 * 24 * 60 * 60_000);
+  const appointments = await prisma.appointment.findMany({
+    where: {
+      date: { gte: start, lt: end },
+      status: { in: [AppointmentStatus.IN_PROGRESS, AppointmentStatus.CONFIRMED, AppointmentStatus.PENDING] },
+    },
+    select: { client: { select: { vehiclePlate: true } } },
+    take: 150,
+  });
+  return [...new Set(
+    appointments
+      .map((item) => normalizeVehiclePlate(item.client.vehiclePlate || ""))
+      .filter(isValidVehiclePlate)
+  )];
+}
+
 export function classifyGateCrossing(
   centroidY: number[],
   gateLine = 0.58,
@@ -159,8 +177,9 @@ async function alertUnmatched(type: GateEventType, plate?: string | null) {
 }
 
 export async function recordGateHeartbeat(input: GateHeartbeat) {
+  const expectedPlates = await expectedGatePlates();
   const duplicate = await prisma.auditLog.findFirst({ where: { resource: `gate-event:${input.eventId}` } });
-  if (duplicate) return { duplicate: true };
+  if (duplicate) return { duplicate: true, online: true, expectedPlates };
   const recent = await prisma.auditLog.findFirst({
     where: { action: "GATE_VISION_HEARTBEAT", createdAt: { gte: new Date(Date.now() - 60_000) } },
   });
@@ -171,7 +190,7 @@ export async function recordGateHeartbeat(input: GateHeartbeat) {
       data: { ...input, capturedAt: input.capturedAt || new Date().toISOString() },
     });
   }
-  return { duplicate: false, online: true };
+  return { duplicate: false, online: true, expectedPlates };
 }
 
 export async function processGateVisionEvent(input: GateVisionEvent) {

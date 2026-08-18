@@ -11,6 +11,7 @@ import json
 import os
 import re
 import tempfile
+import threading
 import time
 import uuid
 from collections import deque
@@ -41,6 +42,10 @@ GATE_LINE_HYSTERESIS = max(0.01, float(os.getenv("GATE_LINE_HYSTERESIS", "0.025"
 PROCESS_FPS = max(1.0, float(os.getenv("GATE_PROCESS_FPS", "5")))
 CAMERA_WIDTH = max(640, int(os.getenv("GATE_CAMERA_WIDTH", "1920")))
 CAMERA_HEIGHT = max(480, int(os.getenv("GATE_CAMERA_HEIGHT", "1080")))
+CAMERA_FPS = max(10.0, min(60.0, float(os.getenv("GATE_CAMERA_FPS", "30"))))
+DETECTION_WIDTH = max(640, min(1280, int(os.getenv("GATE_DETECTION_WIDTH", "960"))))
+MODEL_IMAGE_SIZE = max(416, min(960, int(os.getenv("GATE_MODEL_IMAGE_SIZE", "640"))))
+CPU_THREADS = max(1, min(8, int(os.getenv("GATE_CPU_THREADS", "4"))))
 HEARTBEAT_SECONDS = max(30.0, float(os.getenv("GATE_HEARTBEAT_SECONDS", "60")))
 TRACK_TTL_SECONDS = max(2.0, float(os.getenv("GATE_TRACK_TTL_SECONDS", "6")))
 EVENT_COOLDOWN_SECONDS = max(10.0, float(os.getenv("GATE_EVENT_COOLDOWN_SECONDS", "25")))
@@ -51,6 +56,12 @@ PLATE_OCR_ENABLED = os.getenv("GATE_PLATE_OCR_ENABLED", "true").lower() == "true
 PLATE_OCR_MIN_CONFIDENCE = float(os.getenv("GATE_PLATE_OCR_MIN_CONFIDENCE", "0.45"))
 PLATE_SCAN_INTERVAL = max(0.25, float(os.getenv("GATE_PLATE_SCAN_INTERVAL", "0.8")))
 PLATE_EVENT_WAIT_SECONDS = max(2.0, float(os.getenv("GATE_PLATE_EVENT_WAIT_SECONDS", "10")))
+PLATE_CONFIRM_READS = max(2, min(4, int(os.getenv("GATE_PLATE_CONFIRM_READS", "2"))))
+PLATE_MAX_READS = max(PLATE_CONFIRM_READS, min(12, int(os.getenv("GATE_PLATE_MAX_READS", "7"))))
+PLATE_SINGLE_HIGH_CONFIDENCE = max(
+    PLATE_OCR_MIN_CONFIDENCE,
+    min(0.99, float(os.getenv("GATE_PLATE_SINGLE_HIGH_CONFIDENCE", "0.88"))),
+)
 DETECTION_DISPLAY_TTL_SECONDS = max(0.5, float(os.getenv("GATE_DETECTION_DISPLAY_TTL_SECONDS", "5")))
 PRESENCE_RECOVERY_SECONDS = max(2.0, float(os.getenv("GATE_PRESENCE_RECOVERY_SECONDS", "4")))
 BOX_SMOOTHING_STILL = min(0.8, max(0.05, float(os.getenv("GATE_BOX_SMOOTHING_STILL", "0.12"))))
@@ -114,29 +125,44 @@ def valid_plate(value: str) -> bool:
 
 
 def coerce_plate_candidate(value: str) -> tuple[str, int] | None:
-    candidate = normalize_plate(value)
-    if len(candidate) != 7:
+    raw_candidate = normalize_plate(value)
+    if len(raw_candidate) < 7 or len(raw_candidate) > 10:
         return None
     patterns = ("LLLDDDD", "LLLDLDD")
     options: list[tuple[str, int]] = []
-    for pattern in patterns:
-        corrected: list[str] = []
-        changes = 0
-        possible = True
-        for char, expected in zip(candidate, pattern):
-            if expected == "L":
-                replacement = char if char.isalpha() else LETTER_EQUIVALENTS.get(char)
-            else:
-                replacement = char if char.isdigit() else DIGIT_EQUIVALENTS.get(char)
-            if replacement is None:
-                possible = False
-                break
-            corrected.append(replacement)
-            changes += int(replacement != char)
-        plate = "".join(corrected)
-        if possible and changes <= 1 and valid_plate(plate):
-            options.append((plate, changes))
+    for start in range(len(raw_candidate) - 6):
+        candidate = raw_candidate[start:start + 7]
+        removed = len(raw_candidate) - 7
+        for pattern in patterns:
+            corrected: list[str] = []
+            changes = removed
+            possible = True
+            for char, expected in zip(candidate, pattern):
+                if expected == "L":
+                    replacement = char if char.isalpha() else LETTER_EQUIVALENTS.get(char)
+                else:
+                    replacement = char if char.isdigit() else DIGIT_EQUIVALENTS.get(char)
+                if replacement is None:
+                    possible = False
+                    break
+                corrected.append(replacement)
+                changes += int(replacement != char)
+            plate = "".join(corrected)
+            if possible and changes <= max(1, removed) and valid_plate(plate):
+                options.append((plate, changes))
     return min(options, key=lambda item: item[1]) if options else None
+
+
+def resolve_plate_against_expected(value: str, expected_plates: set[str]) -> str:
+    plate = normalize_plate(value)
+    if plate in expected_plates or not valid_plate(plate):
+        return plate
+    nearest = [
+        expected
+        for expected in expected_plates
+        if len(expected) == len(plate) and sum(left != right for left, right in zip(expected, plate)) == 1
+    ]
+    return nearest[0] if len(nearest) == 1 else plate
 
 
 @dataclass
@@ -149,6 +175,7 @@ class TrackMemory:
     confidence: float = 0.0
     plate: str = ""
     plate_confidence: float = 0.0
+    plate_readings: deque[tuple[str, float]] = field(default_factory=lambda: deque(maxlen=PLATE_MAX_READS))
     last_ocr_at: float = 0.0
     last_box: tuple[int, int, int, int] | None = None
     ocr_future: Future[tuple[str, float] | None] | None = None
@@ -158,6 +185,36 @@ class TrackMemory:
     stable_box_state: np.ndarray | None = None  # centro x/y, largura e altura
     box_velocity: np.ndarray = field(default_factory=lambda: np.zeros(4, dtype=np.float64))
     box_updated_at: float = 0.0
+
+    def add_plate_read(self, reading: tuple[str, float] | None, allow_single: bool = False) -> bool:
+        if reading:
+            plate, confidence = normalize_plate(reading[0]), float(reading[1])
+            if valid_plate(plate):
+                self.plate_readings.append((plate, confidence))
+        if self.plate:
+            return True
+        if not self.plate_readings:
+            return False
+
+        grouped: dict[str, list[float]] = {}
+        for plate, confidence in self.plate_readings:
+            grouped.setdefault(plate, []).append(confidence)
+        ranked = sorted(
+            grouped.items(),
+            key=lambda item: (len(item[1]), sum(item[1]) / len(item[1]), max(item[1])),
+            reverse=True,
+        )
+        candidate, confidences = ranked[0]
+        confirmations = len(confidences)
+        average = sum(confidences) / confirmations
+        runner_confirmations = len(ranked[1][1]) if len(ranked) > 1 else 0
+        confirmed = confirmations >= PLATE_CONFIRM_READS and confirmations > runner_confirmations
+        high_confidence_single = allow_single and confirmations == 1 and max(confidences) >= PLATE_SINGLE_HIGH_CONFIDENCE
+        if not confirmed and not high_confidence_single:
+            return False
+        self.plate = candidate
+        self.plate_confidence = min(0.99, average + min(0.10, (confirmations - 1) * 0.05))
+        return True
 
     def stabilize_box(
         self,
@@ -232,9 +289,24 @@ class GateVisionAgent:
             raise RuntimeError("GATE_DEVICE_TOKEN não foi configurado no arquivo camera-agent/.env")
         if not (GATE_LINE_HYSTERESIS < GATE_LINE < 1 - GATE_LINE_HYSTERESIS):
             raise RuntimeError("GATE_LINE deve ficar entre 0 e 1, longe das bordas da imagem")
+        cv2.setNumThreads(max(1, min(4, CPU_THREADS)))
+        try:
+            import torch
+
+            torch.set_num_threads(CPU_THREADS)
+        except Exception:
+            pass
         self.model = YOLO(MODEL_NAME)
         self.ocr = None
         self.ocr_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="gate-plate-ocr")
+        self.detector_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="gate-yolo")
+        self.network_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="gate-network")
+        self.detection_future: Future[tuple[float, float, list[tuple[int, tuple[int, int, int, int], float]]]] | None = None
+        self.heartbeat_future: Future[Any] | None = None
+        self.network_futures: set[Future[Any]] = set()
+        self.queue_lock = threading.Lock()
+        self.last_inference_ms = 0.0
+        self.expected_plates: set[str] = set()
         if PLATE_OCR_ENABLED:
             try:
                 import easyocr
@@ -242,9 +314,13 @@ class GateVisionAgent:
                 self.ocr = easyocr.Reader(["en"], gpu=False, verbose=False)
             except Exception as error:
                 print(f"[Portao IA] OCR de placa indisponivel: {error}")
-        self.capture = cv2.VideoCapture(camera_source())
+        source = camera_source()
+        self.capture = cv2.VideoCapture(source)
+        if isinstance(source, int):
+            self.capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
         self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
         self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+        self.capture.set(cv2.CAP_PROP_FPS, CAMERA_FPS)
         self.capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         if not self.capture.isOpened():
             raise RuntimeError("Não foi possível abrir a webcam. Revise GATE_CAMERA_SOURCE.")
@@ -279,6 +355,68 @@ class GateVisionAgent:
                 self.live_publisher.start()
             except Exception as error:
                 print(f"[Portao IA] WebRTC indisponivel; instale as dependencias: {error}")
+
+    def submit_network(self, callback: Any, *args: Any) -> None:
+        future = self.network_executor.submit(callback, *args)
+        self.network_futures.add(future)
+        future.add_done_callback(lambda completed: self.network_futures.discard(completed))
+
+    def prepare_detection_frame(self, frame: Any) -> tuple[Any, int, int]:
+        height, width = frame.shape[:2]
+        target_width = min(width, DETECTION_WIDTH)
+        if target_width == width:
+            return frame.copy(), width, height
+        target_height = max(2, int(height * target_width / width))
+        reduced = cv2.resize(frame, (target_width, target_height), interpolation=cv2.INTER_AREA)
+        return reduced, width, height
+
+    def detect_vehicles(
+        self,
+        frame: Any,
+        original_width: int,
+        original_height: int,
+        captured_at: float,
+    ) -> tuple[float, float, list[tuple[int, tuple[int, int, int, int], float]]]:
+        started = time.perf_counter()
+        result = self.model.track(
+            frame,
+            persist=True,
+            classes=VEHICLE_CLASSES,
+            conf=CONFIDENCE,
+            verbose=False,
+            tracker="bytetrack.yaml",
+            imgsz=MODEL_IMAGE_SIZE,
+        )[0]
+        detections: list[tuple[int, tuple[int, int, int, int], float]] = []
+        if result.boxes is not None and result.boxes.id is not None:
+            scale_x = original_width / max(1, frame.shape[1])
+            scale_y = original_height / max(1, frame.shape[0])
+            for box, track_id, confidence in zip(
+                result.boxes.xyxy.cpu().tolist(),
+                result.boxes.id.int().cpu().tolist(),
+                result.boxes.conf.cpu().tolist(),
+            ):
+                x1, y1, x2, y2 = box
+                detections.append((
+                    int(track_id),
+                    (int(x1 * scale_x), int(y1 * scale_y), int(x2 * scale_x), int(y2 * scale_y)),
+                    float(confidence),
+                ))
+        elapsed_ms = (time.perf_counter() - started) * 1000
+        return captured_at, elapsed_ms, detections
+
+    def schedule_detection(self, frame: Any, now: float) -> None:
+        if self.detection_future is not None or now - self.last_process_at < 1 / PROCESS_FPS:
+            return
+        reduced, original_width, original_height = self.prepare_detection_frame(frame)
+        self.last_process_at = now
+        self.detection_future = self.detector_executor.submit(
+            self.detect_vehicles,
+            reduced,
+            original_width,
+            original_height,
+            now,
+        )
 
     @staticmethod
     def box_iou(first: tuple[int, int, int, int], second: tuple[int, int, int, int]) -> float:
@@ -315,7 +453,7 @@ class GateVisionAgent:
     def headers(self) -> dict[str, str]:
         return {"Content-Type": "application/json", "x-gate-vision-token": DEVICE_TOKEN}
 
-    def post(self, payload: dict[str, Any], queue_on_failure: bool = False) -> bool:
+    def post(self, payload: dict[str, Any], queue_on_failure: bool = False) -> dict[str, Any] | None:
         try:
             timeout = 35 if payload.get("action") == "gate_event" else 15
             response = requests.post(API_URL, headers=self.headers, json=payload, timeout=timeout)
@@ -323,29 +461,32 @@ class GateVisionAgent:
             body = response.json()
             if not body.get("success"):
                 raise RuntimeError(body.get("error", "Resposta inválida do CRM"))
-            return True
+            data = body.get("data")
+            return data if isinstance(data, dict) else {"success": True}
         except (requests.RequestException, ValueError, RuntimeError) as error:
             print(f"[Portão IA] Falha ao enviar {payload.get('action')}: {error}")
             if queue_on_failure:
-                queue = load_json(QUEUE_FILE, [])
-                if not any(item.get("eventId") == payload.get("eventId") for item in queue):
-                    queue.append(payload)
-                    atomic_json_write(QUEUE_FILE, queue[-100:])
-            return False
+                with self.queue_lock:
+                    queue = load_json(QUEUE_FILE, [])
+                    if not any(item.get("eventId") == payload.get("eventId") for item in queue):
+                        queue.append(payload)
+                        atomic_json_write(QUEUE_FILE, queue[-100:])
+            return None
 
     def flush_queue(self) -> None:
-        queue = load_json(QUEUE_FILE, [])
-        if not queue:
-            return
-        remaining: list[dict[str, Any]] = []
-        failed = False
-        for payload in queue:
-            if failed:
-                remaining.append(payload)
-            elif not self.post(payload, queue_on_failure=False):
-                remaining.append(payload)
-                failed = True
-        atomic_json_write(QUEUE_FILE, remaining)
+        with self.queue_lock:
+            queue = load_json(QUEUE_FILE, [])
+            if not queue:
+                return
+            remaining: list[dict[str, Any]] = []
+            failed = False
+            for payload in queue:
+                if failed:
+                    remaining.append(payload)
+                elif not self.post(payload, queue_on_failure=False):
+                    remaining.append(payload)
+                    failed = True
+            atomic_json_write(QUEUE_FILE, remaining)
 
     def encode_snapshot(
         self,
@@ -465,61 +606,151 @@ class GateVisionAgent:
         print("[Portao IA] Timelapse descartado: arquivo acima do limite seguro")
         return None
 
-    def read_plate(self, frame: Any, box: tuple[int, int, int, int]) -> tuple[str, float] | None:
-        if self.ocr is None:
-            return None
+    @staticmethod
+    def plate_search_crop(frame: Any, box: tuple[int, int, int, int]) -> Any | None:
         frame_height, frame_width = frame.shape[:2]
         x1, y1, x2, y2 = box
         box_width, box_height = x2 - x1, y2 - y1
         if box_width < 110 or box_height < 70:
             return None
-        margin_x = int(box_width * .10)
+        margin_x = int(box_width * .08)
         crop_x1 = max(0, x1 + margin_x)
         crop_x2 = min(frame_width, x2 - margin_x)
-        crop_y1 = max(0, y1 + int(box_height * .34))
-        crop_y2 = min(frame_height, y2)
+        crop_y1 = max(0, y1 + int(box_height * .38))
+        crop_y2 = min(frame_height, y1 + int(box_height * .94))
         crop = frame[crop_y1:crop_y2, crop_x1:crop_x2]
         if crop.size == 0:
             return None
-        scale = max(1.0, min(2.2, 760 / max(1, crop.shape[1])))
+        return crop.copy()
+
+    def read_plate_region(self, crop: Any) -> tuple[str, float] | None:
+        if self.ocr is None or crop is None or crop.size == 0:
+            return None
+        scale = max(1.0, min(1.8, 680 / max(1, crop.shape[1])))
         enlarged = cv2.resize(crop, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
         gray = cv2.cvtColor(enlarged, cv2.COLOR_BGR2GRAY)
         enhanced = cv2.createCLAHE(clipLimit=2.2, tileGridSize=(8, 8)).apply(gray)
-        _threshold, otsu = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        variants = [enhanced, otsu]
-        adaptive: np.ndarray | None = None
+        blurred = cv2.GaussianBlur(enhanced, (0, 0), 2.0)
+        enhanced = cv2.addWeighted(enhanced, 1.65, blurred, -0.65, 0)
         best: tuple[str, float] | None = None
-        for index, variant in enumerate(variants):
+
+        # Procura primeiro o retângulo da placa por geometria. A etapa
+        # recognize pula o detector de texto do EasyOCR e costuma ser mais de
+        # dez vezes mais rápida em uma placa frontal nítida.
+        edges = cv2.Canny(enhanced, 45, 145)
+        edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (17, 5)), iterations=2)
+        contours, _hierarchy = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        height, width = enhanced.shape[:2]
+        candidates: list[tuple[float, tuple[int, int, int, int]]] = []
+        for contour in contours:
+            x, y, candidate_width, candidate_height = cv2.boundingRect(contour)
+            aspect = candidate_width / max(1, candidate_height)
+            area_ratio = (candidate_width * candidate_height) / max(1, width * height)
+            if not (2.0 <= aspect <= 6.2 and .008 <= area_ratio <= .28):
+                continue
+            if candidate_width < 70 or candidate_height < 18 or y < height * .12:
+                continue
+            center_distance = abs((x + candidate_width / 2) - width / 2) / max(1, width / 2)
+            aspect_score = max(0.0, 1 - abs(aspect - 3.5) / 3.5)
+            score = aspect_score * .55 + (1 - min(1.0, center_distance)) * .30 + min(.15, area_ratio)
+            candidates.append((score, (x, y, candidate_width, candidate_height)))
+
+        for _score, (x, y, candidate_width, candidate_height) in sorted(candidates, reverse=True)[:3]:
+            inner_x1 = max(0, x + int(candidate_width * .025))
+            inner_x2 = min(width, x + candidate_width - int(candidate_width * .025))
+            inner_y1 = max(0, y + int(candidate_height * .18))
+            inner_y2 = min(height, y + candidate_height - int(candidate_height * .04))
+            plate_region = enhanced[inner_y1:inner_y2, inner_x1:inner_x2]
+            if plate_region.size == 0:
+                continue
             try:
-                readings = self.ocr.readtext(
-                    variant,
+                readings = self.ocr.recognize(
+                    plate_region,
                     detail=1,
                     paragraph=False,
                     allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
                     decoder="greedy",
-                    canvas_size=768,
-                    mag_ratio=1.0,
                 )
             except Exception as error:
                 print(f"[Portao IA] Falha temporaria no OCR: {error}")
-                return best
+                break
             for _bounds, text, confidence in readings:
                 coerced = coerce_plate_candidate(str(text))
                 if not coerced:
                     continue
                 plate, corrections = coerced
-                raw_score = float(confidence)
-                score = max(0.0, raw_score - corrections * .04)
-                if corrections == 0 and raw_score >= PLATE_OCR_MIN_CONFIDENCE:
-                    score = max(score, .60)
+                score = max(0.0, float(confidence) - corrections * .04)
                 if score >= PLATE_OCR_MIN_CONFIDENCE and (best is None or score > best[1]):
                     best = (plate, score)
-            if best:
+            if best and best[1] >= .90:
                 return best
-            if index == 0:
-                adaptive = cv2.adaptiveThreshold(enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 9)
-                variants.append(adaptive)
+
+        # Fallback para placas sem contorno visível, muito inclinadas ou com
+        # reflexo. Executa uma única detecção de texto, sempre fora da thread da
+        # prévia da webcam.
+        try:
+            readings = self.ocr.readtext(
+                enhanced,
+                detail=1,
+                paragraph=False,
+                allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+                decoder="greedy",
+                canvas_size=640,
+                mag_ratio=1.0,
+            )
+        except Exception as error:
+            print(f"[Portao IA] Falha temporaria no OCR: {error}")
+            return best
+        detected_best: tuple[str, float] | None = None
+        for _bounds, text, confidence in readings:
+            coerced = coerce_plate_candidate(str(text))
+            if not coerced:
+                continue
+            plate, corrections = coerced
+            raw_score = float(confidence)
+            score = max(0.0, raw_score - corrections * .04)
+            if corrections == 0 and raw_score >= PLATE_OCR_MIN_CONFIDENCE:
+                score = max(score, .60)
+            if score >= PLATE_OCR_MIN_CONFIDENCE and (detected_best is None or score > detected_best[1]):
+                detected_best = (plate, score)
+        # O detector de texto encontrou os limites da linha completa. Quando
+        # ele discorda do recorte geométrico, esta leitura é mais confiável para
+        # o primeiro caractere (caso real F/T observado na webcam).
+        if detected_best is not None:
+            return detected_best
+        if best is not None:
+            return best
+
+        # Último recurso para ângulos fortes: a binarização separa caracteres
+        # que se misturam ao para-choque. Só roda quando os caminhos rápidos não
+        # encontraram nenhum candidato, portanto não pesa na câmera normal.
+        _threshold, otsu = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        try:
+            readings = self.ocr.readtext(
+                otsu,
+                detail=1,
+                paragraph=False,
+                allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+                decoder="greedy",
+                canvas_size=768,
+                mag_ratio=1.0,
+            )
+        except Exception as error:
+            print(f"[Portao IA] Falha temporaria no OCR de contingencia: {error}")
+            return None
+        for _bounds, text, confidence in readings:
+            coerced = coerce_plate_candidate(str(text))
+            if not coerced:
+                continue
+            plate, corrections = coerced
+            score = max(0.0, float(confidence) - corrections * .04)
+            if score >= PLATE_OCR_MIN_CONFIDENCE and (best is None or score > best[1]):
+                best = (plate, score)
         return best
+
+    def read_plate(self, frame: Any, box: tuple[int, int, int, int]) -> tuple[str, float] | None:
+        crop = self.plate_search_crop(frame, box)
+        return self.read_plate_region(crop) if crop is not None else None
 
     def collect_plate_read(self, memory: TrackMemory) -> None:
         future = memory.ocr_future
@@ -531,9 +762,19 @@ class GateVisionAgent:
         except Exception as error:
             print(f"[Portao IA] OCR em segundo plano falhou: {error}")
             return
-        if reading and reading[1] > memory.plate_confidence:
-            memory.plate, memory.plate_confidence = reading
-            print(f"[Portao IA] Placa lida: {memory.plate} ({memory.plate_confidence:.0%})")
+        if reading:
+            raw_plate = reading[0]
+            resolved_plate = resolve_plate_against_expected(raw_plate, getattr(self, "expected_plates", set()))
+            if resolved_plate != raw_plate:
+                print(f"[Portao IA] OCR ajustado pela agenda: {raw_plate} -> {resolved_plate}")
+                reading = (resolved_plate, min(.99, reading[1] + .12))
+            was_confirmed = bool(memory.plate)
+            confirmed = memory.add_plate_read(reading)
+            votes = sum(1 for plate, _confidence in memory.plate_readings if plate == reading[0])
+            if confirmed and not was_confirmed:
+                print(f"[Portao IA] Placa confirmada: {memory.plate} ({memory.plate_confidence:.0%}, {votes} leituras)")
+            elif not confirmed:
+                print(f"[Portao IA] Candidato de placa: {reading[0]} ({reading[1]:.0%}, {votes}/{PLATE_CONFIRM_READS})")
 
     def schedule_plate_read(
         self,
@@ -546,10 +787,15 @@ class GateVisionAgent:
         self.collect_plate_read(memory)
         if self.ocr is None or memory.plate or memory.ocr_future is not None:
             return
+        if len(memory.plate_readings) >= PLATE_MAX_READS:
+            memory.add_plate_read(None, allow_single=True)
+            return
         if not force and now - memory.last_ocr_at < PLATE_SCAN_INTERVAL:
             return
         memory.last_ocr_at = now
-        memory.ocr_future = self.ocr_executor.submit(self.read_plate, frame.copy(), box)
+        crop = self.plate_search_crop(frame, box)
+        if crop is not None:
+            memory.ocr_future = self.ocr_executor.submit(self.read_plate_region, crop)
 
     def queue_crossing(
         self,
@@ -570,8 +816,12 @@ class GateVisionAgent:
         self.collect_plate_read(memory)
         if not memory.pending_crossing:
             return
+        if not memory.plate and memory.pending_frame is not None and memory.last_box is not None:
+            self.schedule_plate_read(memory.pending_frame, memory.last_box, memory, now)
         if not memory.plate and now - memory.pending_since < PLATE_EVENT_WAIT_SECONDS:
             return
+        if not memory.plate:
+            memory.add_plate_read(None, allow_single=True)
         crossing = memory.pending_crossing
         frame = memory.pending_frame
         memory.pending_crossing = None
@@ -610,7 +860,7 @@ class GateVisionAgent:
             timelapse = self.finish_timelapse(frame, now)
             if timelapse:
                 payload["timelapseDataUrl"] = timelapse
-        sent = self.post(payload, queue_on_failure=True)
+        self.submit_network(self.post, payload, True)
         self.state = {
             "occupied": event_type == "ENTER",
             "lastEvent": event_type,
@@ -621,14 +871,14 @@ class GateVisionAgent:
         self.last_event_at = now
         if event_type == "ENTER":
             self.start_timelapse(frame, memory.plate, now)
-        print(f"[Portão IA] {event_type} detectado · track {track_id} · enviado={sent}")
+        print(f"[Portão IA] {event_type} detectado · track {track_id} · envio em segundo plano")
 
     def heartbeat(self, measured_fps: float) -> None:
         now = time.monotonic()
         if now - self.last_heartbeat_at < HEARTBEAT_SECONDS:
             return
         self.last_heartbeat_at = now
-        self.post({
+        payload = {
             "action": "heartbeat",
             "eventId": str(uuid.uuid4()),
             "deviceId": DEVICE_ID,
@@ -638,8 +888,19 @@ class GateVisionAgent:
             "model": MODEL_NAME,
             "width": self.frame_width,
             "height": self.frame_height,
-        })
-        self.flush_queue()
+        }
+        if self.heartbeat_future is None or self.heartbeat_future.done():
+            def send_heartbeat() -> None:
+                response = self.post(payload)
+                if response and isinstance(response.get("expectedPlates"), list):
+                    self.expected_plates = {
+                        normalize_plate(str(plate))
+                        for plate in response["expectedPlates"]
+                        if valid_plate(str(plate))
+                    }
+                self.flush_queue()
+
+            self.heartbeat_future = self.network_executor.submit(send_heartbeat)
 
     def draw_overlay(self, frame: Any, detections: list[tuple[int, tuple[int, int, int, int], float]]) -> None:
         height, width = frame.shape[:2]
@@ -655,6 +916,7 @@ class GateVisionAgent:
             cv2.putText(frame, f"veiculo #{track_id} {confidence:.0%}{plate_label}", (x1, max(20, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, .48, (212, 175, 55), 2)
         state_label = "LAVAGEM" if self.state.get("occupied") else "PORTAO LIVRE"
         cv2.putText(frame, state_label, (width - 220, 30), cv2.FONT_HERSHEY_SIMPLEX, .65, (255, 255, 255), 2)
+        cv2.putText(frame, f"IA {self.last_inference_ms:.0f} ms", (12, height - 18), cv2.FONT_HERSHEY_SIMPLEX, .48, (235, 235, 235), 1)
 
     def run(self) -> None:
         print(
@@ -677,18 +939,14 @@ class GateVisionAgent:
                 self.timelapse_resume_pending = False
                 self.start_timelapse(frame, str(self.state.get("currentPlate") or ""), now)
             detections = self.visible_detections(now)
-            if now - self.last_process_at >= 1 / PROCESS_FPS:
-                self.last_process_at = now
-                result = self.model.track(frame, persist=True, classes=VEHICLE_CLASSES, conf=CONFIDENCE, verbose=False, tracker="bytetrack.yaml")[0]
+            if self.detection_future is not None and self.detection_future.done():
+                completed = self.detection_future
+                self.detection_future = None
                 current_detections: list[tuple[int, tuple[int, int, int, int], float]] = []
-                if result.boxes is not None and result.boxes.id is not None:
-                    boxes = result.boxes.xyxy.cpu().tolist()
-                    ids = result.boxes.id.int().cpu().tolist()
-                    confidences = result.boxes.conf.cpu().tolist()
+                try:
+                    _captured_at, self.last_inference_ms, raw_detections = completed.result()
                     height = frame.shape[0]
-                    for box, raw_track_id, confidence in zip(boxes, ids, confidences):
-                        x1, y1, x2, y2 = map(int, box)
-                        raw_box = (x1, y1, x2, y2)
+                    for raw_track_id, raw_box, confidence in raw_detections:
                         track_id = self.canonical_track_id(raw_track_id, raw_box, now)
                         memory = self.tracks.setdefault(track_id, TrackMemory())
                         stable_box = memory.stabilize_box(raw_box, now, frame.shape[1], height)
@@ -709,6 +967,8 @@ class GateVisionAgent:
                             memory.emitted = True
                             print(f"[Portao IA] Presenca interna recuperada pela placa {memory.plate}")
                             self.queue_crossing("ENTER", track_id, memory, frame, now)
+                except Exception as error:
+                    print(f"[Portao IA] Detector em segundo plano falhou: {error}")
                 if current_detections:
                     self.last_detections = current_detections
                     self.last_detection_at = now
@@ -716,23 +976,25 @@ class GateVisionAgent:
                 elif now - self.last_detection_at > DETECTION_DISPLAY_TTL_SECONDS:
                     self.last_detections = []
                     detections = []
-                for track_id, memory in self.tracks.items():
-                    self.flush_pending_crossing(track_id, memory, now)
-                expired = [
-                    track_id
-                    for track_id, memory in self.tracks.items()
-                    if now - memory.last_seen > TRACK_TTL_SECONDS
-                    and not memory.pending_crossing
-                    and (memory.ocr_future is None or memory.ocr_future.done())
-                ]
-                for track_id in expired:
-                    del self.tracks[track_id]
-                if expired:
-                    self.track_aliases = {
-                        raw_id: canonical_id
-                        for raw_id, canonical_id in self.track_aliases.items()
-                        if canonical_id in self.tracks
-                    }
+            self.schedule_detection(frame, now)
+            for track_id, memory in list(self.tracks.items()):
+                self.collect_plate_read(memory)
+                self.flush_pending_crossing(track_id, memory, now)
+            expired = [
+                track_id
+                for track_id, memory in self.tracks.items()
+                if now - memory.last_seen > TRACK_TTL_SECONDS
+                and not memory.pending_crossing
+                and (memory.ocr_future is None or memory.ocr_future.done())
+            ]
+            for track_id in expired:
+                del self.tracks[track_id]
+            if expired:
+                self.track_aliases = {
+                    raw_id: canonical_id
+                    for raw_id, canonical_id in self.track_aliases.items()
+                    if canonical_id in self.tracks
+                }
             frame_counter += 1
             elapsed = max(.001, now - fps_started)
             measured_fps = frame_counter / elapsed
@@ -749,6 +1011,8 @@ class GateVisionAgent:
         if self.live_publisher is not None:
             self.live_publisher.stop()
         self.ocr_executor.shutdown(wait=False, cancel_futures=True)
+        self.detector_executor.shutdown(wait=False, cancel_futures=True)
+        self.network_executor.shutdown(wait=False, cancel_futures=True)
         cv2.destroyAllWindows()
 
 

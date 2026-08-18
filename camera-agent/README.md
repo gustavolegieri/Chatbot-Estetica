@@ -38,6 +38,10 @@ Na primeira execução, os modelos leves de detecção e OCR são baixados autom
 
 Para uma leitura confiável, o agente solicita imagem 1920×1080, boa iluminação e a placa dianteira ou traseira deve ocupar pelo menos 100 pixels de largura. Evite ângulo muito lateral, reflexo direto e contraluz. Se a linha não coincidir com a passagem física, ajuste `GATE_LINE` observando a prévia.
 
+O processamento foi separado em tarefas independentes: a prévia continua fluida enquanto o YOLO analisa uma cópia reduzida, o OCR trabalha apenas no recorte inferior do veículo e os envios ao CRM acontecem em segundo plano. A imagem original em 1920×1080 continua sendo usada para ler a placa e tirar a foto. `GATE_DETECTION_WIDTH` não reduz a qualidade do OCR.
+
+A primeira leitura de sete caracteres aparece como “candidato”. A placa só é confirmada depois que `GATE_PLATE_CONFIRM_READS` quadros concordam. Isso evita cadastrar ou avisar o cliente errado por causa de uma confusão isolada como `B/8`, `S/5` ou `O/0`. Em uma passagem muito rápida, uma única leitura só pode ser usada se superar `GATE_PLATE_SINGLE_HIGH_CONFIDENCE`.
+
 ## Timelapse
 
 Ao confirmar a entrada, o agente inicia automaticamente uma sequência local com um quadro a cada 30 segundos. O quadro inteiro é preservado, sem desfoque de fundo ou pessoas. Na saída, o agente cria um MP4 curto, reduz resolução se necessário e apaga os quadros temporários da memória. Somente o resultado final é enviado ao servidor e ao cliente associado pela placa.
