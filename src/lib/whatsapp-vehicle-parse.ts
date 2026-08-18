@@ -110,12 +110,16 @@ export function parseModelFromText(text: string): string | null {
 
 function cleanModelText(text: string): string {
   let t = text;
-  t = t.replace(/\bestado\s+(?:bom|otimo|ótimo|excelente|ruim|regular|normal)\b/gi, "");
+  // Tolera erros comuns de digitação em "estado" (ex.: estsdo/estdo),
+  // evitando que a condição seja anexada ao modelo do veículo.
+  const stateWord = "est(?:a|á|s)?do";
+  t = t.replace(new RegExp(`\\b${stateWord}\\s+(?:bom|otimo|ótimo|excelente|ruim|regular|normal)\\b`, "gi"), "");
   t = t.replace(/(?:em\s+)?(?:bom|otimo|ótimo|excelente|ruim|regular|normal)\s+estado/gi, "");
+  t = t.replace(new RegExp(`(?:em\\s+)?(?:bom|otimo|ótimo|excelente|ruim|regular|normal)\\s+${stateWord}`, "gi"), "");
   t = t.replace(/\b(?:bom|otimo|ótimo|excelente|ruim|regular|normal)\b/gi, "");
   t = t.replace(/precisa\s+de\s+aten[çcç]ão/g, "");
   t = t.replace(/pouco\s+uso|bem\s+conservado|bem\s+cuidado|carro\s+novo|zero\s+km|seminovo/gi, "");
-  t = t.replace(/\bestado\b/gi, "");
+  t = t.replace(new RegExp(`\\b${stateWord}\\b`, "gi"), "");
   t = t.replace(/\b(em|de|da|do|no|na|um|uma)\b\s*/gi, "");
   t = t.replace(/,/g, "");
   t = t.replace(/\s+/g, " ").trim();

@@ -13,6 +13,50 @@ function nextBusinessDate() {
   return format(date, "dd/MM/yyyy");
 }
 
+test("simple greeting starts immediately without calling an AI provider", async () => {
+  const previousCerebrasKey = process.env.CEREBRAS_API_KEY;
+  const previousGroqKey = process.env.GROQ_API_KEY;
+  const previousFetch = globalThis.fetch;
+  const originalSettingsFindUnique = prisma.settings.findUnique;
+  process.env.CEREBRAS_API_KEY = "configured-but-must-not-be-called";
+  process.env.GROQ_API_KEY = "";
+  (prisma.settings as any).findUnique = async () => null;
+  (globalThis as any).__BB_WCTX_MOCK__ = {
+    catalog: CATALOG,
+    categories: CATEGORIES,
+    servicesByKey: {},
+    dbServiceIdByKey: {},
+    prompts: getDefaultPromptMap(),
+  };
+  globalThis.fetch = (async () => {
+    throw new Error("A saudação simples não deve consultar IA");
+  }) as typeof fetch;
+
+  const replies: string[] = [];
+  try {
+    await startFlow({
+      phone: "5511000000888",
+      text: "Olá",
+      testMode: {
+        skipDb: true,
+        sendTextCallback: async (text: string) => {
+          replies.push(text);
+        },
+      },
+    });
+    assert.equal(replies.length, 1);
+    assert.match(replies[0], /como você prefere ser chamado/i);
+  } finally {
+    globalThis.fetch = previousFetch;
+    (prisma.settings as any).findUnique = originalSettingsFindUnique;
+    delete (globalThis as any).__BB_WCTX_MOCK__;
+    if (previousCerebrasKey === undefined) delete process.env.CEREBRAS_API_KEY;
+    else process.env.CEREBRAS_API_KEY = previousCerebrasKey;
+    if (previousGroqKey === undefined) delete process.env.GROQ_API_KEY;
+    else process.env.GROQ_API_KEY = previousGroqKey;
+  }
+});
+
 test("official scheduling flow keeps one ordered prompt per customer reply", async () => {
   const previousCerebrasKey = process.env.CEREBRAS_API_KEY;
   const previousGroqKey = process.env.GROQ_API_KEY;

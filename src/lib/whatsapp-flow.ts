@@ -3639,7 +3639,16 @@ export async function startFlow(msg: IncomingMessage) {
       ? detectedServiceKey
       : undefined;
     const questionByRule = looksLikeQuestion(input);
-    const analysis = questionByRule
+    const availabilityRequest = isAvailabilityRequest(input);
+    const knownInitialIntent =
+      isGreetingOrSmallTalk(input) ||
+      availabilityRequest ||
+      wantsToSchedule(input, onlyNumber(input)) ||
+      Boolean(serviceKey);
+    // Saudações, opções, serviços e pedidos de agenda já são inequívocos.
+    // Consultar a IA nesses casos só adiciona latência e pode bloquear o fluxo
+    // quando um provedor está sem quota. IA fica reservada para texto ambíguo.
+    const analysis = questionByRule || knownInitialIntent
       ? null
       : await analyzeWhatsAppMessage({
           text: input,
@@ -3647,7 +3656,6 @@ export async function startFlow(msg: IncomingMessage) {
           pushName: msg.pushName,
           ctx,
         });
-    const availabilityRequest = isAvailabilityRequest(input);
     const availabilityDay = availabilityRequest ? parseDayInput(input, null) : null;
     const initialDoubt =
       !availabilityRequest && (questionByRule || analysis?.intent === "doubt");

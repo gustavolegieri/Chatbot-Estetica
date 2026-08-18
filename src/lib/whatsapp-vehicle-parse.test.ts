@@ -50,3 +50,9 @@ test("parseVehicleMessage removes condition written as estado bom from model", (
   assert.equal(vehicle.color, "branco");
   assert.equal(vehicle.condition, "bom");
 });
+
+test("parseVehicleMessage tolerates a typo in estado without changing the model", () => {
+  const vehicle = parseVehicleMessage("Fiesta 2012, FEG4B58, branco, bom estsdo");
+  assert.equal(vehicle.model, "Fiesta");
+  assert.equal(vehicle.condition, "bom");
+});
