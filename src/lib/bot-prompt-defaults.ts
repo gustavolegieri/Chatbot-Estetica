@@ -245,8 +245,15 @@ export const BOT_PROMPT_DEFAULTS: PromptDef[] = [
     key: "appointment_checkin",
     label: "Check-in e início do serviço",
     category: "automacao",
-    hint: "{name}, {service}, {vehicle}, {brand}",
-    content: "🔧 *Serviço iniciado*\n\nOlá, *{name}*. O check-in de *{vehicle}* foi concluído e nossa equipe já iniciou o serviço *{service}*.\n\nVocê pode acompanhar por aqui. Assim que o veículo estiver pronto, a *{brand}* enviará uma nova atualização.",
+    hint: "{name}, {service}, {vehicle}, {plate}, {brand}",
+    content: "🚘✨ *Seu veículo já está em atendimento*\n\nOlá, *{name}*! Identificamos a entrada do seu veículo e nossa equipe já iniciou todos os cuidados.\n\n🚗 *Veículo:* {vehicle}\n🔠 *Placa:* {plate}\n🫧 *Serviço:* {service}\n🔄 *Etapa atual:* Lavagem iniciada\n\nAgora é só deixar com a gente. A equipe *{brand}* avisará por aqui assim que o veículo avançar para a próxima etapa. 🤍",
+  },
+  {
+    key: "appointment_finalizing",
+    label: "Veículo em finalização pelo Portão IA",
+    category: "automacao",
+    hint: "{name}, {service}, {vehicle}, {plate}, {brand}",
+    content: "✨🔍 *Seu veículo avançou para a finalização*\n\nOlá, *{name}*! A etapa principal do serviço foi concluída e seu veículo entrou na fase de acabamento.\n\n🚗 *Veículo:* {vehicle}\n🔠 *Placa:* {plate}\n🫧 *Serviço:* {service}\n🔄 *Etapa atual:* Acabamento e conferência final\n\nNossa equipe está revisando cada detalhe para entregar o melhor resultado. A *{brand}* enviará uma nova mensagem assim que o veículo estiver pronto. 🤍",
   },
   {
     key: "appointment_status",

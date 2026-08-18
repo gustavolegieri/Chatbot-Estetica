@@ -37,7 +37,7 @@ export async function loadPromptMap(force = false): Promise<PromptMap> {
       // obrigatória para a identificação automática no portão, portanto uma
       // versão antiga não pode remover essa informação crítica do fluxo.
       const requiresPlateCopy = ["etapa4_vehicle", "vehicle_not_understood"].includes(row.key);
-      const requiresPlateVariable = row.key === "vehicle_confirmation";
+      const requiresPlateVariable = ["vehicle_confirmation", "appointment_checkin", "appointment_finalizing"].includes(row.key);
       if (requiresPlateCopy && !/\bplaca\b/i.test(row.content)) continue;
       if (requiresPlateVariable && !row.content.includes("{plate}")) continue;
       map[row.key] = row.content;

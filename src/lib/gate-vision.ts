@@ -1,14 +1,14 @@
 import { AppointmentStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
-import { onAppointmentStatusChange } from "@/lib/appointment-lifecycle";
+import { sendAppointmentCheckIn, sendAppointmentFinalizing, sendAppointmentTimelapse } from "@/lib/appointment-whatsapp";
 import { notifyPwaOperationalAlert } from "@/lib/pwa-push";
-import { uploadImageToCloudinary } from "@/lib/image-upload";
-import { sendText } from "@/lib/evolution-api";
+import { uploadImageToCloudinary, uploadVideoToCloudinary } from "@/lib/image-upload";
 import { isValidVehiclePlate, normalizeVehiclePlate } from "@/lib/whatsapp-vehicle-parse";
+import { getLatestGateDailyReport } from "@/lib/gate-daily-report";
 
 export type GateEventType = "ENTER" | "EXIT";
-export type GateStage = "WAITING" | "WASHING" | "FINALIZED";
+export type GateStage = "WAITING" | "WASHING" | "FINALIZING";
 
 export type GateVisionEvent = {
   eventId: string;
@@ -20,6 +20,7 @@ export type GateVisionEvent = {
   plateConfidence?: number;
   trackId?: string;
   snapshotDataUrl?: string;
+  timelapseDataUrl?: string;
 };
 
 export type GateHeartbeat = {
@@ -36,10 +37,11 @@ export type GateHeartbeat = {
 export const gateStageMeta: Record<GateStage, { label: string; description: string }> = {
   WAITING: { label: "Aguardando veículo", description: "Portão livre e câmera monitorando" },
   WASHING: { label: "Lavagem iniciada", description: "Entrada do veículo confirmada pela IA" },
-  FINALIZED: { label: "Finalização", description: "Saída do veículo confirmada pela IA" },
+  FINALIZING: { label: "Em finalização", description: "Acabamento e conferência após a lavagem" },
 };
 
 const FINALIZATION_VISIBLE_MS = 30 * 60_000;
+const LOGICAL_DUPLICATE_WINDOW_MS = 2 * 60_000;
 
 function jsonRecord(value: Prisma.JsonValue | null | undefined) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -83,6 +85,16 @@ async function uploadSnapshot(dataUrl?: string) {
   return result.success ? result.url || null : null;
 }
 
+async function uploadTimelapse(dataUrl?: string) {
+  if (!dataUrl) return null;
+  const match = dataUrl.match(/^data:video\/mp4;base64,(.+)$/i);
+  if (!match) return null;
+  const buffer = Buffer.from(match[1], "base64");
+  if (buffer.length < 1_000 || buffer.length > 2_500_000) return null;
+  const result = await uploadVideoToCloudinary(buffer, `atendimento-${Date.now()}`, "gate-vision/timelapses");
+  return result.success ? result.url || null : null;
+}
+
 async function findEntryAppointment(plateInput: string, now = new Date()) {
   const plate = normalizeVehiclePlate(plateInput);
   if (!isValidVehiclePlate(plate)) return null;
@@ -95,7 +107,32 @@ async function findEntryAppointment(plateInput: string, now = new Date()) {
     include: { client: true, service: true },
     orderBy: { startTime: "asc" },
   });
-  const appointment = appointments.find((item) => normalizeVehiclePlate(item.client.vehiclePlate || "") === plate);
+  const appointment = selectAppointmentByPlate(appointments, plate);
+  return appointment ? { appointment, match: "plate" as const } : null;
+}
+
+export function selectAppointmentByPlate<T extends { client: { vehiclePlate: string | null } }>(
+  appointments: T[],
+  plateInput: string
+) {
+  const plate = normalizeVehiclePlate(plateInput);
+  if (!isValidVehiclePlate(plate)) return null;
+  return appointments.find((item) => normalizeVehiclePlate(item.client.vehiclePlate || "") === plate) ?? null;
+}
+
+async function findFinalizingAppointment(plateInput: string, now = new Date()) {
+  const plate = normalizeVehiclePlate(plateInput);
+  if (!isValidVehiclePlate(plate)) return null;
+  const { start, end } = businessDayRange(now);
+  const appointments = await prisma.appointment.findMany({
+    where: {
+      date: { gte: start, lt: end },
+      status: AppointmentStatus.IN_PROGRESS,
+    },
+    include: { client: true, service: true },
+    orderBy: { startTime: "desc" },
+  });
+  const appointment = selectAppointmentByPlate(appointments, plate);
   return appointment ? { appointment, match: "plate" as const } : null;
 }
 
@@ -104,39 +141,6 @@ async function latestGateEvent() {
     where: { action: { in: ["GATE_VISION_ENTER", "GATE_VISION_EXIT"] } },
     orderBy: { createdAt: "desc" },
   });
-}
-
-async function createCompletionIncome(appointment: NonNullable<Awaited<ReturnType<typeof findEntryAppointment>>>["appointment"]) {
-  const existing = await prisma.financialRecord.findFirst({
-    where: { appointmentId: appointment.id, type: "INCOME" },
-  });
-  if (existing) return;
-  await prisma.financialRecord.create({
-    data: {
-      type: "INCOME",
-      category: "SERVICE",
-      amount: appointment.finalPrice ?? appointment.service.price,
-      description: `Serviço finalizado automaticamente - ${appointment.service.name}`,
-      appointmentId: appointment.id,
-      serviceId: appointment.serviceId,
-    },
-  });
-}
-
-async function sendGateFinalizationMessage(appointment: NonNullable<Awaited<ReturnType<typeof findEntryAppointment>>>["appointment"]) {
-  const settings = await prisma.settings.findUnique({ where: { id: "default" } });
-  if (!settings?.whatsappEnabled || !appointment.client.phone) return false;
-  await sendText({
-    number: appointment.client.phone,
-    text: [
-      "✅ *Atendimento finalizado*",
-      "",
-      `Olá, *${appointment.client.name}*. O serviço *${appointment.service.name}* foi finalizado e registramos a saída do seu ${appointment.client.vehicleModel || "veículo"}.`,
-      "",
-      `Obrigado por confiar na *${settings.businessName || "Garagem do Ka"}*. Como foi sua experiência? Responda com uma nota de *1 a 5*.`,
-    ].join("\n"),
-  });
-  return true;
 }
 
 async function alertUnmatched(type: GateEventType, plate?: string | null) {
@@ -172,15 +176,19 @@ export async function recordGateHeartbeat(input: GateHeartbeat) {
 export async function processGateVisionEvent(input: GateVisionEvent) {
   const duplicate = await prisma.auditLog.findFirst({ where: { resource: `gate-event:${input.eventId}` } });
   if (duplicate) return { duplicate: true, ignored: true };
+  const safeInput = { ...input, snapshotDataUrl: undefined, timelapseDataUrl: undefined };
 
   const previousLog = await latestGateEvent();
   const previousData = jsonRecord(previousLog?.data);
   const previousType = previousLog?.action === "GATE_VISION_ENTER" ? "ENTER" : previousLog?.action === "GATE_VISION_EXIT" ? "EXIT" : null;
-  if (previousType === input.type) {
+  const repeatedRecently = Boolean(
+    previousLog && Date.now() - previousLog.createdAt.getTime() <= LOGICAL_DUPLICATE_WINDOW_MS
+  );
+  if (previousType === input.type && repeatedRecently) {
     await logAudit({
       action: "GATE_VISION_IGNORED",
       resource: `gate-event:${input.eventId}`,
-      data: { ...input, reason: `Evento ${input.type} repetido sem travessia inversa` },
+      data: { ...safeInput, reason: `Evento ${input.type} repetido sem travessia inversa` },
     });
     return { duplicate: false, ignored: true, reason: "logical-duplicate" };
   }
@@ -188,7 +196,9 @@ export async function processGateVisionEvent(input: GateVisionEvent) {
   const snapshotUrl = await uploadSnapshot(input.snapshotDataUrl);
   const capturedAt = input.capturedAt || new Date().toISOString();
   const plate = normalizeVehiclePlate(input.plate || "");
-  const validPlate = isValidVehiclePlate(plate) && (input.plateConfidence ?? 0) >= 0.55;
+  const configuredPlateConfidence = Number.parseFloat(process.env.GATE_VISION_PLATE_MIN_CONFIDENCE || "0.45");
+  const minimumPlateConfidence = Number.isFinite(configuredPlateConfidence) ? configuredPlateConfidence : 0.45;
+  const validPlate = isValidVehiclePlate(plate) && (input.plateConfidence ?? 0) >= minimumPlateConfidence;
 
   if (input.type === "ENTER") {
     const match = validPlate ? await findEntryAppointment(plate, new Date(capturedAt)) : null;
@@ -196,7 +206,7 @@ export async function processGateVisionEvent(input: GateVisionEvent) {
       await logAudit({
         action: "GATE_VISION_ENTER",
         resource: `gate-event:${input.eventId}`,
-        data: { ...input, plate: plate || null, snapshotDataUrl: undefined, snapshotUrl, appointmentId: null, stage: "WASHING", matched: false },
+        data: { ...safeInput, plate: plate || null, snapshotUrl, appointmentId: null, stage: "WASHING", matched: false },
       });
       await alertUnmatched("ENTER", plate || null);
       return { duplicate: false, ignored: false, stage: "WASHING" as GateStage, appointment: null };
@@ -210,13 +220,12 @@ export async function processGateVisionEvent(input: GateVisionEvent) {
           data: { status: AppointmentStatus.IN_PROGRESS },
           include: { client: true, service: true },
         });
-    if (original.status !== AppointmentStatus.IN_PROGRESS) await onAppointmentStatusChange(original.status, updated);
+    const whatsappSent = await sendAppointmentCheckIn(updated, snapshotUrl);
     await logAudit({
       action: "GATE_VISION_ENTER",
       resource: `gate-event:${input.eventId}`,
       data: {
-        ...input,
-        snapshotDataUrl: undefined,
+        ...safeInput,
         snapshotUrl,
         plate,
         capturedAt,
@@ -227,6 +236,8 @@ export async function processGateVisionEvent(input: GateVisionEvent) {
         stage: "WASHING",
         matched: true,
         matchType: match.match,
+        whatsappSent,
+        whatsappPhone: original.client.phone,
       },
     });
     await notifyPwaOperationalAlert({
@@ -243,17 +254,18 @@ export async function processGateVisionEvent(input: GateVisionEvent) {
     };
   }
 
-  const appointmentId = typeof previousData.appointmentId === "string" ? previousData.appointmentId : null;
   const entryPlate = typeof previousData.plate === "string" ? normalizeVehiclePlate(previousData.plate) : "";
-  if (appointmentId && entryPlate && !validPlate) {
+  if (!validPlate) {
     await logAudit({
       action: "GATE_VISION_IGNORED",
       resource: `gate-event:${input.eventId}`,
-      data: { ...input, plate: plate || null, reason: `Placa não lida com confiança suficiente na saída; entrada registrada como ${entryPlate}` },
+      data: { ...safeInput, plate: plate || null, reason: "Placa não lida com confiança suficiente na saída" },
     });
     await notifyPwaOperationalAlert({
       title: "Confirme a placa na saída",
-      body: `A placa de entrada foi ${entryPlate}, mas o OCR não confirmou a placa na saída. A finalização automática foi bloqueada.`,
+      body: entryPlate
+        ? `A placa de entrada foi ${entryPlate}, mas o OCR não confirmou a placa na saída. Nenhuma mensagem foi enviada.`
+        : "O OCR não confirmou a placa na saída. Nenhuma mensagem foi enviada para evitar avisar o cliente errado.",
       tag: "gate-vision-exit-plate-unread",
       url: "/admin/gate-vision",
       urgency: "high",
@@ -264,7 +276,7 @@ export async function processGateVisionEvent(input: GateVisionEvent) {
     await logAudit({
       action: "GATE_VISION_IGNORED",
       resource: `gate-event:${input.eventId}`,
-      data: { ...input, plate, reason: `Placa de saída ${plate} diferente da entrada ${entryPlate}` },
+      data: { ...safeInput, plate, reason: `Placa de saída ${plate} diferente da entrada ${entryPlate}` },
     });
     await notifyPwaOperationalAlert({
       title: "Placa divergente na saída",
@@ -275,46 +287,40 @@ export async function processGateVisionEvent(input: GateVisionEvent) {
     });
     return { duplicate: false, ignored: true, reason: "plate-mismatch" };
   }
-  const appointment = appointmentId
-    ? await prisma.appointment.findUnique({ where: { id: appointmentId }, include: { client: true, service: true } })
-    : null;
+  const match = await findFinalizingAppointment(plate, new Date(capturedAt));
+  const appointment = match?.appointment ?? null;
   if (!appointment) {
     await logAudit({
       action: "GATE_VISION_EXIT",
       resource: `gate-event:${input.eventId}`,
-      data: { ...input, plate: plate || entryPlate || null, snapshotDataUrl: undefined, snapshotUrl, capturedAt, appointmentId: null, stage: "FINALIZED", matched: false },
+      data: { ...safeInput, plate, snapshotUrl, capturedAt, appointmentId: null, stage: "FINALIZING", matched: false },
     });
-    await alertUnmatched("EXIT");
-    return { duplicate: false, ignored: false, stage: "FINALIZED" as GateStage, appointment: null };
+    await alertUnmatched("EXIT", plate);
+    return { duplicate: false, ignored: false, stage: "FINALIZING" as GateStage, appointment: null };
   }
 
-  const originalStatus = appointment.status;
-  const updated = originalStatus === AppointmentStatus.COMPLETED
-    ? appointment
-    : await prisma.appointment.update({
-        where: { id: appointment.id },
-        data: { status: AppointmentStatus.COMPLETED },
-        include: { client: true, service: true },
-      });
-  if (originalStatus !== AppointmentStatus.COMPLETED) {
-    await createCompletionIncome(updated);
-    await sendGateFinalizationMessage(updated);
-  }
+  const timelapseUrl = await uploadTimelapse(input.timelapseDataUrl);
+  const whatsappSent = await sendAppointmentFinalizing(appointment, snapshotUrl);
+  const timelapseSent = await sendAppointmentTimelapse(appointment, timelapseUrl);
   await logAudit({
     action: "GATE_VISION_EXIT",
     resource: `gate-event:${input.eventId}`,
     data: {
-      ...input,
-      snapshotDataUrl: undefined,
+      ...safeInput,
       snapshotUrl,
-      plate: plate || entryPlate,
+      timelapseUrl,
+      plate,
       capturedAt,
       appointmentId: appointment.id,
       clientName: appointment.client.name,
       vehicle: appointment.client.vehicleModel,
       service: appointment.service.name,
-      stage: "FINALIZED",
+      stage: "FINALIZING",
       matched: true,
+      matchType: "plate",
+      whatsappSent,
+      timelapseSent,
+      whatsappPhone: appointment.client.phone,
     },
   });
   await notifyPwaOperationalAlert({
@@ -326,7 +332,7 @@ export async function processGateVisionEvent(input: GateVisionEvent) {
   return {
     duplicate: false,
     ignored: false,
-    stage: "FINALIZED" as GateStage,
+    stage: "FINALIZING" as GateStage,
     appointment: { id: appointment.id, clientName: appointment.client.name, vehicle: appointment.client.vehicleModel, service: appointment.service.name },
   };
 }
@@ -334,7 +340,7 @@ export async function processGateVisionEvent(input: GateVisionEvent) {
 export async function getGateVisionReport() {
   const { start, end } = businessDayRange();
   const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60_000);
-  const [events, heartbeat, appointments, entriesWeek, exitsWeek] = await Promise.all([
+  const [events, heartbeat, appointments, entriesWeek, exitsWeek, dailyReport] = await Promise.all([
     prisma.auditLog.findMany({
       where: { action: { in: ["GATE_VISION_ENTER", "GATE_VISION_EXIT", "GATE_VISION_IGNORED"] } },
       orderBy: { createdAt: "desc" },
@@ -348,6 +354,7 @@ export async function getGateVisionReport() {
     }),
     prisma.auditLog.count({ where: { action: "GATE_VISION_ENTER", createdAt: { gte: weekStart } } }),
     prisma.auditLog.count({ where: { action: "GATE_VISION_EXIT", createdAt: { gte: weekStart } } }),
+    getLatestGateDailyReport(),
   ]);
   const lastMeaningful = events.find((item) => item.action !== "GATE_VISION_IGNORED") || null;
   const lastData = jsonRecord(lastMeaningful?.data);
@@ -356,7 +363,7 @@ export async function getGateVisionReport() {
   const stage: GateStage = lastMeaningful?.action === "GATE_VISION_ENTER"
     ? "WASHING"
     : lastMeaningful?.action === "GATE_VISION_EXIT" && recentFinalization
-      ? "FINALIZED"
+      ? "FINALIZING"
       : "WAITING";
   const online = Boolean(heartbeat && Date.now() - heartbeat.createdAt.getTime() < 4 * 60_000);
   return {
@@ -380,12 +387,13 @@ export async function getGateVisionReport() {
       since: lastMeaningful?.createdAt || null,
     },
     metrics: { entriesWeek, exitsWeek, automationRate: entriesWeek ? Math.round((Math.min(entriesWeek, exitsWeek) / entriesWeek) * 100) : 0 },
+    dailyReport,
     timeline: events.map((item) => {
       const data = jsonRecord(item.data);
       return {
         id: item.id,
         type: item.action === "GATE_VISION_ENTER" ? "ENTER" : item.action === "GATE_VISION_EXIT" ? "EXIT" : "IGNORED",
-        label: item.action === "GATE_VISION_ENTER" ? "Lavagem iniciada" : item.action === "GATE_VISION_EXIT" ? "Finalização" : "Leitura ignorada",
+        label: item.action === "GATE_VISION_ENTER" ? "Lavagem iniciada" : item.action === "GATE_VISION_EXIT" ? "Finalização iniciada" : "Leitura ignorada",
         clientName: typeof data.clientName === "string" ? data.clientName : null,
         vehicle: typeof data.vehicle === "string" ? data.vehicle : null,
         plate: typeof data.plate === "string" ? data.plate : null,
@@ -394,6 +402,8 @@ export async function getGateVisionReport() {
         matched: data.matched === true,
         reason: typeof data.reason === "string" ? data.reason : null,
         snapshotUrl: typeof data.snapshotUrl === "string" ? data.snapshotUrl : null,
+        timelapseUrl: typeof data.timelapseUrl === "string" ? data.timelapseUrl : null,
+        timelapseSent: data.timelapseSent === true,
         at: item.createdAt,
       };
     }),

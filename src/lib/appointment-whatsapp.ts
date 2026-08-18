@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { Appointment, Client, Service } from "@prisma/client";
 import { loadPromptMap, renderPrompt } from "./bot-prompts";
-import { sendText } from "./evolution-api";
+import { sendMedia, sendText } from "./evolution-api";
 import { prisma } from "./prisma";
 import { formatDurationLabel } from "./appointments";
 
@@ -88,19 +88,53 @@ export async function sendAppointmentThankYou(apt: AptWithRelations) {
   return wasMessageSent(result);
 }
 
-export async function sendAppointmentCheckIn(apt: AptWithRelations) {
+export async function sendAppointmentCheckIn(apt: AptWithRelations, snapshotUrl?: string | null) {
   const settings = await loadSettings();
   if (!settings?.whatsappEnabled || !apt.client.phone) return false;
 
   const prompts = await loadPromptMap();
-  const result = await sendText({
+  const text = renderPrompt(prompts, "appointment_checkin", {
+    name: apt.client.name,
+    service: apt.service.name,
+    vehicle: apt.client.vehicleModel ?? "seu veículo",
+    plate: apt.client.vehiclePlate ?? "não identificada",
+    brand: settings.businessName ?? "Garagem do Ka",
+  });
+  if (snapshotUrl) {
+    const mediaResult = await sendMedia({ number: apt.client.phone, mediaUrl: snapshotUrl, caption: text, mediaType: "image" });
+    if (wasMessageSent(mediaResult)) return true;
+  }
+  return wasMessageSent(await sendText({ number: apt.client.phone, text }));
+}
+
+export async function sendAppointmentFinalizing(apt: AptWithRelations, snapshotUrl?: string | null) {
+  const settings = await loadSettings();
+  if (!settings?.whatsappEnabled || !apt.client.phone || !apt.client.vehiclePlate) return false;
+
+  const prompts = await loadPromptMap();
+  const text = renderPrompt(prompts, "appointment_finalizing", {
+    name: apt.client.name,
+    service: apt.service.name,
+    vehicle: apt.client.vehicleModel ?? "seu veículo",
+    plate: apt.client.vehiclePlate,
+    brand: settings.businessName ?? "Garagem do Ka",
+  });
+  if (snapshotUrl) {
+    const mediaResult = await sendMedia({ number: apt.client.phone, mediaUrl: snapshotUrl, caption: text, mediaType: "image" });
+    if (wasMessageSent(mediaResult)) return true;
+  }
+  return wasMessageSent(await sendText({ number: apt.client.phone, text }));
+}
+
+export async function sendAppointmentTimelapse(apt: AptWithRelations, timelapseUrl?: string | null) {
+  if (!timelapseUrl || !apt.client.phone) return false;
+  const settings = await loadSettings();
+  if (!settings?.whatsappEnabled) return false;
+  const result = await sendMedia({
     number: apt.client.phone,
-    text: renderPrompt(prompts, "appointment_checkin", {
-      name: apt.client.name,
-      service: apt.service.name,
-      vehicle: apt.client.vehicleModel ?? "seu veículo",
-      brand: settings.businessName ?? "Garagem do Ka",
-    }),
+    mediaUrl: timelapseUrl,
+    mediaType: "video",
+    caption: `🎬 *Um pouco dos cuidados com seu veículo*\n\nPreparamos este registro acelerado do atendimento do *${apt.client.vehicleModel ?? "seu veículo"}*. Pessoas e a área externa foram desfocadas para preservar a privacidade. 🤍`,
   });
   return wasMessageSent(result);
 }

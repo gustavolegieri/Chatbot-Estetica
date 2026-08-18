@@ -25,9 +25,43 @@ export async function uploadImageToCloudinary(
   filename?: string,
   folder: string = 'calendars'
 ): Promise<UploadResult> {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const timestamp = Date.now();
+  const publicId = filename
+    ? `${filename.replace(/\.[^/.]+$/, '')}-${timestamp}`
+    : `image-${timestamp}`;
+
+  if (
+    cloudName &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+  ) {
+    try {
+      cloudinary.config({
+        cloud_name: cloudName,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+        secure: true,
+      });
+      const signedResult = await new Promise<{ secure_url: string }>((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder, public_id: publicId, resource_type: 'image', overwrite: false },
+          (error, result) => {
+            if (error || !result?.secure_url) reject(error || new Error('Cloudinary não retornou uma URL'));
+            else resolve({ secure_url: result.secure_url });
+          }
+        );
+        stream.end(imageBuffer);
+      });
+      return { success: true, url: signedResult.secure_url };
+    } catch (error) {
+      console.warn('[Cloudinary] Upload assinado falhou; tentando preset:', error instanceof Error ? error.message : error);
+    }
+  }
+
   try {
     // Verificar se Cloudinary está configurado
-    if (!process.env.CLOUDINARY_CLOUD_NAME) {
+    if (!cloudName) {
       console.warn('[Cloudinary] Não configurado - usando fallback local');
       return {
         success: false,
@@ -41,12 +75,6 @@ export async function uploadImageToCloudinary(
     // Usar unsigned preset (configurado no painel do Cloudinary)
     const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET || 'unsigned_preset';
     
-    // Gerar nome único
-    const timestamp = Date.now();
-    const publicId = filename 
-      ? `calendar-${filename.replace(/\.[^/.]+$/, '')}-${timestamp}`
-      : `calendar-${timestamp}`;
-
     // Converter buffer para base64
     const base64Image = `data:image/png;base64,${imageBuffer.toString('base64')}`;
 
@@ -58,7 +86,6 @@ export async function uploadImageToCloudinary(
     formData.append('folder', folder);
 
     // Fazer upload via API REST (não precisa de API key/secret para unsigned)
-    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
     const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
 
     const response = await Promise.race([
@@ -381,5 +408,41 @@ export async function uploadLocalFileToCloudinary(
       success: false,
       error: error instanceof Error ? error.message : 'Erro ao ler arquivo'
     };
+  }
+}
+
+export async function uploadVideoToCloudinary(
+  videoBuffer: Buffer,
+  filename = `timelapse-${Date.now()}`,
+  folder = 'gate-vision'
+): Promise<UploadResult> {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  if (!cloudName || !apiKey || !apiSecret) {
+    return { success: false, error: 'Credenciais assinadas do Cloudinary não configuradas' };
+  }
+  try {
+    cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret, secure: true });
+    const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder,
+          public_id: filename.replace(/\.[^/.]+$/, ''),
+          resource_type: 'video',
+          overwrite: false,
+          format: 'mp4',
+        },
+        (error, uploaded) => {
+          if (error || !uploaded?.secure_url) reject(error || new Error('Cloudinary não retornou a URL do vídeo'));
+          else resolve({ secure_url: uploaded.secure_url });
+        }
+      );
+      stream.end(videoBuffer);
+    });
+    return { success: true, url: result.secure_url };
+  } catch (error) {
+    console.error('[Cloudinary] Falha no upload do timelapse:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Falha no upload do vídeo' };
   }
 }

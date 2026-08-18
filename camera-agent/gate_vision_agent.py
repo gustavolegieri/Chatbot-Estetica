@@ -10,6 +10,7 @@ import base64
 import json
 import os
 import re
+import tempfile
 import time
 import uuid
 from collections import deque
@@ -47,9 +48,18 @@ SHOW_PREVIEW = os.getenv("GATE_SHOW_PREVIEW", "true").lower() == "true"
 SEND_SNAPSHOTS = os.getenv("GATE_SEND_SNAPSHOTS", "false").lower() == "true"
 FLIP_VERTICAL = os.getenv("GATE_FLIP_VERTICAL", "false").lower() == "true"
 PLATE_OCR_ENABLED = os.getenv("GATE_PLATE_OCR_ENABLED", "true").lower() == "true"
-PLATE_OCR_MIN_CONFIDENCE = float(os.getenv("GATE_PLATE_OCR_MIN_CONFIDENCE", "0.55"))
+PLATE_OCR_MIN_CONFIDENCE = float(os.getenv("GATE_PLATE_OCR_MIN_CONFIDENCE", "0.45"))
 PLATE_SCAN_INTERVAL = max(0.25, float(os.getenv("GATE_PLATE_SCAN_INTERVAL", "0.8")))
-PLATE_EVENT_WAIT_SECONDS = max(2.0, float(os.getenv("GATE_PLATE_EVENT_WAIT_SECONDS", "5")))
+PLATE_EVENT_WAIT_SECONDS = max(2.0, float(os.getenv("GATE_PLATE_EVENT_WAIT_SECONDS", "10")))
+DETECTION_DISPLAY_TTL_SECONDS = max(0.5, float(os.getenv("GATE_DETECTION_DISPLAY_TTL_SECONDS", "5")))
+PRESENCE_RECOVERY_SECONDS = max(2.0, float(os.getenv("GATE_PRESENCE_RECOVERY_SECONDS", "4")))
+BOX_SMOOTHING_STILL = min(0.8, max(0.05, float(os.getenv("GATE_BOX_SMOOTHING_STILL", "0.12"))))
+BOX_SMOOTHING_MOVING = min(0.95, max(BOX_SMOOTHING_STILL, float(os.getenv("GATE_BOX_SMOOTHING_MOVING", "0.42"))))
+TIMELAPSE_ENABLED = os.getenv("GATE_TIMELAPSE_ENABLED", "true").lower() == "true"
+TIMELAPSE_INTERVAL_SECONDS = max(5.0, float(os.getenv("GATE_TIMELAPSE_INTERVAL_SECONDS", "30")))
+TIMELAPSE_MAX_FRAMES = max(24, int(os.getenv("GATE_TIMELAPSE_MAX_FRAMES", "300")))
+TIMELAPSE_FPS = max(6.0, float(os.getenv("GATE_TIMELAPSE_FPS", "12")))
+TIMELAPSE_MAX_BYTES = min(2_800_000, max(500_000, int(os.getenv("GATE_TIMELAPSE_MAX_BYTES", "2400000"))))
 STATE_FILE = ROOT / "gate-state.json"
 QUEUE_FILE = ROOT / "pending-events.json"
 PLATE_PATTERN = re.compile(r"^[A-Z]{3}(?:\d{4}|\d[A-Z]\d{2})$")
@@ -124,6 +134,7 @@ def coerce_plate_candidate(value: str) -> tuple[str, int] | None:
 
 @dataclass
 class TrackMemory:
+    first_seen: float = field(default_factory=time.monotonic)
     first_zone: str | None = None
     last_seen: float = field(default_factory=time.monotonic)
     positions: deque[float] = field(default_factory=lambda: deque(maxlen=40))
@@ -137,6 +148,58 @@ class TrackMemory:
     pending_crossing: str | None = None
     pending_frame: Any | None = None
     pending_since: float = 0.0
+    stable_box_state: np.ndarray | None = None  # centro x/y, largura e altura
+    box_velocity: np.ndarray = field(default_factory=lambda: np.zeros(4, dtype=np.float64))
+    box_updated_at: float = 0.0
+
+    def stabilize_box(
+        self,
+        box: tuple[int, int, int, int],
+        now: float,
+        frame_width: int,
+        frame_height: int,
+    ) -> tuple[int, int, int, int]:
+        x1, y1, x2, y2 = box
+        measured = np.array(((x1 + x2) / 2, (y1 + y2) / 2, x2 - x1, y2 - y1), dtype=np.float64)
+        if self.stable_box_state is None:
+            self.stable_box_state = measured
+            self.box_velocity.fill(0)
+        else:
+            dt = min(0.75, max(0.04, now - self.box_updated_at))
+            predicted = self.stable_box_state + self.box_velocity * dt
+            innovation = measured - predicted
+            diagonal = max(1.0, float(np.hypot(predicted[2], predicted[3])))
+            movement = float(np.hypot(innovation[0], innovation[1]) / diagonal)
+            previous = self.stable_box_state.copy()
+            if movement <= 0.025:
+                # Carro parado: nao transforme o pequeno tremor do detector em movimento.
+                self.stable_box_state = previous + (measured - previous) * BOX_SMOOTHING_STILL
+                self.box_velocity *= 0.18
+            else:
+                gain = 0.78 if movement > 0.35 else BOX_SMOOTHING_MOVING
+                self.stable_box_state = predicted + innovation * gain
+                # Largura/altura oscilam muito mais que o centro nas caixas do YOLO.
+                size_gain = min(0.34, gain * 0.62)
+                self.stable_box_state[2:] = previous[2:] + (measured[2:] - previous[2:]) * size_gain
+                measured_velocity = (self.stable_box_state - previous) / dt
+                self.box_velocity = self.box_velocity * 0.72 + measured_velocity * 0.28
+                self.box_velocity[2:] *= 0.35
+        self.box_updated_at = now
+        return self.display_box(now, frame_width, frame_height)
+
+    def display_box(self, now: float, frame_width: int, frame_height: int) -> tuple[int, int, int, int]:
+        if self.stable_box_state is None:
+            return self.last_box or (0, 0, 0, 0)
+        prediction_seconds = min(0.45, max(0.0, now - self.box_updated_at))
+        state = self.stable_box_state + self.box_velocity * prediction_seconds
+        cx, cy, width, height = state
+        width = min(frame_width, max(40.0, width))
+        height = min(frame_height, max(40.0, height))
+        x1 = int(max(0, min(frame_width - 1, cx - width / 2)))
+        y1 = int(max(0, min(frame_height - 1, cy - height / 2)))
+        x2 = int(max(x1 + 1, min(frame_width, cx + width / 2)))
+        y2 = int(max(y1 + 1, min(frame_height, cy + height / 2)))
+        return x1, y1, x2, y2
 
     def observe(self, y_normalized: float, confidence: float, box: tuple[int, int, int, int]) -> str | None:
         self.positions.append(y_normalized)
@@ -163,6 +226,7 @@ class GateVisionAgent:
         if not (GATE_LINE_HYSTERESIS < GATE_LINE < 1 - GATE_LINE_HYSTERESIS):
             raise RuntimeError("GATE_LINE deve ficar entre 0 e 1, longe das bordas da imagem")
         self.model = YOLO(MODEL_NAME)
+        self.privacy_model = YOLO(MODEL_NAME) if TIMELAPSE_ENABLED else None
         self.ocr = None
         self.ocr_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="gate-plate-ocr")
         if PLATE_OCR_ENABLED:
@@ -183,8 +247,48 @@ class GateVisionAgent:
         self.last_event_at = 0.0
         self.last_heartbeat_at = 0.0
         self.last_process_at = 0.0
+        self.last_detections: list[tuple[int, tuple[int, int, int, int], float]] = []
+        self.last_detection_at = 0.0
+        self.track_aliases: dict[int, int] = {}
+        self.timelapse_active = False
+        self.timelapse_plate = ""
+        self.timelapse_started_at = 0.0
+        self.timelapse_last_frame_at = 0.0
+        self.timelapse_frames: deque[bytes] = deque(maxlen=TIMELAPSE_MAX_FRAMES)
+        self.timelapse_resume_pending = bool(self.state.get("occupied"))
         self.frame_width = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
         self.frame_height = int(self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+
+    @staticmethod
+    def box_iou(first: tuple[int, int, int, int], second: tuple[int, int, int, int]) -> float:
+        ax1, ay1, ax2, ay2 = first
+        bx1, by1, bx2, by2 = second
+        intersection = max(0, min(ax2, bx2) - max(ax1, bx1)) * max(0, min(ay2, by2) - max(ay1, by1))
+        first_area = max(1, (ax2 - ax1) * (ay2 - ay1))
+        second_area = max(1, (bx2 - bx1) * (by2 - by1))
+        return intersection / max(1, first_area + second_area - intersection)
+
+    def canonical_track_id(self, raw_track_id: int, box: tuple[int, int, int, int], now: float) -> int:
+        aliased = self.track_aliases.get(raw_track_id)
+        if aliased is not None and aliased in self.tracks:
+            return aliased
+        best_id, best_score = raw_track_id, 0.0
+        for candidate_id, memory in self.tracks.items():
+            if now - memory.last_seen > DETECTION_DISPLAY_TTL_SECONDS or memory.last_box is None:
+                continue
+            score = self.box_iou(box, memory.last_box)
+            if score > best_score:
+                best_id, best_score = candidate_id, score
+        canonical = best_id if best_score >= 0.28 else raw_track_id
+        self.track_aliases[raw_track_id] = canonical
+        return canonical
+
+    def visible_detections(self, now: float) -> list[tuple[int, tuple[int, int, int, int], float]]:
+        return [
+            (track_id, memory.display_box(now, self.frame_width, self.frame_height), memory.confidence)
+            for track_id, memory in self.tracks.items()
+            if memory.stable_box_state is not None and now - memory.last_seen <= DETECTION_DISPLAY_TTL_SECONDS
+        ]
 
     @property
     def headers(self) -> dict[str, str]:
@@ -192,7 +296,8 @@ class GateVisionAgent:
 
     def post(self, payload: dict[str, Any], queue_on_failure: bool = False) -> bool:
         try:
-            response = requests.post(API_URL, headers=self.headers, json=payload, timeout=15)
+            timeout = 35 if payload.get("action") == "gate_event" else 15
+            response = requests.post(API_URL, headers=self.headers, json=payload, timeout=timeout)
             response.raise_for_status()
             body = response.json()
             if not body.get("success"):
@@ -221,16 +326,153 @@ class GateVisionAgent:
                 failed = True
         atomic_json_write(QUEUE_FILE, remaining)
 
-    def encode_snapshot(self, frame: Any) -> str | None:
+    def encode_snapshot(
+        self,
+        frame: Any,
+        box: tuple[int, int, int, int] | None = None,
+        event_type: str | None = None,
+        plate: str = "",
+    ) -> str | None:
         if not SEND_SNAPSHOTS:
             return None
+        if box:
+            frame_height, frame_width = frame.shape[:2]
+            x1, y1, x2, y2 = box
+            padding_x = int((x2 - x1) * .08)
+            padding_y = int((y2 - y1) * .08)
+            crop_x1 = max(0, x1 - padding_x)
+            crop_y1 = max(0, y1 - padding_y)
+            crop_x2 = min(frame_width, x2 + padding_x)
+            crop_y2 = min(frame_height, y2 + padding_y)
+            if crop_x2 - crop_x1 >= 160 and crop_y2 - crop_y1 >= 120:
+                frame = frame[crop_y1:crop_y2, crop_x1:crop_x2].copy()
         height, width = frame.shape[:2]
         if width > 1280:
             frame = cv2.resize(frame, (1280, int(height * 1280 / width)))
+        if event_type:
+            height, width = frame.shape[:2]
+            banner_height = max(68, int(height * .12))
+            overlay = frame.copy()
+            cv2.rectangle(overlay, (0, height - banner_height), (width, height), (12, 14, 18), -1)
+            frame = cv2.addWeighted(overlay, .86, frame, .14, 0)
+            title = "ENTRADA - LAVAGEM INICIADA" if event_type == "ENTER" else "SAIDA - EM FINALIZACAO"
+            detail = f"PLACA {plate or 'NAO LIDA'}  |  {datetime.now().astimezone().strftime('%d/%m/%Y %H:%M')}"
+            cv2.putText(frame, title, (20, height - banner_height + 27), cv2.FONT_HERSHEY_SIMPLEX, .62, (60, 205, 255), 2, cv2.LINE_AA)
+            cv2.putText(frame, detail, (20, height - 16), cv2.FONT_HERSHEY_SIMPLEX, .48, (235, 235, 235), 1, cv2.LINE_AA)
         success, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 78])
         if not success:
             return None
         return "data:image/jpeg;base64," + base64.b64encode(encoded.tobytes()).decode("ascii")
+
+    def privacy_safe_timelapse_frame(self, frame: Any) -> Any:
+        safe = frame.copy()
+        height, width = safe.shape[:2]
+        gate_y = max(1, min(height - 1, int(height * GATE_LINE)))
+        outside = safe[:gate_y, :]
+        if outside.size:
+            safe[:gate_y, :] = cv2.GaussianBlur(outside, (0, 0), 24)
+        if self.privacy_model is not None:
+            try:
+                result = self.privacy_model.predict(frame, classes=[0, *VEHICLE_CLASSES], conf=.35, imgsz=640, verbose=False)[0]
+                if result.boxes is not None:
+                    boxes = result.boxes.xyxy.cpu().tolist()
+                    classes = result.boxes.cls.int().cpu().tolist()
+                    # Restaura o veículo depois de desfocar a rua; a perspectiva
+                    # pode fazer teto e para-brisa aparecerem acima da linha.
+                    for raw_box, class_id in zip(boxes, classes):
+                        if class_id not in VEHICLE_CLASSES:
+                            continue
+                        x1, y1, x2, y2 = map(int, raw_box)
+                        x1, y1 = max(0, x1), max(0, y1)
+                        x2, y2 = min(width, x2), min(height, y2)
+                        if x2 > x1 and y2 > y1:
+                            safe[y1:y2, x1:x2] = frame[y1:y2, x1:x2]
+                    for raw_box, class_id in zip(boxes, classes):
+                        if class_id != 0:
+                            continue
+                        x1, y1, x2, y2 = map(int, raw_box)
+                        x1, y1 = max(0, x1 - 12), max(0, y1 - 12)
+                        x2, y2 = min(width, x2 + 12), min(height, y2 + 12)
+                        if x2 > x1 and y2 > y1:
+                            safe[y1:y2, x1:x2] = cv2.GaussianBlur(safe[y1:y2, x1:x2], (0, 0), 28)
+            except Exception as error:
+                print(f"[Portao IA] Desfoque de pessoas indisponivel neste quadro: {error}")
+        target_width = min(960, width)
+        if target_width < width:
+            safe = cv2.resize(safe, (target_width, int(height * target_width / width)), interpolation=cv2.INTER_AREA)
+        height, width = safe.shape[:2]
+        overlay = safe.copy()
+        cv2.rectangle(overlay, (0, height - 52), (width, height), (12, 14, 18), -1)
+        safe = cv2.addWeighted(overlay, .82, safe, .18, 0)
+        label = f"GARAGEM DO KA  |  {self.timelapse_plate or 'VEICULO EM ATENDIMENTO'}"
+        captured = datetime.now().astimezone().strftime("%d/%m/%Y %H:%M")
+        cv2.putText(safe, label, (16, height - 29), cv2.FONT_HERSHEY_SIMPLEX, .48, (60, 205, 255), 1, cv2.LINE_AA)
+        cv2.putText(safe, captured, (16, height - 10), cv2.FONT_HERSHEY_SIMPLEX, .38, (235, 235, 235), 1, cv2.LINE_AA)
+        return safe
+
+    def capture_timelapse_frame(self, frame: Any, now: float, force: bool = False) -> None:
+        if not self.timelapse_active or (not force and now - self.timelapse_last_frame_at < TIMELAPSE_INTERVAL_SECONDS):
+            return
+        self.timelapse_last_frame_at = now
+        safe = self.privacy_safe_timelapse_frame(frame)
+        success, encoded = cv2.imencode(".jpg", safe, [cv2.IMWRITE_JPEG_QUALITY, 68])
+        if success:
+            self.timelapse_frames.append(encoded.tobytes())
+
+    def start_timelapse(self, frame: Any, plate: str, now: float) -> None:
+        if not TIMELAPSE_ENABLED:
+            return
+        self.timelapse_frames.clear()
+        self.timelapse_plate = plate
+        self.timelapse_started_at = now
+        self.timelapse_last_frame_at = 0.0
+        self.timelapse_active = True
+        self.capture_timelapse_frame(frame, now, force=True)
+        print(f"[Portao IA] Timelapse iniciado para {plate or 'veiculo'}")
+
+    @staticmethod
+    def encode_timelapse_video(frames: list[bytes], width: int, fps: float) -> bytes | None:
+        decoded = [cv2.imdecode(np.frombuffer(item, np.uint8), cv2.IMREAD_COLOR) for item in frames]
+        decoded = [item for item in decoded if item is not None]
+        if len(decoded) < 2:
+            return None
+        first_height, first_width = decoded[0].shape[:2]
+        height = max(2, int(first_height * width / first_width))
+        if height % 2:
+            height += 1
+        temporary_path = ""
+        writer = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temporary:
+                temporary_path = temporary.name
+            writer = cv2.VideoWriter(temporary_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
+            if not writer.isOpened():
+                return None
+            for item in decoded:
+                writer.write(cv2.resize(item, (width, height), interpolation=cv2.INTER_AREA))
+            writer.release()
+            writer = None
+            return Path(temporary_path).read_bytes()
+        finally:
+            if writer is not None:
+                writer.release()
+            if temporary_path:
+                Path(temporary_path).unlink(missing_ok=True)
+
+    def finish_timelapse(self, frame: Any, now: float) -> str | None:
+        if not self.timelapse_active:
+            return None
+        self.capture_timelapse_frame(frame, now, force=True)
+        frames = list(self.timelapse_frames)
+        self.timelapse_active = False
+        self.timelapse_frames.clear()
+        for stride, width in ((1, 640), (2, 560), (3, 480)):
+            video = self.encode_timelapse_video(frames[::stride], width, TIMELAPSE_FPS)
+            if video and len(video) <= TIMELAPSE_MAX_BYTES:
+                print(f"[Portao IA] Timelapse finalizado: {len(frames[::stride])} quadros, {len(video) // 1024} KB")
+                return "data:video/mp4;base64," + base64.b64encode(video).decode("ascii")
+        print("[Portao IA] Timelapse descartado: arquivo acima do limite seguro")
+        return None
 
     def read_plate(self, frame: Any, box: tuple[int, int, int, int]) -> tuple[str, float] | None:
         if self.ocr is None:
@@ -253,7 +495,7 @@ class GateVisionAgent:
         gray = cv2.cvtColor(enlarged, cv2.COLOR_BGR2GRAY)
         enhanced = cv2.createCLAHE(clipLimit=2.2, tileGridSize=(8, 8)).apply(gray)
         _threshold, otsu = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        variants = [otsu, enhanced]
+        variants = [enhanced, otsu]
         adaptive: np.ndarray | None = None
         best: tuple[str, float] | None = None
         for index, variant in enumerate(variants):
@@ -275,7 +517,10 @@ class GateVisionAgent:
                 if not coerced:
                     continue
                 plate, corrections = coerced
-                score = max(0.0, float(confidence) - corrections * .04)
+                raw_score = float(confidence)
+                score = max(0.0, raw_score - corrections * .04)
+                if corrections == 0 and raw_score >= PLATE_OCR_MIN_CONFIDENCE:
+                    score = max(score, .60)
                 if score >= PLATE_OCR_MIN_CONFIDENCE and (best is None or score > best[1]):
                     best = (plate, score)
             if best:
@@ -367,9 +612,13 @@ class GateVisionAgent:
         if memory.plate:
             payload["plate"] = memory.plate
             payload["plateConfidence"] = round(memory.plate_confidence, 4)
-        snapshot = self.encode_snapshot(frame)
+        snapshot = self.encode_snapshot(frame, memory.last_box, event_type, memory.plate)
         if snapshot:
             payload["snapshotDataUrl"] = snapshot
+        if event_type == "EXIT":
+            timelapse = self.finish_timelapse(frame, now)
+            if timelapse:
+                payload["timelapseDataUrl"] = timelapse
         sent = self.post(payload, queue_on_failure=True)
         self.state = {
             "occupied": event_type == "ENTER",
@@ -379,6 +628,8 @@ class GateVisionAgent:
         }
         atomic_json_write(STATE_FILE, self.state)
         self.last_event_at = now
+        if event_type == "ENTER":
+            self.start_timelapse(frame, memory.plate, now)
         print(f"[Portão IA] {event_type} detectado · track {track_id} · enviado={sent}")
 
     def heartbeat(self, measured_fps: float) -> None:
@@ -429,24 +680,49 @@ class GateVisionAgent:
             if FLIP_VERTICAL:
                 frame = cv2.flip(frame, 0)
             now = time.monotonic()
-            detections: list[tuple[int, tuple[int, int, int, int], float]] = []
+            if self.timelapse_resume_pending and not self.timelapse_active:
+                self.timelapse_resume_pending = False
+                self.start_timelapse(frame, str(self.state.get("currentPlate") or ""), now)
+            detections = self.visible_detections(now)
             if now - self.last_process_at >= 1 / PROCESS_FPS:
                 self.last_process_at = now
                 result = self.model.track(frame, persist=True, classes=VEHICLE_CLASSES, conf=CONFIDENCE, verbose=False, tracker="bytetrack.yaml")[0]
+                current_detections: list[tuple[int, tuple[int, int, int, int], float]] = []
                 if result.boxes is not None and result.boxes.id is not None:
                     boxes = result.boxes.xyxy.cpu().tolist()
                     ids = result.boxes.id.int().cpu().tolist()
                     confidences = result.boxes.conf.cpu().tolist()
                     height = frame.shape[0]
-                    for box, track_id, confidence in zip(boxes, ids, confidences):
+                    for box, raw_track_id, confidence in zip(boxes, ids, confidences):
                         x1, y1, x2, y2 = map(int, box)
-                        center_y = ((y1 + y2) / 2) / height
+                        raw_box = (x1, y1, x2, y2)
+                        track_id = self.canonical_track_id(raw_track_id, raw_box, now)
                         memory = self.tracks.setdefault(track_id, TrackMemory())
-                        self.schedule_plate_read(frame, (x1, y1, x2, y2), memory, now)
-                        crossing = memory.observe(center_y, float(confidence), (x1, y1, x2, y2))
-                        detections.append((track_id, (x1, y1, x2, y2), float(confidence)))
+                        stable_box = memory.stabilize_box(raw_box, now, frame.shape[1], height)
+                        center_y = ((stable_box[1] + stable_box[3]) / 2) / height
+                        self.schedule_plate_read(frame, raw_box, memory, now)
+                        crossing = memory.observe(center_y, float(confidence), stable_box)
+                        current_detections.append((track_id, stable_box, float(confidence)))
                         if crossing:
                             self.queue_crossing(crossing, track_id, memory, frame, now)
+                        elif (
+                            not self.state.get("occupied")
+                            and not memory.emitted
+                            and memory.first_zone == "INSIDE"
+                            and center_y >= GATE_LINE + GATE_LINE_HYSTERESIS
+                            and memory.plate
+                            and now - memory.first_seen >= PRESENCE_RECOVERY_SECONDS
+                        ):
+                            memory.emitted = True
+                            print(f"[Portao IA] Presenca interna recuperada pela placa {memory.plate}")
+                            self.queue_crossing("ENTER", track_id, memory, frame, now)
+                if current_detections:
+                    self.last_detections = current_detections
+                    self.last_detection_at = now
+                    detections = self.visible_detections(now)
+                elif now - self.last_detection_at > DETECTION_DISPLAY_TTL_SECONDS:
+                    self.last_detections = []
+                    detections = []
                 for track_id, memory in self.tracks.items():
                     self.flush_pending_crossing(track_id, memory, now)
                 expired = [
@@ -458,11 +734,18 @@ class GateVisionAgent:
                 ]
                 for track_id in expired:
                     del self.tracks[track_id]
+                if expired:
+                    self.track_aliases = {
+                        raw_id: canonical_id
+                        for raw_id, canonical_id in self.track_aliases.items()
+                        if canonical_id in self.tracks
+                    }
             frame_counter += 1
             elapsed = max(.001, now - fps_started)
             measured_fps = frame_counter / elapsed
             if elapsed >= 10:
                 frame_counter, fps_started = 0, now
+            self.capture_timelapse_frame(frame, now)
             self.heartbeat(measured_fps)
             if SHOW_PREVIEW:
                 self.draw_overlay(frame, detections)

@@ -24,6 +24,7 @@ const eventSchema = z.object({
   plateConfidence: z.number().min(0).max(1).optional(),
   trackId: z.string().max(80).optional(),
   snapshotDataUrl: z.string().max(3_500_000).optional(),
+  timelapseDataUrl: z.string().max(3_500_000).optional(),
 });
 
 const heartbeatSchema = z.object({

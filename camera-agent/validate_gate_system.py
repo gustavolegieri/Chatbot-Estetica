@@ -159,6 +159,46 @@ def run_tracking_validation() -> list[dict[str, Any]]:
     return results
 
 
+def run_box_stability_validation() -> dict[str, Any]:
+    jitter_boxes = [
+        (520, 410, 1215, 945),
+        (538, 393, 1192, 958),
+        (508, 425, 1230, 925),
+        (532, 400, 1198, 952),
+        (515, 418, 1222, 934),
+        (536, 397, 1195, 956),
+        (510, 422, 1228, 929),
+        (530, 402, 1201, 950),
+    ]
+    memory = TrackMemory()
+    stable_boxes = []
+    for index, box in enumerate(jitter_boxes):
+        stable = memory.stabilize_box(box, 100 + index * .2, 1920, 1080)
+        memory.observe(((stable[1] + stable[3]) / 2) / 1080, .92, stable)
+        stable_boxes.append(stable)
+    raw_jitter = float(np.std(np.array(jitter_boxes), axis=0).mean())
+    stable_jitter = float(np.std(np.array(stable_boxes), axis=0).mean())
+    reduction = 1 - stable_jitter / raw_jitter
+
+    agent = object.__new__(GateVisionAgent)
+    agent.tracks = {1: memory}
+    agent.track_aliases = {}
+    reassociated = agent.canonical_track_id(17, (525, 405, 1210, 946), 101.7) == 1
+
+    moving = TrackMemory()
+    centers = []
+    for index, center_x in enumerate(range(400, 1001, 60)):
+        stable = moving.stabilize_box((center_x - 180, 350, center_x + 180, 700), 200 + index * .2, 1920, 1080)
+        centers.append((stable[0] + stable[2]) / 2)
+    follows_motion = all(second >= first for first, second in zip(centers, centers[1:])) and centers[-1] >= 900
+    return {
+        "passed": reduction >= .75 and reassociated and follows_motion,
+        "jitterReduction": round(reduction, 3),
+        "sameCarAfterYoloIdChange": reassociated,
+        "followsRealMotion": follows_motion,
+    }
+
+
 def run_false_positive_validation() -> list[dict[str, Any]]:
     return [
         {"candidate": candidate, "detected": coerce_plate_candidate(candidate), "passed": coerce_plate_candidate(candidate) is None}
@@ -252,16 +292,18 @@ def main() -> int:
     tracking = run_tracking_validation()
     false_positives = run_false_positive_validation()
     async_ocr = run_async_ocr_validation()
+    box_stability = run_box_stability_validation()
     camera = None if args.skip_camera else run_camera_validation(reader, max(1, args.camera_seconds))
     report = {
         "ocr": {"passed": sum(item["passed"] for item in ocr), "total": len(ocr), "scenarios": ocr},
         "tracking": {"passed": sum(item["passed"] for item in tracking), "total": len(tracking), "scenarios": tracking},
         "falsePositives": {"passed": sum(item["passed"] for item in false_positives), "total": len(false_positives), "scenarios": false_positives},
         "asyncOcr": async_ocr,
+        "boxStability": box_stability,
         "camera": camera,
     }
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    return 0 if all(item["passed"] for item in ocr + tracking + false_positives) and async_ocr["passed"] else 1
+    return 0 if all(item["passed"] for item in ocr + tracking + false_positives) and async_ocr["passed"] and box_stability["passed"] else 1
 
 
 if __name__ == "__main__":

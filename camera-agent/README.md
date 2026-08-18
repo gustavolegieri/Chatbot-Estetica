@@ -1,6 +1,6 @@
 # Portão IA — agente local da webcam
 
-Este agente roda no computador da estética. A webcam é processada localmente e o vídeo não é enviado para a internet. O CRM recebe somente dois eventos:
+Este agente roda no computador da estética. A transmissão contínua da webcam nunca é enviada para a internet. O CRM recebe os eventos e, quando habilitado, fotos de passagem e um timelapse curto já tratado para envio ao cliente:
 
 - `ENTER`: o veículo cruzou de fora para dentro; a lavagem é iniciada.
 - `EXIT`: o veículo cruzou de dentro para fora; o atendimento entra em finalização.
@@ -37,6 +37,12 @@ Antes do uso real, execute `python validate_gate_system.py --camera-seconds 6`. 
 Na primeira execução, os modelos leves de detecção e OCR são baixados automaticamente. A prévia mostra a risca do portão, a caixa do veículo e a placa reconhecida. Ajuste `GATE_LINE` até a linha da tela coincidir com a risca física do portão. Pressione `Q` para fechar.
 
 Para uma leitura confiável, o agente solicita imagem 1920×1080, boa iluminação e a placa dianteira ou traseira deve ocupar pelo menos 100 pixels de largura. Evite ângulo muito lateral, reflexo direto e contraluz. Se a linha não coincidir com a passagem física, ajuste `GATE_LINE` observando a prévia.
+
+## Timelapse com privacidade
+
+Ao confirmar a entrada, o agente inicia automaticamente uma sequência local com um quadro a cada 30 segundos. A área da rua é desfocada integralmente e pessoas detectadas também são desfocadas antes de qualquer quadro ser guardado. Na saída, o agente cria um MP4 curto, reduz resolução se necessário e apaga os quadros temporários da memória. Somente o resultado tratado é enviado ao servidor e ao cliente associado pela placa.
+
+O recurso é controlado por `GATE_TIMELAPSE_ENABLED`. Os limites de intervalo, quadros, FPS e tamanho ficam nas variáveis `GATE_TIMELAPSE_*` do `.env`.
 
 ## Regras de segurança operacional
 

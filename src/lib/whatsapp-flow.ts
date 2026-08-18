@@ -819,7 +819,7 @@ async function handleGlobalCommands(
       return true;
     }
 
-    const status = serviceStatusCopy(appointment.status);
+    const status = serviceStatusCopy(appointment.operationalStatus);
     await sendText({
       number: msg.phone,
       text: renderPrompt(wctx.prompts, "appointment_status", {
@@ -3362,10 +3362,35 @@ async function fetchLatestServiceStatus(phone: string) {
   });
 
   const priority: Record<string, number> = { IN_PROGRESS: 4, COMPLETED: 3, CONFIRMED: 2, PENDING: 1 };
-  return appointments.sort((a, b) => (priority[b.status] ?? 0) - (priority[a.status] ?? 0))[0] ?? null;
+  const appointment = appointments.sort((a, b) => (priority[b.status] ?? 0) - (priority[a.status] ?? 0))[0] ?? null;
+  if (!appointment) return null;
+
+  let operationalStatus = appointment.status as string;
+  if (appointment.status === "IN_PROGRESS") {
+    const exitEvents = await prisma.auditLog.findMany({
+      where: {
+        action: "GATE_VISION_EXIT",
+        createdAt: { gte: appointment.updatedAt },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
+    const exitedForThisAppointment = exitEvents.some((event) => {
+      const data = event.data;
+      return Boolean(data && typeof data === "object" && !Array.isArray(data) && data.appointmentId === appointment.id && data.matched === true);
+    });
+    if (exitedForThisAppointment) operationalStatus = "FINALIZING";
+  }
+  return { ...appointment, operationalStatus };
 }
 
 function serviceStatusCopy(status: string) {
+  if (status === "FINALIZING") {
+    return {
+      label: "Em finalização",
+      message: "A lavagem foi concluída e seu veículo está passando pelo acabamento e pela conferência final. Avisaremos por aqui assim que estiver pronto.",
+    };
+  }
   if (status === "IN_PROGRESS") {
     return {
       label: "Em execução",
