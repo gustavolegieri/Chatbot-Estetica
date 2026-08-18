@@ -372,7 +372,9 @@ async function shouldProcessOwnTestMessage(params: {
         phone: params.phone,
         direction: "OUTBOUND",
         body: params.text,
-        createdAt: { gte: new Date(Date.now() - 10 * 60_000) },
+        // Reenvios da fila externa podem chegar vários minutos depois. O texto
+        // exato de uma saída recente continua sendo eco do próprio bot.
+        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60_000) },
       },
       select: { id: true },
     });

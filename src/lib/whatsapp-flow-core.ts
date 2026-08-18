@@ -644,6 +644,10 @@ export async function handleReminderStep(
   // Generate summary card image
   let summaryCardUrl = "";
   try {
+    // Os testes de transcrição validam a ordem sem criar arquivos externos.
+    if ((globalThis as { __BB_SKIP_SUMMARY_CARD__?: boolean }).__BB_SKIP_SUMMARY_CARD__) {
+      throw new Error("summary_card_skipped_in_test");
+    }
     summaryCardUrl = await generateSummaryCard({
       customerName: customerName,
       serviceName: serviceName,
@@ -655,7 +659,9 @@ export async function handleReminderStep(
       pickupAddress: address !== "—" ? address : undefined,
     });
   } catch (error) {
-    console.error("[handleReminderStep] Error generating summary card:", error);
+    if ((error as Error)?.message !== "summary_card_skipped_in_test") {
+      console.error("[handleReminderStep] Error generating summary card:", error);
+    }
   }
   
   const serviceWithComplement = state.upsellLabel
@@ -667,26 +673,29 @@ export async function handleReminderStep(
       : "Busca solicitada"
     : pickupText;
   
+  const summaryText = etapa15SummaryConfirm(
+    {
+      name: customerName,
+      service: serviceWithComplement,
+      vehicle,
+      day: date,
+      time,
+      pickup: pickupWithReturn,
+      address,
+      payment: paymentMethod,
+      reminder: reminderText,
+      value: `R$ ${totalValue.toFixed(2).replace(".", ",")}`,
+    },
+    prompts
+  );
+
+  // Uma única mensagem: imagem + legenda completa. Isso evita que a imagem
+  // chegue agora e o resumo textual apareça vários minutos depois.
   if (summaryCardUrl) {
-    responses.push({ text: "", mediaUrl: summaryCardUrl, mediaType: "image" });
+    responses.push({ text: summaryText, mediaUrl: summaryCardUrl, mediaType: "image" });
+  } else {
+    responses.push({ text: summaryText });
   }
-  responses.push({
-    text: etapa15SummaryConfirm(
-      {
-        name: customerName,
-        service: serviceWithComplement,
-        vehicle,
-        day: date,
-        time,
-        pickup: pickupWithReturn,
-        address,
-        payment: paymentMethod,
-        reminder: reminderText,
-        value: `R$ ${totalValue.toFixed(2).replace(".", ",")}`,
-      },
-      prompts
-    ),
-  });
   
   return { responses, nextState: newState };
 }

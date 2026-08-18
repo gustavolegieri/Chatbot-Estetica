@@ -40,3 +40,13 @@ test("parseVehicleMessage recognizes expanded color vocabulary", () => {
   assert.equal(parseVehicleMessage("Corolla 2022 grafite bom estado").color, "grafite");
   assert.equal(parseVehicleMessage("Onix 2020 vermelha bom estado").color, "vermelha");
 });
+
+test("parseVehicleMessage removes condition written as estado bom from model", () => {
+  const vehicle = parseVehicleMessage("Fiesta 2012, FEG4B58, branco, estado bom");
+
+  assert.equal(vehicle.model, "Fiesta");
+  assert.equal(vehicle.year, "2012");
+  assert.equal(vehicle.plate, "FEG4B58");
+  assert.equal(vehicle.color, "branco");
+  assert.equal(vehicle.condition, "bom");
+});

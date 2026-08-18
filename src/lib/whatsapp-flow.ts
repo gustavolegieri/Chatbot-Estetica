@@ -184,7 +184,7 @@ async function sendMedia(params: Parameters<typeof sendMediaRaw>[0]) {
   return sendMediaRaw(params);
 }
 
-async function sendCalendarWithImageAndList(params: { number: string; prompts?: unknown }) {
+async function sendCalendarWithImageAndList(params: { number: string; prompts?: unknown; caption?: string }) {
   const callback = flowDeliveryContext.getStore()?.sendTextCallback;
   if (!callback) {
     return sendCalendarWithImageAndListRaw(params);
@@ -192,10 +192,10 @@ async function sendCalendarWithImageAndList(params: { number: string; prompts?: 
 
   try {
     const imageUrl = await generateCalendarImageOnly();
-    await callback(`[MÍDIA: image|${imageUrl}] ${generateCalendarLegend()}`);
+    await callback(`[MÍDIA: image|${imageUrl}] ${params.caption?.trim() || generateCalendarLegend()}`);
   } catch (error) {
     console.warn("[WhatsApp Flow] Não foi possível gerar calendário para o simulador:", error);
-    await callback(generateCalendarLegend());
+    await callback(params.caption?.trim() || generateCalendarLegend());
   }
 
   // A orientação já acompanha a imagem. O simulador não repete a mesma
@@ -212,16 +212,23 @@ async function sendTextWrapper(
   options?: { voiceReply?: boolean; includesWelcome?: boolean }
 ) {
   await flowDeliveryContext.run(msg.testMode, async () => {
+    let outboundText = text;
     if (msg.initialWelcomePrefix && !msg.initialWelcomeConsumed) {
       msg.initialWelcomeConsumed = true;
       if (!options?.includesWelcome) {
-        // Em uma pergunta enviada por áudio, a saudação continua em texto e a
-        // voz fica reservada para a resposta útil logo em seguida.
-        await sendText({ number: msg.phone, text: msg.initialWelcomePrefix, voiceReply: false });
-        if (!msg.testMode?.sendTextCallback) await delay(120);
+        if (options?.voiceReply) {
+          // Em uma pergunta enviada por áudio, a saudação continua em texto e
+          // a voz fica reservada para a resposta útil logo em seguida.
+          await sendText({ number: msg.phone, text: msg.initialWelcomePrefix, voiceReply: false });
+          if (!msg.testMode?.sendTextCallback) await delay(120);
+        } else {
+          // Texto inicial + próxima orientação viajam juntos. Isso evita que a
+          // segunda metade seja limitada e chegue minutos depois.
+          outboundText = `${msg.initialWelcomePrefix}\n\n${text}`;
+        }
       }
     }
-    await sendText({ number: msg.phone, text, voiceReply: options?.voiceReply });
+    await sendText({ number: msg.phone, text: outboundText, voiceReply: options?.voiceReply });
   });
   if (!msg.testMode?.sendTextCallback) {
     await delay(120);
@@ -278,6 +285,58 @@ async function executeCoreHandler(
   const responses: FlowResponse[] = [];
   const result = await handler(flow, msg.text, responses, ...handlerArgs);
 
+  const assertDelivered = (delivery: unknown) => {
+    if (!delivery || typeof delivery !== "object") return;
+    const status = delivery as { error?: boolean; blocked?: boolean; queued?: boolean; message?: string };
+    if (status.error || status.blocked || status.queued) {
+      throw new Error(status.message || "A resposta do fluxo não foi entregue imediatamente");
+    }
+  };
+
+  // Enviar antes de avançar a etapa. Assim o sistema nunca espera uma resposta
+  // para uma pergunta que o cliente ainda não recebeu.
+  for (let index = 0; index < result.responses.length; index++) {
+    const response = result.responses[index];
+    if (response.mediaUrl && response.mediaType) {
+      if (msg.testMode?.sendTextCallback) {
+        // Em modo de teste, retorna texto + mídia para exibição no painel
+        await msg.testMode.sendTextCallback(`[MÍDIA: ${response.mediaType}|${response.mediaUrl}] ${response.text || ""}`);
+      } else {
+        const delivery = await sendMedia({
+          number: msg.phone,
+          mediaUrl: response.mediaUrl,
+          mediaType: response.mediaType,
+          caption: response.text || undefined,
+        });
+        assertDelivered(delivery);
+      }
+      continue;
+    }
+
+    if (response.text) {
+      const textBatch = [response.text];
+      while (
+        index + 1 < result.responses.length &&
+        result.responses[index + 1].text &&
+        !result.responses[index + 1].mediaUrl
+      ) {
+        textBatch.push(result.responses[index + 1].text);
+        index++;
+      }
+      const combinedText = textBatch.join("\n\n");
+      if (msg.testMode?.sendTextCallback) {
+        await msg.testMode.sendTextCallback(combinedText, { voiceReply: response.voiceReply });
+      } else {
+        const delivery = await sendText({
+          number: msg.phone,
+          text: combinedText,
+          voiceReply: response.voiceReply,
+        });
+        assertDelivered(delivery);
+      }
+    }
+  }
+
   // A criação final é atômica: não gravamos uma etapa intermediária de
   // confirmação antes de a reserva realmente existir.
   const deferFinalConfirmationPersistence =
@@ -285,30 +344,6 @@ async function executeCoreHandler(
     result.nextState.stage === "ETAPA16_CONFIRMATION";
   if (!deferFinalConfirmationPersistence) {
     await saveFlow(msg.phone, result.nextState, msg.testMode?.skipDb);
-  }
-
-  // Enviar as respostas
-  for (const response of result.responses) {
-    if (response.mediaUrl && response.mediaType) {
-      if (msg.testMode?.sendTextCallback) {
-        // Em modo de teste, retorna texto + mídia para exibição no painel
-        await msg.testMode.sendTextCallback(`[MÍDIA: ${response.mediaType}|${response.mediaUrl}] ${response.text || ""}`);
-      } else {
-        await sendMedia({
-          number: msg.phone,
-          mediaUrl: response.mediaUrl,
-          mediaType: response.mediaType,
-        });
-      }
-    }
-    if (response.text) {
-      if (msg.testMode?.sendTextCallback) {
-        await msg.testMode.sendTextCallback(response.text, { voiceReply: response.voiceReply });
-      } else {
-        await sendText({ number: msg.phone, text: response.text, voiceReply: response.voiceReply });
-        await delay(120);
-      }
-    }
   }
 
   // Rastreamento de funil se necessário (apenas se não estiver em modo de teste)
@@ -961,7 +996,6 @@ async function activateService(
     dbServiceId: dbId,
     stage: serviceKey === "pacotes" ? "ETAPA3_PACKAGE_ACTION" : "ETAPA3_SERVICE_ACTION",
   };
-  await saveFlow(msg.phone, activeFlow);
   const requestContext = (flow.serviceRequestContext ?? "").toLowerCase();
   const contextualIntro = /terra|barro|poeira|muito sujo/.test(requestContext) && /lavagem/.test(serviceKey)
     ? "Pelo que você contou sobre a sujeira do veículo, esta opção é um bom ponto de partida. Se houver resíduos muito aderidos, confirmamos o nível ideal após uma avaliação rápida."
@@ -972,7 +1006,15 @@ async function activateService(
         : null;
   const detailText = `${contextualIntro ? `${contextualIntro}\n\n` : ""}${flowMsg(wctx).detail(serviceKey)}`;
 
-  // Enviar imagem do serviço (se existir)
+  let detailWithWelcome = detailText;
+  if (msg.initialWelcomePrefix && !msg.initialWelcomeConsumed) {
+    msg.initialWelcomeConsumed = true;
+    detailWithWelcome = `${msg.initialWelcomePrefix}\n\n${detailText}`;
+  }
+
+  // Enviar imagem do serviço (se existir), usando o próprio detalhe como
+  // legenda para não separar uma etapa lógica em duas mensagens.
+  let delivery: unknown;
   if (dbId) {
     try {
       // Nem todo schema possui serviceMedia; tratar de forma compatível.
@@ -988,24 +1030,27 @@ async function activateService(
           ? "image"
           : "document";
 
-        await sendMedia({
+        delivery = await sendMedia({
           number: msg.phone,
           mediaUrl: media.path,
-          caption: item.label,
+          caption: detailWithWelcome,
           mediaType,
         });
-        await delay(300);
+      } else {
+        delivery = await sendText({ number: msg.phone, text: detailWithWelcome });
       }
-
-      await delay(150);
-      await sendText({ number: msg.phone, text: detailText });
     } catch (err) {
       console.error("[Midia] Erro ao enviar mídia do serviço:", err);
+      delivery = await sendText({ number: msg.phone, text: detailWithWelcome });
     }
   } else {
-    await delay(150);
-    await sendText({ number: msg.phone, text: detailText });
+    delivery = await sendText({ number: msg.phone, text: detailWithWelcome });
   }
+
+  if ((delivery as any)?.error || (delivery as any)?.blocked || (delivery as any)?.queued) {
+    throw new Error("Não foi possível entregar os detalhes do serviço imediatamente");
+  }
+  await saveFlow(msg.phone, activeFlow);
 }
 
 function dateLabel(date: Date, includeYear = false) {
@@ -1644,7 +1689,6 @@ async function sendQuote(msg: IncomingMessage, flow: FlowState, wctx: WhatsAppCa
   flow.estimatedTime = quote.time;
   flow.serviceLabel = quote.label;
   flow.stage = quote.min > 0 ? "ETAPA7_DAY" : "ETAPA5_QUOTE";
-  await saveFlow(msg.phone, flow);
   let quoteText = etapa5Quote(
       flow.customerName ?? "Cliente",
       vehicleText,
@@ -1662,20 +1706,32 @@ async function sendQuote(msg: IncomingMessage, flow: FlowState, wctx: WhatsAppCa
       `_Como você já escolheu *${chosenDay}*, separei os horários disponíveis._`
     );
   }
-  await sendText({
-    number: msg.phone,
-    text: quoteText,
-  });
-
   // A confirmação do veículo já demonstra intenção de agendar. Evitamos uma
   // segunda pergunta de confirmação e seguimos direto para o calendário.
   if (quote.min > 0) {
     if (flow.dayDate) {
+      await saveFlow(msg.phone, flow);
+      await sendText({ number: msg.phone, text: quoteText });
       await proceedToTimeSelection(msg, flow, wctx);
     } else {
-      await sendCalendarWithImageAndList({ number: msg.phone, prompts: wctx.prompts });
+      const delivery = await sendCalendarWithImageAndList({
+        number: msg.phone,
+        prompts: wctx.prompts,
+        caption: quoteText,
+      });
+      if ((delivery as any)?.error || (delivery as any)?.blocked || (delivery as any)?.queued) {
+        throw new Error("Não foi possível entregar o calendário imediatamente");
+      }
+      await saveFlow(msg.phone, flow);
     }
+    return;
   }
+
+  const delivery = await sendText({ number: msg.phone, text: quoteText });
+  if ((delivery as any)?.error || (delivery as any)?.blocked || (delivery as any)?.queued) {
+    throw new Error("Não foi possível entregar a estimativa imediatamente");
+  }
+  await saveFlow(msg.phone, flow);
 }
 
 export async function processNumberedFlow(msg: IncomingMessage, flow: FlowState) {
@@ -3306,11 +3362,12 @@ async function handlePayment(
 
   if (flow.paymentMethod === "Cartão (na loja)" || flow.paymentMethod === "Dinheiro (na loja)") {
     flow.stage = "ETAPA14_REMINDER";
-    await saveFlow(msg.phone, flow);
-    await sendText({
+    const delivery = await sendText({
       number: msg.phone,
-      text: reminderChoice(prompts),
+      text: `Combinado. Pagamento em *${flow.paymentMethod}* no atendimento.\n\n${reminderChoice(prompts)}`,
     });
+    if ((delivery as any)?.error || (delivery as any)?.queued) throw new Error("Falha ao entregar a etapa de lembrete");
+    await saveFlow(msg.phone, flow);
     return;
   }
 
@@ -3318,12 +3375,12 @@ async function handlePayment(
     flow.paymentMethod = "PIX (no atendimento)";
     flow.pixPaymentType = "delivery";
     flow.stage = "ETAPA14_REMINDER";
-    await saveFlow(msg.phone, flow);
-    await sendText({
+    const delivery = await sendText({
       number: msg.phone,
-      text: "Perfeito. O pagamento será feito por *PIX no dia do atendimento*.",
+      text: `Perfeito. O pagamento será feito por *PIX no dia do atendimento*.\n\n${reminderChoice(prompts)}`,
     });
-    await sendText({ number: msg.phone, text: reminderChoice(prompts) });
+    if ((delivery as any)?.error || (delivery as any)?.queued) throw new Error("Falha ao entregar a etapa de lembrete");
+    await saveFlow(msg.phone, flow);
     return;
   }
 
@@ -3512,11 +3569,20 @@ async function confirmFinal(
     awaitingPostConfirmationReturn: true,
   };
 
-  await delay(180);
-  await sendText({
+  const confirmationDelivery = await sendText({
     number: msg.phone,
     text: confirmBody,
   });
+  if (
+    (confirmationDelivery as any)?.error ||
+    (confirmationDelivery as any)?.blocked ||
+    (confirmationDelivery as any)?.queued
+  ) {
+    // A reserva já existe e fica ligada à sessão por pendingAppointmentId.
+    // Mantemos a etapa de confirmação para que um retry apenas reenvie a
+    // confirmação, sem criar outro agendamento.
+    throw new Error("A reserva foi criada, mas a confirmação não foi entregue imediatamente");
+  }
 
   await saveFlow(msg.phone, menuFlow, msg.testMode?.skipDb);
   if (!msg.testMode?.skipDb) {
@@ -3696,7 +3762,7 @@ export async function startFlow(msg: IncomingMessage) {
         savedVehicle
           ? `Olá, *${returningName}*! Que bom ter você de volta 😊\n\nEste atendimento será para o mesmo veículo, *${savedVehicle}${savedVehiclePlate ? ` · ${savedVehiclePlate}` : ""}*?\n\n*1* ✅ Sim, o mesmo veículo\n*2* 🚗 Não, quero informar outro\n\n_Você também pode responder com suas palavras._`
           : flowMsg(wctx).mainMenu(returningState, msg.pushName),
-        { includesWelcome: true }
+        { includesWelcome: false }
       );
       return;
     }

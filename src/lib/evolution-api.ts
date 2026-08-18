@@ -28,6 +28,29 @@ import { isVoiceReplyEligible, synthesizeVoiceReply } from "./whatsapp-voice";
 import { extractWasenderSendId } from "./whatsapp-self-test";
 
 const WASENDER_BASE = process.env.WASENDER_BASE_URL || "https://wasenderapi.com/api";
+const MIN_RECIPIENT_SEND_GAP_MS = 2_100;
+const recipientReadyAt = new Map<string, number>();
+
+type WasenderFetchOptions = {
+  queueOnFailure?: boolean;
+  retryAttempt?: number;
+};
+
+function deliveryWasAccepted(result: unknown) {
+  if (!result || typeof result !== "object") return false;
+  const value = result as { error?: boolean; blocked?: boolean };
+  return !value.error && !value.blocked;
+}
+
+async function waitForRecipientWindow(recipient?: string) {
+  if (!recipient) return;
+  const key = phoneToWhatsApp(recipient).replace(/\D/g, "");
+  const now = Date.now();
+  const reservedAt = Math.max(now, recipientReadyAt.get(key) ?? now);
+  recipientReadyAt.set(key, reservedAt + MIN_RECIPIENT_SEND_GAP_MS);
+  const waitMs = reservedAt - now;
+  if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+}
 
 type TestModeRecipientConfig = {
   enabled: boolean;
@@ -188,13 +211,19 @@ async function addToQueue(
   }
 }
 
-export async function wasenderFetch(body: object): Promise<unknown> {
+export async function wasenderFetch(
+  body: object,
+  options: WasenderFetchOptions = {}
+): Promise<unknown> {
   const recipient = (body as { to?: string }).to;
   if (recipient && !(await outboundRecipientAllowed(recipient))) {
     console.warn("[WasenderAPI] ⛔ Modo de teste bloqueou envio para número não autorizado");
     return { blocked: true, reason: "test_mode_recipient" };
   }
   const apiKey = getApiKey();
+  const contextualFlow = Boolean(getMessageLogContext()?.sessionId);
+  const queueOnFailure = options.queueOnFailure ?? !contextualFlow;
+  const retryAttempt = options.retryAttempt ?? 0;
 
   if (!apiKey) {
     console.warn("[WasenderAPI] ❌ Não configurada - mensagem simulada:", body);
@@ -214,6 +243,7 @@ export async function wasenderFetch(body: object): Promise<unknown> {
 
   let response: Response;
   try {
+    await waitForRecipientWindow(recipient);
     response = await fetchWithTimeout(`${WASENDER_BASE}/send-message`, {
       method: "POST",
       headers: {
@@ -224,12 +254,18 @@ export async function wasenderFetch(body: object): Promise<unknown> {
     });
   } catch (error) {
     const phone = (body as { to?: string }).to;
-    if (phone) {
+    if (contextualFlow && retryAttempt < 2) {
+      return wasenderFetch(body, {
+        queueOnFailure: false,
+        retryAttempt: retryAttempt + 1,
+      });
+    }
+    if (phone && queueOnFailure) {
       await addToQueue(phone, body, false, 5_000);
       console.warn("[WasenderAPI] Falha rápida de rede; mensagem preservada na fila:", error);
       return { queued: true, reason: "network_error" };
     }
-    throw error;
+    return { error: true, reason: "network_error", message: String(error) };
   }
 
   if (response.status === 429) {
@@ -252,13 +288,20 @@ export async function wasenderFetch(body: object): Promise<unknown> {
     }
 
     const phone = (body as any).to;
-    if (phone) {
+    if (contextualFlow && retryAttempt < 2) {
+      await new Promise((resolve) => setTimeout(resolve, Math.min(waitMs, 2_500)));
+      return wasenderFetch(body, {
+        queueOnFailure: false,
+        retryAttempt: retryAttempt + 1,
+      });
+    }
+    if (phone && queueOnFailure) {
       await addToQueue(phone, body, false, waitMs);
       console.log("[WasenderAPI] Rate limit temporário; mensagem enfileirada sem bloquear o webhook");
       return { queued: true, reason: "rate_limit" };
     }
 
-    return { error: true, status: 429, message: "Rate limit persistente" };
+    return { error: true, status: 429, message: "Rate limit persistente", reason: "rate_limit" };
   }
 
   if (!response.ok) {
@@ -282,8 +325,14 @@ export async function wasenderFetch(body: object): Promise<unknown> {
     }
     
     if (response.status >= 500) {
+      if (contextualFlow && retryAttempt < 2) {
+        return wasenderFetch(body, {
+          queueOnFailure: false,
+          retryAttempt: retryAttempt + 1,
+        });
+      }
       const phone = (body as { to?: string }).to;
-      if (phone) {
+      if (phone && queueOnFailure) {
         await addToQueue(phone, body, false, 5_000);
         console.warn("[WasenderAPI] Erro temporário; mensagem preservada na fila");
         return { queued: true, reason: `http_${response.status}` };
@@ -388,7 +437,7 @@ export async function sendText({
           text,
         });
 
-    if (!skipBotLog) {
+    if (!skipBotLog && deliveryWasAccepted(result)) {
       const msgSender: MessageSender = sender === "ADMIN" ? MessageSender.ADMIN : MessageSender.BOT;
       await logWhatsAppMessage({
         phone: number,
@@ -480,16 +529,18 @@ export async function sendMedia({
           : mediaType === "audio"
             ? "Áudio"
             : "Documento";
-    await logWhatsAppMessage({
-      phone: number,
-      sessionId: ctx?.sessionId,
-      clientId: ctx?.clientId,
-      direction: MessageDirection.OUTBOUND,
-      sender: MessageSender.BOT,
-      body: caption?.trim() || `[${mediaLabel} enviado]`,
-      flowStage: ctx?.getStage(),
-      wasenderMessageId: extractWasenderSendId(result),
-    }).catch((err) => console.error("[WhatsApp Log] outbound media:", err));
+    if (deliveryWasAccepted(result)) {
+      await logWhatsAppMessage({
+        phone: number,
+        sessionId: ctx?.sessionId,
+        clientId: ctx?.clientId,
+        direction: MessageDirection.OUTBOUND,
+        sender: MessageSender.BOT,
+        body: caption?.trim() || `[${mediaLabel} enviado]`,
+        flowStage: ctx?.getStage(),
+        wasenderMessageId: extractWasenderSendId(result),
+      }).catch((err) => console.error("[WhatsApp Log] outbound media:", err));
+    }
     return result;
   } catch (err) {
     console.error("[WasenderAPI] ❌ Erro ao enviar mídia, mas continuando fluxo:", err);
@@ -519,11 +570,26 @@ export async function sendButtons({
   buttons.forEach((b, i) => lines.push(`${i + 1} — ${b.displayText}`));
   if (footer) lines.push("", `_${footer}_`);
 
+  const text = lines.join("\n");
   try {
-    return await wasenderFetch({
+    const result = await wasenderFetch({
       to: toE164(number),
-      text: lines.join("\n"),
+      text,
     });
+    const ctx = getMessageLogContext();
+    if (deliveryWasAccepted(result)) {
+      await logWhatsAppMessage({
+        phone: number,
+        sessionId: ctx?.sessionId,
+        clientId: ctx?.clientId,
+        direction: MessageDirection.OUTBOUND,
+        sender: MessageSender.BOT,
+        body: text,
+        flowStage: ctx?.getStage(),
+        wasenderMessageId: extractWasenderSendId(result),
+      }).catch((err) => console.error("[WhatsApp Log] outbound buttons:", err));
+    }
+    return result;
   } catch (err) {
     console.error("[WasenderAPI] ❌ Erro ao enviar botões, mas continuando fluxo:", err);
     return { error: true, message: "Erro ao enviar botões, fluxo continuou" };
@@ -562,11 +628,26 @@ export async function sendList({
     }
   }
 
+  const text = lines.join("\n");
   try {
-    return await wasenderFetch({
+    const result = await wasenderFetch({
       to: toE164(number),
-      text: lines.join("\n"),
+      text,
     });
+    const ctx = getMessageLogContext();
+    if (deliveryWasAccepted(result)) {
+      await logWhatsAppMessage({
+        phone: number,
+        sessionId: ctx?.sessionId,
+        clientId: ctx?.clientId,
+        direction: MessageDirection.OUTBOUND,
+        sender: MessageSender.BOT,
+        body: text,
+        flowStage: ctx?.getStage(),
+        wasenderMessageId: extractWasenderSendId(result),
+      }).catch((err) => console.error("[WhatsApp Log] outbound list:", err));
+    }
+    return result;
   } catch (err) {
     console.error("[WasenderAPI] ❌ Erro ao enviar lista, mas continuando fluxo:", err);
     return { error: true, message: "Erro ao enviar lista, fluxo continuou" };

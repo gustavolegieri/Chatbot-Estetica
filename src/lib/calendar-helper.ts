@@ -1,6 +1,5 @@
-import { generateCalendarImage, getMonthOccupancy, buildDayListSections } from "./calendar-core";
-import { sendMedia, sendList, sendText } from "./evolution-api";
-import { BRAND_DEFAULT } from "./whatsapp-catalog";
+import { generateCalendarImage } from "./calendar-core";
+import { sendMedia, sendText } from "./evolution-api";
 import { convertAndUploadCalendar, savePngLocally } from "./calendar-converter";
 
 /**
@@ -70,7 +69,7 @@ export function generateCalendarLegend(): string {
   return [
     "📅 *Escolha o melhor dia no calendário*",
     "",
-    "Toque em *Ver dias* ou envie a data desejada, por exemplo: *16/08*.",
+    "Envie a data desejada, por exemplo: *19/08*.",
   ].join("\n");
 }
 
@@ -82,7 +81,15 @@ export function generateCalendarLegend(): string {
  * @param number WhatsApp number (international format)
  * @param prompts Prompt map opcional (compatibilidade)
  */
-export async function sendCalendarWithImageAndList({ number, prompts }: { number: string; prompts?: any }) {
+export async function sendCalendarWithImageAndList({
+  number,
+  prompts: _prompts,
+  caption,
+}: {
+  number: string;
+  prompts?: unknown;
+  caption?: string;
+}) {
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth();
@@ -120,11 +127,12 @@ export async function sendCalendarWithImageAndList({ number, prompts }: { number
     } else if (conversionResult.fallbackText) {
       // Se todos os serviços de upload falharam, usa o fallback de texto
       console.log("[Calendar] Todos os serviços de upload falharam, usando texto:", conversionResult.error);
-      await sendText({
+      return sendText({
         number,
-        text: conversionResult.fallbackText,
+        text: [caption?.trim() || generateCalendarLegend(), conversionResult.fallbackText]
+          .filter(Boolean)
+          .join("\n\n"),
       });
-      // Continua com o fluxo normal da lista
     } else {
       console.log("[Calendar] Conversão falhou, usando SVG:", conversionResult.error);
     }
@@ -137,20 +145,21 @@ export async function sendCalendarWithImageAndList({ number, prompts }: { number
   try {
     console.log("[Calendar] Enviando imagem como", imageType, "para", number);
     console.log("[Calendar] URL da imagem:", finalImageUrl.substring(0, 100) + "...");
-    const result = await sendMedia({ 
+    const result = await sendMedia({
       number, 
       mediaUrl: finalImageUrl, 
-      caption: generateCalendarLegend(),
+      caption: caption?.trim() || generateCalendarLegend(),
     });
     console.log("[Calendar] Resultado do envio:", JSON.stringify(result));
     
     // Verifica se o envio foi bem-sucedido (não retornou erro)
-    const hasError = result && typeof result === 'object' && 'error' in result;
-    const isBlocked = result && typeof result === 'object' && 'blocked' in result;
+    const hasError = Boolean(result && typeof result === 'object' && (result as { error?: boolean }).error);
+    const isBlocked = Boolean(result && typeof result === 'object' && (result as { blocked?: boolean }).blocked);
     
     if (result && !hasError && !isBlocked) {
       imageSent = true;
       console.log("[Calendar] ✅ Imagem enviada com sucesso");
+      return result;
     } else {
       console.log("[Calendar] ❌ Falha ao enviar imagem - hasError:", hasError, "isBlocked:", isBlocked);
       if (hasError) {
@@ -165,38 +174,13 @@ export async function sendCalendarWithImageAndList({ number, prompts }: { number
 
   // 5. Se a imagem falhou, envia apenas a legenda em texto
   if (!imageSent) {
-    await sendText({
+    return sendText({
       number,
-      text: generateCalendarLegend(),
+      text: caption?.trim() || generateCalendarLegend(),
     });
   }
 
-  // 6. Busca dados reais de ocupação
-  const { occupancyMap } = await getMonthOccupancy(year, month);
-
-  // 7. Monta seções da List Message
-  const sections = buildDayListSections(occupancyMap, month, year);
-
-  if (sections.length === 0) {
-    // Nenhum dia disponível
-    await sendText({
-      number,
-      text: "Nenhum dia disponível neste mês. Tente novamente mais tarde.",
-    });
-    return;
-  }
-
-  // 8. Envia a lista interativa
-  const totalRows = sections.reduce((acc, s) => acc + s.rows.length, 0);
-  if (totalRows === 0) return;
-
-  // WhatsApp List Message: máximo 10 itens no total, agrupados em até 10 seções
-  // A WASender API aceita seções com rows dentro
-  await sendList({
-    number,
-    title: "Escolha o dia",
-    description: "Toque no dia desejado:",
-    buttonText: "Ver dias",
-    sections,
-  });
+  // A imagem já contém todos os dias. Não enviamos uma segunda lista porque
+  // ela duplicava a escolha e, em caso de rate limit, podia chegar quando o
+  // cliente já estava na etapa de pagamento.
 }

@@ -1,3 +1,5 @@
+import { SVG_FONT_FAMILY } from "./svg-font";
+
 let logoBase64Cache: string | null = null;
 
 /**
@@ -31,7 +33,7 @@ export async function renderLogo(x: number, y: number, maxWidth: number, maxHeig
   
   if (!logoBase64) {
     // Fallback placeholder se logo não encontrada
-    const fontFamily = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif";
+    const fontFamily = SVG_FONT_FAMILY;
     return `
       <rect x="${x}" y="${y}" width="${maxWidth}" height="${maxHeight}" fill="#c9a24b" rx="8"/>
       <text x="${x + maxWidth/2}" y="${y + maxHeight/2 + 6}" text-anchor="middle" fill="#0d0d0d" font-family="${fontFamily}" font-weight="bold" font-size="14">LOGO</text>

@@ -3,6 +3,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isBefore, 
 import { ptBR } from "date-fns/locale";
 import { BRAND_DEFAULT } from "./whatsapp-catalog";
 import { renderLogo } from "./svg-utils";
+import { getEmbeddedSvgFontCss, SVG_FONT_FAMILY } from "./svg-font";
 
 // ─── Tipos ───────────────────────────────────────────────────────
 
@@ -279,17 +280,18 @@ export function generateCalendarSVG(data: CalendarData): string {
   const logoHeight = 80;
   const headerMonthHeight = 50;
   const weekdayHeaderHeight = 30;
-  const legendHeight = 40;
+  const legendHeight = 70;
   const padding = 24;
   
   const cols = 7;
-  const rows = Math.ceil(data.days.length / 7);
+  const startOffset = new Date(data.year, data.month, 1).getDay();
+  const rows = Math.ceil((startOffset + data.days.length) / 7);
   
   const gridWidth = cols * cellSize + (cols - 1) * cellGap;
   const canvasW = padding * 2 + gridWidth;
   const canvasH = padding + logoHeight + 30 + headerMonthHeight + 16 + weekdayHeaderHeight + rows * cellSize + (rows - 1) * cellGap + 20 + legendHeight + padding;
 
-  let svg = `<svg width="${canvasW}" height="${canvasH}" xmlns="http://www.w3.org/2000/svg">`;
+  let svg = `<svg width="${canvasW}" height="${canvasH}" xmlns="http://www.w3.org/2000/svg">${getEmbeddedSvgFontCss()}`;
   
   // Background
   svg += `<rect width="100%" height="100%" fill="#0d0d0d"/>`;
@@ -298,23 +300,23 @@ export function generateCalendarSVG(data: CalendarData): string {
   
   // Logo placeholder
   svg += `<rect x="${(canvasW - 100)/2}" y="${currentY}" width="100" height="${logoHeight}" fill="#c9a24b" rx="8"/>`;
-  svg += `<text x="${canvasW/2}" y="${currentY + logoHeight/2 + 10}" text-anchor="middle" fill="#0d0d0d" font-family="Arial, sans-serif" font-weight="bold" font-size="14">LOGO</text>`;
+  svg += `<text x="${canvasW/2}" y="${currentY + logoHeight/2 + 10}" text-anchor="middle" fill="#0d0d0d" font-family="${SVG_FONT_FAMILY}" font-weight="bold" font-size="14">LOGO</text>`;
   
   currentY += logoHeight + 10;
   
   // Brand text
-  svg += `<text x="${canvasW/2}" y="${currentY + 20}" text-anchor="middle" fill="#c9a24b" font-family="Arial, sans-serif" font-weight="bold" font-size="16">Garagem do Ka</text>`;
+  svg += `<text x="${canvasW/2}" y="${currentY + 20}" text-anchor="middle" fill="#c9a24b" font-family="${SVG_FONT_FAMILY}" font-weight="bold" font-size="16">Garagem do Ka</text>`;
   
   currentY += 30;
   
   // Month title
-  svg += `<text x="${canvasW/2}" y="${currentY + 20}" text-anchor="middle" fill="#c9a24b" font-family="Arial, sans-serif" font-weight="bold" font-size="24">Calendário do ${data.monthLabel}</text>`;
+  svg += `<text x="${canvasW/2}" y="${currentY + 20}" text-anchor="middle" fill="#c9a24b" font-family="${SVG_FONT_FAMILY}" font-weight="bold" font-size="24">Calendário do ${data.monthLabel}</text>`;
   
   currentY += headerMonthHeight + 16;
   
   // Weekday headers
   const weekdayShort = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
-  svg += `<g font-family="Arial, sans-serif" font-weight="bold" font-size="13" fill="#e5c07b" text-anchor="middle">`;
+  svg += `<g font-family="${SVG_FONT_FAMILY}" font-weight="bold" font-size="13" fill="#e5c07b" text-anchor="middle">`;
   for (let c = 0; c < cols; c++) {
     const x = padding + c * (cellSize + cellGap) + cellSize / 2;
     svg += `<text x="${x}" y="${currentY + 20}">${weekdayShort[c]}</text>`;
@@ -327,8 +329,9 @@ export function generateCalendarSVG(data: CalendarData): string {
   let dayCount = 0;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      if (dayCount >= data.days.length) break;
-      
+      const cellIdx = r * 7 + c;
+      if (cellIdx < startOffset || dayCount >= data.days.length) continue;
+
       const dayInfo = data.days[dayCount];
       const x = padding + c * (cellSize + cellGap);
       const y = currentY + r * (cellSize + cellGap);
@@ -342,7 +345,7 @@ export function generateCalendarSVG(data: CalendarData): string {
       }
       
       const textColor = dayInfo.occupancy === "past" ? "#6b7280" : "#ffffff";
-      svg += `<text x="${x + cellSize/2}" y="${y + cellSize/2 + 7}" text-anchor="middle" fill="${textColor}" font-family="Arial, sans-serif" font-weight="bold" font-size="19">${dayInfo.day}</text>`;
+      svg += `<text x="${x + cellSize/2}" y="${y + cellSize/2 + 7}" text-anchor="middle" fill="${textColor}" font-family="${SVG_FONT_FAMILY}" font-weight="bold" font-size="19">${dayInfo.day}</text>`;
       
       dayCount++;
     }
@@ -358,14 +361,17 @@ export function generateCalendarSVG(data: CalendarData): string {
     { color: "#374151", label: "Fechado" },
   ];
   
-  const legendSpacing = (canvasW - padding * 2) / legendItems.length;
+  const legendItemWidth = (canvasW - padding * 2) / 2;
   
   for (let i = 0; i < legendItems.length; i++) {
     const item = legendItems[i];
-    const lx = padding + i * legendSpacing + legendSpacing / 2 - 40;
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const lx = padding + col * legendItemWidth + 20;
+    const ly = currentY + row * 30;
     
-    svg += `<rect x="${lx}" y="${currentY}" width="14" height="14" fill="${item.color}" rx="2"/>`;
-    svg += `<text x="${lx + 20}" y="${currentY + 12}" fill="#e5c07b" font-family="Arial, sans-serif" font-weight="bold" font-size="13">${item.label}</text>`;
+    svg += `<rect x="${lx}" y="${ly}" width="14" height="14" fill="${item.color}" rx="2"/>`;
+    svg += `<text x="${lx + 20}" y="${ly + 12}" fill="#e5c07b" font-family="${SVG_FONT_FAMILY}" font-weight="bold" font-size="13">${item.label}</text>`;
   }
   
   svg += `</svg>`;
@@ -404,21 +410,22 @@ async function generateCalendarSVGInternal(data: CalendarData): Promise<string> 
   const logoHeight = 80;
   const headerMonthHeight = 50;
   const weekdayHeaderHeight = 30;
-  const legendHeight = 40;
+  const legendHeight = 70;
   const padding = 24;
   
   const cols = 7;
-  const rows = Math.ceil(data.days.length / 7);
+  const startOffset = new Date(data.year, data.month, 1).getDay();
+  const rows = Math.ceil((startOffset + data.days.length) / 7);
   
   const gridWidth = cols * cellSize + (cols - 1) * cellGap;
   const canvasW = padding * 2 + gridWidth;
   const canvasH = padding + logoHeight + 30 + headerMonthHeight + 16 + weekdayHeaderHeight + rows * cellSize + (rows - 1) * cellGap + 20 + legendHeight + padding;
 
   // Fonte moderna com melhor suporte a Unicode/acentuação
-  const fontFamily = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif";
+  const fontFamily = SVG_FONT_FAMILY;
 
   let svg = `<?xml version="1.0" encoding="UTF-8"?>`;
-  svg += `<svg width="${canvasW}" height="${canvasH}" xmlns="http://www.w3.org/2000/svg">`;
+  svg += `<svg width="${canvasW}" height="${canvasH}" xmlns="http://www.w3.org/2000/svg">${getEmbeddedSvgFontCss()}`;
   
   // Background
   svg += `<rect width="100%" height="100%" fill="#0d0d0d"/>`;
@@ -454,7 +461,7 @@ async function generateCalendarSVGInternal(data: CalendarData): Promise<string> 
   
   // Calendar grid - CORRECTED: calculate starting weekday
   const monthStart = new Date(data.year, data.month, 1);
-  const startOffset = monthStart.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  const monthStartOffset = monthStart.getDay(); // 0 = Sunday, 1 = Monday, etc.
   
   let dayCount = 0;
   for (let r = 0; r < rows; r++) {
@@ -465,7 +472,7 @@ async function generateCalendarSVGInternal(data: CalendarData): Promise<string> 
       
       // Check if this cell should have a day
       // Days start at startOffset and go through all days in the month
-      if (cellIdx >= startOffset && dayCount < data.days.length) {
+      if (cellIdx >= monthStartOffset && dayCount < data.days.length) {
         const dayInfo = data.days[dayCount];
         
         const color = OCCUPANCY_COLORS[dayInfo.occupancy] || "#374151";
@@ -495,14 +502,17 @@ async function generateCalendarSVGInternal(data: CalendarData): Promise<string> 
     { color: "#374151", label: "Fechado" },
   ];
   
-  const legendSpacing = (canvasW - padding * 2) / legendItems.length;
+  const legendItemWidth = (canvasW - padding * 2) / 2;
   
   for (let i = 0; i < legendItems.length; i++) {
     const item = legendItems[i];
-    const lx = padding + i * legendSpacing + legendSpacing / 2 - 40;
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const lx = padding + col * legendItemWidth + 20;
+    const ly = currentY + row * 30;
     
-    svg += `<rect x="${lx}" y="${currentY}" width="14" height="14" fill="${item.color}" rx="2"/>`;
-    svg += `<text x="${lx + 20}" y="${currentY + 12}" fill="#e5c07b" font-family="${fontFamily}" font-weight="bold" font-size="13">${item.label}</text>`;
+    svg += `<rect x="${lx}" y="${ly}" width="14" height="14" fill="${item.color}" rx="2"/>`;
+    svg += `<text x="${lx + 20}" y="${ly + 12}" fill="#e5c07b" font-family="${fontFamily}" font-weight="bold" font-size="13">${item.label}</text>`;
   }
   
   svg += `</svg>`;

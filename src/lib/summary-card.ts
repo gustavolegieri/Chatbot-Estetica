@@ -1,6 +1,7 @@
 import { renderLogo } from "./svg-utils";
 import sharp from 'sharp';
 import { uploadImageToCloudinary } from './image-upload';
+import { getEmbeddedSvgFontCss, SVG_FONT_FAMILY } from './svg-font';
 
 export interface SummaryCardData {
   customerName: string;
@@ -121,8 +122,8 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
           <g transform="translate(${(iconCircleSize - iconSize) / 2}, ${(iconCircleSize - iconSize) / 2}) scale(${iconScale})">
             <path d="${field.icon}" fill="#e0c060"/>
           </g>
-          <text x="${iconCircleSize + 12}" y="${iconSize - 2}" fill="#e0c060" font-family="Arial, sans-serif" font-size="16" font-weight="500">${escapeXml(field.label)}:</text>
-          <text x="${iconCircleSize + 12}" y="${iconSize + 14}" fill="#ffffff" font-family="Arial, sans-serif" font-size="18">${escapeXml(field.value)}</text>
+          <text x="${iconCircleSize + 12}" y="${iconSize - 2}" fill="#e0c060" font-family="${SVG_FONT_FAMILY}" font-size="16" font-weight="500">${escapeXml(field.label)}:</text>
+          <text x="${iconCircleSize + 12}" y="${iconSize + 14}" fill="#ffffff" font-family="${SVG_FONT_FAMILY}" font-size="18">${escapeXml(field.value)}</text>
         </g>
         ${dividerSvg}
       `;
@@ -134,7 +135,7 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
       addressLines.slice(1).forEach((line, index) => {
         const lineY = addressExtraStartY + (index * 24);
         fieldsSvg += `
-          <text x="${cardPadding + iconCircleSize + 12}" y="${lineY}" fill="#ffffff" font-family="Arial, sans-serif" font-size="18">${escapeXml(line)}</text>
+          <text x="${cardPadding + iconCircleSize + 12}" y="${lineY}" fill="#ffffff" font-family="${SVG_FONT_FAMILY}" font-size="18">${escapeXml(line)}</text>
         `;
       });
     }
@@ -148,6 +149,7 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
     
     const svg = `
       <svg width="${width}" height="${totalHeight}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${totalHeight}">
+        ${getEmbeddedSvgFontCss()}
         <defs>
           <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
@@ -167,7 +169,7 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
         ${logoSvg}
         
         <!-- Título -->
-        <text x="${width / 2}" y="${outerPadding + logoSectionHeight + titleSize - 6}" fill="#FFD700" font-family="Arial, sans-serif" font-size="${titleSize}" font-weight="bold" text-anchor="middle">RESUMO DO AGENDAMENTO</text>
+        <text x="${width / 2}" y="${outerPadding + logoSectionHeight + titleSize - 6}" fill="#FFD700" font-family="${SVG_FONT_FAMILY}" font-size="${titleSize}" font-weight="bold" text-anchor="middle">RESUMO DO AGENDAMENTO</text>
         
         <!-- Linha divisória com gradiente -->
         <rect x="${outerPadding}" y="${outerPadding + logoSectionHeight + titleSize + titleMargin - 10}" width="${width - outerPadding * 2}" height="1" fill="url(#divider)" />
@@ -196,13 +198,13 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
             <g transform="translate(${(iconCircleSize - iconSize) / 2}, ${(iconCircleSize - iconSize) / 2}) scale(${iconScale})">
               <path d="${ICONS.money}" fill="#e0c060"/>
             </g>
-            <text x="${iconCircleSize + 12}" y="${iconSize + 8}" fill="#e0c060" font-family="Arial, sans-serif" font-size="20" font-weight="bold">TOTAL:</text>
-            <text x="${width - outerPadding * 2 - cardPadding - 24}" y="${iconSize + 8}" fill="#FFD700" font-family="Arial, sans-serif" font-size="32" font-weight="bold" text-anchor="end">${escapeXml(totalText)}</text>
+            <text x="${iconCircleSize + 12}" y="${iconSize + 8}" fill="#e0c060" font-family="${SVG_FONT_FAMILY}" font-size="20" font-weight="bold">TOTAL:</text>
+            <text x="${width - outerPadding * 2 - cardPadding - 24}" y="${iconSize + 8}" fill="#FFD700" font-family="${SVG_FONT_FAMILY}" font-size="32" font-weight="bold" text-anchor="end">${escapeXml(totalText)}</text>
           </g>
         </g>
         
         <!-- Rodapé -->
-        <text x="${width / 2}" y="${totalHeight - outerPadding - 10}" fill="#888888" font-family="Arial, sans-serif" font-size="16" text-anchor="middle">Cancelamento até 2h antes sem custo</text>
+        <text x="${width / 2}" y="${totalHeight - outerPadding - 10}" fill="#888888" font-family="${SVG_FONT_FAMILY}" font-size="16" text-anchor="middle">Cancelamento até 2h antes sem custo</text>
       </svg>
     `;
 
@@ -210,9 +212,7 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
     console.log("[generateSummaryCard] Convertendo SVG para PNG...");
     const svgBuffer = Buffer.from(svg);
     
-    const pngBuffer = await sharp(svgBuffer, {
-      density: 300
-    })
+    const pngBuffer = await sharp(svgBuffer, { density: 144 })
     .png({
       quality: 90,
       compressionLevel: 6

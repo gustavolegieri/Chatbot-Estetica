@@ -118,7 +118,9 @@ export async function POST(req: NextRequest) {
         
         // Converter o JSON de volta para objeto para enviar à API
         const body = typeof msg.body === 'string' ? JSON.parse(msg.body) : msg.body;
-        const result = await wasenderFetch(body);
+        // O cron já controla tentativas e reagendamento desta linha. Impedir que
+        // wasenderFetch crie uma segunda linha para a mesma mensagem.
+        const result = await wasenderFetch(body, { queueOnFailure: false });
 
         const delivery = result as {
           queued?: boolean;
