@@ -2,6 +2,12 @@ const WASENDER_BASE = process.env.WASENDER_BASE_URL || "https://wasenderapi.com/
 const GROQ_TRANSCRIPTION_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 const MAX_AUDIO_BYTES = 16 * 1024 * 1024;
 
+function configuredTimeout(name: string, fallback: number, max: number): number {
+  const configured = Number(process.env[name] ?? fallback);
+  if (!Number.isFinite(configured)) return fallback;
+  return Math.max(2_000, Math.min(Math.round(configured), max));
+}
+
 export type WasenderAudioMessage = Record<string, unknown> & {
   url?: string;
   mediaKey?: string;
@@ -76,7 +82,7 @@ export async function decryptWasenderAudio(params: {
         },
       }),
     },
-    15_000
+    configuredTimeout("WHATSAPP_AUDIO_DECRYPT_TIMEOUT_MS", 8_000, 15_000)
   );
 
   const body = (await response.json().catch(() => null)) as
@@ -110,7 +116,7 @@ export async function transcribeAudioWithGroq(audioUrl: string): Promise<string>
       headers: { Authorization: `Bearer ${apiKey}` },
       body: form,
     },
-    30_000
+    configuredTimeout("GROQ_TRANSCRIPTION_TIMEOUT_MS", 15_000, 30_000)
   );
   const body = (await response.json().catch(() => null)) as { text?: string; error?: { message?: string } } | null;
   const transcript = body?.text?.trim();

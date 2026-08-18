@@ -2,6 +2,13 @@ import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 
 const DEFAULT_VOICE = "pt-BR-AntonioNeural";
 const MAX_SPOKEN_CHARACTERS = 650;
+const DEFAULT_TTS_TIMEOUT_MS = 8_000;
+
+function ttsTimeoutMs(): number {
+  const configured = Number(process.env.WHATSAPP_TTS_TIMEOUT_MS ?? DEFAULT_TTS_TIMEOUT_MS);
+  if (!Number.isFinite(configured)) return DEFAULT_TTS_TIMEOUT_MS;
+  return Math.max(2_000, Math.min(Math.round(configured), 15_000));
+}
 
 export function voiceRepliesEnabled(): boolean {
   return process.env.WHATSAPP_VOICE_REPLIES_ENABLED !== "false";
@@ -69,19 +76,30 @@ export async function synthesizeVoiceReply(text: string): Promise<Buffer> {
 
   const chunks: Buffer[] = [];
   return new Promise<Buffer>((resolve, reject) => {
+    let settled = false;
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      tts.close();
+      callback();
+    };
+    const timeout = setTimeout(() => {
+      finish(() => reject(new Error("Tempo limite excedido ao gerar a resposta em áudio")));
+      audioStream.destroy();
+    }, ttsTimeoutMs());
+
     audioStream.on("data", (chunk: Buffer | Uint8Array) => chunks.push(Buffer.from(chunk)));
     audioStream.on("error", (error) => {
-      tts.close();
-      reject(error);
+      finish(() => reject(error));
     });
     audioStream.on("end", () => {
       const audio = Buffer.concat(chunks);
-      tts.close();
       if (!audio.length) {
-        reject(new Error("O serviço de voz não retornou áudio"));
+        finish(() => reject(new Error("O serviço de voz não retornou áudio")));
         return;
       }
-      resolve(audio);
+      finish(() => resolve(audio));
     });
   });
 }

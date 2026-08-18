@@ -28,8 +28,13 @@ import { isVoiceReplyEligible, synthesizeVoiceReply } from "./whatsapp-voice";
 import { extractWasenderSendId } from "./whatsapp-self-test";
 
 const WASENDER_BASE = process.env.WASENDER_BASE_URL || "https://wasenderapi.com/api";
-const MIN_RECIPIENT_SEND_GAP_MS = 2_100;
 const recipientReadyAt = new Map<string, number>();
+
+function recipientSendGapMs() {
+  const configured = Number(process.env.WASENDER_MIN_SEND_GAP_MS ?? 350);
+  if (!Number.isFinite(configured)) return 350;
+  return Math.max(0, Math.min(Math.round(configured), 5_000));
+}
 
 type WasenderFetchOptions = {
   queueOnFailure?: boolean;
@@ -47,7 +52,7 @@ async function waitForRecipientWindow(recipient?: string) {
   const key = phoneToWhatsApp(recipient).replace(/\D/g, "");
   const now = Date.now();
   const reservedAt = Math.max(now, recipientReadyAt.get(key) ?? now);
-  recipientReadyAt.set(key, reservedAt + MIN_RECIPIENT_SEND_GAP_MS);
+  recipientReadyAt.set(key, reservedAt + recipientSendGapMs());
   const waitMs = reservedAt - now;
   if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
 }
