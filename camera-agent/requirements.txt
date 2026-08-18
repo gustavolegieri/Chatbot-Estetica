@@ -3,3 +3,4 @@ opencv-python==4.12.0.88
 requests==2.32.4
 python-dotenv==1.1.1
 easyocr==1.7.2
+aiortc>=1.9.0,<2.0.0

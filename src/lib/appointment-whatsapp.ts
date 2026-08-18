@@ -88,18 +88,25 @@ export async function sendAppointmentThankYou(apt: AptWithRelations) {
   return wasMessageSent(result);
 }
 
-export async function sendAppointmentCheckIn(apt: AptWithRelations, snapshotUrl?: string | null) {
+export async function sendAppointmentCheckIn(
+  apt: AptWithRelations,
+  snapshotUrl?: string | null,
+  liveViewUrl?: string | null
+) {
   const settings = await loadSettings();
   if (!settings?.whatsappEnabled || !apt.client.phone) return false;
 
   const prompts = await loadPromptMap();
-  const text = renderPrompt(prompts, "appointment_checkin", {
+  let text = renderPrompt(prompts, "appointment_checkin", {
     name: apt.client.name,
     service: apt.service.name,
     vehicle: apt.client.vehicleModel ?? "seu veículo",
     plate: apt.client.vehiclePlate ?? "não identificada",
     brand: settings.businessName ?? "Garagem do Ka",
   });
+  if (liveViewUrl) {
+    text += `\n\n📹 *Acompanhe seu veículo ao vivo*\n${liveViewUrl}\n\n_Link privado e temporário. A transmissão termina automaticamente quando o veículo sair da garagem._`;
+  }
   if (snapshotUrl) {
     const mediaResult = await sendMedia({ number: apt.client.phone, mediaUrl: snapshotUrl, caption: text, mediaType: "image" });
     if (wasMessageSent(mediaResult)) return true;
@@ -134,7 +141,7 @@ export async function sendAppointmentTimelapse(apt: AptWithRelations, timelapseU
     number: apt.client.phone,
     mediaUrl: timelapseUrl,
     mediaType: "video",
-    caption: `🎬 *Um pouco dos cuidados com seu veículo*\n\nPreparamos este registro acelerado do atendimento do *${apt.client.vehicleModel ?? "seu veículo"}*. Pessoas e a área externa foram desfocadas para preservar a privacidade. 🤍`,
+    caption: `🎬 *Um pouco dos cuidados com seu veículo*\n\nPreparamos este registro acelerado do atendimento do *${apt.client.vehicleModel ?? "seu veículo"}*. 🤍`,
   });
   return wasMessageSent(result);
 }

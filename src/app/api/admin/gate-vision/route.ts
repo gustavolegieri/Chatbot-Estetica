@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
@@ -8,6 +7,7 @@ import {
   recordGateHeartbeat,
   simulateGateVision,
 } from "@/lib/gate-vision";
+import { gateDeviceAuthorized } from "@/lib/gate-device-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,21 +39,6 @@ const heartbeatSchema = z.object({
   height: z.number().int().min(1).max(4320).optional(),
 });
 
-function timingSafeToken(provided: string, configured: string) {
-  const left = Buffer.from(provided);
-  const right = Buffer.from(configured);
-  return left.length === right.length && crypto.timingSafeEqual(left, right);
-}
-
-function deviceAuthorized(request: NextRequest) {
-  const configured = process.env.GATE_VISION_DEVICE_TOKEN?.trim();
-  if (!configured) return false;
-  const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
-  const custom = request.headers.get("x-gate-vision-token")?.trim();
-  const provided = custom || bearer || "";
-  return Boolean(provided && timingSafeToken(provided, configured));
-}
-
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ success: false, error: "Não autenticado" }, { status: 401 });
@@ -75,7 +60,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, data: simulateGateVision() });
   }
 
-  if (!deviceAuthorized(request)) {
+  if (!gateDeviceAuthorized(request)) {
     return NextResponse.json({ success: false, error: "Agente de câmera não autorizado" }, { status: 401 });
   }
 

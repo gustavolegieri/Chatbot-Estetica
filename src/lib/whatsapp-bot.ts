@@ -19,6 +19,7 @@ import {
   wantsHumanHandoff,
 } from "./whatsapp-handoff";
 import { analyzeConversationRules, analyzeConversationWithAI } from "./conversation-intelligence";
+import { handleGateTestCommand } from "./gate-test-flow";
 
 interface IncomingMessage {
   phone: string;
@@ -196,17 +197,22 @@ async function handleMessageInternal(msg: IncomingMessage) {
         return;
       }
 
+      const normalizedPhone = msg.phone.replace(/\D/g, "");
+      const settingsTestModeAuthorized = Boolean(
+        settings?.testModeEnabled &&
+        settings.testModePhone &&
+        normalizedPhone === settings.testModePhone.replace(/\D/g, "")
+      );
+      if (settingsTestModeAuthorized && await handleGateTestCommand(msg.phone, inboundText)) {
+        return;
+      }
+
       if (await tryHandleAppointmentConfirmation(msg.phone, msg.text, flowRef.current.stage)) {
         return;
       }
 
       const businessStatus = settings ? getBusinessHoursStatus(settings) : { isOpen: true };
-      const normalizedPhone = msg.phone.replace(/\D/g, "");
       const envTestMode = process.env.TEST_MODE === "true";
-      const settingsTestModeAuthorized =
-        settings?.testModeEnabled &&
-        !!settings.testModePhone &&
-        normalizedPhone === settings.testModePhone.replace(/\D/g, "");
       const bypassBusinessHours = envTestMode || settingsTestModeAuthorized;
 
       if (bypassBusinessHours) {

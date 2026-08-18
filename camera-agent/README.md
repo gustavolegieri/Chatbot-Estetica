@@ -1,6 +1,6 @@
 # Portão IA — agente local da webcam
 
-Este agente roda no computador da estética. A transmissão contínua da webcam nunca é enviada para a internet. O CRM recebe os eventos e, quando habilitado, fotos de passagem e um timelapse curto já tratado para envio ao cliente:
+Este agente roda no computador da estética. O vídeo não é armazenado nem retransmitido pela nuvem: quando um cliente abre o link privado, o WebRTC cria uma conexão direta entre o computador da garagem e o aparelho dele. O CRM recebe os eventos e, quando habilitado, fotos de passagem e um timelapse curto para envio ao cliente:
 
 - `ENTER`: o veículo cruzou de fora para dentro; a lavagem é iniciada.
 - `EXIT`: o veículo cruzou de dentro para fora; o atendimento entra em finalização.
@@ -38,11 +38,24 @@ Na primeira execução, os modelos leves de detecção e OCR são baixados autom
 
 Para uma leitura confiável, o agente solicita imagem 1920×1080, boa iluminação e a placa dianteira ou traseira deve ocupar pelo menos 100 pixels de largura. Evite ângulo muito lateral, reflexo direto e contraluz. Se a linha não coincidir com a passagem física, ajuste `GATE_LINE` observando a prévia.
 
-## Timelapse com privacidade
+## Timelapse
 
-Ao confirmar a entrada, o agente inicia automaticamente uma sequência local com um quadro a cada 30 segundos. A área da rua é desfocada integralmente e pessoas detectadas também são desfocadas antes de qualquer quadro ser guardado. Na saída, o agente cria um MP4 curto, reduz resolução se necessário e apaga os quadros temporários da memória. Somente o resultado tratado é enviado ao servidor e ao cliente associado pela placa.
+Ao confirmar a entrada, o agente inicia automaticamente uma sequência local com um quadro a cada 30 segundos. O quadro inteiro é preservado, sem desfoque de fundo ou pessoas. Na saída, o agente cria um MP4 curto, reduz resolução se necessário e apaga os quadros temporários da memória. Somente o resultado final é enviado ao servidor e ao cliente associado pela placa.
 
 O recurso é controlado por `GATE_TIMELAPSE_ENABLED`. Os limites de intervalo, quadros, FPS e tamanho ficam nas variáveis `GATE_TIMELAPSE_*` do `.env`.
+
+## Acompanhamento ao vivo gratuito
+
+Com `GATE_LIVE_ENABLED=true`, a entrada de uma placa associada a um agendamento cria um link privado e o inclui na mesma mensagem de início da lavagem. O cliente abre o link no navegador, sem instalar nada. A negociação usa o CRM, mas os quadros seguem diretamente por WebRTC, sem áudio e sem gravação na nuvem.
+
+- O token do link é aleatório e somente seu hash fica no banco.
+- A sessão pertence ao agendamento, à placa e ao dispositivo do portão.
+- A saída encerra a transmissão e invalida o acesso automaticamente.
+- A página não é indexada e não revela telefone ou dados de outros clientes.
+- `GATE_LIVE_FPS=8` e `GATE_LIVE_WIDTH=960` equilibram nitidez e consumo de internet.
+- O teste `python test_webrtc_live.py` publica uma animação local sem abrir a webcam nem enviar mensagens.
+
+A modalidade gratuita usa servidores STUN públicos apenas para descobrir a rota e funciona ponto a ponto. Algumas redes móveis ou empresariais com NAT muito restritivo podem exigir um TURN opcional; nesse caso a tela informa a falha sem expor a câmera.
 
 ## Regras de segurança operacional
 

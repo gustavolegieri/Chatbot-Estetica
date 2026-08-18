@@ -6,6 +6,7 @@ import { notifyPwaOperationalAlert } from "@/lib/pwa-push";
 import { uploadImageToCloudinary, uploadVideoToCloudinary } from "@/lib/image-upload";
 import { isValidVehiclePlate, normalizeVehiclePlate } from "@/lib/whatsapp-vehicle-parse";
 import { getLatestGateDailyReport } from "@/lib/gate-daily-report";
+import { endGateLiveSession, startGateLiveSession } from "@/lib/gate-live";
 
 export type GateEventType = "ENTER" | "EXIT";
 export type GateStage = "WAITING" | "WASHING" | "FINALIZING";
@@ -220,7 +221,19 @@ export async function processGateVisionEvent(input: GateVisionEvent) {
           data: { status: AppointmentStatus.IN_PROGRESS },
           include: { client: true, service: true },
         });
-    const whatsappSent = await sendAppointmentCheckIn(updated, snapshotUrl);
+    let liveView: Awaited<ReturnType<typeof startGateLiveSession>> | null = null;
+    try {
+      liveView = await startGateLiveSession({
+        appointmentId: original.id,
+        clientId: original.clientId,
+        deviceId: input.deviceId,
+        plate,
+        startedAt: new Date(capturedAt),
+      });
+    } catch (error) {
+      console.error("[Gate Live] Não foi possível abrir a transmissão", error);
+    }
+    const whatsappSent = await sendAppointmentCheckIn(updated, snapshotUrl, liveView?.url);
     await logAudit({
       action: "GATE_VISION_ENTER",
       resource: `gate-event:${input.eventId}`,
@@ -238,6 +251,8 @@ export async function processGateVisionEvent(input: GateVisionEvent) {
         matchType: match.match,
         whatsappSent,
         whatsappPhone: original.client.phone,
+        liveViewActive: Boolean(liveView),
+        liveSessionId: liveView?.session.id || null,
       },
     });
     await notifyPwaOperationalAlert({
@@ -251,8 +266,11 @@ export async function processGateVisionEvent(input: GateVisionEvent) {
       ignored: false,
       stage: "WASHING" as GateStage,
       appointment: { id: original.id, clientName: original.client.name, vehicle: original.client.vehicleModel, service: original.service.name },
+      liveView: liveView ? { active: true, sessionId: liveView.session.id } : null,
     };
   }
+
+  await endGateLiveSession({ deviceId: input.deviceId, endedAt: new Date(capturedAt) });
 
   const entryPlate = typeof previousData.plate === "string" ? normalizeVehiclePlate(previousData.plate) : "";
   if (!validPlate) {

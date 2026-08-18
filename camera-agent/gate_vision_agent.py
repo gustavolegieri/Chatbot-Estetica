@@ -60,6 +60,13 @@ TIMELAPSE_INTERVAL_SECONDS = max(5.0, float(os.getenv("GATE_TIMELAPSE_INTERVAL_S
 TIMELAPSE_MAX_FRAMES = max(24, int(os.getenv("GATE_TIMELAPSE_MAX_FRAMES", "300")))
 TIMELAPSE_FPS = max(6.0, float(os.getenv("GATE_TIMELAPSE_FPS", "12")))
 TIMELAPSE_MAX_BYTES = min(2_800_000, max(500_000, int(os.getenv("GATE_TIMELAPSE_MAX_BYTES", "2400000"))))
+LIVE_ENABLED = os.getenv("GATE_LIVE_ENABLED", "true").lower() == "true"
+LIVE_API_URL = os.getenv(
+    "GATE_LIVE_API_URL",
+    API_URL.replace("/api/admin/gate-vision", "/api/gate-live/device"),
+).strip()
+LIVE_FPS = max(2.0, min(15.0, float(os.getenv("GATE_LIVE_FPS", "8"))))
+LIVE_WIDTH = max(480, min(1280, int(os.getenv("GATE_LIVE_WIDTH", "960"))))
 STATE_FILE = ROOT / "gate-state.json"
 QUEUE_FILE = ROOT / "pending-events.json"
 PLATE_PATTERN = re.compile(r"^[A-Z]{3}(?:\d{4}|\d[A-Z]\d{2})$")
@@ -226,7 +233,6 @@ class GateVisionAgent:
         if not (GATE_LINE_HYSTERESIS < GATE_LINE < 1 - GATE_LINE_HYSTERESIS):
             raise RuntimeError("GATE_LINE deve ficar entre 0 e 1, longe das bordas da imagem")
         self.model = YOLO(MODEL_NAME)
-        self.privacy_model = YOLO(MODEL_NAME) if TIMELAPSE_ENABLED else None
         self.ocr = None
         self.ocr_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="gate-plate-ocr")
         if PLATE_OCR_ENABLED:
@@ -258,6 +264,21 @@ class GateVisionAgent:
         self.timelapse_resume_pending = bool(self.state.get("occupied"))
         self.frame_width = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
         self.frame_height = int(self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+        self.live_publisher = None
+        if LIVE_ENABLED:
+            try:
+                from webrtc_live import GateWebRtcPublisher
+
+                self.live_publisher = GateWebRtcPublisher(
+                    api_url=LIVE_API_URL,
+                    device_id=DEVICE_ID,
+                    device_token=DEVICE_TOKEN,
+                    fps=LIVE_FPS,
+                    width=LIVE_WIDTH,
+                )
+                self.live_publisher.start()
+            except Exception as error:
+                print(f"[Portao IA] WebRTC indisponivel; instale as dependencias: {error}")
 
     @staticmethod
     def box_iou(first: tuple[int, int, int, int], second: tuple[int, int, int, int]) -> float:
@@ -364,39 +385,9 @@ class GateVisionAgent:
             return None
         return "data:image/jpeg;base64," + base64.b64encode(encoded.tobytes()).decode("ascii")
 
-    def privacy_safe_timelapse_frame(self, frame: Any) -> Any:
+    def prepare_timelapse_frame(self, frame: Any) -> Any:
         safe = frame.copy()
         height, width = safe.shape[:2]
-        gate_y = max(1, min(height - 1, int(height * GATE_LINE)))
-        outside = safe[:gate_y, :]
-        if outside.size:
-            safe[:gate_y, :] = cv2.GaussianBlur(outside, (0, 0), 24)
-        if self.privacy_model is not None:
-            try:
-                result = self.privacy_model.predict(frame, classes=[0, *VEHICLE_CLASSES], conf=.35, imgsz=640, verbose=False)[0]
-                if result.boxes is not None:
-                    boxes = result.boxes.xyxy.cpu().tolist()
-                    classes = result.boxes.cls.int().cpu().tolist()
-                    # Restaura o veículo depois de desfocar a rua; a perspectiva
-                    # pode fazer teto e para-brisa aparecerem acima da linha.
-                    for raw_box, class_id in zip(boxes, classes):
-                        if class_id not in VEHICLE_CLASSES:
-                            continue
-                        x1, y1, x2, y2 = map(int, raw_box)
-                        x1, y1 = max(0, x1), max(0, y1)
-                        x2, y2 = min(width, x2), min(height, y2)
-                        if x2 > x1 and y2 > y1:
-                            safe[y1:y2, x1:x2] = frame[y1:y2, x1:x2]
-                    for raw_box, class_id in zip(boxes, classes):
-                        if class_id != 0:
-                            continue
-                        x1, y1, x2, y2 = map(int, raw_box)
-                        x1, y1 = max(0, x1 - 12), max(0, y1 - 12)
-                        x2, y2 = min(width, x2 + 12), min(height, y2 + 12)
-                        if x2 > x1 and y2 > y1:
-                            safe[y1:y2, x1:x2] = cv2.GaussianBlur(safe[y1:y2, x1:x2], (0, 0), 28)
-            except Exception as error:
-                print(f"[Portao IA] Desfoque de pessoas indisponivel neste quadro: {error}")
         target_width = min(960, width)
         if target_width < width:
             safe = cv2.resize(safe, (target_width, int(height * target_width / width)), interpolation=cv2.INTER_AREA)
@@ -414,7 +405,7 @@ class GateVisionAgent:
         if not self.timelapse_active or (not force and now - self.timelapse_last_frame_at < TIMELAPSE_INTERVAL_SECONDS):
             return
         self.timelapse_last_frame_at = now
-        safe = self.privacy_safe_timelapse_frame(frame)
+        safe = self.prepare_timelapse_frame(frame)
         success, encoded = cv2.imencode(".jpg", safe, [cv2.IMWRITE_JPEG_QUALITY, 68])
         if success:
             self.timelapse_frames.append(encoded.tobytes())
@@ -679,6 +670,8 @@ class GateVisionAgent:
                 continue
             if FLIP_VERTICAL:
                 frame = cv2.flip(frame, 0)
+            if self.live_publisher is not None:
+                self.live_publisher.update_frame(frame)
             now = time.monotonic()
             if self.timelapse_resume_pending and not self.timelapse_active:
                 self.timelapse_resume_pending = False
@@ -753,6 +746,8 @@ class GateVisionAgent:
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
         self.capture.release()
+        if self.live_publisher is not None:
+            self.live_publisher.stop()
         self.ocr_executor.shutdown(wait=False, cancel_futures=True)
         cv2.destroyAllWindows()
 

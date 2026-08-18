@@ -28,6 +28,37 @@ import { isVoiceReplyEligible, synthesizeVoiceReply } from "./whatsapp-voice";
 
 const WASENDER_BASE = process.env.WASENDER_BASE_URL || "https://wasenderapi.com/api";
 
+type TestModeRecipientConfig = {
+  enabled: boolean;
+  phone: string | null;
+  loadedAt: number;
+};
+
+let testModeRecipientCache: TestModeRecipientConfig | null = null;
+
+export function testModeAllowsRecipient(number: string, enabled: boolean, testPhone?: string | null) {
+  if (!enabled) return true;
+  const recipient = phoneToWhatsApp(number).replace(/\D/g, "");
+  const allowed = phoneToWhatsApp(testPhone || "").replace(/\D/g, "");
+  return Boolean(allowed && recipient === allowed);
+}
+
+async function outboundRecipientAllowed(number: string) {
+  const now = Date.now();
+  if (!testModeRecipientCache || now - testModeRecipientCache.loadedAt > 5_000) {
+    const settings = await prisma.settings.findUnique({
+      where: { id: "default" },
+      select: { testModeEnabled: true, testModePhone: true },
+    });
+    testModeRecipientCache = {
+      enabled: settings?.testModeEnabled ?? false,
+      phone: settings?.testModePhone ?? null,
+      loadedAt: now,
+    };
+  }
+  return testModeAllowsRecipient(number, testModeRecipientCache.enabled, testModeRecipientCache.phone);
+}
+
 interface SendTextParams {
   number: string;
   text: string;
@@ -157,6 +188,11 @@ async function addToQueue(
 }
 
 export async function wasenderFetch(body: object): Promise<unknown> {
+  const recipient = (body as { to?: string }).to;
+  if (recipient && !(await outboundRecipientAllowed(recipient))) {
+    console.warn("[WasenderAPI] ⛔ Modo de teste bloqueou envio para número não autorizado");
+    return { blocked: true, reason: "test_mode_recipient" };
+  }
   const apiKey = getApiKey();
 
   if (!apiKey) {
