@@ -39,13 +39,14 @@ MODEL_NAME = os.getenv("GATE_MODEL", "yolov8n.pt").strip()
 CONFIDENCE = float(os.getenv("GATE_CONFIDENCE", "0.55"))
 GATE_LINE = float(os.getenv("GATE_LINE", "0.58"))
 GATE_LINE_HYSTERESIS = max(0.01, float(os.getenv("GATE_LINE_HYSTERESIS", "0.025")))
-PROCESS_FPS = max(1.0, float(os.getenv("GATE_PROCESS_FPS", "5")))
+PROCESS_FPS = max(1.0, float(os.getenv("GATE_PROCESS_FPS", "3")))
 CAMERA_WIDTH = max(640, int(os.getenv("GATE_CAMERA_WIDTH", "1920")))
 CAMERA_HEIGHT = max(480, int(os.getenv("GATE_CAMERA_HEIGHT", "1080")))
 CAMERA_FPS = max(10.0, min(60.0, float(os.getenv("GATE_CAMERA_FPS", "30"))))
-DETECTION_WIDTH = max(640, min(1280, int(os.getenv("GATE_DETECTION_WIDTH", "960"))))
-MODEL_IMAGE_SIZE = max(416, min(960, int(os.getenv("GATE_MODEL_IMAGE_SIZE", "640"))))
+DETECTION_WIDTH = max(640, min(1280, int(os.getenv("GATE_DETECTION_WIDTH", "768"))))
+MODEL_IMAGE_SIZE = max(416, min(960, int(os.getenv("GATE_MODEL_IMAGE_SIZE", "512"))))
 CPU_THREADS = max(1, min(8, int(os.getenv("GATE_CPU_THREADS", "4"))))
+TORCH_THREADS = max(0, min(32, int(os.getenv("GATE_TORCH_THREADS", "0"))))
 HEARTBEAT_SECONDS = max(30.0, float(os.getenv("GATE_HEARTBEAT_SECONDS", "60")))
 TRACK_TTL_SECONDS = max(2.0, float(os.getenv("GATE_TRACK_TTL_SECONDS", "6")))
 EVENT_COOLDOWN_SECONDS = max(10.0, float(os.getenv("GATE_EVENT_COOLDOWN_SECONDS", "25")))
@@ -153,15 +154,22 @@ def coerce_plate_candidate(value: str) -> tuple[str, int] | None:
     return min(options, key=lambda item: item[1]) if options else None
 
 
-def resolve_plate_against_expected(value: str, expected_plates: set[str]) -> str:
+def resolve_plate_against_expected(value: str, expected_plates: set[str], max_distance: int = 2) -> str:
     plate = normalize_plate(value)
     if plate in expected_plates or not valid_plate(plate):
         return plate
-    nearest = [
-        expected
-        for expected in expected_plates
-        if len(expected) == len(plate) and sum(left != right for left, right in zip(expected, plate)) == 1
-    ]
+    ranked = sorted(
+        (
+            (sum(left != right for left, right in zip(expected, plate)), expected)
+            for expected in expected_plates
+            if len(expected) == len(plate)
+        ),
+        key=lambda item: item[0],
+    )
+    if not ranked or ranked[0][0] > max_distance:
+        return plate
+    best_distance = ranked[0][0]
+    nearest = [expected for distance, expected in ranked if distance == best_distance]
     return nearest[0] if len(nearest) == 1 else plate
 
 
@@ -293,11 +301,13 @@ class GateVisionAgent:
         try:
             import torch
 
-            torch.set_num_threads(CPU_THREADS)
+            if TORCH_THREADS > 0:
+                torch.set_num_threads(TORCH_THREADS)
         except Exception:
             pass
         self.model = YOLO(MODEL_NAME)
         self.ocr = None
+        self.ocr_engine = "none"
         self.ocr_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="gate-plate-ocr")
         self.detector_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="gate-yolo")
         self.network_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="gate-network")
@@ -306,14 +316,25 @@ class GateVisionAgent:
         self.network_futures: set[Future[Any]] = set()
         self.queue_lock = threading.Lock()
         self.last_inference_ms = 0.0
+        self.last_metrics_at = 0.0
         self.expected_plates: set[str] = set()
+        self.expected_plates_loaded = False
         if PLATE_OCR_ENABLED:
             try:
-                import easyocr
+                from rapidocr_onnxruntime import RapidOCR
 
-                self.ocr = easyocr.Reader(["en"], gpu=False, verbose=False)
-            except Exception as error:
-                print(f"[Portao IA] OCR de placa indisponivel: {error}")
+                self.ocr = RapidOCR()
+                self.ocr_engine = "rapid"
+                print("[Portao IA] OCR ONNX otimizado pronto")
+            except Exception as rapid_error:
+                try:
+                    import easyocr
+
+                    self.ocr = easyocr.Reader(["en"], gpu=False, verbose=False)
+                    self.ocr_engine = "easy"
+                    print(f"[Portao IA] OCR ONNX indisponivel; usando contingencia: {rapid_error}")
+                except Exception as error:
+                    print(f"[Portao IA] OCR de placa indisponivel: {error}")
         source = camera_source()
         self.capture = cv2.VideoCapture(source)
         if isinstance(source, int):
@@ -407,6 +428,10 @@ class GateVisionAgent:
 
     def schedule_detection(self, frame: Any, now: float) -> None:
         if self.detection_future is not None or now - self.last_process_at < 1 / PROCESS_FPS:
+            return
+        # EasyOCR e YOLO usam a mesma CPU. Dar uma janela exclusiva ao OCR faz
+        # a placa terminar em vez de manter os dois modelos disputando núcleos.
+        if any(memory.ocr_future is not None and not memory.ocr_future.done() for memory in self.tracks.values()):
             return
         reduced, original_width, original_height = self.prepare_detection_frame(frame)
         self.last_process_at = now
@@ -684,6 +709,10 @@ class GateVisionAgent:
                     best = (plate, score)
             if best and best[1] >= .90:
                 return best
+            if best:
+                resolved = resolve_plate_against_expected(best[0], getattr(self, "expected_plates", set()))
+                if resolved != best[0]:
+                    return resolved, min(.99, best[1] + .12)
 
         # Fallback para placas sem contorno visível, muito inclinadas ou com
         # reflexo. Executa uma única detecção de texto, sempre fora da thread da
@@ -717,6 +746,9 @@ class GateVisionAgent:
         # ele discorda do recorte geométrico, esta leitura é mais confiável para
         # o primeiro caractere (caso real F/T observado na webcam).
         if detected_best is not None:
+            resolved = resolve_plate_against_expected(detected_best[0], getattr(self, "expected_plates", set()))
+            if resolved != detected_best[0]:
+                return resolved, min(.99, detected_best[1] + .12)
             return detected_best
         if best is not None:
             return best
@@ -748,9 +780,39 @@ class GateVisionAgent:
                 best = (plate, score)
         return best
 
+    def read_plate_rapid(self, crop: Any) -> tuple[str, float] | None:
+        if self.ocr is None or crop is None or crop.size == 0:
+            return None
+        try:
+            result, _timing = self.ocr(crop)
+        except Exception as error:
+            print(f"[Portao IA] Falha temporaria no OCR ONNX: {error}")
+            return None
+        best: tuple[str, float] | None = None
+        for item in result or []:
+            if not isinstance(item, (list, tuple)) or len(item) < 3:
+                continue
+            text, confidence = item[1], item[2]
+            coerced = coerce_plate_candidate(str(text))
+            if not coerced:
+                continue
+            plate, corrections = coerced
+            score = max(0.0, float(confidence) - corrections * .04)
+            resolved = resolve_plate_against_expected(plate, getattr(self, "expected_plates", set()))
+            if resolved != plate:
+                plate, score = resolved, min(.99, score + .12)
+            if score >= PLATE_OCR_MIN_CONFIDENCE and (best is None or score > best[1]):
+                best = (plate, score)
+        return best
+
+    def read_plate_task(self, crop: Any) -> tuple[str, float] | None:
+        if getattr(self, "ocr_engine", "easy") == "rapid":
+            return self.read_plate_rapid(crop)
+        return self.read_plate_region(crop)
+
     def read_plate(self, frame: Any, box: tuple[int, int, int, int]) -> tuple[str, float] | None:
         crop = self.plate_search_crop(frame, box)
-        return self.read_plate_region(crop) if crop is not None else None
+        return self.read_plate_task(crop) if crop is not None else None
 
     def collect_plate_read(self, memory: TrackMemory) -> None:
         future = memory.ocr_future
@@ -787,6 +849,8 @@ class GateVisionAgent:
         self.collect_plate_read(memory)
         if self.ocr is None or memory.plate or memory.ocr_future is not None:
             return
+        if not getattr(self, "expected_plates_loaded", True) and now - memory.first_seen < 2.5:
+            return
         if len(memory.plate_readings) >= PLATE_MAX_READS:
             memory.add_plate_read(None, allow_single=True)
             return
@@ -795,7 +859,7 @@ class GateVisionAgent:
         memory.last_ocr_at = now
         crop = self.plate_search_crop(frame, box)
         if crop is not None:
-            memory.ocr_future = self.ocr_executor.submit(self.read_plate_region, crop)
+            memory.ocr_future = self.ocr_executor.submit(self.read_plate_task, crop)
 
     def queue_crossing(
         self,
@@ -898,6 +962,7 @@ class GateVisionAgent:
                         for plate in response["expectedPlates"]
                         if valid_plate(str(plate))
                     }
+                    self.expected_plates_loaded = True
                 self.flush_queue()
 
             self.heartbeat_future = self.network_executor.submit(send_heartbeat)
@@ -945,6 +1010,7 @@ class GateVisionAgent:
                 current_detections: list[tuple[int, tuple[int, int, int, int], float]] = []
                 try:
                     _captured_at, self.last_inference_ms, raw_detections = completed.result()
+                    self.last_process_at = now
                     height = frame.shape[0]
                     for raw_track_id, raw_box, confidence in raw_detections:
                         track_id = self.canonical_track_id(raw_track_id, raw_box, now)
@@ -1000,6 +1066,13 @@ class GateVisionAgent:
             measured_fps = frame_counter / elapsed
             if elapsed >= 10:
                 frame_counter, fps_started = 0, now
+            if now - self.last_metrics_at >= 10:
+                self.last_metrics_at = now
+                ocr_busy = any(memory.ocr_future is not None and not memory.ocr_future.done() for memory in self.tracks.values())
+                print(
+                    f"[Portao IA] Desempenho: camera {measured_fps:.1f} FPS | "
+                    f"YOLO {self.last_inference_ms:.0f} ms | veiculos {len(detections)} | OCR {'ocupado' if ocr_busy else 'livre'}"
+                )
             self.capture_timelapse_frame(frame, now)
             self.heartbeat(measured_fps)
             if SHOW_PREVIEW:

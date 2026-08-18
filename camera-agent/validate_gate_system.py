@@ -12,6 +12,7 @@ from typing import Any
 import cv2
 import numpy as np
 from easyocr import Reader
+from rapidocr_onnxruntime import RapidOCR
 from ultralytics import YOLO
 
 from gate_vision_agent import (
@@ -150,6 +151,28 @@ def run_ocr_validation(reader: Reader) -> list[dict[str, Any]]:
     return results
 
 
+def run_rapid_ocr_validation(reader: RapidOCR) -> list[dict[str, Any]]:
+    agent = object.__new__(GateVisionAgent)
+    agent.ocr = reader
+    agent.ocr_engine = "rapid"
+    agent.expected_plates = set()
+    results = []
+    for scenario in OCR_SCENARIOS:
+        frame, box = vehicle_frame(scenario)
+        started = time.perf_counter()
+        reading = agent.read_plate(frame, box)
+        detected = reading[0] if reading else None
+        results.append({
+            "name": scenario.name,
+            "expected": scenario.plate,
+            "detected": detected,
+            "confidence": round(reading[1], 3) if reading else 0,
+            "passed": detected == scenario.plate,
+            "milliseconds": round((time.perf_counter() - started) * 1000),
+        })
+    return results
+
+
 def run_tracking_validation() -> list[dict[str, Any]]:
     results = []
     for name, positions, expected in TRACK_SCENARIOS:
@@ -258,13 +281,15 @@ def run_plate_consensus_validation() -> dict[str, Any]:
     high.add_plate_read(("BRA2E19", .93))
     high_confidence_fallback = high.add_plate_read(None, allow_single=True) and high.plate == "BRA2E19"
     agenda_correction = resolve_plate_against_expected("TEG4B58", {"FEG4B58", "BRA2E19"}) == "FEG4B58"
-    ambiguous_not_changed = resolve_plate_against_expected("TEG4B58", {"FEG4B58", "GEG4B58"}) == "TEG4B58"
+    two_character_correction = resolve_plate_against_expected("TEL4B58", {"FEG4B58", "BRA2E19"}) == "FEG4B58"
+    ambiguous_not_changed = resolve_plate_against_expected("TEG4B58", {"FEG4B58", "GEG4B58"}, max_distance=1) == "TEG4B58"
     return {
-        "passed": wrong_rejected and first_correct_waits and second_correct_confirms and high_confidence_fallback and agenda_correction and ambiguous_not_changed,
+        "passed": wrong_rejected and first_correct_waits and second_correct_confirms and high_confidence_fallback and agenda_correction and two_character_correction and ambiguous_not_changed,
         "wrongSingleRejected": wrong_rejected,
         "correctRequiredConsensus": first_correct_waits and second_correct_confirms,
         "highConfidenceFallback": high_confidence_fallback,
         "agendaCorrection": agenda_correction,
+        "twoCharacterAgendaCorrection": two_character_correction,
         "ambiguousPlateNotChanged": ambiguous_not_changed,
         "plate": memory.plate,
     }
@@ -321,7 +346,9 @@ def main() -> int:
     parser.add_argument("--skip-camera", action="store_true")
     args = parser.parse_args()
     reader = Reader(["en"], gpu=False, verbose=False)
+    rapid_reader = RapidOCR()
     ocr = run_ocr_validation(reader)
+    rapid_ocr = run_rapid_ocr_validation(rapid_reader)
     tracking = run_tracking_validation()
     false_positives = run_false_positive_validation()
     noisy_candidates = run_noisy_candidate_validation()
@@ -331,6 +358,7 @@ def main() -> int:
     camera = None if args.skip_camera else run_camera_validation(reader, max(1, args.camera_seconds))
     report = {
         "ocr": {"passed": sum(item["passed"] for item in ocr), "total": len(ocr), "scenarios": ocr},
+        "rapidOcr": {"passed": sum(item["passed"] for item in rapid_ocr), "total": len(rapid_ocr), "scenarios": rapid_ocr},
         "tracking": {"passed": sum(item["passed"] for item in tracking), "total": len(tracking), "scenarios": tracking},
         "falsePositives": {"passed": sum(item["passed"] for item in false_positives), "total": len(false_positives), "scenarios": false_positives},
         "noisyPlateCandidates": {"passed": sum(item["passed"] for item in noisy_candidates), "total": len(noisy_candidates), "scenarios": noisy_candidates},
@@ -340,7 +368,7 @@ def main() -> int:
         "camera": camera,
     }
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    return 0 if all(item["passed"] for item in ocr + tracking + false_positives + noisy_candidates) and async_ocr["passed"] and plate_consensus["passed"] and box_stability["passed"] else 1
+    return 0 if all(item["passed"] for item in ocr + rapid_ocr + tracking + false_positives + noisy_candidates) and async_ocr["passed"] and plate_consensus["passed"] and box_stability["passed"] else 1
 
 
 if __name__ == "__main__":
