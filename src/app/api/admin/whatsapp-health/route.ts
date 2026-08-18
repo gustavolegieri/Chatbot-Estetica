@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { isCerebrasConfigured } from "@/lib/cerebras-ai";
+import { getCerebrasStatus, isCerebrasConfigured } from "@/lib/cerebras-ai";
 import { voiceRepliesEnabled } from "@/lib/whatsapp-voice";
 
 export const runtime = "nodejs";
@@ -77,9 +77,12 @@ export async function GET() {
   const inboundHour = dayMessages.filter((row) => row.direction === "INBOUND" && row.createdAt >= hourAgo).length;
   const outboundHour = dayMessages.filter((row) => row.direction === "OUTBOUND" && row.createdAt >= hourAgo).length;
 
+  const aiStatus = getCerebrasStatus();
   const integrations = {
     wasender: Boolean(process.env.WASENDER_API_KEY?.trim()),
     cerebras: isCerebrasConfigured(),
+    ollama: aiStatus.localConfigured,
+    aiProvider: aiStatus.provider,
     groq: Boolean(process.env.GROQ_API_KEY?.trim()),
     voice: voiceRepliesEnabled(),
   };

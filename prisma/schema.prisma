@@ -477,6 +477,25 @@ model OutboundMessageQueue {
   @@index([claimedBy])
 }
 
+model LocalAiJob {
+  id          String   @id @default(cuid())
+  system      String   @db.Text
+  user        String   @db.Text
+  maxTokens   Int      @default(512)
+  temperature Float    @default(0.2)
+  status      String   @default("PENDING")
+  response    String?  @db.Text
+  error       String?
+  claimedAt   DateTime?
+  completedAt DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([expiresAt])
+}
+
 enum UserRole {
   ADMIN
   OPERATOR

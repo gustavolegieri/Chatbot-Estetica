@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { looksLikeQuestion } from "./whatsapp-ai";
+import { detectServiceKey } from "./whatsapp-intent";
 
 test("looksLikeQuestion recognizes customer doubts even without a question mark", () => {
   assert.equal(looksLikeQuestion("Quanto custa o polimento"), true);
@@ -19,4 +20,8 @@ test("looksLikeQuestion does not turn ordinary flow answers into doubts", () => 
   assert.equal(looksLikeQuestion("quero agendar"), false);
   assert.equal(looksLikeQuestion("Honda Fit 2020 branco"), false);
   assert.equal(looksLikeQuestion("sim"), false);
+});
+
+test("routes vitrification to premium packages instead of decontamination", () => {
+  assert.equal(detectServiceKey("quero fazer vitrificação cerâmica"), "pacotes");
 });

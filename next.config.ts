@@ -9,8 +9,10 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "2mb",
     },
   },
-  // @napi-rs/canvas contém binários nativos (.node) que não devem ser processados pelo Webpack
-  serverExternalPackages: ["@napi-rs/canvas"],
+  // Canvas e a pilha de voz/WebSocket devem executar diretamente no Node.
+  // Empacotar `ws` no servidor altera o fallback opcional de buffer e pode
+  // travar respostas de áudio com `bufferUtil.mask is not a function`.
+  serverExternalPackages: ["@napi-rs/canvas", "msedge-tts", "isomorphic-ws", "ws"],
 };
 
 

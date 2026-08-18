@@ -24,6 +24,7 @@ export function detectServiceKey(text: string): string | null {
     [/lavagem detalhada|detalhad/, "lavagem_detalhada"],
     [/motor/, "limpeza_motor"],
     [/farol|farois|cristaliza.*farol/, "cristalizacao_farois"],
+    [/vitrif|cer[aâ]mic|coating/, "pacotes"],
     [/descontamina.*pintura|cera nobre/, "descontaminacao_pintura"],
     [/descontamina.*vidro|vidro/, "descontaminacao_vidro"],
     [/higieniza.*couro.*complet|couro.*teto|carpete.*couro/, "higienizacao_couro_completa"],

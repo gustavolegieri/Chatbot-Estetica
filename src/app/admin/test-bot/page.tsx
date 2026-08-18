@@ -51,6 +51,8 @@ interface FlowState {
 interface AiStatus {
   configured: boolean;
   model: string;
+  provider?: string;
+  localConfigured?: boolean;
 }
 
 const flowSteps = [
@@ -213,9 +215,9 @@ export default function TestBotPage() {
               <BrainCircuit className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-white">Cerebras AI</p>
+              <p className="text-sm font-semibold text-white">{ai?.provider || "Assistente de IA"}</p>
               <p className="text-xs text-slate-400">
-                {ai === null ? "Verificando configuração…" : ai.configured ? `${ai.model} pronto para enriquecer o fluxo` : "Configure CEREBRAS_API_KEY para ativar a IA"}
+                {ai === null ? "Verificando configuração…" : ai.configured ? `${ai.model} pronto para enriquecer o fluxo` : "Configure a IA local ou uma chave de provedor"}
               </p>
             </div>
           </div>
@@ -326,7 +328,7 @@ export default function TestBotPage() {
             {showTechnical && <><div className="mt-4 border-t border-surface-700 pt-4"><Detail label="Estado interno" value={flowState.stage} mono /><Detail label="Sessão" value={sessionId ? `${sessionId.slice(0, 12)}…` : "Criando…"} mono /></div><pre className="mt-4 max-h-64 overflow-auto rounded-lg bg-surface-900 p-3 text-[10px] leading-5 text-slate-400">{JSON.stringify(flowState, null, 2)}</pre></>}
           </section>
 
-          {!ai?.configured && <section className="rounded-2xl border border-amber-400/20 bg-amber-400/5 p-4"><div className="flex gap-2"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" /><div><p className="text-sm font-medium text-amber-100">IA aguardando configuração</p><p className="mt-1 text-xs leading-5 text-amber-200/70">Adicione <code className="rounded bg-black/20 px-1">CEREBRAS_API_KEY</code> ao ambiente para respostas e análises inteligentes.</p></div></div></section>}
+          {!ai?.configured && <section className="rounded-2xl border border-amber-400/20 bg-amber-400/5 p-4"><div className="flex gap-2"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" /><div><p className="text-sm font-medium text-amber-100">IA aguardando configuração</p><p className="mt-1 text-xs leading-5 text-amber-200/70">Ative o <code className="rounded bg-black/20 px-1">OLLAMA_ENABLED</code> para usar a IA local sem quota.</p></div></div></section>}
         </aside>
       </div>
     </div>

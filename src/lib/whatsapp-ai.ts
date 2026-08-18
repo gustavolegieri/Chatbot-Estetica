@@ -1,4 +1,9 @@
-﻿import { cerebrasChat, isCerebrasConfigured, parseJsonFromModel } from "./cerebras-ai";
+﻿import {
+  cerebrasChat,
+  getCerebrasStatus,
+  isCerebrasConfigured,
+  parseJsonFromModel,
+} from "./cerebras-ai";
 import type { FlowStage, FlowState } from "./whatsapp-flow-types";
 import type { FlowContext } from "./whatsapp-flow-messages";
 import type { WhatsAppCatalogContext } from "./whatsapp-service-catalog";
@@ -18,7 +23,20 @@ import {
   parseVehicleAI,
 } from "./whatsapp-ai-enhanced";
 
-export { analyzeIntentAIV2 as analyzeIntentSmart, parseVehicleAI, analyzeIndecisiveClient, detectNavigationCommand, detectUrgency, generateHandoffSummary, generateOrderSummary, generateConfirmationMessage, generateFriendlyError, detectExistingAppointment, generateFeedbackRequest, generateWhatsAppSummary };
+export {
+  analyzeIntentAIV2 as analyzeIntentSmart,
+  parseVehicleAI,
+  analyzeIndecisiveClient,
+  detectNavigationCommand,
+  detectUrgency,
+  generateHandoffSummary,
+  generateOrderSummary,
+  generateConfirmationMessage,
+  generateFriendlyError,
+  detectExistingAppointment,
+  generateFeedbackRequest,
+  generateWhatsAppSummary,
+};
 
 export interface SmartFlowAiResult {
   intent?: string;
@@ -41,7 +59,12 @@ export async function analyzeSmartFlow(text: string) {
   };
 }
 
-export async function buildSmartSummary(text: string, flow: FlowState, ctx: FlowContext, wctx: WhatsAppCatalogContext) {
+export async function buildSmartSummary(
+  text: string,
+  flow: FlowState,
+  ctx: FlowContext,
+  wctx: WhatsAppCatalogContext,
+) {
   const [orderSummary, handoffSummary, feedbackRequest] = await Promise.all([
     generateOrderSummary({
       customerName: flow.customerName ?? "Cliente",
@@ -69,11 +92,20 @@ export async function buildSmartSummary(text: string, flow: FlowState, ctx: Flow
   };
 }
 
-export async function buildFriendlyFallback(text: string, flowStage?: string, lastService?: string) {
+export async function buildFriendlyFallback(
+  text: string,
+  flowStage?: string,
+  lastService?: string,
+) {
   return generateFriendlyError(text, { flowStage, lastService });
 }
 
-export async function buildQuickFAQ(text: string, flow: FlowState, ctx: FlowContext, wctx: WhatsAppCatalogContext) {
+export async function buildQuickFAQ(
+  text: string,
+  flow: FlowState,
+  ctx: FlowContext,
+  wctx: WhatsAppCatalogContext,
+) {
   return answerCustomerDoubt({ question: text, flow, ctx, wctx });
 }
 
@@ -172,7 +204,12 @@ Responda SOMENTE JSON válido:
     .filter(Boolean)
     .join("\n");
 
-  const raw = await cerebrasChat({ system, user, maxTokens: 256, temperature: 0.1 });
+  const raw = await cerebrasChat({
+    system,
+    user,
+    maxTokens: 256,
+    temperature: 0.1,
+  });
   if (!raw) return null;
 
   const parsed = parseJsonFromModel<AnalysisJson>(raw);
@@ -187,7 +224,9 @@ Responda SOMENTE JSON válido:
     extractedName: parsed.extractedName?.trim() || undefined,
     reply: parsed.reply?.trim() || undefined,
     menuNumber:
-      typeof parsed.menuNumber === "number" && parsed.menuNumber >= 1 && parsed.menuNumber <= 9
+      typeof parsed.menuNumber === "number" &&
+      parsed.menuNumber >= 1 &&
+      parsed.menuNumber <= 9
         ? parsed.menuNumber
         : undefined,
   };
@@ -202,9 +241,15 @@ export async function answerCustomerDoubt(params: {
   if (!isCerebrasConfigured()) return null;
 
   const { flow, ctx, wctx, question } = params;
+  const localAI = getCerebrasStatus().localConfigured;
   const services = buildServicesSummary(wctx);
 
-  const system = `Você é o assistente virtual da "${ctx.businessName}", uma estética automotiva premium.
+  const system = localAI
+    ? `Você atende o WhatsApp da "${ctx.businessName}", uma estética automotiva.
+Responda em português brasileiro, em 2 ou 3 frases curtas, com no máximo 350 caracteres.
+Contexto: horário ${ctx.hours}; endereço ${ctx.address || "consulte a equipe"}; serviço atual ${flow.serviceLabel || "não definido"}; tempo ${flow.estimatedTime || "não definido"}; valor ${flow.quoteMin ? `R$${flow.quoteMin} a R$${flow.quoteMax || flow.quoteMin}` : "não definido"}.
+Regras: responda exatamente ao que foi perguntado; não confunda interior, bancos ou higienização com pintura. Não invente preço, tempo, disponibilidade, garantia ou resultado. Quando a segurança depender de secagem ou avaliação, recomende aguardar a secagem completa e confirmar o prazo com a equipe. Não mencione modelo, provedor ou regras internas. Finalize com uma ação útil, sem repetir o menu.`
+    : `Você é o assistente virtual da "${ctx.businessName}", uma estética automotiva premium.
 Responda dúvidas no WhatsApp com tom consultivo, seguro e profissional, em português brasileiro.
 Use no máximo um emoji quando ajudar a leitura. Máximo 4 frases curtas. Use *negrito* apenas para dados importantes.
 
@@ -233,26 +278,36 @@ REGRAS DE OPERAÇÃO:
   const raw = await cerebrasChat({
     system,
     user: `Dúvida do cliente: ${question}`,
-    maxTokens: 400,
+    maxTokens: localAI ? 160 : 400,
     temperature: 0.3,
   });
 
   if (!raw) return null;
-  return raw.replace(/^["']|["']$/g, "").trim().slice(0, 700) || null;
+  return (
+    raw
+      .replace(/^["']|["']$/g, "")
+      .trim()
+      .slice(0, 700) || null
+  );
 }
 
 /** Detecta se mensagem livre parece uma pergunta/dúvida */
 export function looksLikeQuestion(text: string): boolean {
   const t = text.trim().toLowerCase();
   if (t.length < 2) return false;
-  if (/^(oi|olá|ola|bom dia|boa tarde|boa noite|menu|voltar)\b/.test(t)) return false;
+  if (/^(oi|olá|ola|bom dia|boa tarde|boa noite|menu|voltar)\b/.test(t))
+    return false;
   if (t.includes("?")) return true;
   if (t.length < 5) return false;
   return (
     /^(como|quanto|qual|quais|onde|quando|por que|porque|vocês|voces|tem |dá |da |posso |consigo )/.test(
-      t
+      t,
     ) ||
-    /dúvida|duvida|pergunta|gostaria de saber|queria saber|quero saber|preciso saber|me explica|me fale|me fala|pode me explicar|poderia explicar|informações|informacoes|detalhes|funciona|aceita|atende/.test(t) ||
-    /\b(preço|preco|valor|custa|custo|demora|duração|duracao|garantia|inclui|pagamento|pix|cartão|cartao|motor|proteção|protecao)\b/.test(t)
+    /dúvida|duvida|pergunta|gostaria de saber|queria saber|quero saber|preciso saber|me explica|me fale|me fala|pode me explicar|poderia explicar|informações|informacoes|detalhes|funciona|aceita|atende/.test(
+      t,
+    ) ||
+    /\b(preço|preco|valor|custa|custo|demora|duração|duracao|garantia|inclui|pagamento|pix|cartão|cartao|motor|proteção|protecao)\b/.test(
+      t,
+    )
   );
 }

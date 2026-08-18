@@ -19,7 +19,7 @@ import { prisma } from "@/lib/prisma";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { phone, text, buttonId, listId, pushName, messageId } = body;
+    const { phone, text, buttonId, listId, pushName, messageId, sourceType } = body;
 
     if (!phone || !text) {
       return NextResponse.json(
@@ -34,7 +34,8 @@ export async function POST(req: NextRequest) {
       buttonId,
       listId,
       pushName,
-      messageId
+      messageId,
+      sourceType,
     });
 
     // Se messageId foi fornecido, verifica a deduplicação do webhook real.
@@ -63,12 +64,13 @@ export async function POST(req: NextRequest) {
       listId,
       pushName,
       messageId,
+      sourceType: sourceType === "audio" ? "audio" : "text",
     });
 
     return NextResponse.json({
       success: true,
       message: "Mensagem processada com sucesso",
-      data: { phone, text, buttonId, listId, pushName, messageId }
+      data: { phone, text, buttonId, listId, pushName, messageId, sourceType: sourceType === "audio" ? "audio" : "text" }
     });
   } catch (error) {
     console.error("[Test Webhook] ❌ Erro ao processar mensagem:", error);
@@ -91,7 +93,8 @@ export async function GET() {
         buttonId: "string (opcional) - ID do botão clicado",
         listId: "string (opcional) - ID da lista selecionada",
         pushName: "string (opcional) - nome do remetente",
-        messageId: "string (opcional) - ID da mensagem para testar deduplicação"
+        messageId: "string (opcional) - ID da mensagem para testar deduplicação",
+        sourceType: '"text" ou "audio" (opcional) - simula a origem da mensagem'
       },
       example: {
         phone: "5511972851072",

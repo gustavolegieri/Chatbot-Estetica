@@ -2028,7 +2028,10 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
         text: answer,
         voiceReply: true,
       });
-      await sendText({ number: msg.phone, text: doubtResumePrompt(contextualFlow), voiceReply: false });
+      const resumePrompt = doubtResumePrompt(contextualFlow);
+      if (resumePrompt) {
+        await sendText({ number: msg.phone, text: resumePrompt, voiceReply: false });
+      }
       return;
     }
 
@@ -2170,7 +2173,10 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
         text: answer,
         voiceReply: true,
       });
-      await sendText({ number: msg.phone, text: doubtResumePrompt(contextualFlow), voiceReply: false });
+      const resumePrompt = doubtResumePrompt(contextualFlow);
+      if (resumePrompt) {
+        await sendText({ number: msg.phone, text: resumePrompt, voiceReply: false });
+      }
       return;
     }
   }
@@ -3156,7 +3162,7 @@ function doubtResumePrompt(flow: FlowState): string {
   switch (flow.stage) {
     case "ETAPA2_MAIN_MENU":
     case "ETAPA2_SUB":
-      return "_Se quiser agendar, diga em uma frase qual cuidado seu veículo precisa._";
+      return "";
     case "ETAPA3_SERVICE_ACTION":
     case "ETAPA3_PACKAGE_ACTION":
     case "ETAPA5_QUOTE":
@@ -3215,6 +3221,23 @@ function controlledDoubtFallback(question: string, flow: FlowState, wctx: WhatsA
   }
 
   return "Entendi sua dúvida. Não consegui consultar a IA neste instante sem correr o risco de inventar uma informação; você pode reformular a pergunta ou pedir um especialista da equipe.";
+}
+
+function vitrificationDoubtAnswer(question: string): string | null {
+  if (!/vitrif|cer[aâ]mic|coating/i.test(question)) return null;
+  if (/lavar|lavagem|depois|manuten|conservar|cuidar/i.test(question)) {
+    return "Sim. Depois do período de cura indicado pela equipe, o veículo pode ser lavado normalmente. Para preservar a vitrificação, recomendamos shampoo automotivo de pH neutro, microfibra limpa e evitar produtos abrasivos ou lavagem com escova.";
+  }
+  if (/sol|uv|vantagem|benef[ií]cio|prote[cç][aã]o/i.test(question)) {
+    return "A vitrificação cria uma camada cerâmica que ajuda a proteger contra raios UV, sujeira e contaminantes, além de facilitar a lavagem e prolongar o brilho. Ela reduz o desgaste, mas não torna a pintura imune a riscos ou impactos.";
+  }
+  if (/garantia|dura|tempo|validade/i.test(question)) {
+    return "A durabilidade e a garantia da vitrificação dependem do produto aplicado, da preparação da pintura e da manutenção. A equipe confirma essas condições na avaliação antes do serviço, sem prometer um prazo genérico.";
+  }
+  if (/quanto|pre[cç]o|valor|custa/i.test(question)) {
+    return "O valor da vitrificação é confirmado após avaliarmos o tamanho do veículo e o estado da pintura, porque a preparação necessária interfere diretamente no resultado. Ela é organizada dentro dos nossos Pacotes Premium.";
+  }
+  return "A vitrificação é uma proteção cerâmica aplicada após a preparação da pintura. Ela aumenta o brilho, dificulta a aderência de sujeira e ajuda contra a ação do sol e de contaminantes; a indicação ideal depende do estado atual da pintura.";
 }
 
 function catalogGroundedDoubtAnswer(
@@ -3276,6 +3299,8 @@ async function buildCustomerDoubtAnswer(
   wctx: WhatsAppCatalogContext,
   analyzedReply?: string
 ): Promise<string> {
+  const vitrificationAnswer = vitrificationDoubtAnswer(question);
+  if (vitrificationAnswer) return vitrificationAnswer;
   const serviceKey = detectServiceKey(question) ?? flow.pendingServiceKey ?? flow.serviceKey;
   const service = serviceKey ? wctx.catalog[serviceKey] : null;
   const doubtFlow: FlowState = service
@@ -3785,12 +3810,10 @@ export async function startFlow(msg: IncomingMessage) {
 
       const answer = await buildCustomerDoubtAnswer(input, initialState, ctx, wctx, analysis?.reply);
       await sendTextWrapper(msg, answer, { voiceReply: true });
-      await sendTextWrapper(
-        msg,
-        profileName
-          ? doubtResumePrompt(initialState)
-          : "Para personalizar o atendimento, como posso te chamar? 😊\n_Envie somente seu primeiro nome._"
-      );
+      const resumePrompt = profileName
+        ? doubtResumePrompt(initialState)
+        : "Para personalizar o atendimento, como posso te chamar? 😊\n_Envie somente seu primeiro nome._";
+      if (resumePrompt) await sendTextWrapper(msg, resumePrompt);
       return;
     }
 

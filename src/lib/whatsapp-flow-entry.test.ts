@@ -53,11 +53,10 @@ test("first doubt uses voice and availability keeps calendar date until service 
         },
       },
     });
-    assert.equal(namedDoubtReplies.length, 3);
+    assert.equal(namedDoubtReplies.length, 2);
     assert.match(namedDoubtReplies[0].text, /você está falando com/i);
     assert.equal(namedDoubtReplies[1].voiceReply, true);
     assert.doesNotMatch(namedDoubtReplies[1].text, /se quiser agendar/i);
-    assert.match(namedDoubtReplies[2].text, /se quiser agendar/i);
 
     const variedQuestions = [
       "Vocês aceitam cartão?",
@@ -78,9 +77,8 @@ test("first doubt uses voice and availability keeps calendar date until service 
           },
         },
       });
-      assert.equal(replies.length, 3, question);
+      assert.equal(replies.length, 2, question);
       assert.equal(replies[1].voiceReply, true, question);
-      assert.equal(replies[2].voiceReply, undefined, question);
     }
 
     let state: FlowState = {
