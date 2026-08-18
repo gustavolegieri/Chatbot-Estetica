@@ -1159,3 +1159,1098 @@
  GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 1963ms
  GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2405ms
  GET /api/gate-live/device?deviceId=portao-principal 200 in 1436ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1301ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2085ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2224ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1179ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2621ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1260ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2399ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2684ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2615ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1345ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2724ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1446ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2787ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2866ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1247ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1598ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2278ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1245ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2137ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1100ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2137ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2772ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1115ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2367ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1043ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2459ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1086ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2086ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1189ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2298ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1317ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2347ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2219ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1066ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1395ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2493ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 3146ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1287ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1569ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1295ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2233ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2350ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1033ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2047ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1171ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2334ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1472ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2335ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1339ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2190ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2421ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1167ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2254ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1172ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2198ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2097ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1710ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2147ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1049ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2140ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2018ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1213ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1200ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2650ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2249ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2569ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1026ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2065ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2119ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1151ms
+ ○ Compiling /api/admin/test-webhook ...
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2039ms
+ ✓ Compiled /api/admin/test-webhook in 26.5s (1728 modules)
+[Test Webhook] 🧪 Simulando mensagem recebida: {
+  phone: '5511944400696',
+  text: 'Oi',
+  buttonId: undefined,
+  listId: undefined,
+  pushName: undefined,
+  messageId: 'CODEX-FLOW-b2a1f25f9c3f45cdb24e962b53868ccc'
+}
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 30162ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 27617ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 20821ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 9904ms
+[Test Webhook] Mensagem marcada como processada: CODEX-FLOW-b2a1f25f9c3f45cdb24e962b53868ccc
+[WhatsApp Bot] processWhatsAppMessage chamado: { phone: '5511944400696', text: 'Oi' }
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: { phone: '5511944400696', text: 'Oi' }
+[WhatsApp Bot] [1787020998988-prvs68oi1] Processando mensagem: { phone: '5511944400696', text: 'Oi' }
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2600ms
+[WhatsApp Bot] Configurações carregadas: {
+  whatsappEnabled: true,
+  testModeEnabled: true,
+  testModePhone: '5511944400696'
+}
+[WhatsApp Bot] Modo de teste - mensagem autorizada de telefone: 5511944400696
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511944400696
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2821ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2439ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1533ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 3205ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 3039ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2167ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2089ms
+[WhatsApp Bot] Test mode active - bypassing business hours check
+[WhatsApp Flow] 🚀 Iniciando flow de boas-vindas
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2025ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1733ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2071ms
+[WhatsApp Flow] 📤 Enviando mensagem de boas-vindas
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2914ms
+[WasenderAPI] 📤 Enviando mensagem: {
+  to: '+5511944400696',
+  textLength: 451,
+  textPreview: 'Olá! Você está falando com a *Estética Automotiva*',
+  hasMedia: false
+}
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 3187ms
+[WasenderAPI] ✅ Resposta da API: {
+  status: 'success',
+  to: '+5511944400696',
+  result: {
+    success: true,
+    data: { msgId: 72278717, jid: '+5511944400696', status: 'in_progress' }
+  }
+}
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2555ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1041ms
+[WhatsApp Flow] 💾 Salvando estado com welcomed=true
+[WhatsApp Flow] 💾 Salvando estado do fluxo: {
+  phone: '5511944400696',
+  stage: 'ETAPA1_AWAITING_NAME',
+  welcomed: true
+}
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+[WhatsApp Flow] ✅ Estado salvo com sucesso
+[WhatsApp Flow] ✅ Flow de boas-vindas concluído
+ POST /api/admin/test-webhook 200 in 61707ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2202ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1750ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2603ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2085ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1302ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1056ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2184ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2367ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2136ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1231ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1120ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2137ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2249ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2728ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2649ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2465ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2301ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1086ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2533ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2337ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1153ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2100ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2239ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 3196ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2302ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1196ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2196ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2168ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1616ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2250ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1087ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2570ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2398ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2785ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2325ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1120ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 1967ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1015ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2648ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1243ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2051ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 950ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2020ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 977ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2097ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1004ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2187ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2210ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1199ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2103ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1119ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 1982ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2112ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1533ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1028ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 1971ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 921ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2004ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2683ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 947ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2109ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 983ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2238ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1180ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2159ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1134ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2236ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2016ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1038ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 986ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2163ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2133ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2129ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2266ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2535ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2300ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2301ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2537ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1627ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1005ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2118ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2030ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2320ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2118ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1220ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2119ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1318ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2374ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1254ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2198ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1184ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2102ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 985ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2039ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 985ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2131ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2389ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 998ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1318ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2391ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2373ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1134ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2352ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1003ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2013ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1566ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 1986ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 3245ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 969ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1080ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2163ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2049ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1621ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2615ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1087ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2076ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1681ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2002ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 3314ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 971ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1067ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2250ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2243ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1597ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2339ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1282ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2248ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1611ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2351ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2607ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1180ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1295ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2214ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 3000ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1059ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1184ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2263ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1588ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2670ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1196ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2630ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2231ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2271ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2610ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1130ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2270ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2135ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2164ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2306ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1522ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2138ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1552ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2248ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2051ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1033ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2274ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1285ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2218ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1054ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1140ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2291ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2419ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1107ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2352ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1066ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2221ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1690ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2471ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2153ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 984ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2081ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1035ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2091ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1205ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2131ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2067ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1196ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1171ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2071ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2132ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1653ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2023ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1052ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2138ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1967ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2521ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 3669ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1052ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1065ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2233ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2369ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2169ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1710ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1043ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2067ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2055ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2663ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2284ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1084ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1169ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2342ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 3011ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2961ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1229ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 989ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2100ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2288ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2187ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2983ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1086ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1055ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2153ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2620ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1150ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2240ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1481ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2418ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1083ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2071ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2681ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1122ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2113ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1115ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2152ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1436ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2247ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2199ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1018ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1055ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2172ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 3504ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2397ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2564ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1265ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2115ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1217ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2321ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2705ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1037ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1379ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2566ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2783ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1121ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2351ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1198ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2034ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2189ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1565ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2210ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1254ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1632ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2301ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 3296ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 3054ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1097ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1169ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 3239ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2052ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1903ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2854ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1015ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1081ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2413ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2338ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1070ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2016ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1182ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2120ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1298ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2333ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2363ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1012ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2262ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1037ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1133ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2098ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2166ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1101ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 1989ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1178ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2176ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1836ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2436ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 3237ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1053ms
+ ✓ Compiled in 3.2s (368 modules)
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 6535ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 7608ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 4647ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1039ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2073ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1327ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2186ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2135ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 972ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 3240ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ ✓ Compiled in 6.2s (251 modules)
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 5339ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 5457ms
+ ✓ Compiled in 2.5s (251 modules)
+ GET /acompanhar/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 4271ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 3213ms
+ GET /acompanhar/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 1036ms
+ GET /acompanhar/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 663ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 4388ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2060ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2865ms
+ ✓ Compiled in 2.1s (251 modules)
+ GET /acompanhar/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 1234ms
+ GET /acompanhar/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 1047ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1591ms
+ GET /acompanhar/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 639ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1128ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2240ms
+ GET /acompanhar/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 518ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2044ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1134ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1529ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2222ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2230ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 3026ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1166ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2051ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1134ms
+ GET /acompanhar/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 469ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2149ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1314ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2372ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1688ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2146ms
+ GET /acompanhar/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 403ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2203ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2585ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2387ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1105ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2240ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2766ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 3358ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1164ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1109ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 3649ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2965ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 3928ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1165ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1070ms
+ GET /api/gate-live/client/kK0DDSBwNITSa9ypQhvCxCc-RMFAyvFTPmy7PwaVvl8 200 in 2100ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1100ms
+[Prisma] Initializing with connection_limit: 2
+[Prisma] Database URL (masked): postgresql://***:***@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&sslmode=require
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1071ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2416ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 933ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1052ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1116ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1066ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1004ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1583ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1143ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1133ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1354ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 996ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1002ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1114ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1000ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 983ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 965ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1032ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1125ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1159ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 919ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 984ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 934ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 966ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 937ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1071ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1180ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 949ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 966ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1016ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 959ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 929ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 915ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1104ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 951ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1024ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 935ms
+ ✓ Compiled in 1522ms (251 modules)
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1139ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 978ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1147ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 965ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 951ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 951ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 944ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 948ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 982ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1142ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 986ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 953ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 965ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1119ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 931ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1093ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 956ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1021ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 931ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 984ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 935ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 940ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1097ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1037ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 983ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 961ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 990ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 906ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 957ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1093ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 932ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2249ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1085ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1022ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 986ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 969ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 954ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1105ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 953ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 966ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 996ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1106ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 962ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1153ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 969ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 980ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 940ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 937ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 920ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1130ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1621ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 4948ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1637ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2420ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2120ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1319ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1402ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1389ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1222ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1351ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2070ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1554ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1054ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1330ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 3763ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1205ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1018ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1014ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 999ms
+ ○ Compiling /api/whatsapp/webhook ...
+ ✓ Compiled /api/whatsapp/webhook in 8.9s (1786 modules)
+[Webhook] Evento recebido: messages.upsert
+[Webhook] Message key: {"id":"self-echo-validation-1","fromMe":true,"remoteJid":"5511944400696@s.whatsapp.net","cleanedSenderPn":"5511944400696"}
+[Webhook] Telefone extraído: 5511944400696
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 12165ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1502ms
+[Webhook] Mensagem manual do número conectado aceita no autoteste
+[Webhook] messageId recebido: self-echo-validation-1 tipo: string
+[Webhook] Conteúdo da mensagem: {
+  text: 'Olá! Você está falando com a *Estética Automotiva*',
+  hasAudio: false,
+  buttonId: undefined,
+  listId: undefined,
+  pushName: ''
+}
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1037ms
+[Webhook] Iniciando processamento da mensagem
+[WhatsApp Bot] processWhatsAppMessage chamado: {
+  phone: '5511944400696',
+  text: 'Olá! Você está falando com a *Estética Automotiva* 🚗\n' +
+    '\n' +
+    'Sou a assistente virtual com IA da nossa equipe. Posso orientar o melhor cuidado para o seu veículo, informar uma estimativa e organizar seu agendamento.\n' +
+    '\n' +
+    'Trabalhamos com lavagem técnica, polimento, proteção de pintura, higienização interna e detalhamento automotivo.\n' +
+    '\n' +
+    '📍 Consulte nosso endereço\n' +
+    '🕒 Segunda a sábado, 08:00 às 00:00\n' +
+    '\n' +
+    'Para iniciar seu atendimento, como você prefere ser chamado(a)?'
+}
+[WhatsApp Bot] handleMessageInternal sendo chamado via debounce: {
+  phone: '5511944400696',
+  text: 'Olá! Você está falando com a *Estética Automotiva* 🚗\n' +
+    '\n' +
+    'Sou a assistente virtual com IA da nossa equipe. Posso orientar o melhor cuidado para o seu veículo, informar uma estimativa e organizar seu agendamento.\n' +
+    '\n' +
+    'Trabalhamos com lavagem técnica, polimento, proteção de pintura, higienização interna e detalhamento automotivo.\n' +
+    '\n' +
+    '📍 Consulte nosso endereço\n' +
+    '🕒 Segunda a sábado, 08:00 às 00:00\n' +
+    '\n' +
+    'Para iniciar seu atendimento, como você prefere ser chamado(a)?'
+}
+[WhatsApp Bot] [1787021783680-xp4nca3f9] Processando mensagem: {
+  phone: '5511944400696',
+  text: 'Olá! Você está falando com a *Estética Automotiva* 🚗\n' +
+    '\n' +
+    'Sou a assistente virtual com IA da nossa equipe. Posso orientar o melhor cuidado para o seu veículo, informar uma estimativa e organizar seu agendamento.\n' +
+    '\n' +
+    'Trabalhamos com lavagem técnica, polimento, proteção de pintura, higienização interna e detalhamento automotivo.\n' +
+    '\n' +
+    '📍 Consulte nosso endereço\n' +
+    '🕒 Segunda a sábado, 08:00 às 00:00\n' +
+    '\n' +
+    'Para iniciar seu atendimento, como você prefere ser chamado(a)?'
+}
+[WhatsApp Bot] Configurações carregadas: {
+  whatsappEnabled: true,
+  testModeEnabled: true,
+  testModePhone: '5511944400696'
+}
+[WhatsApp Bot] Modo de teste - mensagem autorizada de telefone: 5511944400696
+[WhatsApp Bot] Bot habilitado, processando mensagem de: 5511944400696
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1353ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 969ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1229ms
+[WhatsApp Bot] Test mode active - bypassing business hours check
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1114ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1155ms
+[WasenderAPI] 📤 Enviando mensagem: {
+  to: '+5511944400696',
+  textLength: 132,
+  textPreview: '📍 Endereço: Ainda não definido\n⏱ Horário: Segunda',
+  hasMedia: false
+}
+[WasenderAPI] ✅ Resposta da API: {
+  status: 'success',
+  to: '+5511944400696',
+  result: {
+    success: true,
+    data: { msgId: 72279946, jid: '+5511944400696', status: 'in_progress' }
+  }
+}
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1018ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1078ms
+[Webhook] processamento concluído
+ POST /api/whatsapp/webhook 200 in 36281ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1018ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1004ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1012ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1154ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1033ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 974ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1019ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 969ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1069ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1156ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1079ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1007ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1304ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 3464ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1164ms
+[Webhook] Evento recebido: messages.upsert
+[Webhook] Message key: {"id":"self-echo-validation-2","fromMe":true,"remoteJid":"5511944400696@s.whatsapp.net","cleanedSenderPn":"5511944400696"}
+[Webhook] Telefone extraído: 5511944400696
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1079ms
+[Webhook] Eco do bot ou mensagem própria fora do autoteste, ignorando
+ POST /api/whatsapp/webhook 200 in 2904ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 983ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 970ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1016ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 971ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1138ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1466ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1022ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 999ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 986ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1155ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1216ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1022ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1025ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1193ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 987ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1134ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1232ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1007ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 956ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1047ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1052ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1077ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1154ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1046ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1005ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1230ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1087ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1008ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1151ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 990ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1013ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1066ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1102ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1052ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1269ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1133ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 982ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 966ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 997ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1124ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1183ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1223ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1078ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 966ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1012ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1040ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1264ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1017ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 989ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 968ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1061ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 999ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1215ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 973ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1022ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1063ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1031ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1004ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1235ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 985ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1015ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1003ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1334ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1102ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1133ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1001ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1029ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1044ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 986ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1037ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1193ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1080ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1020ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1020ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 981ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1031ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1191ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1164ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 972ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1097ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 993ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1051ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1173ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1072ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 974ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 981ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1021ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 987ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1217ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1167ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2129ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 2481ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 976ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 928ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 954ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 914ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1066ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1005ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 906ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 913ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 961ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 933ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 981ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1049ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 939ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 861ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 912ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 915ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 950ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1016ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1052ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 910ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 930ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 887ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 960ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 913ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 929ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1152ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 912ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 921ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 922ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 918ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 919ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 988ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1132ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1035ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 918ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 928ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 904ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 902ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 950ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1135ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 934ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1679ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 958ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 929ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 950ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1601ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 933ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 966ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 936ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 938ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 957ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 918ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1137ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1383ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1008ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 907ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 941ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 913ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1069ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 949ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 937ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1032ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 915ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1818ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1119ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 905ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 930ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 922ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 933ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 950ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 950ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1133ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 979ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 951ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 910ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 997ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 999ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 956ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1055ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1105ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 962ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 936ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 927ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1134ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1142ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1003ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 883ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 882ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 853ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 865ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 868ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1030ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 853ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 904ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 884ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 931ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 882ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 866ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1036ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 867ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 881ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 950ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 859ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 868ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 882ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1018ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 874ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 880ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 867ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 907ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 853ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 861ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 987ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 914ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 863ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 848ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 851ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 922ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1980ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 858ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 843ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 857ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 848ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 839ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 855ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1010ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 850ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 847ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1055ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 843ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 852ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 851ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1014ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 852ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 865ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1114ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1058ms
