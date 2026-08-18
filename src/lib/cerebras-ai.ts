@@ -9,6 +9,13 @@ const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
 const AI_TOTAL_TIMEOUT_MS = 5_000;
 const PRIMARY_TIMEOUT_MS = 2_500;
 const cerebrasRuntime = new AsyncLocalStorage<{ enabled: boolean }>();
+let cerebrasUnavailableUntil = 0;
+
+function cerebrasCooldownForStatus(status: number): number {
+  if (status === 401 || status === 402) return 10 * 60 * 1000;
+  if (status === 429) return 60 * 1000;
+  return 0;
+}
 
 export function withCerebrasEnabled<T>(enabled: boolean, callback: () => Promise<T>): Promise<T> {
   return cerebrasRuntime.run({ enabled }, callback);
@@ -70,6 +77,10 @@ export async function cerebrasChat(params: {
 
     if (!res.ok) {
       const err = await res.text().catch(() => "");
+      if (provider.name === "Cerebras") {
+        const cooldown = cerebrasCooldownForStatus(res.status);
+        if (cooldown > 0) cerebrasUnavailableUntil = Date.now() + cooldown;
+      }
         console.error(`[${provider.name}] API error:`, res.status, err.slice(0, 300));
       return null;
     }
@@ -88,7 +99,7 @@ export async function cerebrasChat(params: {
   }
   };
 
-  if (cerebrasKey) {
+  if (cerebrasKey && Date.now() >= cerebrasUnavailableUntil) {
     const primary = await requestProvider({
       name: "Cerebras",
       url: CEREBRAS_URL,

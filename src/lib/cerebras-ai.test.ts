@@ -27,6 +27,11 @@ test("uses Groq automatically when Cerebras is unavailable", async () => {
     assert.equal(answer, "Resposta útil");
     assert.match(urls[0], /cerebras\.ai/);
     assert.match(urls[1], /groq\.com/);
+
+    const secondAnswer = await cerebrasChat({ system: "Sistema", user: "Outra pergunta" });
+    assert.equal(secondAnswer, "Resposta útil");
+    assert.equal(urls.filter((url) => url.includes("cerebras.ai")).length, 1);
+    assert.equal(urls.filter((url) => url.includes("groq.com")).length, 2);
   } finally {
     globalThis.fetch = previousFetch;
     if (previousCerebrasKey === undefined) delete process.env.CEREBRAS_API_KEY;

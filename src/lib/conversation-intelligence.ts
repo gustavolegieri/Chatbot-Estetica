@@ -1,6 +1,43 @@
 import { cerebrasChat, isCerebrasConfigured, parseJsonFromModel } from "./cerebras-ai";
 import type { FlowState } from "./whatsapp-flow-types";
 
+const STRUCTURED_FLOW_STAGES = new Set<FlowState["stage"]>([
+  "ETAPA4_VEHICLE",
+  "ETAPA4_VEHICLE_CONFIRM",
+  "ETAPA7_DAY",
+  "ETAPA7_TIME",
+  "ETAPA7_PERIOD",
+  "ETAPA7_CUSTOM_DAY",
+  "ETAPA9_COUPON",
+  "ETAPA9_LOYALTY",
+  "ETAPA9_REMINDER",
+  "ETAPA10_BUDGET",
+  "ETAPA10_LOGISTICS",
+  "ETAPA8_PAYMENT",
+  "ETAPA8_PAYMENT_NO_PIX",
+  "ETAPA8_PAYMENT_CARD_TYPE",
+  "ETAPA8_PIX_CHOICE",
+  "ETAPA8_RECEIPT_UPLOAD",
+  "ETAPA14_REMINDER",
+  "ETAPA15_SUMMARY_CONFIRM",
+  "ETAPA16_CONFIRMATION",
+]);
+
+/**
+ * Etapas transacionais já possuem validadores próprios. Rodar um classificador
+ * remoto antes deles aumenta a latência e pode impedir uma escolha válida de
+ * avançar quando o provedor de IA está sem cota.
+ */
+export function isDeterministicConversationTurn(text: string, stage: FlowState["stage"]): boolean {
+  const value = text.trim();
+  if (STRUCTURED_FLOW_STAGES.has(stage)) return true;
+  return (
+    /^\d{1,2}$/.test(value) ||
+    /^\d{1,2}:\d{2}$/.test(value) ||
+    /^\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?$/.test(value)
+  );
+}
+
 export type AiSentiment = "positive" | "neutral" | "negative";
 export type AiUrgency = "low" | "medium" | "high" | "critical";
 export type AiTone = "concise" | "consultative" | "reassuring";

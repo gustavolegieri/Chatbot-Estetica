@@ -18,7 +18,11 @@ import {
   requestHumanHandoff,
   wantsHumanHandoff,
 } from "./whatsapp-handoff";
-import { analyzeConversationRules, analyzeConversationWithAI } from "./conversation-intelligence";
+import {
+  analyzeConversationRules,
+  analyzeConversationWithAI,
+  isDeterministicConversationTurn,
+} from "./conversation-intelligence";
 import { handleGateTestCommand } from "./gate-test-flow";
 
 interface IncomingMessage {
@@ -144,10 +148,11 @@ async function handleMessageInternal(msg: IncomingMessage) {
 
         const ruleIntelligence = analyzeConversationRules(inboundText, flowRef.current.aiIntelligence);
         const needsDeepAnalysis =
-          ruleIntelligence.confidence < 80 ||
-          ruleIntelligence.objection !== "none" ||
-          ruleIntelligence.intent === "complaint" ||
-          inboundText.length > 80;
+          !isDeterministicConversationTurn(inboundText, flowRef.current.stage) &&
+          (ruleIntelligence.confidence < 80 ||
+            ruleIntelligence.objection !== "none" ||
+            ruleIntelligence.intent === "complaint" ||
+            inboundText.length > 80);
         const intelligence = needsDeepAnalysis
           ? await analyzeConversationWithAI(inboundText, flowRef.current, ruleIntelligence)
           : ruleIntelligence;

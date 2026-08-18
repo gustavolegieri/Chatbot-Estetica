@@ -60,8 +60,12 @@ test("simple greeting starts immediately without calling an AI provider", async 
 test("official scheduling flow keeps one ordered prompt per customer reply", async () => {
   const previousCerebrasKey = process.env.CEREBRAS_API_KEY;
   const previousGroqKey = process.env.GROQ_API_KEY;
-  process.env.CEREBRAS_API_KEY = "";
+  const previousFetch = globalThis.fetch;
+  process.env.CEREBRAS_API_KEY = "configured-but-must-not-be-called";
   process.env.GROQ_API_KEY = "";
+  globalThis.fetch = (async () => {
+    throw new Error("Etapas objetivas do agendamento não devem consultar IA");
+  }) as typeof fetch;
   const originalSettingsFindUnique = prisma.settings.findUnique;
   const originalAppointmentFindMany = prisma.appointment.findMany;
   (prisma.settings as any).findUnique = async () => null;
@@ -156,6 +160,7 @@ test("official scheduling flow keeps one ordered prompt per customer reply", asy
     assert.equal(state.stage, "ETAPA2_MAIN_MENU");
     assert.equal(state.awaitingPostConfirmationReturn, true);
   } finally {
+    globalThis.fetch = previousFetch;
     (prisma.settings as any).findUnique = originalSettingsFindUnique;
     (prisma.appointment as any).findMany = originalAppointmentFindMany;
     delete (globalThis as any).__BB_WCTX_MOCK__;

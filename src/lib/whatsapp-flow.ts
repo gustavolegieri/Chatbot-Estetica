@@ -166,6 +166,38 @@ interface IncomingMessage {
  */
 const flowDeliveryContext = new AsyncLocalStorage<IncomingMessage["testMode"]>();
 
+const STRUCTURED_INPUT_STAGES = new Set<FlowState["stage"]>([
+  "ETAPA4_VEHICLE",
+  "ETAPA4_VEHICLE_CONFIRM",
+  "ETAPA7_DAY",
+  "ETAPA7_TIME",
+  "ETAPA7_PERIOD",
+  "ETAPA7_CUSTOM_DAY",
+  "ETAPA9_COUPON",
+  "ETAPA9_LOYALTY",
+  "ETAPA9_REMINDER",
+  "ETAPA10_BUDGET",
+  "ETAPA10_LOGISTICS",
+  "ETAPA8_PAYMENT",
+  "ETAPA8_PAYMENT_NO_PIX",
+  "ETAPA8_PAYMENT_CARD_TYPE",
+  "ETAPA8_PIX_CHOICE",
+  "ETAPA8_RECEIPT_UPLOAD",
+  "ETAPA14_REMINDER",
+  "ETAPA15_SUMMARY_CONFIRM",
+  "ETAPA16_CONFIRMATION",
+]);
+
+function shouldAnalyzeFreeTextIntent(stage: FlowState["stage"], text: string): boolean {
+  if (STRUCTURED_INPUT_STAGES.has(stage)) return false;
+  const value = text.trim();
+  return !(
+    /^\d{1,2}$/.test(value) ||
+    /^\d{1,2}:\d{2}$/.test(value) ||
+    /^\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?$/.test(value)
+  );
+}
+
 async function sendText(params: Parameters<typeof sendTextRaw>[0]) {
   const callback = flowDeliveryContext.getStore()?.sendTextCallback;
   if (callback) {
@@ -2117,7 +2149,7 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
     flow.stage !== "ETAPA1_AWAITING_NAME"
   ) {
     const questionByRule = looksLikeQuestion(input);
-    const analysis = questionByRule
+    const analysis = questionByRule || !shouldAnalyzeFreeTextIntent(flow.stage, input)
       ? null
       : await analyzeWhatsAppMessage({
           text: input,
@@ -2191,7 +2223,13 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
         ? detectedServiceKey
         : flow.pendingServiceKey;
       const questionByRule = looksLikeQuestion(input);
-      const analysis = questionByRule
+      const directName = looksLikePersonName(input) ? input.split(/\s+/)[0] : null;
+      const validDirectName = directName && isValidCustomerName(directName) ? directName : null;
+      const knownIntent =
+        isGreetingOrSmallTalk(input) ||
+        wantsToSchedule(input, num) ||
+        Boolean(serviceKey);
+      const analysis = questionByRule || validDirectName || knownIntent
         ? null
         : await analyzeWhatsAppMessage({
             text: input,
@@ -2224,7 +2262,7 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
         analysis?.intent === "name" && analysis.extractedName
           ? analysis.extractedName.split(/\s+/)[0]
           : null;
-      const nameFromInput = looksLikePersonName(input) ? input.split(/\s+/)[0] : null;
+      const nameFromInput = validDirectName;
       const name = (nameFromAi ?? nameFromInput ?? "").trim();
 
       // Se o input já for um nome válido, usar diretamente sem pedir confirmação
