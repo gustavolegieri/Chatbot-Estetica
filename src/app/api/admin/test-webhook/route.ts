@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processWhatsAppMessage } from "@/lib/whatsapp-bot";
 import { prisma } from "@/lib/prisma";
-import { normalizePhone } from "@/lib/utils";
 
 /**
  * API para simular mensagens recebidas do WhatsApp
@@ -38,10 +37,9 @@ export async function POST(req: NextRequest) {
       messageId
     });
 
-    // Se messageId foi fornecido, simula a deduplicação do webhook real
+    // Se messageId foi fornecido, verifica a deduplicação do webhook real.
+    // A gravação é feita uma única vez por processWhatsAppMessage abaixo.
     if (messageId) {
-      const normalized = normalizePhone(phone);
-      
       // Verificar se já foi processado (similar ao isMessageProcessed do webhook)
       const existing = await prisma.whatsAppMessage.findUnique({
         where: { wasenderMessageId: messageId }
@@ -55,40 +53,6 @@ export async function POST(req: NextRequest) {
           dedup: true
         });
       }
-      
-      // Marcar como processado (similar ao markMessageAsProcessed do webhook)
-      try {
-        // Buscar sessão para obter sessionId e clientId
-        const session = await prisma.whatsAppSession.findUnique({
-          where: { phone: normalized },
-          select: { id: true, clientId: true }
-        });
-        
-        await prisma.whatsAppMessage.create({
-          data: {
-            phone: normalized,
-            body: text,
-            direction: "INBOUND",
-            sender: "CLIENT",
-            wasenderMessageId: messageId,
-            sessionId: session?.id,
-            clientId: session?.clientId,
-            flowStage: "TEST_DEDUP",
-          }
-        });
-        
-        console.log("[Test Webhook] Mensagem marcada como processada:", messageId);
-      } catch (error: any) {
-        if (error.code === 'P2002') {
-          console.log("[Test Webhook] Mensagem já marcada (P2002):", messageId);
-          return NextResponse.json({
-            success: true,
-            message: "Mensagem ignorada (constraint UNIQUE)",
-            dedup: true
-          });
-        }
-        console.error("[Test Webhook] Erro ao marcar mensagem:", error);
-      }
     }
 
     // Processar a mensagem como se fosse recebida pelo webhook
@@ -98,6 +62,7 @@ export async function POST(req: NextRequest) {
       buttonId,
       listId,
       pushName,
+      messageId,
     });
 
     return NextResponse.json({

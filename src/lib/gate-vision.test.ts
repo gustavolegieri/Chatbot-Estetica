@@ -30,6 +30,18 @@ test("plate selects only the appointment for the correct customer", () => {
   assert.equal(selectAppointmentByPlate(appointments, "COROLLA"), null);
 });
 
+test("test mode plate selection is restricted to the authorized phone", () => {
+  const appointments = [
+    { id: "old-demo", client: { vehiclePlate: "FEG4B58", phone: "5500119786435" } },
+    { id: "authorized", client: { vehiclePlate: "FEG4B58", phone: "5511944400696" } },
+  ];
+
+  assert.equal(
+    selectAppointmentByPlate(appointments, "FEG4B58", "5511944400696")?.id,
+    "authorized"
+  );
+});
+
 test("exit means finalizing and not completed", () => {
   assert.equal(gateStageMeta.FINALIZING.label, "Em finalização");
   assert.equal("FINALIZED" in gateStageMeta, false);

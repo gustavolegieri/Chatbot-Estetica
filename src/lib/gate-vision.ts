@@ -7,6 +7,7 @@ import { uploadImageToCloudinary, uploadVideoToCloudinary } from "@/lib/image-up
 import { isValidVehiclePlate, normalizeVehiclePlate } from "@/lib/whatsapp-vehicle-parse";
 import { getLatestGateDailyReport } from "@/lib/gate-daily-report";
 import { endGateLiveSession, startGateLiveSession } from "@/lib/gate-live";
+import { normalizePhone } from "@/lib/utils";
 
 export type GateEventType = "ENTER" | "EXIT";
 export type GateStage = "WAITING" | "WASHING" | "FINALIZING";
@@ -126,17 +127,32 @@ async function findEntryAppointment(plateInput: string, now = new Date()) {
     include: { client: true, service: true },
     orderBy: { startTime: "asc" },
   });
-  const appointment = selectAppointmentByPlate(appointments, plate);
+  const appointment = selectAppointmentByPlate(appointments, plate, await authorizedTestPhone());
   return appointment ? { appointment, match: "plate" as const } : null;
 }
 
-export function selectAppointmentByPlate<T extends { client: { vehiclePlate: string | null } }>(
+async function authorizedTestPhone() {
+  const settings = await prisma.settings.findUnique({
+    where: { id: "default" },
+    select: { testModeEnabled: true, testModePhone: true },
+  });
+  return settings?.testModeEnabled && settings.testModePhone
+    ? normalizePhone(settings.testModePhone)
+    : null;
+}
+
+export function selectAppointmentByPlate<T extends { client: { vehiclePlate: string | null; phone?: string | null } }>(
   appointments: T[],
-  plateInput: string
+  plateInput: string,
+  authorizedPhone?: string | null
 ) {
   const plate = normalizeVehiclePlate(plateInput);
   if (!isValidVehiclePlate(plate)) return null;
-  return appointments.find((item) => normalizeVehiclePlate(item.client.vehiclePlate || "") === plate) ?? null;
+  const phone = authorizedPhone ? normalizePhone(authorizedPhone) : null;
+  return appointments.find((item) =>
+    normalizeVehiclePlate(item.client.vehiclePlate || "") === plate &&
+    (!phone || normalizePhone(item.client.phone || "") === phone)
+  ) ?? null;
 }
 
 async function findFinalizingAppointment(plateInput: string, now = new Date()) {
@@ -151,7 +167,7 @@ async function findFinalizingAppointment(plateInput: string, now = new Date()) {
     include: { client: true, service: true },
     orderBy: { startTime: "desc" },
   });
-  const appointment = selectAppointmentByPlate(appointments, plate);
+  const appointment = selectAppointmentByPlate(appointments, plate, await authorizedTestPhone());
   return appointment ? { appointment, match: "plate" as const } : null;
 }
 

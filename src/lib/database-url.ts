@@ -117,11 +117,14 @@ export function repairDatabaseUrl(raw?: string): string | undefined {
     if (!url.includes("sslmode=")) {
       url += url.includes("?") ? "&sslmode=require" : "?sslmode=require";
     }
-    // Aplica fallback seguro de connection_limit=2 para ambiente serverless com pooler
-    // Se não estiver especificado manualmente, usa 2 para evitar esgotamento
-    if (!url.includes("connection_limit=")) {
-      url += url.includes("?") ? "&connection_limit=2" : "?connection_limit=2";
-    }
+  }
+
+  // Webhooks, mídia, IA e a câmera podem chegar em paralelo. Mantemos o pool
+  // definido pelo projeto mesmo quando uma variável antiga ainda contém 1 ou 2.
+  if (/[?&]connection_limit=\d+/i.test(url)) {
+    url = url.replace(/([?&]connection_limit=)\d+/i, (_match, prefix: string) => `${prefix}50`);
+  } else {
+    url += url.includes("?") ? "&connection_limit=50" : "?connection_limit=50";
   }
 
   return url;
