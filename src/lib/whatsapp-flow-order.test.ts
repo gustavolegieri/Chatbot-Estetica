@@ -131,10 +131,9 @@ test("official scheduling flow keeps one ordered prompt per customer reply", asy
     assert.equal((await reply("1")).length, 1);
     assert.equal(state.stage, "ETAPA9_COUPON");
 
-    assert.equal((await reply("2")).length, 1);
-    assert.equal(state.stage, "ETAPA10_BUDGET");
-
-    assert.equal((await reply("1")).length, 1);
+    const logisticsReply = await reply("2");
+    assert.equal(logisticsReply.length, 1);
+    assert.match(logisticsReply[0], /Como o veículo chegará/i);
     assert.equal(state.stage, "ETAPA10_LOGISTICS");
 
     assert.equal((await reply("1")).length, 1);

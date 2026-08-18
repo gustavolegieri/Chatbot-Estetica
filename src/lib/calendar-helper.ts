@@ -104,8 +104,7 @@ export async function sendCalendarWithImageAndList({
   const svgContent = svgBuffer.toString('utf-8');
 
   // 3. Tenta converter SVG para PNG e salvar no diretório público
-  let finalImageUrl = svgDataUrl; // Fallback para SVG
-  let imageType = "SVG";
+  let finalImageUrl: string | null = null;
 
   try {
     console.log("[Calendar] Tentando converter SVG para PNG e salvar no diretório público...");
@@ -121,7 +120,6 @@ export async function sendCalendarWithImageAndList({
 
     if (conversionResult.success && conversionResult.url) {
       finalImageUrl = conversionResult.url;
-      imageType = "PNG";
       console.log("[Calendar] SVG convertido para PNG e salvo:", conversionResult.url);
       console.log("[Calendar] Passos:", conversionResult.steps.join(', '));
     } else if (conversionResult.fallbackText) {
@@ -134,16 +132,23 @@ export async function sendCalendarWithImageAndList({
           .join("\n\n"),
       });
     } else {
-      console.log("[Calendar] Conversão falhou, usando SVG:", conversionResult.error);
+      console.log("[Calendar] Conversão falhou; SVG não será enviado:", conversionResult.error);
     }
   } catch (err) {
-    console.log("[Calendar] Erro na conversão, usando SVG:", err);
+    console.log("[Calendar] Erro na conversão; usando orientação em texto:", err);
   }
 
-  // 4. Tenta enviar a IMAGEM do calendário
+  if (!finalImageUrl) {
+    return sendText({
+      number,
+      text: caption?.trim() || generateCalendarLegend(),
+    });
+  }
+
+  // 4. Envia exclusivamente o PNG público validado.
   let imageSent = false;
   try {
-    console.log("[Calendar] Enviando imagem como", imageType, "para", number);
+    console.log("[Calendar] Enviando calendário PNG para", number);
     console.log("[Calendar] URL da imagem:", finalImageUrl.substring(0, 100) + "...");
     const result = await sendMedia({
       number, 

@@ -33,6 +33,7 @@ import {
   getUpsellForKey,
   type WhatsAppCatalogContext,
 } from "./whatsapp-service-catalog";
+import { CATALOG, CATEGORIES } from "./whatsapp-catalog";
 import { resolveValidCustomerName } from "./customer-name";
 import { requestHumanHandoff, wantsHumanHandoff } from "./whatsapp-handoff";
 import {
@@ -216,16 +217,10 @@ async function sendTextWrapper(
     if (msg.initialWelcomePrefix && !msg.initialWelcomeConsumed) {
       msg.initialWelcomeConsumed = true;
       if (!options?.includesWelcome) {
-        if (options?.voiceReply) {
-          // Em uma pergunta enviada por áudio, a saudação continua em texto e
-          // a voz fica reservada para a resposta útil logo em seguida.
-          await sendText({ number: msg.phone, text: msg.initialWelcomePrefix, voiceReply: false });
-          if (!msg.testMode?.sendTextCallback) await delay(120);
-        } else {
-          // Texto inicial + próxima orientação viajam juntos. Isso evita que a
-          // segunda metade seja limitada e chegue minutos depois.
-          outboundText = `${msg.initialWelcomePrefix}\n\n${text}`;
-        }
+        // A apresentação nunca deve chegar colada ao menu, serviço ou dúvida.
+        // Mantemos uma mensagem curta e independente antes de continuar.
+        await sendText({ number: msg.phone, text: msg.initialWelcomePrefix, voiceReply: false });
+        if (!msg.testMode?.sendTextCallback) await delay(180);
       }
     }
     await sendText({ number: msg.phone, text: outboundText, voiceReply: options?.voiceReply });
@@ -1006,10 +1001,11 @@ async function activateService(
         : null;
   const detailText = `${contextualIntro ? `${contextualIntro}\n\n` : ""}${flowMsg(wctx).detail(serviceKey)}`;
 
-  let detailWithWelcome = detailText;
+  const detailWithWelcome = detailText;
   if (msg.initialWelcomePrefix && !msg.initialWelcomeConsumed) {
     msg.initialWelcomeConsumed = true;
-    detailWithWelcome = `${msg.initialWelcomePrefix}\n\n${detailText}`;
+    await sendText({ number: msg.phone, text: msg.initialWelcomePrefix, voiceReply: false });
+    if (!msg.testMode?.sendTextCallback) await delay(180);
   }
 
   // Enviar imagem do serviço (se existir), usando o próprio detalhe como
@@ -1295,6 +1291,50 @@ async function saveFlow(phone: string, flow: FlowState, skipDb = false) {
   console.log("[WhatsApp Flow] ✅ Estado salvo com sucesso");
 }
 
+function catalogDurationMinutes(serviceKey: string) {
+  const value = CATALOG[serviceKey]?.time ?? "";
+  const minutes = value.match(/(\d+)\s*min/i)?.[1];
+  if (minutes) return Math.max(15, Number(minutes));
+  const hours = value.match(/(\d+)\s*h/i)?.[1];
+  if (hours) return Math.max(15, Number(hours) * 60);
+  if (/dia/i.test(value)) return 8 * 60;
+  return 60;
+}
+
+async function ensureCatalogService(serviceKey: string, label?: string) {
+  const item = CATALOG[serviceKey];
+  if (!item) return null;
+  const categoryEntry = Object.entries(CATEGORIES).find(([, category]) =>
+    category.keys.includes(serviceKey)
+  );
+  const categoryNum = categoryEntry ? Number(categoryEntry[0]) : null;
+  const menuOrder = categoryEntry ? categoryEntry[1].keys.indexOf(serviceKey) : 0;
+  const created = await prisma.service.upsert({
+    where: { catalogKey: serviceKey },
+    update: { active: true, showInWhatsApp: true },
+    create: {
+      catalogKey: serviceKey,
+      name: label || item.label,
+      description: item.short,
+      price: new Prisma.Decimal(item.hatchMin),
+      durationMin: catalogDurationMinutes(serviceKey),
+      active: true,
+      showInWhatsApp: true,
+      categoryNum,
+      menuOrder: Math.max(0, menuOrder),
+      priceHatchMin: new Prisma.Decimal(item.hatchMin),
+      priceHatchMax: new Prisma.Decimal(item.hatchMax),
+      priceSuvMin: new Prisma.Decimal(item.suvMin),
+      priceSuvMax: new Prisma.Decimal(item.suvMax),
+      timeEstimate: item.time,
+      whatsappShort: item.short,
+      whatsappPitch: item.pitch,
+    },
+  });
+  console.log("[WhatsApp Catalog] Serviço oficial sincronizado:", serviceKey, created.id);
+  return created;
+}
+
 async function resolveDbService(serviceKey?: string, dbMatch?: string) {
   const ors: Array<Record<string, unknown>> = [];
 
@@ -1311,9 +1351,11 @@ async function resolveDbService(serviceKey?: string, dbMatch?: string) {
     return null;
   }
 
-  return prisma.service.findFirst({
+  const existing = await prisma.service.findFirst({
     where: { active: true, OR: ors } as any,
   });
+  if (existing || !serviceKey) return existing;
+  return ensureCatalogService(serviceKey);
 }
 
 function nextWeekdayDate(weekday: number): string {
@@ -1515,11 +1557,15 @@ async function createAppointment(flow: FlowState, phone: string) {
   }
 
   const startTime = flow.startTime;
-  if (!client || !flow.dbServiceId || !flow.dayDate || !startTime) {
+  if (!client || (!flow.dbServiceId && !flow.serviceKey) || !flow.dayDate || !startTime) {
     return { appointment: null, conflict: false };
   }
 
-  const service = await prisma.service.findUnique({ where: { id: flow.dbServiceId } });
+  const service = flow.dbServiceId
+    ? await prisma.service.findUnique({ where: { id: flow.dbServiceId } })
+    : flow.serviceKey
+      ? await ensureCatalogService(flow.serviceKey, flow.serviceLabel)
+      : null;
   if (!service) {
     return { appointment: null, conflict: false };
   }

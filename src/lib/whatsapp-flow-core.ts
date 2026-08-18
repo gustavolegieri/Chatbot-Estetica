@@ -392,24 +392,19 @@ export async function handleLoyaltyStep(
   const prompts = await loadPromptMap();
 
   let loyaltyDiscount = 0;
+  let loyaltyMessage = "Perfeito. Seguiremos sem utilizar pontos nesta reserva.";
   if (usePoints && state.loyaltyPoints && state.loyaltyPoints > 0) {
     loyaltyDiscount = Math.floor(state.loyaltyPoints / 100) * 10; // 100 pontos = R$ 10
-    responses.push({ text: "✅ Pontos de fidelidade aplicados ao orçamento." });
-  } else {
-    responses.push({ text: "Perfeito. Seguiremos sem utilizar pontos nesta reserva." });
+    loyaltyMessage = "✅ Pontos de fidelidade aplicados ao orçamento.";
   }
 
   const newState: FlowState = {
     ...state,
     loyaltyPoints: usePoints ? (state.loyaltyPoints ?? 0) % 100 : state.loyaltyPoints, // Remove apenas os pontos usados
     loyaltyDiscountApplied: loyaltyDiscount,
-    stage: "ETAPA10_BUDGET",
+    stage: "ETAPA10_LOGISTICS",
   };
-
-  // Mostrar orçamento conforme ETAPA10_BUDGET
-  const totalValue = calculateFlowTotal({ ...state, loyaltyDiscountApplied: loyaltyDiscount });
-
-  responses.push({ text: etapa10Budget(`R$ ${totalValue.toFixed(2).replace(".", ",")}`, prompts) });
+  responses.push({ text: `${loyaltyMessage}\n\n${etapa10Logistics(prompts)}` });
 
   return { responses, nextState: newState };
 }
@@ -499,12 +494,9 @@ export async function handleCouponStep(
     const loyaltyPoints = next.loyaltyPoints ?? 0;
     const discountValue = Math.floor(loyaltyPoints / 100) * 10;
     if (discountValue <= 0) {
-      const budgetState: FlowState = { ...next, stage: "ETAPA10_BUDGET" };
-      const totalValue = calculateFlowTotal(budgetState);
-      responses.push({
-        text: etapa10Budget(`R$ ${totalValue.toFixed(2).replace(".", ",")}`, prompts),
-      });
-      return budgetState;
+      const logisticsState: FlowState = { ...next, stage: "ETAPA10_LOGISTICS" };
+      responses.push({ text: etapa10Logistics(prompts) });
+      return logisticsState;
     }
     const loyaltyState: FlowState = { ...next, stage: "ETAPA9_LOYALTY" };
     responses.push({ text: etapa9Loyalty(loyaltyPoints, discountValue, prompts) });
