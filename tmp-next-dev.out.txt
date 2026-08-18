@@ -2254,3 +2254,5 @@
  GET /api/gate-live/device?deviceId=portao-principal 200 in 865ms
  GET /api/gate-live/device?deviceId=portao-principal 200 in 1114ms
  GET /api/gate-live/device?deviceId=portao-principal 200 in 1058ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1151ms
+ GET /api/gate-live/device?deviceId=portao-principal 200 in 1269ms
