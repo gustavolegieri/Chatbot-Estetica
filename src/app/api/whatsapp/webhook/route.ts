@@ -7,6 +7,7 @@ import { sendText } from "@/lib/evolution-api";
 import { notifyPwaAboutWhatsAppMessage } from "@/lib/pwa-push";
 import { applyWasenderContactEvents } from "@/lib/wasender-contacts";
 import { isWasenderMessageTooOld } from "@/lib/wasender-timestamp";
+import { firstWasenderMessage, isAuthorizedSelfTestPhone } from "@/lib/whatsapp-self-test";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -170,16 +171,11 @@ export async function POST(req: NextRequest) {
   const data = payload.data as Record<string, unknown> | undefined;
   if (!data) return NextResponse.json({ ok: true });
 
-  const msgRaw = data.messages ?? data;
-  const msg = msgRaw as Record<string, unknown>;
+  const msg = firstWasenderMessage(data);
+  if (!msg) return NextResponse.json({ ok: true });
 
   const msgKey = (msg.key ?? {}) as Record<string, unknown>;
   console.log("[Webhook] Message key:", JSON.stringify(msgKey));
-
-  if (msgKey.fromMe === true) {
-    console.log("[Webhook] Mensagem do próprio bot, ignorando");
-    return NextResponse.json({ ok: true });
-  }
 
   const remoteJid = (msgKey.remoteJid ?? "") as string;
   if (remoteJid.includes("@g.us") || remoteJid.includes("@broadcast")) {
@@ -195,6 +191,29 @@ export async function POST(req: NextRequest) {
   
   console.log("[Webhook] Telefone extraído:", phone);
 
+  const originalText = extractText(msg);
+  const audioMessage = extractWasenderAudioMessage(msg);
+  const { buttonId, listId } = extractInteractive(msg);
+  const pushName = (msg.pushName ?? msg.notifyName ?? "") as string;
+  const messageId =
+    typeof msgKey.id === "string" || typeof msgKey.id === "number"
+      ? String(msgKey.id)
+      : undefined;
+
+  if (msgKey.fromMe === true) {
+    const processOwnMessage = await shouldProcessOwnTestMessage({
+      phone,
+      text: originalText || buttonId || listId || "",
+      messageId,
+      hasAudio: Boolean(audioMessage),
+    });
+    if (!processOwnMessage) {
+      console.log("[Webhook] Eco do bot ou mensagem própria fora do autoteste, ignorando");
+      return NextResponse.json({ ok: true });
+    }
+    console.log("[Webhook] Mensagem manual do número conectado aceita no autoteste");
+  }
+
   // Aceita timestamp em segundos ou milissegundos e ignora apenas eventos 24h+.
   const messageTimestamp = msgKey.timestamp as number | string | undefined;
   if (isWasenderMessageTooOld(messageTimestamp)) {
@@ -203,13 +222,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Deduplicação baseada em ID da mensagem (persistida no banco)
-  const messageId = msgKey.id as string | undefined;
   console.log("[Webhook] messageId recebido:", messageId, "tipo:", typeof messageId);
-
-  const originalText = extractText(msg);
-  const audioMessage = extractWasenderAudioMessage(msg);
-  const { buttonId, listId } = extractInteractive(msg);
-  const pushName = (msg.pushName ?? msg.notifyName ?? "") as string;
 
   console.log("[Webhook] Conteúdo da mensagem:", {
     text: originalText?.substring(0, 50),
@@ -315,4 +328,70 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+async function shouldProcessOwnTestMessage(params: {
+  phone: string;
+  text: string;
+  messageId?: string;
+  hasAudio: boolean;
+}) {
+  const settings = await prisma.settings.findUnique({
+    where: { id: "default" },
+    select: { testModeEnabled: true, testModePhone: true },
+  });
+
+  if (
+    !isAuthorizedSelfTestPhone(
+      params.phone,
+      settings?.testModeEnabled ?? false,
+      settings?.testModePhone
+    )
+  ) {
+    return false;
+  }
+
+  // O fluxo aceita texto, respostas interativas e áudio. Imagens, vídeos e
+  // calendários sem legenda enviados pelo bot não podem virar uma nova entrada.
+  if (!params.text.trim() && !params.hasAudio) return false;
+
+  // O ID retornado pelo envio e o ID do webhook normalmente são iguais.
+  // Quando forem, esta consulta elimina o eco do bot sem depender do texto.
+  if (params.messageId) {
+    const sentByBot = await prisma.whatsAppMessage.findUnique({
+      where: { wasenderMessageId: params.messageId },
+      select: { direction: true },
+    });
+    if (sentByBot?.direction === "OUTBOUND") return false;
+  }
+
+  // Fallback para provedores que usam IDs diferentes no POST e no webhook.
+  if (params.text.trim()) {
+    const echoedText = await prisma.whatsAppMessage.findFirst({
+      where: {
+        phone: params.phone,
+        direction: "OUTBOUND",
+        body: params.text,
+        createdAt: { gte: new Date(Date.now() - 10 * 60_000) },
+      },
+      select: { id: true },
+    });
+    if (echoedText) return false;
+  }
+
+  // Áudio não carrega o texto no webhook. O eco do áudio do bot chega quase
+  // imediatamente; um áudio gravado manualmente depois continua permitido.
+  if (params.hasAudio && !params.text.trim()) {
+    const justSentByBot = await prisma.whatsAppMessage.findFirst({
+      where: {
+        phone: params.phone,
+        direction: "OUTBOUND",
+        createdAt: { gte: new Date(Date.now() - 8_000) },
+      },
+      select: { id: true },
+    });
+    if (justSentByBot) return false;
+  }
+
+  return true;
 }

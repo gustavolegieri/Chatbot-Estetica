@@ -25,6 +25,7 @@ import { logWhatsAppMessage } from "./whatsapp-message-log";
 import { prisma } from "./prisma";
 import crypto from "crypto";
 import { isVoiceReplyEligible, synthesizeVoiceReply } from "./whatsapp-voice";
+import { extractWasenderSendId } from "./whatsapp-self-test";
 
 const WASENDER_BASE = process.env.WASENDER_BASE_URL || "https://wasenderapi.com/api";
 
@@ -334,16 +335,17 @@ async function uploadAudioBuffer(audio: Buffer): Promise<string> {
   return body.publicUrl;
 }
 
-async function trySendVoiceReply(number: string, text: string, force = false): Promise<boolean> {
+async function trySendVoiceReply(number: string, text: string, force = false) {
   if (!isVoiceReplyEligible(text, { force })) return false;
   try {
     const audio = await synthesizeVoiceReply(text);
     const audioUrl = await uploadAudioBuffer(audio);
-    const result = (await wasenderFetch({
+    const result = await wasenderFetch({
       to: toE164(number),
       audioUrl,
-    })) as { error?: boolean } | null;
-    return !result?.error;
+    });
+    const failed = Boolean((result as { error?: boolean } | null)?.error);
+    return failed ? false : result;
   } catch (error) {
     console.warn("[WhatsApp Voice] Não foi possível enviar a resposta em áudio; usando texto:", error);
     return false;
@@ -373,11 +375,14 @@ export async function sendText({
       sender === "BOT" &&
       !ctx?.voiceReplySent &&
       Boolean(explicitVoiceReply || (voiceReply !== false && ctx?.replyWithAudio));
-    const voiceSent = shouldTryVoice ? await trySendVoiceReply(number, text, explicitVoiceReply) : false;
+    const voiceResult = shouldTryVoice
+      ? await trySendVoiceReply(number, text, explicitVoiceReply)
+      : false;
+    const voiceSent = Boolean(voiceResult);
     if (voiceSent && ctx) ctx.voiceReplySent = true;
 
     const result = voiceSent
-      ? { success: true, type: "audio" }
+      ? voiceResult
       : await wasenderFetch({
           to: whatsappNumber,
           text,
@@ -393,6 +398,7 @@ export async function sendText({
         sender: msgSender,
         body: text,
         flowStage: flowStage ?? ctx?.getStage(),
+        wasenderMessageId: extractWasenderSendId(result),
       }).catch((err) => console.error("[WhatsApp Log] outbound:", err));
     }
 
@@ -464,7 +470,27 @@ export async function sendMedia({
   }
 
   try {
-    return await wasenderFetch(payload);
+    const result = await wasenderFetch(payload);
+    const ctx = getMessageLogContext();
+    const mediaLabel =
+      mediaType === "image"
+        ? "Imagem"
+        : mediaType === "video"
+          ? "Vídeo"
+          : mediaType === "audio"
+            ? "Áudio"
+            : "Documento";
+    await logWhatsAppMessage({
+      phone: number,
+      sessionId: ctx?.sessionId,
+      clientId: ctx?.clientId,
+      direction: MessageDirection.OUTBOUND,
+      sender: MessageSender.BOT,
+      body: caption?.trim() || `[${mediaLabel} enviado]`,
+      flowStage: ctx?.getStage(),
+      wasenderMessageId: extractWasenderSendId(result),
+    }).catch((err) => console.error("[WhatsApp Log] outbound media:", err));
+    return result;
   } catch (err) {
     console.error("[WasenderAPI] ❌ Erro ao enviar mídia, mas continuando fluxo:", err);
     return { error: true, message: "Erro ao enviar mídia, fluxo continuou" };
