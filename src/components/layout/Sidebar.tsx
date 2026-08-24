@@ -20,6 +20,7 @@ import {
   Gauge,
   Headphones,
   Image as ImageIcon,
+  Instagram,
   Layers,
   Lightbulb,
   LogOut,
@@ -82,6 +83,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/admin/servicos", label: "Serviços", icon: Wrench },
       { href: "/admin/campanhas", label: "Campanhas", icon: Send },
+      { href: "/admin/instagram", label: "Instagram Automático", icon: Instagram },
       { href: "/admin/fidelidade", label: "Fidelidade e cupons", icon: Gift },
       { href: "/admin/financeiro", label: "Financeiro", icon: DollarSign },
       { href: "/admin/pagamentos", label: "Pagamentos", icon: QrCode },

@@ -9,15 +9,15 @@ datasource db {
 }
 
 model User {
-  id               String            @id @default(cuid())
-  email            String            @unique
-  name             String
-  password         String
-  role             UserRole          @default(OPERATOR)
-  active           Boolean           @default(true)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  financialRecords FinancialRecord[]
+  id                   String                @id @default(cuid())
+  email                String                @unique
+  name                 String
+  password             String
+  role                 UserRole              @default(OPERATOR)
+  active               Boolean               @default(true)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  financialRecords     FinancialRecord[]
   pwaPushSubscriptions PwaPushSubscription[]
 }
 
@@ -135,22 +135,22 @@ model Appointment {
 }
 
 model GateLiveSession {
-  id              String      @id @default(cuid())
-  appointmentId   String
-  clientId        String
-  deviceId        String
-  plate           String
-  tokenHash       String      @unique
-  status          String      @default("ACTIVE")
-  offer           Json?
-  answer          Json?
-  startedAt       DateTime    @default(now())
-  expiresAt       DateTime
-  lastViewerAt    DateTime?
-  endedAt         DateTime?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  appointment     Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  id            String      @id @default(cuid())
+  appointmentId String
+  clientId      String
+  deviceId      String
+  plate         String
+  tokenHash     String      @unique
+  status        String      @default("ACTIVE")
+  offer         Json?
+  answer        Json?
+  startedAt     DateTime    @default(now())
+  expiresAt     DateTime
+  lastViewerAt  DateTime?
+  endedAt       DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
 
   @@index([appointmentId])
   @@index([deviceId, status])
@@ -459,14 +459,14 @@ model OutboundMessageQueue {
   id           String    @id @default(cuid())
   phone        String
   body         Json
-  bodyHash     String?   // Hash do conteúdo para deduplicação
+  bodyHash     String? // Hash do conteúdo para deduplicação
   attempts     Int       @default(0)
   maxAttempts  Int       @default(3)
   scheduledFor DateTime  @default(now())
   processedAt  DateTime?
   error        String?
   isDailyLimit Boolean   @default(false)
-  claimedBy    String?   // UUID da execução que claimou esta mensagem (lock distribuído)
+  claimedBy    String? // UUID da execução que claimou esta mensagem (lock distribuído)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -478,19 +478,19 @@ model OutboundMessageQueue {
 }
 
 model LocalAiJob {
-  id          String   @id @default(cuid())
-  system      String   @db.Text
-  user        String   @db.Text
-  maxTokens   Int      @default(512)
-  temperature Float    @default(0.2)
-  status      String   @default("PENDING")
-  response    String?  @db.Text
+  id          String    @id @default(cuid())
+  system      String    @db.Text
+  user        String    @db.Text
+  maxTokens   Int       @default(512)
+  temperature Float     @default(0.2)
+  status      String    @default("PENDING")
+  response    String?   @db.Text
   error       String?
   claimedAt   DateTime?
   completedAt DateTime?
   expiresAt   DateTime
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([status, createdAt])
   @@index([expiresAt])
@@ -584,4 +584,77 @@ enum QueueStatus {
   SENDING
   SENT
   FAILED
+}
+
+/// Configuração da automação de Instagram Stories (singleton)
+model InstagramAutomation {
+  id                  String    @id @default("default")
+  enabled             Boolean   @default(false)
+  /// Horários locais (America/Sao_Paulo), separados por vírgula — ex: 09:00,14:00,19:00
+  publishTimes        String    @default("09:00,14:00,19:00")
+  /// Conteúdo editorial + comercial em rodízio automático
+  rotationCategories  String    @default("curiosidade,dica,bastidor,enquete,lavagem,polimento,higienizacao,promocao,antes_depois,agenda_vaga")
+  /// Não repetir o mesmo contentKey por N dias
+  blockRepeatDays     Int       @default(7)
+  vacantSlotsCampaign Boolean   @default(true)
+  ctaText             String    @default("Agende pelo WhatsApp")
+  lastRunAt           DateTime?
+  lastError           String?
+  updatedAt           DateTime  @updatedAt
+}
+
+/// Fotos/promoções usadas no rodízio de Stories
+model InstagramStoryAsset {
+  id             String    @id @default(cuid())
+  /// before_after | promo | custom
+  type           String
+  /// lavagem | polimento | higienizacao | promocao | geral
+  category       String    @default("geral")
+  title          String?
+  caption        String?
+  imageUrl       String
+  imageUrlAfter  String?
+  /// Imagens ficam no Postgres/Supabase para não depender de storage pago.
+  imageData      Bytes?
+  imageDataAfter Bytes?
+  imageMime      String    @default("image/jpeg")
+  imageMimeAfter String?
+  publicToken    String?   @unique
+  active         Boolean   @default(true)
+  timesUsed      Int       @default(0)
+  lastUsedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([active, category])
+  @@index([type, active])
+}
+
+/// Histórico CRM de Stories publicados (anti-repetição + métricas)
+model InstagramStoryPost {
+  id          String    @id @default(cuid())
+  slot        String
+  contentType String
+  contentKey  String
+  title       String
+  subtitle    String?
+  imageUrl    String?
+  /// JPEG público servido pelo próprio app durante a publicação da Meta.
+  imageData   Bytes?
+  imageMime   String    @default("image/jpeg")
+  publicToken String?   @unique
+  mediaId     String?
+  creationId  String?
+  /// pending | published | failed | skipped
+  status      String    @default("pending")
+  error       String?
+  reach       Int?
+  impressions Int?
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([contentKey, publishedAt])
+  @@index([status, createdAt])
+  @@index([slot, publishedAt])
+  @@index([publishedAt])
 }

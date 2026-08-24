@@ -8,6 +8,18 @@
     {
       "path": "/api/cron/gate-daily-report",
       "schedule": "5 3 * * *"
+    },
+    {
+      "path": "/api/cron/instagram-morning",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/instagram-afternoon",
+      "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/cron/instagram-evening",
+      "schedule": "0 22 * * *"
     }
   ]
 }

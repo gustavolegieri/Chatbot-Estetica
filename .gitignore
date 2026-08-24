@@ -42,3 +42,11 @@ next-env.d.ts
 # Python do agente local da webcam
 __pycache__/
 *.py[cod]
+
+# Arquivos intermediários do gerador de Stories (os assets finais ficam em public/story-*)
+/public/tmp/story-bgs/
+/public/tmp/fonts/
+/public/tmp/exemplo-instagram-story.jpg
+/public/tmp/exemplo-story-*.jpg
+/public/tmp/story-bg-default.jpg
+/public/tmp/story-bg-sample.jpg
