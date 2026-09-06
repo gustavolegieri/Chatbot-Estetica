@@ -1999,8 +1999,13 @@ async function enviarTabelaDeServicos(msg: IncomingMessage, wctx: WhatsAppCatalo
     await sendMedia({
       number: msg.phone,
       mediaUrl: cartao,
-      caption:
-        "Essa é a tabela completa 📋\n\nGuarde ou encaminhe — todos os serviços com preço e tempo.\n\n_Me diga o que seu carro precisa e eu monto a proposta, ou envie *menu*._",
+      caption: "Essa é a tabela completa 📋\n\nGuarde ou encaminhe — todos os serviços com preço e tempo.",
+    });
+    // Depois da tabela o cliente já sabe o que quer: a lista de categorias volta
+    // como lista tocável, em vez de pedir que ele digite *menu*.
+    await sendText({
+      number: msg.phone,
+      text: flowMsg(wctx).mainMenu({ stage: "ETAPA2_MAIN_MENU" } as FlowState, msg.pushName),
     });
     return;
   }
@@ -2210,22 +2215,27 @@ async function enviarComplementos(
   await saveFlow(msg.phone, proximo, msg.testMode?.skipDb);
   msg.testMode?.onFlowStateChange?.(proximo);
 
+  // A legenda de imagem não vira lista tocável: o WhatsApp só monta a lista a
+  // partir de uma mensagem de texto. Por isso o cartão explica e as opções vão
+  // logo depois, em mensagem própria — é ali que a lista nativa aparece.
+  const opcoes = `${linhas.join("\n")}\n*0* — Seguir sem adicionais`;
+
   if (cartao) {
     await sendMedia({
       number: msg.phone,
       mediaUrl: cartao,
-      caption: `O carro já vai ficar aqui — quer aproveitar? 🛠️\n\n${linhas.join(
-        "\n"
-      )}\n\nResponda os números que quiser (*1,3*) ou *pular*.`,
+      caption: "O carro já vai ficar aqui — quer aproveitar? 🛠️",
+    });
+    await sendText({
+      number: msg.phone,
+      text: `Escolha o que quiser incluir:\n\n${opcoes}\n\n_Pode marcar mais de um: responda *1,3*._`,
     });
     return true;
   }
 
   await sendText({
     number: msg.phone,
-    text: `O carro já vai ficar aqui — quer aproveitar?\n\n${linhas.join(
-      "\n"
-    )}\n\nResponda os números que quiser (*1,3*) ou *pular*.`,
+    text: `O carro já vai ficar aqui — quer aproveitar?\n\n${opcoes}\n\n_Pode marcar mais de um: responda *1,3*._`,
   });
   return true;
 }
@@ -4296,7 +4306,7 @@ ${await menuForStage(flow, wctx, msg.pushName)}`,
 
     case "ETAPA_EXTRAS": {
       const oferecidos = flow.extrasOptions ?? [];
-      const pulou = /^(pular|pula|n[ãa]o|nao|nenhum|s[óo] isso|assim est[áa] bom|0)$/i.test(input.trim());
+      const pulou = /^(0|pular|pula|n[ãa]o|nao|nenhum|s[óo] isso|assim est[áa] bom)$/i.test(input.trim());
 
       const escolhidos = pulou
         ? []

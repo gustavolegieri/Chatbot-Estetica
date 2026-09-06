@@ -218,7 +218,7 @@ export async function cerebrasChat(params: {
   const cerebrasKey = process.env.CEREBRAS_API_KEY?.trim();
   const groqKey = process.env.GROQ_API_KEY?.trim();
   if (!cerebrasKey && !groqKey) return null;
-  const startedAt = Date.now();
+  let startedAt = Date.now();
 
   const requestProvider = async (provider: {
     name: "Cerebras" | "Groq";
@@ -277,6 +277,10 @@ export async function cerebrasChat(params: {
 
   const cerebrasEmCooldown =
     Date.now() < cerebrasUnavailableUntil || (await flagAtiva(FLAG_CEREBRAS_INDISPONIVEL));
+  // A consulta ao marcador é I/O e não pode comer o orçamento de resposta da
+  // IA: o relógio do atendimento começa depois dela.
+  startedAt = Date.now();
+
   if (cerebrasKey && !cerebrasEmCooldown) {
     const primary = await requestProvider({
       name: "Cerebras",
