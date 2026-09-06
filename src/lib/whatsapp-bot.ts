@@ -26,6 +26,7 @@ import {
 } from "./conversation-intelligence";
 import { handleGateTestCommand } from "./gate-test-flow";
 import { parseTestModePhones, testModeAllowsPhone } from "./test-mode-phones";
+import { pareceRabisco } from "./whatsapp-copy";
 
 interface IncomingMessage {
   phone: string;
@@ -153,8 +154,13 @@ async function handleMessageInternal(msg: IncomingMessage) {
         });
 
         const ruleIntelligence = analyzeConversationRules(inboundText, flowRef.current.aiIntelligence);
+        // Rabisco de teclado tem confiança baixa por não parecer nada — era
+        // justamente o que mandava a mensagem para a análise profunda. Gastar
+        // segundos de IA para concluir "não é nada" atrasava a etapa que já
+        // sabia responder: o menu de volta.
         const needsDeepAnalysis =
           !isDeterministicConversationTurn(inboundText, flowRef.current.stage) &&
+          !pareceRabisco(inboundText) &&
           (ruleIntelligence.confidence < 80 ||
             ruleIntelligence.objection !== "none" ||
             ruleIntelligence.intent === "complaint" ||
