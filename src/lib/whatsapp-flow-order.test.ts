@@ -110,30 +110,53 @@ test("official scheduling flow keeps one ordered prompt per customer reply", asy
     assert.equal((await reply("1")).length, 1);
     assert.equal(state.stage, "ETAPA2_SUB");
 
-    assert.equal((await reply("1")).length, 1);
-    assert.equal(state.stage, "ETAPA3_SERVICE_ACTION");
-
-    assert.equal((await reply("1")).length, 1);
+    // Escolher o serviço na lista já é a decisão de agendar: o detalhe e o
+    // pedido dos dados do veículo saem na mesma mensagem.
+    const detalhe = await reply("1");
+    assert.equal(detalhe.length, 1);
+    assert.match(detalhe[0], /Lavagem Simples/i);
+    assert.match(detalhe[0], /ve[íi]culo/i);
     assert.equal(state.stage, "ETAPA4_VEHICLE");
 
-    assert.equal((await reply("Fiesta 2012, FEG4B58, branco, estado bom")).length, 1);
-    assert.equal(state.stage, "ETAPA4_VEHICLE");
-    assert.equal(state.vehicleCollectStep, undefined);
+    // Com o veículo reconhecido não há tela de "confirma que é um Fiesta?": o
+    // orçamento vira a legenda do calendário e a lista de datas vem logo abaixo.
+    // São duas mensagens porque legenda de imagem não aceita menu — é a única
+    // etapa do fluxo em que isso acontece.
+    const orcamento = await reply("Fiesta 2012, FEG4B58, branco, estado bom");
+    assert.equal(orcamento.length, 2);
+    assert.match(orcamento[0], /^\[MÍDIA: image\|/);
+    assert.match(orcamento[0], /Lavagem Simples/);
+    assert.match(orcamento[1], /Quando fica melhor/i);
     assert.equal(state.vehicleModel, "Fiesta");
     assert.equal(state.vehiclePlate, "FEG4B58");
-
-    const calendarReply = await reply("1");
-    assert.equal(calendarReply.length, 1);
-    assert.match(calendarReply[0], /^\[MÍDIA: image\|/);
-    assert.match(calendarReply[0], /Lavagem Simples/);
     assert.equal(state.stage, "ETAPA7_DAY");
 
-    assert.equal((await reply(nextBusinessDate())).length, 1);
-    assert.equal(state.stage, "ETAPA7_TIME");
-    assert.ok((state.availableSlots?.length ?? 0) > 0);
+    // A lista abre por atalhos de horário e segue por semana; um atalho fecha
+    // data e hora de uma vez.
+    const atalho = state.pickerOptions!.find((o) => /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(o.id));
+    assert.ok(atalho, "a lista de datas deve trazer atalhos de horário");
+    assert.ok(
+      state.pickerOptions!.some((o) => o.id.startsWith("semana:")),
+      "a lista de datas deve trazer as semanas"
+    );
 
-    assert.equal((await reply("1")).length, 1);
+    // Cupom, logística, pagamento e lembrete deixaram de ser etapas
+    // obrigatórias e passaram a ser opções do próprio resumo — a cauda entre o
+    // compromisso e a reserva era onde o cliente desistia.
+    const summaryReply = await reply(atalho!.id);
+    assert.equal(summaryReply.length, 1);
+    assert.match(summaryReply[0], /Resumo do agendamento/i);
+    assert.equal(state.stage, "ETAPA15_SUMMARY_CONFIRM");
+
+    // Padrões assumidos, todos visíveis no resumo.
+    assert.equal(state.needsPickup, false);
+    assert.equal(state.paymentMethod, "Dinheiro (na loja)");
+    assert.equal(state.reminderEnabled, true);
+
+    // As etapas antigas continuam alcançáveis a partir do resumo.
+    const couponReply = await reply("4");
     assert.equal(state.stage, "ETAPA9_COUPON");
+    assert.match(couponReply[0], /cupom/i);
 
     const logisticsReply = await reply("2");
     assert.equal(logisticsReply.length, 1);
@@ -149,9 +172,9 @@ test("official scheduling flow keeps one ordered prompt per customer reply", asy
     assert.match(paymentReply[0], /lembrete/i);
     assert.equal(state.stage, "ETAPA14_REMINDER");
 
-    const summaryReply = await reply("1");
-    assert.equal(summaryReply.length, 1);
-    assert.match(summaryReply[0], /Resumo do agendamento/i);
+    const summaryAgain = await reply("1");
+    assert.equal(summaryAgain.length, 1);
+    assert.match(summaryAgain[0], /Resumo do agendamento/i);
     assert.equal(state.stage, "ETAPA15_SUMMARY_CONFIRM");
 
     const confirmationReply = await reply("1");

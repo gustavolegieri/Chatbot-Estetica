@@ -123,9 +123,11 @@ test('coupon step skips the loyalty question when the client has no usable point
       responses,
     );
 
+    // Sem pontos utilizáveis a etapa de fidelidade é pulada e o fluxo segue
+    // direto para a logística, sem citar um saldo zerado.
     const text = responses.map((response) => response.text).join('\n');
-    assert.equal(result.nextState.stage, 'ETAPA10_BUDGET');
-    assert.match(text, /Resumo financeiro/i);
+    assert.equal(result.nextState.stage, 'ETAPA10_LOGISTICS');
+    assert.match(text, /Como o veículo chegará/i);
     assert.doesNotMatch(text, /0 pontos/i);
   } finally {
     delete (globalThis as Record<string, unknown>).__BB_USE_PROMPT_FALLBACK__;

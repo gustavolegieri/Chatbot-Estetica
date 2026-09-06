@@ -10,6 +10,10 @@
       "schedule": "5 3 * * *"
     },
     {
+      "path": "/api/cron/recurrence",
+      "schedule": "0 13 * * *"
+    },
+    {
       "path": "/api/cron/instagram-morning",
       "schedule": "0 12 * * *"
     },

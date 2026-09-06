@@ -88,6 +88,8 @@ export async function POST(request: NextRequest) {
       paidAt: new Date(),
       paymentSimulationCode: null,
       reminderPreference: null,
+      beforeAfterUrl: null,
+      recurrenceNotifiedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       client: {

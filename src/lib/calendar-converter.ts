@@ -3,8 +3,42 @@
  * Resolve o problema do WhatsApp não renderizar SVG inline
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
 import sharp from 'sharp';
+import { Resvg } from '@resvg/resvg-js';
 import { uploadImageToCloudinary, uploadToImgur, uploadToTelegraph, uploadToImgBB, uploadToFreeImage, uploadToPostImages } from './image-upload';
+
+/**
+ * Fontes empacotadas no repositório. O SVG do calendário embute a fonte por
+ * `@font-face` com data URI, mas nem o librsvg (usado pelo sharp) nem o resvg
+ * interpretam `@font-face`: os dois resolvem a família pelo banco de fontes do
+ * processo. No Windows isso passava despercebido porque havia fonte de sistema
+ * para o fallback; no Linux da Vercel não há nenhuma, e todo texto virava
+ * quadrado. Carregar os arquivos explicitamente faz os dois ambientes
+ * renderizarem igual.
+ */
+const BUNDLED_FONTS = ['NotoSans-Regular.ttf', 'Montserrat-Black.ttf'];
+/** Nome real da família dentro de NotoSans-Regular.ttf (tabela `name`). */
+const DEFAULT_FONT_FAMILY = 'Noto Sans';
+
+let cachedFontFiles: string[] | null = null;
+
+function bundledFontFiles(): string[] {
+  if (cachedFontFiles) return cachedFontFiles;
+  const dir = path.join(process.cwd(), 'public', 'fonts');
+  cachedFontFiles = BUNDLED_FONTS.map((name) => path.join(dir, name)).filter((file) => {
+    try {
+      return fs.existsSync(file);
+    } catch {
+      return false;
+    }
+  });
+  if (!cachedFontFiles.length) {
+    console.warn('[SVG Converter] Nenhuma fonte empacotada encontrada em public/fonts');
+  }
+  return cachedFontFiles;
+}
 
 interface ConversionOptions {
   width?: number;
@@ -39,36 +73,27 @@ export async function convertSvgToPng(
     console.log('[SVG Converter] Tamanho do SVG:', svgString.length, 'bytes');
     console.log('[SVG Converter] Largura alvo:', width, 'px');
 
-    // Converter SVG string para Buffer
-    const svgBuffer = Buffer.from(svgString);
-
-    // Usar sharp para converter SVG para PNG
-    const sharpInstance = sharp(svgBuffer, {
-      density: 300  // DPI para alta qualidade
+    const fontFiles = bundledFontFiles();
+    const resvg = new Resvg(svgString, {
+      fitTo: { mode: 'width', value: width },
+      font: {
+        // Sem fontes de sistema: o resultado passa a depender só do que está no
+        // repositório, então o que sai aqui é igual ao que sai na Vercel.
+        loadSystemFonts: false,
+        fontFiles,
+        defaultFontFamily: DEFAULT_FONT_FAMILY,
+      },
     });
-
-    // Configurar redimensionamento
-    const resizeOptions: any = {
-      width: width,
-      fit: 'inside',
-      withoutEnlargement: true
-    };
+    let pngBuffer = resvg.render().asPng();
 
     if (height) {
-      resizeOptions.height = height;
+      pngBuffer = await sharp(pngBuffer)
+        .resize({ width, height, fit: 'inside', withoutEnlargement: true })
+        .png({ compressionLevel: 9, adaptiveFiltering: true })
+        .toBuffer();
     }
 
-    // Converter para PNG
-    const pngBuffer = await sharpInstance
-      .resize(resizeOptions)
-      .png({
-        quality: quality,
-        compressionLevel: 9,
-        adaptiveFiltering: true
-      })
-      .toBuffer();
-
-    console.log('[SVG Converter] Conversão concluída com sucesso');
+    console.log('[SVG Converter] Conversão concluída com sucesso (resvg,', fontFiles.length, 'fonte(s))');
     console.log('[SVG Converter] Tamanho do PNG:', pngBuffer.length, 'bytes');
 
     return {
@@ -77,11 +102,25 @@ export async function convertSvgToPng(
     };
 
   } catch (error) {
-    console.error('[SVG Converter] Erro na conversão:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Erro desconhecido na conversão'
-    };
+    console.error('[SVG Converter] Erro na conversão com resvg:', error);
+
+    // Último recurso: o sharp ainda pode salvar a entrega em ambientes onde o
+    // binário nativo do resvg não carregue. O texto pode sair sem a fonte
+    // correta, mas é melhor do que não enviar imagem nenhuma.
+    try {
+      const fallback = await sharp(Buffer.from(svgString), { density: 300 })
+        .resize({ width, ...(height ? { height } : {}), fit: 'inside', withoutEnlargement: true })
+        .png({ compressionLevel: 9, adaptiveFiltering: true })
+        .toBuffer();
+      console.warn('[SVG Converter] Fallback com sharp aplicado');
+      return { success: true, pngBuffer: fallback };
+    } catch (fallbackError) {
+      console.error('[SVG Converter] Fallback com sharp também falhou:', fallbackError);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erro desconhecido na conversão'
+      };
+    }
   }
 }
 

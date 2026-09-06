@@ -2,18 +2,53 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processWhatsAppMessage } from "@/lib/whatsapp-bot";
 import { prisma } from "@/lib/prisma";
-import { extractWasenderAudioMessage, transcribeWasenderAudio } from "@/lib/whatsapp-audio";
+import {
+  extractWasenderAudioMessage,
+  transcribeAudioWithGroq,
+  transcribeWasenderAudio,
+} from "@/lib/whatsapp-audio";
 import { sendText } from "@/lib/evolution-api";
 import { notifyPwaAboutWhatsAppMessage } from "@/lib/pwa-push";
 import { applyWasenderContactEvents } from "@/lib/wasender-contacts";
 import { isWasenderMessageTooOld } from "@/lib/wasender-timestamp";
 import { firstWasenderMessage, isAuthorizedSelfTestPhone } from "@/lib/whatsapp-self-test";
+import { isValidPrivateRecipient } from "@/lib/whatsapp-jid";
+import {
+  activeProvider,
+  logUnknownShape,
+  parseWaflyWebhook,
+  parseZapsterWebhook,
+} from "@/lib/whatsapp-provider";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 /** Verifica assinatura enviada pela WasenderAPI no header X-Webhook-Signature */
 function verifySignature(req: NextRequest, rawBody: string): boolean {
+  // Cada provedor manda a assinatura em um header próprio. Sem segredo
+  // configurado a verificação é dispensada, como antes.
+  if (activeProvider() === "wafly") {
+    // A Wafly não assina o webhook. Com `WAFLY_WEBHOOK_TOKEN` configurado, o
+    // segredo viaja na própria URL registrada na Wafly
+    // (…/api/whatsapp/webhook?token=SEGREDO) e qualquer POST sem ele é
+    // recusado. Sem a variável o comportamento continua aberto, como antes.
+    const secret = process.env.WAFLY_WEBHOOK_TOKEN?.trim();
+    if (!secret) return true;
+    const informado =
+      req.nextUrl.searchParams.get("token") ?? req.headers.get("x-webhook-token");
+    return informado === secret;
+  }
+
+  if (activeProvider() === "zapster") {
+    const secret = process.env.ZAPSTER_WEBHOOK_SECRET?.trim();
+    if (!secret) return true;
+    const signature =
+      req.headers.get("x-zapster-signature") ??
+      req.headers.get("x-webhook-signature") ??
+      req.headers.get("x-signature");
+    return signature === secret;
+  }
+
   const secret = process.env.WASENDER_WEBHOOK_SECRET;
   if (!secret) return true;
   const signature = req.headers.get("x-webhook-signature");
@@ -146,6 +181,47 @@ export async function POST(req: NextRequest) {
     payload = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
+  }
+
+  // A Wafly (família Z-API) entrega os campos no topo do corpo, sem envelope.
+  if (activeProvider() === "wafly") {
+    logUnknownShape("wafly", payload);
+    return handleWaflyWebhook(payload);
+  }
+
+  // A Zapster usa outro envelope: `{ id, type, created_at, data }`, com o tipo
+  // em `type` (ex.: "message.received") em vez de `event`. Quando o provedor
+  // ativo é ela, normalizamos aqui e seguimos pelo mesmo processamento.
+  if (activeProvider() === "zapster") {
+    logUnknownShape("zapster", payload);
+    const tipo = typeof payload.type === "string" ? payload.type : "";
+
+    if (tipo && tipo !== "message.received") {
+      console.log("[Webhook/Zapster] Evento ignorado:", tipo);
+      return NextResponse.json({ ok: true });
+    }
+
+    const recebida = parseZapsterWebhook(payload);
+    if (!recebida) {
+      console.warn("[Webhook/Zapster] Não foi possível extrair a mensagem do payload");
+      return NextResponse.json({ ok: true });
+    }
+
+    const texto = recebida.buttonId || recebida.text;
+    if (!texto.trim()) {
+      console.log("[Webhook/Zapster] Mensagem sem conteúdo processável");
+      return NextResponse.json({ ok: true });
+    }
+
+    await processWhatsAppMessage({
+      phone: recebida.phone,
+      text: texto,
+      buttonId: recebida.buttonId,
+      pushName: recebida.pushName,
+      messageId: recebida.messageId,
+      sourceType: "text",
+    });
+    return NextResponse.json({ ok: true, provider: "zapster" });
   }
 
   const event = payload.event as string | undefined;
@@ -328,6 +404,140 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * Pipeline da Wafly.
+ *
+ * A Wafly entrega a mídia já descriptografada, então o áudio vai direto para a
+ * transcrição — não existe a etapa de `decrypt-media` da Wasender. O resto do
+ * caminho é o mesmo: autoteste, deduplicação por id, transcrição e envio ao
+ * motor de fluxo.
+ */
+async function handleWaflyWebhook(payload: Record<string, unknown>) {
+  const recebida = parseWaflyWebhook(payload);
+  if (!recebida) {
+    console.log("[Webhook/Wafly] Evento sem mensagem processável (status ou callback)");
+    return NextResponse.json({ ok: true });
+  }
+
+  const { phone, messageId, audioUrl, imageUrl } = recebida;
+
+  // Grupo, comunidade e canal chegam com o JID no lugar do telefone, e nem
+  // sempre com `isGroup`. Sem este corte cada mensagem de grupo virava uma
+  // linha em WhatsAppMessage e uma sessão vazia — milhares por dia — antes de
+  // o fluxo descartá-la lá na frente por não ser conversa privada.
+  if (!isValidPrivateRecipient(phone)) {
+    console.log("[Webhook/Wafly] Ignorado (não é conversa privada):", phone);
+    return NextResponse.json({ ok: true });
+  }
+
+  const textoDireto = recebida.buttonId || recebida.text || "";
+
+  if (recebida.fromMe) {
+    // O número de teste é o próprio número conectado: a conversa acontece no
+    // autochat. Sem esta liberação nenhuma mensagem de teste seria processada.
+    const aceitar = await shouldProcessOwnTestMessage({
+      phone,
+      text: textoDireto,
+      messageId,
+      hasAudio: Boolean(audioUrl),
+    });
+    if (!aceitar) {
+      console.log("[Webhook/Wafly] Eco do próprio bot, ignorando");
+      return NextResponse.json({ ok: true });
+    }
+    console.log("[Webhook/Wafly] Mensagem do número conectado aceita no autoteste");
+  }
+
+  if (isWasenderMessageTooOld(recebida.timestampMs)) {
+    console.log("[Webhook/Wafly] Ignorando mensagem com mais de 24 horas");
+    return NextResponse.json({ ok: true });
+  }
+
+  if (!textoDireto.trim() && !audioUrl && !imageUrl) {
+    console.log("[Webhook/Wafly] Mensagem sem conteúdo processável");
+    return NextResponse.json({ ok: true });
+  }
+
+  let sessionId: string | undefined;
+  let clientId: string | undefined;
+  try {
+    const session = await prisma.whatsAppSession.findUnique({
+      where: { phone },
+      select: { id: true, clientId: true },
+    });
+    if (session) {
+      sessionId = session.id;
+      clientId = session.clientId || undefined;
+    }
+  } catch (error) {
+    console.error("[Webhook/Wafly] Erro ao buscar sessão:", error);
+  }
+
+  let markerCreated = false;
+  if (messageId) {
+    markerCreated = await markMessageAsProcessed(
+      messageId,
+      phone,
+      textoDireto || (audioUrl ? "[Áudio recebido]" : "[Imagem recebida]"),
+      sessionId,
+      clientId
+    );
+    if (!markerCreated) return NextResponse.json({ ok: true });
+  }
+
+  try {
+    let processedText = textoDireto;
+    if (audioUrl) {
+      try {
+        processedText = await transcribeAudioWithGroq(audioUrl);
+        console.log("[Webhook/Wafly] Áudio transcrito:", processedText.substring(0, 120));
+      } catch (audioError) {
+        console.error("[Webhook/Wafly] Falha ao transcrever áudio:", audioError);
+        await sendText({
+          number: phone,
+          text: "Recebi seu áudio, mas não consegui entendê-lo agora. Pode mandar de novo ou escrever a mensagem?",
+          flowStage: "AUDIO_TRANSCRIPTION_FALLBACK",
+        });
+        return NextResponse.json({ ok: true, audioProcessed: false });
+      }
+    } else if (!processedText.trim() && imageUrl) {
+      // O comprovante e a foto do veículo chegam ao fluxo como URL pública.
+      processedText = imageUrl;
+    }
+
+    if (!processedText.trim()) {
+      await sendText({
+        number: phone,
+        text: "Recebi sua mensagem. No momento consigo entender melhor *texto* e *áudio*. Se enviou uma foto ou documento, escreva em uma frase o que deseja.",
+        flowStage: "UNSUPPORTED_MESSAGE_FALLBACK",
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    await processWhatsAppMessage({
+      phone,
+      text: processedText,
+      buttonId: recebida.buttonId,
+      // `listId` recebia o mesmo `buttonId`: a escolha de lista chegava
+      // duplicada em dois campos e nenhum deles era lido pelo fluxo, que só usa
+      // `text`. O id da opção já viaja em `processedText`.
+      pushName: recebida.pushName,
+      messageId,
+      sourceType: audioUrl ? "audio" : "text",
+    });
+
+    await notifyPwaAboutWhatsAppMessage({ phone, body: processedText }).catch((error) => {
+      console.error("[Webhook/Wafly] Falha isolada ao notificar PWA:", error);
+    });
+  } catch (err) {
+    console.error("[Webhook/Wafly] ERRO:", err);
+    if (markerCreated && messageId) await deleteMessageProcessingMarker(messageId);
+    return NextResponse.json({ ok: false, retry: true }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, provider: "wafly" });
 }
 
 async function shouldProcessOwnTestMessage(params: {

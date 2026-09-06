@@ -40,9 +40,10 @@ function serviceToCatalogItem(s: Service): CatalogItem {
   };
 }
 
-function buildCategoriesFromServices(
+export function buildCategoriesFromServices(
   services: Service[],
-  prompts: PromptMap
+  prompts: PromptMap,
+  suppressedKeys: Set<string> = new Set()
 ): Record<number, { title: string; keys: string[] }> {
   const result: Record<number, { title: string; keys: string[] }> = {};
 
@@ -61,19 +62,35 @@ function buildCategoriesFromServices(
     .filter((s) => s.active && s.showInWhatsApp && s.catalogKey)
     .sort((a, b) => a.menuOrder - b.menuOrder || a.name.localeCompare(b.name));
 
+  // Onde cada chave cadastrada no banco deve aparecer. Serve para tirar a chave
+  // da categoria estática quando o cadastro a moveu para outra categoria.
+  const dbCategoryByKey = new Map<string, number>();
   for (const s of whatsappServices) {
-    const catNum = resolveServiceCategoryNum(s);
+    dbCategoryByKey.set(s.catalogKey!, resolveServiceCategoryNum(s));
+  }
+
+  for (const [key, catNum] of dbCategoryByKey) {
     if (!result[catNum]) {
       result[catNum] = { title: `Categoria ${catNum}`, keys: [] };
     }
-    result[catNum].keys.push(s.catalogKey!);
+    result[catNum].keys.push(key);
   }
 
-  for (const num of Object.keys(result)) {
-    const n = Number(num);
-    if (result[n].keys.length === 0 && CATEGORIES[n]) {
-      result[n].keys = [...CATEGORIES[n].keys];
-    }
+  // O catálogo oficial (`fluxo-oficial.md`) é a lista base de serviços; o banco
+  // sobrescreve preço/detalhe e pode acrescentar itens novos. Por isso as duas
+  // listas são MESCLADAS. Antes o bloco abaixo só valia para categoria vazia, o
+  // que fazia um único serviço cadastrado esconder os demais da mesma categoria
+  // (ex.: "Lavagem Simples" no banco ocultava Completa e Detalhada).
+  for (const numStr of Object.keys(result)) {
+    const n = Number(numStr);
+    const staticKeys = CATEGORIES[n]?.keys ?? [];
+    const restored = staticKeys.filter((key) => {
+      if (suppressedKeys.has(key)) return false; // desativado de propósito no painel
+      const dbCategory = dbCategoryByKey.get(key);
+      return dbCategory === undefined || dbCategory === n;
+    });
+    // Ordem oficial primeiro; serviços que só existem no banco entram depois.
+    result[n].keys = [...new Set([...restored, ...result[n].keys])];
   }
 
   if (!result[8]?.keys.includes("indeciso")) {
@@ -99,15 +116,26 @@ export async function loadWhatsAppCatalog(force = false): Promise<WhatsAppCatalo
 
   let services: Array<Service & { upsellService?: Service | null }> = [];
   let prompts: PromptMap = getDefaultPromptMap();
+  // Chaves oficiais que o painel desativou ou tirou do WhatsApp de propósito.
+  // Sem essa lista, a mesclagem com o catálogo estático faria um serviço
+  // desligado voltar a aparecer no menu.
+  let suppressedKeys = new Set<string>();
   try {
-    [services, prompts] = await Promise.all([
+    const [active, hidden, promptMap] = await Promise.all([
       prisma.service.findMany({
         where: { active: true, showInWhatsApp: true },
         include: { upsellService: true },
         orderBy: [{ categoryNum: "asc" }, { menuOrder: "asc" }, { name: "asc" }],
       }),
+      prisma.service.findMany({
+        where: { catalogKey: { not: null }, OR: [{ active: false }, { showInWhatsApp: false }] },
+        select: { catalogKey: true },
+      }),
       loadPromptMap(force),
     ]);
+    services = active;
+    prompts = promptMap;
+    suppressedKeys = new Set(hidden.map((s) => s.catalogKey!).filter(Boolean));
   } catch (error) {
     console.error("[WhatsApp Catalog] Banco indisponível; usando catálogo oficial local.", error);
   }
@@ -125,7 +153,7 @@ export async function loadWhatsAppCatalog(force = false): Promise<WhatsAppCatalo
     dbServiceIdByKey[s.catalogKey] = s.id;
   }
 
-  const categories = buildCategoriesFromServices(services, prompts);
+  const categories = buildCategoriesFromServices(services, prompts, suppressedKeys);
   const ctx: WhatsAppCatalogContext = { catalog, categories, servicesByKey, dbServiceIdByKey, prompts };
   catalogCache = { ctx, loadedAt: Date.now() };
   return ctx;
@@ -135,15 +163,107 @@ export function invalidateCatalogCache() {
   catalogCache = null;
 }
 
-export function buildMainMenu(categories: WhatsAppCatalogContext["categories"], prompts: PromptMap): string {
-  const lines: string[] = [];
-  const icons = ["💧", "✨", "🛡️", "🪑", "🔬", "🔄", "📦", "🤔"];
-  for (let i = 1; i <= MAIN_MENU_CATEGORIES; i++) {
-    const cat = categories[i];
+/** Chaves que não representam um serviço com preço próprio. */
+const KEYS_SEM_PRECO = new Set(["indeciso", "pacotes"]);
+
+/**
+ * Menor preço praticado na categoria, para o rótulo "a partir de".
+ * Ignora itens sem valor cadastrado — eles não devem puxar o mínimo para zero.
+ */
+export function categoryStartingPrice(
+  keys: string[],
+  catalog: Record<string, CatalogItem>
+): number | null {
+  const valores = keys
+    .filter((key) => !KEYS_SEM_PRECO.has(key))
+    .map((key) => Number(catalog[key]?.hatchMin ?? 0))
+    .filter((valor) => Number.isFinite(valor) && valor > 0);
+  return valores.length ? Math.min(...valores) : null;
+}
+
+function precoCurto(valor: number): string {
+  return Number.isInteger(valor)
+    ? `R$ ${valor}`
+    : `R$ ${valor.toFixed(2).replace(".", ",")}`;
+}
+
+/**
+ * O preço aparece já no menu principal. Antes o cliente precisava de três
+ * cliques (menu → categoria → serviço) só para descobrir quanto custava, e quem
+ * estava pesquisando preço desistia antes de chegar lá.
+ */
+const ICONES_DE_CATEGORIA: Record<number, string> = {
+  1: "💧",
+  2: "✨",
+  3: "🛡️",
+  4: "🪑",
+  5: "🔬",
+  6: "🔄",
+  7: "📦",
+  8: "🤔",
+};
+
+export interface MainMenuEntry {
+  /** Número que o cliente digita ou toca. */
+  display: number;
+  /** Categoria correspondente no catálogo. */
+  categoryNum: number;
+  title: string;
+  icon: string;
+  startingPrice: number | null;
+}
+
+/**
+ * Opções visíveis do menu principal, numeradas sem buracos.
+ *
+ * A categoria 6 ("Revitalização") existe no catálogo estático mas não tem
+ * serviço próprio — seus itens vivem na 3. Numerar pela categoria fazia o menu
+ * pular do *5* para o *7*, e sobrava a impressão de opção quebrada. Agora a
+ * posição na lista é a numeração, e o mapa de volta mora aqui, num lugar só,
+ * para a leitura da resposta continuar casando com o que foi mostrado.
+ */
+export function mainMenuEntries(
+  categories: WhatsAppCatalogContext["categories"],
+  catalog?: Record<string, CatalogItem>
+): MainMenuEntry[] {
+  const entradas: MainMenuEntry[] = [];
+  for (let categoryNum = 1; categoryNum <= MAIN_MENU_CATEGORIES; categoryNum++) {
+    const cat = categories[categoryNum];
     if (!cat || cat.keys.length === 0) continue;
-    lines.push(`*${i}* ${icons[i - 1] ?? "•"} ${cat.title}`);
+    entradas.push({
+      display: entradas.length + 1,
+      categoryNum,
+      title: cat.title,
+      icon: ICONES_DE_CATEGORIA[categoryNum] ?? "•",
+      startingPrice: catalog ? categoryStartingPrice(cat.keys, catalog) : null,
+    });
   }
-  // Add option 9 for human handoff
+  return entradas;
+}
+
+/** Converte o número digitado pelo cliente na categoria que ele viu. */
+export function categoryFromMenuNumber(
+  categories: WhatsAppCatalogContext["categories"],
+  escolhido: number
+): number | null {
+  return mainMenuEntries(categories).find((e) => e.display === escolhido)?.categoryNum ?? null;
+}
+
+/**
+ * O preço aparece já no menu principal. Antes o cliente precisava de três
+ * cliques (menu → categoria → serviço) só para descobrir quanto custava, e quem
+ * estava pesquisando preço desistia antes de chegar lá.
+ */
+export function buildMainMenu(
+  categories: WhatsAppCatalogContext["categories"],
+  prompts: PromptMap,
+  catalog?: Record<string, CatalogItem>
+): string {
+  const lines = mainMenuEntries(categories, catalog).map((entrada) => {
+    const sufixo = entrada.startingPrice ? ` — a partir de ${precoCurto(entrada.startingPrice)}` : "";
+    return `*${entrada.display}* ${entrada.icon} ${entrada.title}${sufixo}`;
+  });
+  // A opção 9 é fixa: atendimento humano, fora da numeração das categorias.
   lines.push(`*9* 👤 Falar com atendente`);
   return lines.join("\n");
 }

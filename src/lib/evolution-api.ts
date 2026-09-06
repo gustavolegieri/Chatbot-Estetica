@@ -20,9 +20,24 @@
 import { MessageDirection, MessageSender } from "./message-enums";
 import { phoneToWhatsApp } from "./utils";
 import { isValidPrivateRecipient } from "./whatsapp-jid";
+import {
+  activeProvider,
+  buildProviderRequest,
+  buttonsAsNumberedText,
+  providerApiKey,
+  providerSupportsButtons,
+  providerSupportsLists,
+  type OutboundBody,
+  type ProviderButton,
+  type ProviderListOption,
+} from "./whatsapp-provider";
+import { planInteractiveDelivery } from "./whatsapp-interactive";
+import { fitRowTitles } from "./whatsapp-list-text";
+import { testModeAllowsPhone } from "./test-mode-phones";
 import { getMessageLogContext } from "./whatsapp-message-context";
 import { logWhatsAppMessage } from "./whatsapp-message-log";
 import { prisma } from "./prisma";
+import { getRuntimeSettings } from "./settings-runtime";
 import crypto from "crypto";
 import { isVoiceReplyEligible, synthesizeVoiceReply } from "./whatsapp-voice";
 import { extractWasenderSendId } from "./whatsapp-self-test";
@@ -66,19 +81,13 @@ type TestModeRecipientConfig = {
 let testModeRecipientCache: TestModeRecipientConfig | null = null;
 
 export function testModeAllowsRecipient(number: string, enabled: boolean, testPhone?: string | null) {
-  if (!enabled) return true;
-  const recipient = phoneToWhatsApp(number).replace(/\D/g, "");
-  const allowed = phoneToWhatsApp(testPhone || "").replace(/\D/g, "");
-  return Boolean(allowed && recipient === allowed);
+  return testModeAllowsPhone(phoneToWhatsApp(number), enabled, testPhone);
 }
 
 async function outboundRecipientAllowed(number: string) {
   const now = Date.now();
   if (!testModeRecipientCache || now - testModeRecipientCache.loadedAt > 5_000) {
-    const settings = await prisma.settings.findUnique({
-      where: { id: "default" },
-      select: { testModeEnabled: true, testModePhone: true },
-    });
+    const settings = await getRuntimeSettings();
     testModeRecipientCache = {
       enabled: settings?.testModeEnabled ?? false,
       phone: settings?.testModePhone ?? null,
@@ -129,7 +138,8 @@ function toE164(number: string): string {
 }
 
 function getApiKey(): string | null {
-  return process.env.WASENDER_API_KEY ?? null;
+  // A chave depende do provedor ativo (ver `whatsapp-provider.ts`).
+  return providerApiKey();
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 8_000) {
@@ -249,13 +259,14 @@ export async function wasenderFetch(
   let response: Response;
   try {
     await waitForRecipientWindow(recipient);
-    response = await fetchWithTimeout(`${WASENDER_BASE}/send-message`, {
+    const requisicao = buildProviderRequest(body as OutboundBody, apiKey);
+    // O endpoint diz o formato entregue (texto, lista ou botão) sem expor o
+    // token, que faz parte do caminho na Wafly.
+    console.log("[WhatsApp] ➡️ Formato:", requisicao.url.split("/").pop());
+    response = await fetchWithTimeout(requisicao.url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
+      headers: requisicao.headers,
+      body: requisicao.body,
     });
   } catch (error) {
     const phone = (body as { to?: string }).to;
@@ -364,6 +375,12 @@ async function uploadAudioBuffer(audio: Buffer): Promise<string> {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("WASENDER_API_KEY não configurada");
 
+  // A Wafly não tem endpoint de upload: o `send-audio` recebe o próprio áudio
+  // em base64. Enviar o data URI evita depender de hospedagem intermediária.
+  if (activeProvider() === "wafly") {
+    return `data:audio/mpeg;base64,${audio.toString("base64")}`;
+  }
+
   // O Edge TTS inicia o MP3 diretamente por um frame MPEG. O arquivo é
   // reproduzível, mas o detector de tipo da WASender exige uma assinatura ID3.
   const hasId3Header =
@@ -406,6 +423,41 @@ async function trySendVoiceReply(number: string, text: string, force = false) {
   }
 }
 
+/**
+ * Monta o corpo de uma mensagem de texto do bot.
+ *
+ * As etapas do fluxo escrevem menus no formato `*1* — Opção`. Quando o provedor
+ * tem lista ou botão nativo, o menu vira uma mensagem interativa: o corpo perde
+ * as linhas numeradas e as opções viram itens tocáveis, cujo id é o mesmo
+ * número que a etapa já sabe interpretar. Sem suporte interativo, o texto segue
+ * exatamente como antes.
+ */
+export function buildOutboundTextBody(
+  whatsappNumber: string,
+  text: string,
+  sender: "BOT" | "ADMIN" = "BOT"
+): OutboundBody {
+  if (sender !== "BOT") return { to: whatsappNumber, text };
+
+  const plano = planInteractiveDelivery(text);
+  if (plano.kind === "buttons") {
+    return { to: whatsappNumber, text: plano.body, buttons: plano.buttons };
+  }
+  if (plano.kind === "list") {
+    const corpo = plano.truncated
+      ? `${plano.body}\n\n_Se preferir outra opção, é só escrever._`
+      : plano.body;
+    return {
+      to: whatsappNumber,
+      text: corpo,
+      listOptions: plano.options,
+      listTitle: plano.listTitle,
+      listButtonLabel: plano.listButtonLabel,
+    };
+  }
+  return { to: whatsappNumber, text };
+}
+
 /** Envia mensagem de texto simples */
 export async function sendText({
   number,
@@ -437,10 +489,7 @@ export async function sendText({
 
     const result = voiceSent
       ? voiceResult
-      : await wasenderFetch({
-          to: whatsappNumber,
-          text,
-        });
+      : await wasenderFetch(buildOutboundTextBody(whatsappNumber, text, sender));
 
     if (!skipBotLog && deliveryWasAccepted(result)) {
       const msgSender: MessageSender = sender === "ADMIN" ? MessageSender.ADMIN : MessageSender.BOT;
@@ -568,18 +617,29 @@ export async function sendButtons({
     return { blocked: true, reason: "not_private_recipient" };
   }
 
-  const lines: string[] = [];
-  if (title) lines.push(`*${title}*`);
-  if (description) lines.push(description);
-  lines.push("");
-  buttons.forEach((b, i) => lines.push(`${i + 1} — ${b.displayText}`));
-  if (footer) lines.push("", `_${footer}_`);
+  // Cabeçalho da mensagem, comum aos dois caminhos.
+  const cabecalho: string[] = [];
+  if (title) cabecalho.push(`*${title}*`);
+  if (description) cabecalho.push(description);
+  if (footer) cabecalho.push("", `_${footer}_`);
+  const corpo = cabecalho.join("\n");
 
-  const text = lines.join("\n");
+  // Com provedor que suporta botão, manda botão de verdade. Sem ele, rebaixa
+  // para a lista numerada de sempre — era isso que esta função fazia sozinha,
+  // apesar de o nome sugerir o contrário.
+  const suportaBotoes = providerSupportsButtons();
+  const opcoes: ProviderButton[] = buttons.map((b) => ({
+    id: b.id,
+    label: b.displayText,
+    type: "reply",
+  }));
+  const text = suportaBotoes ? corpo : buttonsAsNumberedText(corpo, opcoes);
+
   try {
     const result = await wasenderFetch({
       to: toE164(number),
       text,
+      ...(suportaBotoes ? { buttons: opcoes } : {}),
     });
     const ctx = getMessageLogContext();
     if (deliveryWasAccepted(result)) {
@@ -606,6 +666,7 @@ export async function sendList({
   number,
   title,
   description,
+  buttonText,
   sections,
 }: {
   number: string;
@@ -622,14 +683,38 @@ export async function sendList({
     return { blocked: true, reason: "not_private_recipient" };
   }
 
+  // O título passa pelo encurtador antes de virar linha: um nome que não cabe
+  // perde as palavras de ligação em vez de perder letras, e o nome inteiro fica
+  // na descrição.
+  const linhas = sections.flatMap((section) => section.rows);
+  const titulos = fitRowTitles(linhas.map((row) => row.title));
+  const opcoes: ProviderListOption[] = linhas.map((row, i) => ({
+    id: row.id,
+    title: titulos[i],
+    description:
+      titulos[i] === row.title.trim()
+        ? row.description
+        : [row.title.trim(), row.description].filter(Boolean).join(" · "),
+  }));
+
+  // Provedor com lista nativa (Wafly) manda um menu tocável — é o único formato
+  // interativo que comporta o menu principal inteiro.
+  const suportaLista = providerSupportsLists() && opcoes.length > 0;
+
   const lines: string[] = [];
   if (title) lines.push(`*${title}*`);
   if (description) lines.push(description);
 
-  for (const section of sections) {
-    lines.push("", `*${section.title}*`);
-    for (const row of section.rows) {
-      lines.push(`• ${row.title}${row.description ? ` — ${row.description}` : ""}`);
+  if (!suportaLista) {
+    // Sem lista nativa as linhas vão numeradas: é o número que o cliente
+    // responde, e as etapas guardam a ordem das opções para reconhecê-lo.
+    let posicao = 0;
+    for (const section of sections) {
+      lines.push("", `*${section.title}*`);
+      for (const row of section.rows) {
+        posicao++;
+        lines.push(`*${posicao}* — ${row.title}${row.description ? ` — ${row.description}` : ""}`);
+      }
     }
   }
 
@@ -638,6 +723,9 @@ export async function sendList({
     const result = await wasenderFetch({
       to: toE164(number),
       text,
+      ...(suportaLista
+        ? { listOptions: opcoes, listTitle: title, listButtonLabel: buttonText || "Ver opções" }
+        : {}),
     });
     const ctx = getMessageLogContext();
     if (deliveryWasAccepted(result)) {

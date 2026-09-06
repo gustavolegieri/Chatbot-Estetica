@@ -256,6 +256,27 @@ export const BOT_PROMPT_DEFAULTS: PromptDef[] = [
     content: "✨🔍 *Seu veículo avançou para a finalização*\n\nOlá, *{name}*! A etapa principal do serviço foi concluída e seu veículo entrou na fase de acabamento.\n\n🚗 *Veículo:* {vehicle}\n🔠 *Placa:* {plate}\n🫧 *Serviço:* {service}\n🔄 *Etapa atual:* Acabamento e conferência final\n\nNossa equipe está revisando cada detalhe para entregar o melhor resultado. A *{brand}* enviará uma nova mensagem assim que o veículo estiver pronto. 🤍",
   },
   {
+    key: "appointment_before_after",
+    label: "Antes e depois automático (Portão IA)",
+    category: "automacao",
+    hint: "{name}, {service}, {vehicle}, {brand}",
+    content: "📸 *O antes e depois do seu {vehicle}*\n\n*{name}*, montamos o comparativo com as fotos da entrada e da saída do seu veículo aqui na *{brand}*.\n\n🫧 *Serviço:* {service}\n\nSe curtir o resultado, fique à vontade para compartilhar 🤍",
+  },
+  {
+    key: "recurrence_due",
+    label: "Recorrência — hora de repetir o serviço",
+    category: "automacao",
+    hint: "{name}, {brand}, {service}, {vehicle}, {elapsed}",
+    content: "Oi, *{name}*! 👋\n\nDando uma olhada no histórico do seu *{vehicle}* aqui na *{brand}*: já faz *{elapsed}* desde o último *{service}*.\n\nÉ mais ou menos o intervalo que a gente recomenda para manter o resultado. Quer que eu veja os horários livres desta semana?\n\nÉ só responder *sim* que eu te mostro. 🙂",
+  },
+  {
+    key: "recurrence_warranty",
+    label: "Recorrência — garantia por vencer",
+    category: "automacao",
+    hint: "{name}, {brand}, {service}, {vehicle}, {warrantyDays}",
+    content: "Oi, *{name}*! 🛡️\n\nUm aviso rápido sobre o seu *{vehicle}*: a garantia do *{service}* que fizemos aqui na *{brand}* vence em *{warrantyDays} dias*.\n\nDá tempo de trazer para a revisão de garantia sem custo adicional. Quer que eu veja um horário para você?\n\nResponda *sim* e eu te mostro as opções. 🙂",
+  },
+  {
     key: "appointment_status",
     label: "Consulta de status do veículo",
     category: "automacao",
@@ -371,7 +392,7 @@ export const BOT_PROMPT_DEFAULTS: PromptDef[] = [
     label: "Resumo e confirmação",
     category: "fluxo",
     hint: "{name}, {service}, {vehicle}, {day}, {time}, {pickup}, {address}, {payment}, {reminder}, {value}",
-    content: "*Resumo do agendamento*\n\n👤 Cliente: {name}\n🛠️ Serviço: {service}\n🚗 Veículo: {vehicle}\n📅 Data: {day}\n🕒 Horário: {time}\n🚚 Coleta: {pickup}\n📍 Endereço: {address}\n💳 Pagamento: {payment}\n🔔 Lembrete: {reminder}\n💰 Valor estimado: {value}\n\n_Cancelamentos sem custo podem ser solicitados com até 2 horas de antecedência._\n\n*1* ✅ Confirmar reserva\n*2* 📅 Alterar data ou horário\n*3* 💳 Alterar forma de pagamento",
+    content: "*Resumo do agendamento*\n\n👤 Cliente: {name}\n🛠️ Serviço: {service}\n🚗 Veículo: {vehicle}\n📅 Data: {day}\n🕒 Horário: {time}\n🚚 Coleta: {pickup}\n📍 Endereço: {address}\n💳 Pagamento: {payment}\n🔔 Lembrete: {reminder}\n💰 Valor estimado: {value}\n\n_Cancelamentos sem custo podem ser solicitados com até 2 horas de antecedência._\n\n*1* ✅ Confirmar reserva\n*2* 📅 Alterar data ou horário\n*3* 💳 Alterar forma de pagamento\n*4* 🎟️ Tenho um cupom\n*5* 🚚 Quero leva e traz",
   },
   {
     key: "etapa16_confirmation",
@@ -501,7 +522,7 @@ export const BOT_PROMPT_DEFAULTS: PromptDef[] = [
     key: "summary_review",
     label: "Revisão do resumo",
     category: "fluxo",
-    content: "Confira o resumo do agendamento acima.\n\n*1* ✅ Confirmar reserva\n*2* ✏️ Alterar data ou horário\n*3* 💳 Alterar forma de pagamento",
+    content: "Confira o resumo do agendamento acima.\n\n*1* ✅ Confirmar reserva\n*2* ✏️ Alterar data ou horário\n*3* 💳 Alterar forma de pagamento\n*4* 🎟️ Tenho um cupom\n*5* 🚚 Quero leva e traz",
   },
   {
     key: "evaluation_required",

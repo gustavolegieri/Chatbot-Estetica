@@ -4,6 +4,7 @@
  */
 
 import { cerebrasChat, isCerebrasConfigured, parseJsonFromModel } from "./cerebras-ai";
+import { toWhatsAppMarkdown } from "./prompt-utils";
 import { CATALOG } from "./whatsapp-catalog";
 import type { FlowState } from "./whatsapp-flow-types";
 import type { FlowContext } from "./whatsapp-flow-messages";
@@ -159,7 +160,9 @@ Se a dúvida exigir o dono/equipe, sugira digitar *falar com o dono*.`;
   });
 
   if (!raw) return null;
-  return raw.replace(/^['"]|['"]$/g, "").trim().slice(0, 900) || null;
+  // Mesma conversão do `whatsapp-ai`: o modelo escreve em Markdown e o WhatsApp
+  // só entende `*negrito*`, então `**assim**` chegaria com os asteriscos à vista.
+  return toWhatsAppMarkdown(raw.replace(/^['"]|['"]$/g, "")).slice(0, 900) || null;
 }
 
 /**

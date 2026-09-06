@@ -72,6 +72,16 @@ export interface FlowState {
   /** Duração real do complemento aceito, para não encurtar a reserva. */
   upsellDurationMin?: number;
   availableSlots?: string[];
+  /**
+   * Opções da última lista enviada nas etapas de agendamento (semanas, dias,
+   * períodos ou horários), na ordem em que apareceram.
+   *
+   * O id de cada linha não é um número — é a data, a semana ou a hora. Guardar
+   * a ordem permite que o cliente que digita "2" em vez de tocar caia na mesma
+   * opção, e que a lista continue funcionando como texto numerado em provedores
+   * sem menu interativo.
+   */
+  pickerOptions?: Array<{ id: string; label: string }>;
   serviceDurationMin?: number;
   dayLabel?: string;
   dayDate?: string;
@@ -146,6 +156,15 @@ export interface FlowState {
   awaitingSavedVehicleChoice?: boolean;
   /** Após uma reserva, aguarda uma nova mensagem antes de iniciar outro atendimento. */
   awaitingPostConfirmationReturn?: boolean;
+  /** Oferta de repetição pendente de resposta (caminho rápido do recorrente). */
+  repeatOffer?: unknown;
+  /** Reserva já feita; falta só a placa para o reconhecimento no portão. */
+  awaitingPlateAfterBooking?: boolean;
+  /** Cancelamento de uma reserva existente, aguardando o sim do cliente. */
+  awaitingCancelConfirmation?: boolean;
+  cancelAppointmentId?: string;
+  /** Reserva que será substituída quando o novo horário for confirmado. */
+  rescheduleAppointmentId?: string;
   /** Na retomada, pergunta se o atendimento será para o mesmo veículo. */
   awaitingReturningVehicleChoice?: boolean;
   loyaltyPoints?: number;
@@ -182,4 +201,24 @@ export interface FlowState {
   paymentSimulationCode?: string;
 }
 
+/**
+ * Data para o cliente ler. Quando o dia é escolhido pela lista do calendário,
+ * `dayLabel` guarda só o nome do dia ("Segunda-feira") — e o resumo e a
+ * confirmação saíam sem dizer *qual* segunda. Este helper junta o dia da semana
+ * com a data real sempre que `dayDate` (YYYY-MM-DD) estiver preenchido.
+ */
+export function customerDayDisplay(flow: {
+  dayLabel?: string | null;
+  dayDate?: string | null;
+}): string | null {
+  const label = flow.dayLabel?.trim() || null;
+  const iso = flow.dayDate?.trim() || null;
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return label;
 
+  const [year, month, day] = iso.split("-").map(Number);
+  const curta = `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}`;
+  if (!label) return curta;
+  // `dateLabel` já produz "07/09 (segunda-feira)"; não duplica a data.
+  if (label.includes(curta)) return label;
+  return `${label}, ${curta}`;
+}

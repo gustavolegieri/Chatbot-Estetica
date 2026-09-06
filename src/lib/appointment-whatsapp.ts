@@ -146,6 +146,30 @@ export async function sendAppointmentTimelapse(apt: AptWithRelations, timelapseU
   return wasMessageSent(result);
 }
 
+/**
+ * Envia a montagem antes/depois montada com as fotos do portão. É a última
+ * mensagem do atendimento, então vale um texto curto e um convite de partilha.
+ */
+export async function sendAppointmentBeforeAfter(apt: AptWithRelations, imageUrl?: string | null) {
+  if (!imageUrl || !apt.client.phone) return false;
+  const settings = await loadSettings();
+  if (!settings?.whatsappEnabled || !settings.beforeAfterEnabled) return false;
+
+  const prompts = await loadPromptMap();
+  const result = await sendMedia({
+    number: apt.client.phone,
+    mediaUrl: imageUrl,
+    mediaType: "image",
+    caption: renderPrompt(prompts, "appointment_before_after", {
+      name: apt.client.name,
+      service: apt.service.name,
+      vehicle: apt.client.vehicleModel ?? "seu veículo",
+      brand: settings.businessName ?? "Garagem do Ka",
+    }),
+  });
+  return wasMessageSent(result);
+}
+
 export async function sendAppointmentCancelledNotice(apt: AptWithRelations, reason: string) {
   const settings = await loadSettings();
   if (!settings?.whatsappEnabled || !apt.client.phone) return false;

@@ -61,9 +61,20 @@ function formatServicePrice(item: CatalogItem): string {
   return `💰 *R$ ${item.hatchMin}*`;
 }
 
-export function serviceDetail(item: CatalogItem, prompts?: PromptMap, detailOverride?: string | null) {
+/**
+ * Detalhe do serviço. `includeActionMenu` fica desligado no fluxo rápido: em
+ * vez de perguntar "quer agendar?" logo depois de o cliente escolher o serviço
+ * na lista, a etapa seguinte já pede o veículo.
+ */
+export function serviceDetail(
+  item: CatalogItem,
+  prompts?: PromptMap,
+  detailOverride?: string | null,
+  includeActionMenu = true
+) {
+  const rodape = includeActionMenu ? [``, serviceActionMenu(prompts)] : [];
   if (detailOverride?.trim()) {
-    return [detailOverride.trim(), ``, serviceActionMenu(prompts)].join("\n");
+    return [detailOverride.trim(), ...rodape].join("\n");
   }
 
   if (item.key === "pacotes") {
@@ -326,7 +337,7 @@ export function serviceDetail(item: CatalogItem, prompts?: PromptMap, detailOver
     formatServicePrice(item),
   ];
 
-  return [...lines.filter((l) => l !== undefined), ``, serviceActionMenu(prompts)].join("\n");
+  return [...lines.filter((l) => l !== undefined), ...rodape].join("\n");
 }
 
 export function serviceActionMenu(prompts?: PromptMap) {

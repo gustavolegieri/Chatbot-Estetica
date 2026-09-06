@@ -1,3 +1,10 @@
+import {
+  buildRepeatOffer,
+  formatRepeatOffer,
+  slotLabel,
+  parseRepeatChoice,
+  type RepeatOffer,
+} from "./whatsapp-repeat-offer";
 import { AppointmentStatus, Prisma } from "@prisma/client";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { addDays, format, parse } from "date-fns";
@@ -7,6 +14,8 @@ import { renderPrompt } from "./bot-prompts";
 import {
   sendText as sendTextRaw,
   sendMedia as sendMediaRaw,
+  sendList as sendListRaw,
+  sendButtons,
 } from "./evolution-api";
 import {
   generateCalendarImageOnly,
@@ -17,24 +26,41 @@ import {
   calculateEndTime,
   formatDurationLabel,
   generateAvailableSlots,
+  generateAvailableSlotsRange,
   overlapsExisting,
   parseTimeInput,
   parseTimeSelection,
   timeToMinutes,
 } from "./appointments";
 import { normalizePhone } from "./utils";
+import { providerSupportsButtons } from "./whatsapp-provider";
+import {
+  MAX_LIST_ROWS,
+  parseNumberedOptions,
+  planInteractiveDelivery,
+  renderOptionLines,
+} from "./whatsapp-interactive";
+import { customerDayDisplay } from "./whatsapp-flow-types";
 import {
   BRAND_DEFAULT,
   MAIN_MENU_CATEGORIES,
   UNDECIDED_TO_KEY,
   loadWhatsAppCatalog,
   buildMainMenu,
+  categoryFromMenuNumber,
   subMenuForCategoryCtx,
   getUpsellForKey,
   type WhatsAppCatalogContext,
 } from "./whatsapp-service-catalog";
 import { CATALOG, CATEGORIES } from "./whatsapp-catalog";
+import {
+  cancelAppointmentFromBot,
+  detectAppointmentChangeIntent,
+  fetchNextAppointment,
+  stageAllowsAppointmentChange,
+} from "./whatsapp-appointment-change";
 import { resolveValidCustomerName } from "./customer-name";
+import { getCachedWorkingDays, getRuntimeSettings } from "./settings-runtime";
 import { requestHumanHandoff, wantsHumanHandoff } from "./whatsapp-handoff";
 import {
   etapa1Welcome,
@@ -44,8 +70,6 @@ import {
   etapa5Quote,
   etapa6Upsell,
   etapa7Day,
-  etapa7NoSlots,
-  etapa7Time,
   etapa8Payment,
   etapa8PixBlock,
   etapa8PixChoice,
@@ -87,7 +111,9 @@ import {
 import {
   detectCategoryNum,
   detectServiceKey,
+  greetingByTime,
   isAvailabilityRequest,
+  isConversationOpener,
   isGreetingOrSmallTalk,
   onlyMenuNumber,
   wantsDoubt,
@@ -100,6 +126,8 @@ import {
   isValidVehicle,
   looksLikePersonName,
   parsePlateFromText,
+  isValidVehiclePlate,
+  normalizeVehiclePlate,
   parseVehicleMessage,
   parseVehicleMessageSmart,
   parseYearFromText,
@@ -119,6 +147,7 @@ import {
   handleReceiptUpload,
   handleCouponStep,
   handleReminderStep,
+  buildSummaryConfirmResponses,
   handleFinalConfirm,
   handleSummaryConfirm,
   handleRating,
@@ -215,6 +244,67 @@ async function sendMedia(params: Parameters<typeof sendMediaRaw>[0]) {
     return { simulated: true };
   }
   return sendMediaRaw(params);
+}
+
+/**
+ * Entrega uma resposta do fluxo que pode trazer imagem.
+ *
+ * A legenda de uma mídia não aceita lista nem botão. Quando a mensagem tem
+ * imagem *e* opções — o caso do resumo com o cartão do agendamento —, o resumo
+ * vai na legenda e as opções seguem em uma mensagem própria, que aí sim chega
+ * tocável. Sem provedor interativo nada muda: legenda e opções continuam juntas.
+ */
+async function sendFlowResponse(
+  msg: IncomingMessage,
+  resposta: { text?: string; mediaUrl?: string; mediaType?: string; voiceReply?: boolean }
+) {
+  if (!resposta.mediaUrl) {
+    return sendText({ number: msg.phone, text: resposta.text ?? "", voiceReply: resposta.voiceReply });
+  }
+
+  const mediaType = (resposta.mediaType as "image" | "video") ?? "image";
+  const plano = resposta.text ? planInteractiveDelivery(resposta.text) : { kind: "text" as const };
+
+  if (plano.kind === "text") {
+    return sendMedia({
+      number: msg.phone,
+      mediaUrl: resposta.mediaUrl,
+      mediaType,
+      caption: resposta.text || undefined,
+    });
+  }
+
+  const { body, options } = parseNumberedOptions(resposta.text ?? "");
+  const entrega = await sendMedia({
+    number: msg.phone,
+    mediaUrl: resposta.mediaUrl,
+    mediaType,
+    caption: body,
+  });
+  await sendText({
+    number: msg.phone,
+    text: `Como deseja seguir?\n\n${renderOptionLines(options)}`,
+    voiceReply: false,
+  });
+  return entrega;
+}
+
+/** Lista de opções. No simulador vira texto numerado, como o cliente veria. */
+async function sendList(params: Parameters<typeof sendListRaw>[0]) {
+  const callback = flowDeliveryContext.getStore()?.sendTextCallback;
+  if (callback) {
+    const linhas: string[] = [`*${params.title}*`, params.description];
+    let posicao = 0;
+    for (const section of params.sections) {
+      for (const row of section.rows) {
+        posicao++;
+        linhas.push(`*${posicao}* — ${row.title}${row.description ? ` — ${row.description}` : ""}`);
+      }
+    }
+    await callback(linhas.filter(Boolean).join("\n"));
+    return { simulated: true };
+  }
+  return sendListRaw(params);
 }
 
 async function sendCalendarWithImageAndList(params: { number: string; prompts?: unknown; caption?: string }) {
@@ -329,13 +419,7 @@ async function executeCoreHandler(
         // Em modo de teste, retorna texto + mídia para exibição no painel
         await msg.testMode.sendTextCallback(`[MÍDIA: ${response.mediaType}|${response.mediaUrl}] ${response.text || ""}`);
       } else {
-        const delivery = await sendMedia({
-          number: msg.phone,
-          mediaUrl: response.mediaUrl,
-          mediaType: response.mediaType,
-          caption: response.text || undefined,
-        });
-        assertDelivered(delivery);
+        assertDelivered(await sendFlowResponse(msg, response));
       }
       continue;
     }
@@ -391,14 +475,14 @@ function flowMsg(wctx: WhatsAppCatalogContext) {
     mainMenu: (flow: FlowState, pushName?: string) =>
       etapa2MainMenu(
         clientDisplayName(flow, pushName),
-        buildMainMenu(wctx.categories, prompts),
+        buildMainMenu(wctx.categories, prompts, wctx.catalog),
         prompts
       ),
     subMenu: (n: number) => subMenuForCategoryCtx(n, wctx),
-    detail: (key: string) => {
+    detail: (key: string, includeActionMenu = true) => {
       const item = catalog[key];
       if (!item) return "";
-      return serviceDetail(item, prompts, wctx.servicesByKey[key]?.whatsappDetail);
+      return serviceDetail(item, prompts, wctx.servicesByKey[key]?.whatsappDetail, includeActionMenu);
     },
   };
 }
@@ -643,14 +727,105 @@ function storeVehicle(flow: FlowState, text: string): FlowState {
   return next;
 }
 
+/**
+ * Serviços cujo preço/execução dependem do estado da pintura. Só neles faz
+ * sentido exigir cor e conservação antes do orçamento.
+ */
+const SERVICOS_SENSIVEIS_AO_ESTADO =
+  /polimento|vitrific|cer[âa]mic|coating|revitaliza|descontamina|premium|prote[çc][ãa]o|cristaliza/i;
+
+function servicoDependeDoEstado(flow: FlowState): boolean {
+  const referencia = `${flow.serviceKey ?? ""} ${flow.serviceLabel ?? ""}`.trim();
+  return referencia ? SERVICOS_SENSIVEIS_AO_ESTADO.test(referencia) : false;
+}
+
+/**
+ * Dados de veículo realmente necessários para fechar o agendamento.
+ *
+ * Antes o fluxo exigia modelo + ano + placa + cor + estado para qualquer
+ * serviço — cinco campos para uma lavagem de R$ 55, o que fazia o cliente
+ * desistir na coleta. Agora:
+ *  - modelo é sempre necessário (define porte e preço);
+ *  - cor e estado só entram quando o serviço depende da pintura;
+ *  - a placa saiu da coleta e é pedida depois da confirmação, quando o cliente
+ *    já comprou (ver `awaitingPlateAfterBooking`). Ela continua obrigatória
+ *    para o reconhecimento no portão, só deixou de bloquear a venda.
+ */
+export function requiredVehicleFields(flow: FlowState): VehicleField[] {
+  const campos: VehicleField[] = ["model"];
+  if (servicoDependeDoEstado(flow)) campos.push("color", "condition");
+  return campos;
+}
+
 function hasVehicleInFlow(flow: FlowState) {
-  // A placa é obrigatória para permitir a identificação automática no portão.
-  if (flow.vehicleModel && flow.vehicleYear && flow.vehiclePlate && flow.vehicleColor && flow.vehicleCondition) return true;
-  
-  // Verifica vehicleRaw APENAS se já tem cor e condição (requisito mínimo)
-  if (flow.vehicleRaw && isValidVehicle(flow.vehicleRaw) && flow.vehiclePlate && flow.vehicleColor && flow.vehicleCondition) return true;
-  
+  const faltando = missingVehicleFields(flow);
+  if (faltando.length === 0) return true;
+  // Um texto livre já reconhecido como veículo cobre o modelo.
+  if (faltando.length === 1 && faltando[0] === "model") {
+    return Boolean(flow.vehicleRaw && isValidVehicle(flow.vehicleRaw));
+  }
   return false;
+}
+
+/**
+ * Tenta abrir a conversa com a oferta de repetição. Devolve `true` quando a
+ * oferta foi enviada — nesse caso o chamador não deve seguir para o menu.
+ */
+async function offerRepeatIfPossible(msg: IncomingMessage, flow: FlowState): Promise<boolean> {
+  if (msg.testMode?.skipDb) return false;
+  try {
+    const oferta = await buildRepeatOffer(msg.phone);
+    if (!oferta) return false;
+    const nome = clientDisplayName(flow, msg.pushName);
+    await saveFlow(msg.phone, { ...flow, repeatOffer: oferta, stage: "ETAPA2_MAIN_MENU" });
+
+    // Com provedor que suporta botão, os horários viram toque em vez de digitar
+    // um número. É o ponto de maior atrito do fluxo rápido.
+    if (providerSupportsButtons() && oferta.slots.length) {
+      const botoes = oferta.slots.slice(0, 2).map((slot, i) => ({
+        id: String(i + 1),
+        displayText: `${slot.label} ${slot.time}`.slice(0, 20),
+      }));
+      botoes.push({ id: "5", displayText: "Outro horário" });
+      await sendButtons({
+        number: msg.phone,
+        title: `Oi, ${nome}! 👋`,
+        description: `Da última vez foi *${oferta.serviceName}* no *${oferta.vehicleLabel}*.\nQuer repetir? R$ ${oferta.servicePrice.toFixed(2).replace(".", ",")}`,
+        footer: "Toque em um horário para reservar",
+        buttons: botoes,
+      });
+      return true;
+    }
+
+    await sendText({ number: msg.phone, text: formatRepeatOffer(oferta, nome) });
+    return true;
+  } catch (error) {
+    console.error("[WhatsApp Flow] Oferta de repetição indisponível; seguindo pelo menu.", error);
+    return false;
+  }
+}
+
+/**
+ * Depois de reconhecer o veículo, segue direto para o orçamento.
+ *
+ * A tela "confirma que é um Civic 2020? *1* sim *2* não" custava um turno para
+ * validar um dado que o próprio orçamento e o resumo final já mostram — e que o
+ * cliente pode corrigir escrevendo a qualquer momento. Ela só continua
+ * aparecendo quando ainda falta algum dado obrigatório do veículo.
+ */
+async function advanceAfterVehicle(
+  msg: IncomingMessage,
+  next: FlowState,
+  wctx: WhatsAppCatalogContext
+) {
+  if (!hasVehicleInFlow(next)) {
+    await saveFlow(msg.phone, next);
+    await sendText({ number: msg.phone, text: vehicleMissingCopy(next, wctx.prompts) });
+    return;
+  }
+  const confirmado: FlowState = { ...next, vehicleConfirmed: true, vehicleCollectStep: undefined };
+  await saveFlow(msg.phone, confirmado);
+  await sendQuote(msg, confirmado, wctx);
 }
 
 function beginVehicleCollection(flow: FlowState, reset = false): FlowState {
@@ -671,13 +846,14 @@ function beginVehicleCollection(flow: FlowState, reset = false): FlowState {
 type VehicleField = "model" | "year" | "plate" | "color" | "condition";
 
 function missingVehicleFields(flow: FlowState): VehicleField[] {
-  const missing: VehicleField[] = [];
-  if (!flow.vehicleModel) missing.push("model");
-  if (!flow.vehicleYear) missing.push("year");
-  if (!flow.vehiclePlate) missing.push("plate");
-  if (!flow.vehicleColor) missing.push("color");
-  if (!flow.vehicleCondition) missing.push("condition");
-  return missing;
+  const preenchido: Record<VehicleField, boolean> = {
+    model: Boolean(flow.vehicleModel),
+    year: Boolean(flow.vehicleYear),
+    plate: Boolean(flow.vehiclePlate),
+    color: Boolean(flow.vehicleColor),
+    condition: Boolean(flow.vehicleCondition),
+  };
+  return requiredVehicleFields(flow).filter((campo) => !preenchido[campo]);
 }
 
 function vehicleKnownLabel(flow: FlowState) {
@@ -845,7 +1021,10 @@ function renderAppointmentsSummary(appointments: Array<{ date: Date; startTime: 
   ];
 
   for (const appointment of appointments.slice(0, 4)) {
-    const serviceLabel = appointment.service.whatsappShort ?? appointment.service.name;
+    // `whatsappShort` guarda a descrição do serviço ("Ducha, secagem, limpeza
+    // interna..."), não um nome curto: usada aqui, a lista de agendamentos
+    // mostrava um parágrafo no lugar de "Lavagem Completa".
+    const serviceLabel = appointment.service.name;
     lines.push(`• ${format(new Date(appointment.date), "dd/MM/yyyy")} às ${appointment.startTime} — ${serviceLabel}`);
   }
 
@@ -937,7 +1116,18 @@ async function handleGlobalCommands(
   return false;
 }
 
-async function goToVehicleStep(msg: IncomingMessage, flow: FlowState, wctx: WhatsAppCatalogContext) {
+/**
+ * Pede os dados do veículo. `prefixo` permite juntar o detalhe do serviço à
+ * pergunta na mesma mensagem — o fluxo mantém uma pergunta por resposta do
+ * cliente mesmo tendo perdido a etapa intermediária de "quer agendar?".
+ */
+async function goToVehicleStep(
+  msg: IncomingMessage,
+  flow: FlowState,
+  wctx: WhatsAppCatalogContext,
+  prefixo?: string
+) {
+  const comPrefixo = (texto: string) => (prefixo ? `${prefixo}\n\n${texto}` : texto);
   if (flow.savedVehicle && !hasVehicleInFlow(flow)) {
     const saved = parseVehicleMessage(flow.savedVehicle);
     const next: FlowState = {
@@ -947,32 +1137,53 @@ async function goToVehicleStep(msg: IncomingMessage, flow: FlowState, wctx: What
       vehiclePlate: flow.savedVehiclePlate || saved.plate || undefined,
       vehicleRaw: saved.summary || flow.savedVehicle,
       vehicleYear: saved.year || undefined,
-      vehicleColor: undefined,
-      vehicleCondition: undefined,
+      vehicleColor: flow.vehicleColor,
+      vehicleCondition: flow.vehicleCondition,
       vehicleIsSuv: saved.isSuv,
-      vehicleCollectStep: "details",
-      awaitingSavedVehicleChoice: true,
     };
+
+    // O cliente que retorna já respondeu "é o mesmo veículo?" na abertura da
+    // conversa. Perguntar de novo aqui repetia a mesma pergunta sete passos
+    // depois. Quando a escolha já foi feita, seguimos direto.
+    if (flow.vehicleConfirmed) {
+      next.vehicleCollectStep = hasVehicleInFlow(next) ? undefined : "details";
+      await saveFlow(msg.phone, next);
+      if (hasVehicleInFlow(next)) {
+        if (prefixo) await sendText({ number: msg.phone, text: prefixo });
+        await sendQuote(msg, next, wctx);
+      } else {
+        await sendText({ number: msg.phone, text: comPrefixo(vehicleMissingCopy(next, wctx.prompts)) });
+      }
+      return;
+    }
+
+    next.vehicleCollectStep = "details";
+    next.awaitingSavedVehicleChoice = true;
     await saveFlow(msg.phone, next);
     await sendText({
       number: msg.phone,
-      text: `Veículo salvo encontrado: *${flow.savedVehicle}${flow.savedVehiclePlate ? ` · ${flow.savedVehiclePlate}` : ""}*.
+      text: comPrefixo(`Veículo salvo encontrado: *${flow.savedVehicle}${flow.savedVehiclePlate ? ` · ${flow.savedVehiclePlate}` : ""}*.
 
 Deseja usar esse veículo novamente?
 *1* — Sim
-*2* — Não, informar outro veículo`,
+*2* — Não, informar outro veículo`),
     });
     return;
   }
 
   const next = beginVehicleCollection(flow);
   await saveFlow(msg.phone, next);
-  await sendText({
+  const delivery = await sendText({
     number: msg.phone,
-    text: vehicleKnownLabel(next) === "nenhum dado confirmado ainda"
-      ? etapa4Vehicle(false, wctx.prompts)
-      : vehicleMissingCopy(next, wctx.prompts),
+    text: comPrefixo(
+      vehicleKnownLabel(next) === "nenhum dado confirmado ainda"
+        ? etapa4Vehicle(false, wctx.prompts)
+        : vehicleMissingCopy(next, wctx.prompts)
+    ),
   });
+  if ((delivery as any)?.error || (delivery as any)?.blocked || (delivery as any)?.queued) {
+    throw new Error("Não foi possível pedir os dados do veículo imediatamente");
+  }
 }
 
 function normalizeConditionValue(value: string | null | undefined): "excelente" | "bom" | "normal" | "ruim" {
@@ -1016,12 +1227,17 @@ async function activateService(
   if (!item) return;
   const dbService = msg.testMode?.skipDb ? null : await resolveDbService(serviceKey, item.dbMatch);
   const dbId = wctx.dbServiceIdByKey[serviceKey] ?? dbService?.id;
+  // Escolher o serviço na lista já é a decisão de agendar. O menu "1 agendar /
+  // 2 outro serviço / 3 dúvida" custava um turno inteiro para repetir uma
+  // intenção que o cliente acabou de manifestar; agora só os pacotes, que
+  // precisam de comparação, mantêm o menu de ação.
+  const ehPacote = serviceKey === "pacotes";
   const activeFlow: FlowState = {
     ...flow,
     serviceKey,
     serviceLabel: item.label,
     dbServiceId: dbId,
-    stage: serviceKey === "pacotes" ? "ETAPA3_PACKAGE_ACTION" : "ETAPA3_SERVICE_ACTION",
+    stage: ehPacote ? "ETAPA3_PACKAGE_ACTION" : "ETAPA3_SERVICE_ACTION",
   };
   const requestContext = (flow.serviceRequestContext ?? "").toLowerCase();
   const contextualIntro = /terra|barro|poeira|muito sujo/.test(requestContext) && /lavagem/.test(serviceKey)
@@ -1031,7 +1247,7 @@ async function activateService(
       : /risco|opac|sem brilho/.test(requestContext) && /polimento|pintura/.test(serviceKey)
         ? "Pelo relato sobre riscos ou perda de brilho, este serviço é o mais indicado para começarmos a avaliação da pintura."
         : null;
-  const detailText = `${contextualIntro ? `${contextualIntro}\n\n` : ""}${flowMsg(wctx).detail(serviceKey)}`;
+  const detailText = `${contextualIntro ? `${contextualIntro}\n\n` : ""}${flowMsg(wctx).detail(serviceKey, ehPacote)}`;
 
   const detailWithWelcome = detailText;
   if (msg.initialWelcomePrefix && !msg.initialWelcomeConsumed) {
@@ -1040,45 +1256,71 @@ async function activateService(
     if (!msg.testMode?.sendTextCallback) await delay(180);
   }
 
-  // Enviar imagem do serviço (se existir), usando o próprio detalhe como
-  // legenda para não separar uma etapa lógica em duas mensagens.
-  let delivery: unknown;
+  // Imagem do serviço, quando houver: o detalhe vira a legenda para não
+  // separar uma etapa lógica em duas mensagens.
+  let media: { path?: string; mimeType?: string } | null = null;
   if (dbId) {
     try {
       // Nem todo schema possui serviceMedia; tratar de forma compatível.
-      const media = await (prisma as any).serviceMedia?.findFirst({
+      media = await (prisma as any).serviceMedia?.findFirst({
         where: { serviceId: dbId },
         orderBy: { createdAt: "asc" },
       });
-
-      if (media?.path) {
-        const mediaType = media.mimeType?.startsWith("video/")
-          ? "video"
-          : media.mimeType?.startsWith("image/")
-          ? "image"
-          : "document";
-
-        delivery = await sendMedia({
-          number: msg.phone,
-          mediaUrl: media.path,
-          caption: detailWithWelcome,
-          mediaType,
-        });
-      } else {
-        delivery = await sendText({ number: msg.phone, text: detailWithWelcome });
-      }
     } catch (err) {
-      console.error("[Midia] Erro ao enviar mídia do serviço:", err);
-      delivery = await sendText({ number: msg.phone, text: detailWithWelcome });
+      console.error("[Midia] Erro ao buscar mídia do serviço:", err);
+      media = null;
     }
-  } else {
-    delivery = await sendText({ number: msg.phone, text: detailWithWelcome });
   }
 
-  if ((delivery as any)?.error || (delivery as any)?.blocked || (delivery as any)?.queued) {
-    throw new Error("Não foi possível entregar os detalhes do serviço imediatamente");
-  }
+  const assertDelivery = (delivery: unknown) => {
+    if ((delivery as any)?.error || (delivery as any)?.blocked || (delivery as any)?.queued) {
+      throw new Error("Não foi possível entregar os detalhes do serviço imediatamente");
+    }
+  };
+
   await saveFlow(msg.phone, activeFlow);
+
+  // Pacote: o detalhe termina no menu de comparação e a conversa para aqui.
+  if (ehPacote) {
+    assertDelivery(await entregarDetalhe(msg, detailWithWelcome, media));
+    return;
+  }
+
+  // Serviço avulso: escolher o serviço já é a decisão de agendar, então o
+  // detalhe e o pedido do veículo saem juntos — uma pergunta por resposta.
+  if (hasVehicleInFlow(activeFlow)) {
+    assertDelivery(await entregarDetalhe(msg, detailWithWelcome, media));
+    await sendQuote(msg, activeFlow, wctx);
+    return;
+  }
+
+  if (media?.path) {
+    assertDelivery(await entregarDetalhe(msg, detailWithWelcome, media));
+    await goToVehicleStep(msg, activeFlow, wctx);
+    return;
+  }
+
+  await goToVehicleStep(msg, activeFlow, wctx, detailWithWelcome);
+}
+
+/** Envia o detalhe do serviço com a mídia cadastrada, se existir. */
+async function entregarDetalhe(
+  msg: IncomingMessage,
+  texto: string,
+  media: { path?: string; mimeType?: string } | null
+) {
+  if (!media?.path) return sendText({ number: msg.phone, text: texto });
+  const mediaType = media.mimeType?.startsWith("video/")
+    ? "video"
+    : media.mimeType?.startsWith("image/")
+      ? "image"
+      : "document";
+  try {
+    return await sendMedia({ number: msg.phone, mediaUrl: media.path, caption: texto, mediaType });
+  } catch (err) {
+    console.error("[Midia] Erro ao enviar mídia do serviço:", err);
+    return sendText({ number: msg.phone, text: texto });
+  }
 }
 
 function dateLabel(date: Date, includeYear = false) {
@@ -1088,7 +1330,13 @@ function dateLabel(date: Date, includeYear = false) {
 function validBusinessDay(date: Date) {
   const today = new Date();
   const dayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  return date >= dayStart && date.getDay() !== 0;
+  if (date < dayStart) return false;
+  // Os dias de funcionamento vêm do painel. Antes o domingo estava fechado no
+  // código: uma loja que abrisse aos domingos teria o dia oferecido pela agenda
+  // e recusado aqui, e quem fechasse às segundas continuaria recebendo pedidos.
+  const diasDeTrabalho = getCachedWorkingDays();
+  if (diasDeTrabalho) return diasDeTrabalho.includes(date.getDay());
+  return date.getDay() !== 0;
 }
 
 export function parseDayInput(input: string, num: number | null) {
@@ -1194,13 +1442,13 @@ function availabilityServiceSelectionText(
   pushName?: string
 ): string {
   const name = clientDisplayName(flow, pushName);
-  const date = flow.dayLabel ?? flow.dayDate;
+  const date = customerDayDisplay(flow);
   return [
     `Claro, *${name}*. ${date ? `Considerei *${date}*.` : "Vamos encontrar a melhor data para você."}`,
     "",
     "Para consultar os horários reais, primeiro preciso saber qual serviço você deseja — a duração muda conforme o cuidado escolhido.",
     "",
-    buildMainMenu(wctx.categories, wctx.prompts),
+    buildMainMenu(wctx.categories, wctx.prompts, wctx.catalog),
     "",
     "_Você pode responder com o número ou escrever o nome do serviço._",
   ].join("\n");
@@ -1256,27 +1504,27 @@ function buildBudgetMessage(flow: FlowState) {
 
   const lines = [
     "━━━━━━━━━━━━━━━",
-    "📋 **Seu orçamento**",
-    `- Serviço: ${flow.serviceLabel ?? "Serviço premium"} — **R$ ${serviceValue.toFixed(2).replace(".", ",")}**`,
+    "📋 *Seu orçamento*",
+    `• Serviço: ${flow.serviceLabel ?? "Serviço premium"} — *R$ ${serviceValue.toFixed(2).replace(".", ",")}*`,
   ];
 
   if (complementValue > 0) {
-    lines.push(`- Proteção: **R$ ${complementValue.toFixed(2).replace(".", ",")}**`);
+    lines.push(`• Proteção: *R$ ${complementValue.toFixed(2).replace(".", ",")}*`);
   }
 
   if (pickupValue > 0) {
-    lines.push(`- Leva e traz: **R$ ${pickupValue.toFixed(2).replace(".", ",")}**`);
+    lines.push(`• Leva e traz: *R$ ${pickupValue.toFixed(2).replace(".", ",")}*`);
   }
 
   if (couponValue > 0) {
-    lines.push(`- Cupom: **- R$ ${couponValue.toFixed(2).replace(".", ",")}**`);
+    lines.push(`• Cupom: *- R$ ${couponValue.toFixed(2).replace(".", ",")}*`);
   }
 
   if (firstTimeBonus > 0) {
-    lines.push(`- Bônus de primeira visita: **- R$ ${firstTimeBonus.toFixed(2).replace(".", ",")}**`);
+    lines.push(`• Bônus de primeira visita: *- R$ ${firstTimeBonus.toFixed(2).replace(".", ",")}*`);
   }
 
-  lines.push(`- **Total: R$ ${totalValue.toFixed(2).replace(".", ",")}**`);
+  lines.push(`• *Total: R$ ${totalValue.toFixed(2).replace(".", ",")}*`);
   lines.push("━━━━━━━━━━━━━━━");
   return lines.join("\n");
 }
@@ -1284,7 +1532,7 @@ function buildBudgetMessage(flow: FlowState) {
 async function loadContext(): Promise<FlowContext> {
   let s: Awaited<ReturnType<typeof prisma.settings.findUnique>> = null;
   try {
-    s = await prisma.settings.findUnique({ where: { id: "default" } });
+    s = await getRuntimeSettings();
   } catch (error) {
     if (!flowDeliveryContext.getStore()?.skipDb) throw error;
     console.error("[WhatsApp Flow] Configurações externas indisponíveis no simulador; usando padrões locais.", error);
@@ -1296,7 +1544,10 @@ async function loadContext(): Promise<FlowContext> {
       s?.businessHoursEnd ?? "18:00",
       s?.workingDays ?? "1,2,3,4,5,6"
     ),
-    address: s?.businessAddress ?? "",
+    // `businessAddress` costuma ficar vazio; o endereço real do local mora em
+    // `storeAddress` (usado pelo cálculo de leva-e-traz). Sem este fallback o
+    // bot respondia "Consulte nosso endereço" mesmo tendo o endereço cadastrado.
+    address: s?.businessAddress?.trim() || s?.storeAddress?.trim() || "",
     pixKey: s?.pixKey ?? null,
     pixHolder: s?.pixHolderName ?? null,
     pixBank: s?.pixBank ?? null,
@@ -1419,6 +1670,592 @@ async function getFlowDurationMin(flow: FlowState, wctx: WhatsAppCatalogContext)
   return CATALOG_DURATION_MIN[key] ?? 120;
 }
 
+/** Por quantos dias à frente o seletor procura vagas. */
+const DIAS_NA_AGENDA = 28;
+/** Quantos horários prontos abrem o seletor, antes das semanas. */
+const ATALHOS_DE_HORARIO = 3;
+
+type DiaDaAgenda = { iso: string; data: Date; slots: string[] };
+
+/** Nome curto do dia: "Hoje", "Amanhã" ou o dia da semana. */
+function nomeDoDia(data: Date, hoje: Date): string {
+  const dias = Math.round(
+    (new Date(data.getFullYear(), data.getMonth(), data.getDate()).getTime() -
+      new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).getTime()) /
+      86_400_000
+  );
+  if (dias === 0) return "Hoje";
+  if (dias === 1) return "Amanhã";
+  const semana = format(data, "EEEE", { locale: ptBR }).replace("-feira", "");
+  return semana.charAt(0).toUpperCase() + semana.slice(1);
+}
+
+/** Segunda-feira da semana de uma data. */
+function inicioDaSemana(data: Date): Date {
+  const copia = new Date(data.getFullYear(), data.getMonth(), data.getDate());
+  const diaDaSemana = copia.getDay();
+  // Domingo (0) pertence à semana que começou na segunda anterior.
+  const recuo = diaDaSemana === 0 ? 6 : diaDaSemana - 1;
+  copia.setDate(copia.getDate() - recuo);
+  return copia;
+}
+
+/**
+ * Dias com vaga nas próximas semanas, com os horários de cada um.
+ *
+ * Uma consulta só cobre o período inteiro (`generateAvailableSlotsRange`), então
+ * montar o seletor de semana, o de dia e o de horário não custa uma ida ao
+ * banco por dia.
+ */
+async function carregarAgenda(durationMin: number): Promise<DiaDaAgenda[]> {
+  const hoje = new Date();
+  const simulador = Boolean(flowDeliveryContext.getStore()?.skipDb);
+
+  let porDia = new Map<string, string[]>();
+  try {
+    porDia = await generateAvailableSlotsRange(
+      format(hoje, "yyyy-MM-dd"),
+      DIAS_NA_AGENDA,
+      durationMin
+    );
+  } catch (error) {
+    if (!simulador) throw error;
+  }
+
+  const dias: DiaDaAgenda[] = [];
+  for (let i = 0; i < DIAS_NA_AGENDA; i++) {
+    const data = addDays(hoje, i);
+    if (!validBusinessDay(data)) continue;
+    const iso = format(data, "yyyy-MM-dd");
+    let slots = porDia.get(iso) ?? [];
+    // O simulador não tem agenda real; horários de demonstração mantêm o
+    // caminho completo visível no painel de teste.
+    if (slots.length === 0 && simulador) slots = ["09:00", "11:00", "14:00", "16:00"];
+    if (slots.length === 0) continue;
+    dias.push({ iso, data, slots });
+  }
+  return dias;
+}
+
+/** Guarda as opções mostradas para que a resposta por número continue valendo. */
+async function registrarOpcoes(
+  msg: IncomingMessage,
+  flow: FlowState,
+  opcoes: Array<{ id: string; label: string }>,
+  stage: FlowState["stage"]
+) {
+  flow.pickerOptions = opcoes;
+  flow.stage = stage;
+  await saveFlow(msg.phone, flow, msg.testMode?.skipDb);
+}
+
+/** Resolve o número digitado para o id da opção correspondente da última lista. */
+function opcaoEscolhida(flow: FlowState, input: string): string | null {
+  const posicao = Number(input.trim());
+  if (!Number.isInteger(posicao) || posicao < 1) return null;
+  return flow.pickerOptions?.[posicao - 1]?.id ?? null;
+}
+
+
+/**
+ * Cancelar ou remarcar uma reserva já existente.
+ *
+ * Devolve `true` quando a mensagem foi resolvida aqui. Só entra em ação quando
+ * existe um agendamento ativo — assim "cancelar" no meio de um orçamento
+ * continua significando desistir da compra, e não desmarcar outro atendimento.
+ */
+async function handleAppointmentChange(
+  msg: IncomingMessage,
+  flow: FlowState,
+  wctx: WhatsAppCatalogContext,
+  input: string
+): Promise<boolean> {
+  const resposta = input.trim();
+
+  if (flow.awaitingCancelConfirmation && flow.cancelAppointmentId) {
+    if (/^(1|sim|s|confirmo|pode cancelar|cancela|cancelar)$/i.test(resposta)) {
+      const cancelado = await cancelAppointmentFromBot({
+        appointmentId: flow.cancelAppointmentId,
+        motivo: "Cancelado pelo cliente no WhatsApp",
+      });
+      const next: FlowState = {
+        ...flow,
+        awaitingCancelConfirmation: false,
+        cancelAppointmentId: undefined,
+        stage: "ETAPA2_MAIN_MENU",
+      };
+      await saveFlow(msg.phone, next);
+      await sendText({
+        number: msg.phone,
+        text: [
+          `Pronto. Seu horário de *${format(new Date(cancelado.date), "dd/MM")} às ${cancelado.startTime}* foi cancelado, sem custo.`,
+          "",
+          "Quando quiser remarcar, é só me chamar — envie *menu* para ver os serviços.",
+        ].join("\n"),
+      });
+      return true;
+    }
+
+    if (/^(2|n[ãa]o|nao|n|manter|mantenha|deixa)/i.test(resposta)) {
+      const next: FlowState = {
+        ...flow,
+        awaitingCancelConfirmation: false,
+        cancelAppointmentId: undefined,
+      };
+      await saveFlow(msg.phone, next);
+      await sendText({
+        number: msg.phone,
+        text: "Combinado, seu horário continua confirmado 😊 Te espero no dia!",
+      });
+      return true;
+    }
+
+    // Outra coisa qualquer não pode ficar presa na pergunta: sai do modo e
+    // segue lendo a mensagem logo abaixo — quem repete "quero cancelar" recebe
+    // a pergunta de novo, e qualquer outro assunto continua pelo fluxo normal.
+    flow.awaitingCancelConfirmation = false;
+    flow.cancelAppointmentId = undefined;
+    await saveFlow(msg.phone, flow);
+  }
+
+  if (!stageAllowsAppointmentChange(flow.stage)) return false;
+
+  const intencao = detectAppointmentChangeIntent(resposta);
+  if (!intencao) return false;
+
+  const agendamento = await fetchNextAppointment(msg.phone);
+  if (!agendamento) return false;
+
+  const quando = `*${format(new Date(agendamento.date), "dd/MM/yyyy")}* às *${agendamento.startTime}*`;
+
+  if (intencao === "cancel") {
+    const next: FlowState = {
+      ...flow,
+      awaitingCancelConfirmation: true,
+      cancelAppointmentId: agendamento.id,
+    };
+    await saveFlow(msg.phone, next);
+    await sendText({
+      number: msg.phone,
+      text: [
+        `Você tem *${agendamento.service.name}* marcado para ${quando}.`,
+        "",
+        "Confirma o cancelamento?",
+        "",
+        "*1* ✅ Sim, cancelar",
+        "*2* 📅 Manter o horário",
+        "",
+        "_Se preferir apenas trocar o dia, responda *remarcar*._",
+      ].join("\n"),
+    });
+    return true;
+  }
+
+  const duracao =
+    timeToMinutes(agendamento.endTime) - timeToMinutes(agendamento.startTime) ||
+    agendamento.service.durationMin;
+  const valor = Number(agendamento.finalPrice ?? agendamento.service.price);
+
+  // Depois de um atendimento humano o estado da conversa é zerado, então o
+  // veículo pode não estar mais no fluxo. O cadastro do cliente guarda o mesmo
+  // dado e evita um resumo com "seu veículo" no lugar do carro.
+  const veiculoSalvo = [agendamento.client.vehicleModel, agendamento.client.vehiclePlate]
+    .filter(Boolean)
+    .join(" · ");
+  const next: FlowState = {
+    ...flow,
+    rescheduleAppointmentId: agendamento.id,
+    vehicleModel: flow.vehicleModel ?? agendamento.client.vehicleModel ?? undefined,
+    vehiclePlate: flow.vehiclePlate ?? agendamento.client.vehiclePlate ?? undefined,
+    vehicleRaw: flow.vehicleRaw ?? agendamento.client.vehicleModel ?? undefined,
+    savedVehicle: flow.savedVehicle ?? (veiculoSalvo || null),
+    dbServiceId: agendamento.serviceId,
+    serviceKey: agendamento.service.catalogKey ?? flow.serviceKey,
+    serviceLabel: agendamento.service.name,
+    serviceDurationMin: duracao,
+    estimatedTime: `${duracao} min`,
+    quoteMin: valor,
+    quoteMax: valor,
+    vehicleConfirmed: true,
+    // O dia antigo não pode continuar preenchido: ele faria o fluxo pular a
+    // escolha da nova data e voltar direto para os horários do mesmo dia.
+    dayDate: undefined,
+    dayLabel: undefined,
+    startTime: undefined,
+    periodLabel: undefined,
+    stage: "ETAPA7_DAY",
+  };
+  await saveFlow(msg.phone, next);
+
+  const ofereceu = await sendDayPicker(
+    msg,
+    next,
+    wctx,
+    `Vamos remarcar seu atendimento de *${agendamento.service.name}*, marcado para ${quando}.\n\nO horário atual fica reservado até você confirmar o novo.`
+  );
+  if (!ofereceu) {
+    await sendText({
+      number: msg.phone,
+      text: "Não encontrei vagas nas próximas semanas para remarcar. Responda *9* que um especialista organiza a troca com você.",
+    });
+  }
+  return true;
+}
+
+/**
+ * Abre a escolha de data: imagem do calendário e, logo abaixo, a lista.
+ *
+ * A lista começa pelos horários prontos (um toque fecha data e hora) e segue
+ * pelas semanas. A divisão semana → dia → horário existe porque a lista da
+ * Wafly não aceita seções: sem ela, um mês de agenda viraria trinta linhas
+ * seguidas, sem separação nenhuma. Assim cada tela cabe na altura do aparelho e
+ * o calendário fica logo acima, como referência do mês.
+ */
+async function sendDayPicker(
+  msg: IncomingMessage,
+  flow: FlowState,
+  wctx: WhatsAppCatalogContext,
+  cabecalho?: string
+): Promise<boolean> {
+  let durationMin = await getFlowDurationMin(flow, wctx);
+  if (flow.upsellAccepted) durationMin += flow.upsellDurationMin ?? 60;
+  flow.serviceDurationMin = durationMin;
+
+  const agenda = await carregarAgenda(durationMin);
+  if (agenda.length === 0) return false;
+
+  const hoje = new Date();
+
+  // Atalhos: o primeiro horário de cada um dos próximos dias com vaga.
+  const atalhos = agenda.slice(0, ATALHOS_DE_HORARIO).map((dia) => ({
+    id: `${dia.iso} ${dia.slots[0]}`,
+    label: `${nomeDoDia(dia.data, hoje)} ${format(dia.data, "dd/MM")} · ${dia.slots[0]}`,
+    description: `Primeiro horário livre · ${dia.slots.length} no dia`,
+  }));
+
+  // Semanas, com a contagem real de vagas de cada uma.
+  const semanas = new Map<string, { inicio: Date; dias: number }>();
+  for (const dia of agenda) {
+    const inicio = inicioDaSemana(dia.data);
+    const chave = format(inicio, "yyyy-MM-dd");
+    const atual = semanas.get(chave) ?? { inicio, dias: 0 };
+    atual.dias += 1;
+    semanas.set(chave, atual);
+  }
+
+  const linhasSemana = [...semanas.entries()].map(([chave, semana], indice) => {
+    const fim = addDays(semana.inicio, 5);
+    const nome =
+      indice === 0
+        ? "Esta semana"
+        : indice === 1
+          ? "Próxima semana"
+          : `Semana de ${format(semana.inicio, "dd/MM")}`;
+    return {
+      id: `semana:${chave}`,
+      label: `📅 ${nome}`,
+      description: `${format(semana.inicio, "dd/MM")} a ${format(fim, "dd/MM")} · ${semana.dias} ${semana.dias === 1 ? "dia" : "dias"} com vaga`,
+    };
+  });
+
+  const linhas = [...atalhos, ...linhasSemana].slice(0, MAX_LIST_ROWS);
+  await registrarOpcoes(
+    msg,
+    flow,
+    linhas.map(({ id, label }) => ({ id, label })),
+    "ETAPA7_DAY"
+  );
+
+  // O calendário vem primeiro, como referência visual do mês.
+  const legenda = [
+    cabecalho?.trim(),
+    cabecalho ? "" : null,
+    `📅 Escolha o dia do atendimento. Reservamos *${formatDurationLabel(durationMin)}* só para o seu veículo.`,
+  ]
+    .filter((linha) => linha !== null && linha !== undefined)
+    .join("\n");
+
+  const entregaCalendario = await sendCalendarWithImageAndList({
+    number: msg.phone,
+    prompts: wctx.prompts,
+    caption: legenda,
+  });
+  if ((entregaCalendario as any)?.error || (entregaCalendario as any)?.blocked) {
+    throw new Error("Não foi possível entregar o calendário imediatamente");
+  }
+
+  const entrega = await sendList({
+    number: msg.phone,
+    title: "Quando fica melhor?",
+    description: [
+      "Toque em um horário para reservar direto, ou escolha a semana para ver todos os dias.",
+      "",
+      `_Se preferir, escreva a data — por exemplo *${format(addDays(hoje, 7), "dd/MM")}* ou *sexta*._`,
+    ].join("\n"),
+    buttonText: "Ver datas",
+    sections: [
+      {
+        title: "Datas disponíveis",
+        rows: linhas.map((l) => ({ id: l.id, title: l.label, description: l.description })),
+      },
+    ],
+  });
+  if ((entrega as any)?.error || (entrega as any)?.blocked || (entrega as any)?.queued) {
+    throw new Error("Não foi possível entregar as datas imediatamente");
+  }
+  return true;
+}
+
+/** Lista os dias com vaga de uma semana. */
+async function sendWeekDays(
+  msg: IncomingMessage,
+  flow: FlowState,
+  wctx: WhatsAppCatalogContext,
+  inicioIso: string
+): Promise<boolean> {
+  const durationMin = flow.serviceDurationMin ?? (await getFlowDurationMin(flow, wctx));
+  const agenda = await carregarAgenda(durationMin);
+  const inicio = parse(inicioIso, "yyyy-MM-dd", new Date());
+  const fim = addDays(inicio, 6);
+
+  const dias = agenda.filter((dia) => dia.data >= inicio && dia.data < fim);
+  if (dias.length === 0) {
+    await sendText({
+      number: msg.phone,
+      text: "Essa semana ficou sem vaga para a duração deste serviço. Veja as outras datas abaixo.",
+    });
+    return sendDayPicker(msg, flow, wctx);
+  }
+
+  const hoje = new Date();
+  const linhas = dias.slice(0, MAX_LIST_ROWS - 1).map((dia) => ({
+    id: dia.iso,
+    label: `${nomeDoDia(dia.data, hoje)} ${format(dia.data, "dd/MM")}`,
+    description: `${dia.slots.length} ${dia.slots.length === 1 ? "horário livre" : "horários livres"} · a partir de ${dia.slots[0]}`,
+  }));
+  linhas.push({
+    id: "outro-dia",
+    label: "↩️ Ver outras semanas",
+    description: "Voltar ao calendário",
+  });
+
+  await registrarOpcoes(
+    msg,
+    flow,
+    linhas.map(({ id, label }) => ({ id, label })),
+    "ETAPA7_DAY"
+  );
+
+  const entrega = await sendList({
+    number: msg.phone,
+    title: `Semana de ${format(inicio, "dd/MM")}`,
+    description: "Escolha o dia e eu mostro os horários livres.",
+    buttonText: "Ver dias",
+    sections: [
+      {
+        title: "Dias com vaga",
+        rows: linhas.map((l) => ({ id: l.id, title: l.label, description: l.description })),
+      },
+    ],
+  });
+  if ((entrega as any)?.error || (entrega as any)?.blocked || (entrega as any)?.queued) {
+    throw new Error("Não foi possível entregar os dias imediatamente");
+  }
+  return true;
+}
+
+/**
+ * Fecha a escolha de horário e vai direto ao resumo.
+ *
+ * Escolher o horário é o momento do compromisso. Antes vinham mais seis telas
+ * depois dele (cupom, fidelidade, logística, pagamento, lembrete e resumo), e é
+ * aí que o cliente desistia. Assumimos os padrões mais comuns e mostramos o
+ * resumo; quem quiser mexer responde pelo próprio resumo.
+ */
+async function goToSummaryWithChosenTime(msg: IncomingMessage, flow: FlowState, chosen: string) {
+  flow.startTime = chosen;
+  flow.periodLabel = chosen;
+  flow.needsPickup = flow.needsPickup ?? false;
+  flow.paymentMethod = flow.paymentMethod ?? "Dinheiro (na loja)";
+  flow.reminderEnabled = flow.reminderEnabled ?? true;
+  flow.reminderPreference = flow.reminderPreference ?? "30min";
+  flow.stage = "ETAPA15_SUMMARY_CONFIRM";
+  await saveFlow(msg.phone, flow, msg.testMode?.skipDb);
+
+  const resumo = await buildSummaryConfirmResponses(flow, [], msg.pushName);
+  for (const resposta of resumo) {
+    await sendFlowResponse(msg, resposta);
+  }
+}
+
+/**
+ * Reserva um horário escolhido em um toque na lista de próximos horários.
+ * Revalida a agenda antes de seguir: entre a montagem da lista e o toque do
+ * cliente outra reserva pode ter ocupado a vaga.
+ */
+async function takeOfferedSlot(
+  msg: IncomingMessage,
+  flow: FlowState,
+  wctx: WhatsAppCatalogContext,
+  iso: string,
+  time: string
+): Promise<boolean> {
+  const durationMin = flow.serviceDurationMin ?? (await getFlowDurationMin(flow, wctx));
+
+  let livres: string[] = [];
+  try {
+    livres = await generateAvailableSlots(iso, durationMin);
+  } catch (error) {
+    if (!flowDeliveryContext.getStore()?.skipDb) throw error;
+    livres = [time];
+  }
+  if (flowDeliveryContext.getStore()?.skipDb && livres.length === 0) livres = [time];
+
+  if (!livres.includes(time)) {
+    await sendText({
+      number: msg.phone,
+      text: "Esse horário acabou de ser reservado por outro cliente 😕 Escolha outro nas opções abaixo.",
+    });
+    await sendDayPicker(msg, flow, wctx);
+    return true;
+  }
+
+  const dia = parse(iso, "yyyy-MM-dd", new Date());
+  flow.dayDate = iso;
+  flow.dayLabel = dateLabel(dia, true);
+  flow.availableSlots = livres;
+  flow.serviceDurationMin = durationMin;
+  await goToSummaryWithChosenTime(msg, flow, time);
+  return true;
+}
+
+type PeriodoDoDia = "manha" | "tarde" | "noite";
+
+const PERIODOS: Array<{ chave: PeriodoDoDia; nome: string; emoji: string; de: number; ate: number }> = [
+  { chave: "manha", nome: "Manhã", emoji: "🌅", de: 0, ate: 12 },
+  { chave: "tarde", nome: "Tarde", emoji: "☀️", de: 12, ate: 18 },
+  { chave: "noite", nome: "Noite", emoji: "🌙", de: 18, ate: 24 },
+];
+
+function periodoDoHorario(slot: string): PeriodoDoDia {
+  const hora = Number(slot.split(":")[0]);
+  if (hora < 12) return "manha";
+  if (hora < 18) return "tarde";
+  return "noite";
+}
+
+/**
+ * Mostra os horários de um dia.
+ *
+ * Um dia cheio pode ter mais horários do que cabe em uma lista legível. Quando
+ * isso acontece, a escolha passa por período (manhã, tarde, noite) antes de
+ * chegar aos horários — é a mesma ideia de dividir por semana antes de dividir
+ * por dia. `flow.availableSlots` guarda sempre o dia inteiro, então escrever
+ * "15:30" continua funcionando mesmo que a lista mostre só a manhã.
+ */
+async function sendTimeList(
+  msg: IncomingMessage,
+  flow: FlowState,
+  wctx: WhatsAppCatalogContext,
+  todos: string[],
+  opcoes?: { periodo?: PeriodoDoDia; introducao?: string }
+) {
+  const durationMin = flow.serviceDurationMin ?? (await getFlowDurationMin(flow, wctx));
+  const diaLegivel = flow.dayLabel ?? flow.dayDate ?? "o dia";
+  const cabeNaLista = MAX_LIST_ROWS - 1;
+
+  const doPeriodo = opcoes?.periodo
+    ? todos.filter((slot) => periodoDoHorario(slot) === opcoes.periodo)
+    : todos;
+
+  // Dia cheio demais para uma lista só: primeiro o período, depois o horário.
+  if (!opcoes?.periodo && doPeriodo.length > cabeNaLista) {
+    const linhas = PERIODOS.map((periodo) => {
+      const horarios = todos.filter((slot) => periodoDoHorario(slot) === periodo.chave);
+      if (horarios.length === 0) return null;
+      return {
+        id: `periodo:${periodo.chave}`,
+        label: `${periodo.emoji} ${periodo.nome}`,
+        description: `${horarios.length} horários · ${horarios[0]} às ${horarios[horarios.length - 1]}`,
+      };
+    }).filter((linha): linha is { id: string; label: string; description: string } => linha !== null);
+
+    linhas.push({
+      id: "outro-dia",
+      label: "↩️ Escolher outro dia",
+      description: "Voltar ao calendário",
+    });
+
+    await registrarOpcoes(
+      msg,
+      flow,
+      linhas.map(({ id, label }) => ({ id, label })),
+      "ETAPA7_TIME"
+    );
+
+    await sendList({
+      number: msg.phone,
+      title: `Horários — ${diaLegivel}`,
+      description: [
+        opcoes?.introducao?.trim(),
+        `São *${todos.length}* horários livres nesse dia. Escolha o período e eu mostro os horários exatos.`,
+        "",
+        `_Se já sabe a hora, é só escrever — por exemplo *${todos[0]}*._`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      buttonText: "Ver períodos",
+      sections: [
+        {
+          title: "Períodos do dia",
+          rows: linhas.map((l) => ({ id: l.id, title: l.label, description: l.description })),
+        },
+      ],
+    });
+    return;
+  }
+
+  const exibidos = doPeriodo.slice(0, cabeNaLista);
+  const linhas = exibidos.map((slot) => ({
+    id: slot,
+    label: `🕒 ${slot}`,
+    description: `Termina às ${calculateEndTime(slot, durationMin)}`,
+  }));
+  linhas.push({
+    id: "outro-dia",
+    label: "↩️ Escolher outro dia",
+    description: "Voltar ao calendário",
+  });
+
+  await registrarOpcoes(
+    msg,
+    flow,
+    linhas.map(({ id, label }) => ({ id, label })),
+    "ETAPA7_TIME"
+  );
+
+  await sendList({
+    number: msg.phone,
+    title: `Horários — ${diaLegivel}`,
+    description: [
+      opcoes?.introducao?.trim(),
+      `O atendimento leva *${formatDurationLabel(durationMin)}* e esse período fica reservado só para o seu veículo.`,
+      doPeriodo.length > exibidos.length
+        ? `\n_Há mais horários nesse dia; se quiser outro, é só escrever a hora._`
+        : null,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    buttonText: "Escolher horário",
+    sections: [
+      {
+        title: "Horários livres",
+        rows: linhas.map((l) => ({ id: l.id, title: l.label, description: l.description })),
+      },
+    ],
+  });
+}
+
 async function proceedToTimeSelection(
   msg: IncomingMessage,
   flow: FlowState,
@@ -1429,60 +2266,151 @@ async function proceedToTimeSelection(
 
   if (!flow.dayDate) return;
 
-  let slots: string[] = [];
+  let todos: string[] = [];
   try {
-    slots = await generateAvailableSlots(flow.dayDate, durationMin);
+    todos = await generateAvailableSlots(flow.dayDate, durationMin);
   } catch (error) {
     if (!flowDeliveryContext.getStore()?.skipDb) throw error;
     console.warn("[WhatsApp Flow] Agenda indisponível no simulador; usando horários de demonstração.", error);
   }
-  if (slots.length === 0 && flowDeliveryContext.getStore()?.skipDb) {
-    slots = ["09:00", "11:00", "14:00", "16:00"];
+  if (todos.length === 0 && flowDeliveryContext.getStore()?.skipDb) {
+    todos = ["09:00", "11:00", "14:00", "16:00"];
   }
-  const requestedPreference = flow.requestedTimePreference;
-  let preferenceApplied = false;
-  if (requestedPreference && slots.length > 0) {
-    const preferredSlots = slots.filter((slot) => {
-      const hour = Number(slot.split(":")[0]);
-      if (requestedPreference === "morning") return hour < 12;
-      if (requestedPreference === "afternoon") return hour >= 12 && hour < 18;
-      return hour >= 18;
-    });
-    if (preferredSlots.length > 0) {
-      slots = preferredSlots;
-      preferenceApplied = true;
-    }
-  }
-  flow.serviceDurationMin = durationMin;
-  flow.availableSlots = slots;
-  const { prompts } = wctx;
 
-  if (slots.length === 0) {
+  flow.serviceDurationMin = durationMin;
+  // O dia inteiro fica guardado mesmo quando a lista mostra só um período:
+  // é ele que valida um horário escrito à mão.
+  flow.availableSlots = todos;
+
+  if (todos.length === 0) {
     flow.stage = "ETAPA7_DAY";
     delete flow.availableSlots;
-    await saveFlow(msg.phone, flow);
+    await saveFlow(msg.phone, flow, msg.testMode?.skipDb);
     await sendText({
       number: msg.phone,
-      text: etapa7NoSlots(flow.dayLabel ?? "este dia", prompts),
+      text: `Não encontrei uma janela livre em *${flow.dayLabel ?? "esse dia"}* para a duração deste serviço. Vamos ver outra data:`,
     });
+    await sendDayPicker(msg, flow, wctx);
     return;
   }
 
-  flow.stage = "ETAPA7_TIME";
-  await saveFlow(msg.phone, flow);
-  await sendText({
-    number: msg.phone,
-    text: `${requestedPreference
-      ? preferenceApplied
-        ? `Encontrei estes horários no período da *${requestedPeriodLabel(requestedPreference)}*, como você pediu.\n\n`
-        : `Não encontrei vagas no período da *${requestedPeriodLabel(requestedPreference)}*; abaixo estão as opções disponíveis no dia.\n\n`
-      : ""}${etapa7Time(
-        flow.dayLabel ?? flow.dayDate,
-        slots,
-        formatDurationLabel(durationMin),
-        prompts
-      )}`,
+  // Preferência dita na conversa ("de manhã", "à tarde") abre direto no período.
+  const preferencia = flow.requestedTimePreference;
+  const periodoPreferido: PeriodoDoDia | undefined =
+    preferencia === "morning"
+      ? "manha"
+      : preferencia === "afternoon"
+        ? "tarde"
+        : preferencia === "evening"
+          ? "noite"
+          : undefined;
+  const temNoPeriodo =
+    periodoPreferido && todos.some((slot) => periodoDoHorario(slot) === periodoPreferido);
+
+  await sendTimeList(msg, flow, wctx, todos, {
+    periodo: temNoPeriodo ? periodoPreferido : undefined,
+    introducao: preferencia
+      ? temNoPeriodo
+        ? `Estes são os horários da *${requestedPeriodLabel(preferencia)}*, como você pediu.`
+        : `Não encontrei vaga na *${requestedPeriodLabel(preferencia)}* nesse dia; estas são as opções disponíveis.`
+      : undefined,
   });
+}
+
+/**
+ * Leva uma mensagem escrita para onde ela pertence, em qualquer etapa.
+ *
+ * As etapas de agendamento esperam uma opção da lista, mas o cliente escreve o
+ * que quiser: "na verdade quero polimento" no meio da escolha da data, ou
+ * "quanto dura?" antes de decidir. Antes essas mensagens batiam num "não
+ * entendi" e o atendimento travava. Aqui a etapa dá o primeiro palpite; só
+ * quando ela não reconhece a resposta é que este roteador tenta entender a
+ * intenção — e devolve `true` quando assumiu a conversa.
+ *
+ * A ordem importa: pedido concreto (serviço/categoria) antes de dúvida, porque
+ * "quero saber sobre polimento" é as duas coisas e a mais útil é abrir o
+ * serviço.
+ */
+async function routeFreeText(
+  msg: IncomingMessage,
+  flow: FlowState,
+  ctx: FlowContext,
+  wctx: WhatsAppCatalogContext,
+  input: string
+): Promise<boolean> {
+  const texto = input.trim();
+  if (texto.length < 2) return false;
+  // Um número solto é resposta de menu, não mudança de assunto.
+  if (/^\d{1,2}$/.test(texto)) return false;
+
+  if (wantsHumanHandoff(texto)) {
+    await handleHumanHandoffRequest(msg, flow);
+    return true;
+  }
+
+  const servico = detectServiceKey(texto);
+  if (servico && servico !== "indeciso" && servico !== flow.serviceKey) {
+    await activateService(msg, { ...flow, serviceRequestContext: texto.slice(0, 500) }, servico, wctx);
+    return true;
+  }
+
+  const categoria = detectCategoryNum(texto);
+  if (categoria && wctx.categories[categoria]?.keys.length) {
+    await saveFlow(
+      msg.phone,
+      { ...flow, stage: "ETAPA2_SUB", categoryNum: categoria },
+      msg.testMode?.skipDb
+    );
+    await sendText({ number: msg.phone, text: subMenuForCategoryCtx(categoria, wctx) });
+    return true;
+  }
+
+  if (looksLikeQuestion(texto) || wantsDoubt(texto, null)) {
+    // A dúvida é respondida sem sair do lugar: a etapa continua a mesma e o
+    // cliente recebe, logo em seguida, a mesma pergunta que estava pendente.
+    const resposta = await buildCustomerDoubtAnswer(texto, flow, ctx, wctx);
+    await sendText({ number: msg.phone, text: resposta, voiceReply: true });
+    await resendCurrentStep(msg, flow, wctx);
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Repete a pergunta da etapa atual depois de um desvio (uma dúvida, por
+ * exemplo), para o cliente não ficar sem saber o que responder.
+ */
+async function resendCurrentStep(
+  msg: IncomingMessage,
+  flow: FlowState,
+  wctx: WhatsAppCatalogContext
+) {
+  switch (flow.stage) {
+    case "ETAPA7_DAY":
+    case "ETAPA7_CUSTOM_DAY":
+      await sendDayPicker(msg, flow, wctx);
+      return;
+    case "ETAPA7_TIME":
+      if (flow.availableSlots?.length) {
+        await sendTimeList(msg, flow, wctx, flow.availableSlots);
+        return;
+      }
+      await sendDayPicker(msg, flow, wctx);
+      return;
+    case "ETAPA4_VEHICLE":
+      await sendText({ number: msg.phone, text: vehicleMissingCopy(flow, wctx.prompts) });
+      return;
+    case "ETAPA2_SUB":
+      if (flow.categoryNum) {
+        await sendText({ number: msg.phone, text: subMenuForCategoryCtx(flow.categoryNum, wctx) });
+        return;
+      }
+      await sendText({ number: msg.phone, text: flowMsg(wctx).mainMenu(flow, msg.pushName) });
+      return;
+    default:
+      await sendText({ number: msg.phone, text: flowMsg(wctx).mainMenu(flow, msg.pushName) });
+  }
 }
 
 async function ensureClient(phone: string, name: string, skipDb = false) {
@@ -1792,15 +2720,26 @@ async function sendQuote(msg: IncomingMessage, flow: FlowState, wctx: WhatsAppCa
       await sendText({ number: msg.phone, text: quoteText });
       await proceedToTimeSelection(msg, flow, wctx);
     } else {
-      const delivery = await sendCalendarWithImageAndList({
-        number: msg.phone,
-        prompts: wctx.prompts,
-        caption: quoteText,
-      });
-      if ((delivery as any)?.error || (delivery as any)?.blocked || (delivery as any)?.queued) {
-        throw new Error("Não foi possível entregar o calendário imediatamente");
+      // O orçamento vira a legenda do calendário, e a lista de datas vem logo
+      // abaixo dele. A frase padrão do prompt já aponta para o calendário, então
+      // só o que fala em "abaixo" precisa sair, para não repetir a instrução.
+      const textoDoCalendario = quoteText.replace(
+        /\n*_Agora escolha o melhor dia no calend[aá]rio abaixo\._/i,
+        ""
+      );
+      const ofertou = await sendDayPicker(msg, flow, wctx, textoDoCalendario);
+      if (!ofertou) {
+        // Agenda cheia no mês: resta o calendário com a resposta livre por data.
+        const delivery = await sendCalendarWithImageAndList({
+          number: msg.phone,
+          prompts: wctx.prompts,
+          caption: quoteText,
+        });
+        if ((delivery as any)?.error || (delivery as any)?.blocked || (delivery as any)?.queued) {
+          throw new Error("Não foi possível entregar o calendário imediatamente");
+        }
+        await saveFlow(msg.phone, flow);
       }
-      await saveFlow(msg.phone, flow);
     }
     return;
   }
@@ -1903,18 +2842,148 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
   // próxima mensagem iniciamos uma nova jornada, usando o nome já conhecido e
   // perguntando primeiro se o veículo continua sendo o mesmo.
   if (flow.awaitingPostConfirmationReturn) {
-    const next: FlowState = {
-      ...flow,
-      awaitingPostConfirmationReturn: false,
-      awaitingReturningVehicleChoice: true,
-      stage: "ETAPA2_MAIN_MENU",
-    };
+    // Cliente conhecido volta direto numa oferta fechável, em vez do menu.
+    if (await offerRepeatIfPossible(msg, { ...flow, awaitingPostConfirmationReturn: false })) return;
+
+    // Só a saudação abre a jornada com a pergunta do veículo. Quem volta já
+    // dizendo o que quer ("9", "cancelar", "quero polimento") tinha a mensagem
+    // trocada por essa pergunta e precisava repetir o pedido.
+    if (!isGreetingOrSmallTalk(input)) {
+      flow = { ...flow, awaitingPostConfirmationReturn: false };
+      await saveFlow(msg.phone, flow);
+    } else {
+      const next: FlowState = {
+        ...flow,
+        awaitingPostConfirmationReturn: false,
+        awaitingReturningVehicleChoice: true,
+        stage: "ETAPA2_MAIN_MENU",
+      };
+      await saveFlow(msg.phone, next);
+      await sendText({
+        number: msg.phone,
+        text: `Olá, *${clientDisplayName(next, msg.pushName)}*! Que bom falar com você novamente.\n\nO novo atendimento será para o mesmo veículo, *${next.savedVehicle ?? vehicleDisplayFromFlow(next)}${next.savedVehiclePlate ? ` · ${next.savedVehiclePlate}` : ""}*?\n\n*1* ✅ Mesmo veículo\n*2* 🚗 Outro veículo`,
+      });
+      return;
+    }
+  }
+
+  // Resposta à oferta de repetição (caminho rápido do cliente recorrente).
+  if (flow.repeatOffer) {
+    const oferta = flow.repeatOffer as RepeatOffer;
+    const escolha = parseRepeatChoice(input, oferta);
+
+    if (escolha.kind === "slot") {
+      const pronto: FlowState = {
+        ...flow,
+        repeatOffer: undefined,
+        stage: "ETAPA15_SUMMARY_CONFIRM",
+        dbServiceId: oferta.serviceId,
+        serviceLabel: oferta.serviceName,
+        serviceDurationMin: oferta.serviceDurationMin,
+        quoteMin: oferta.servicePrice,
+        quoteMax: oferta.servicePrice,
+        dayDate: escolha.slot.date,
+        dayLabel: escolha.slot.label,
+        startTime: escolha.slot.time,
+        // Padrões do caminho rápido: sem coleta e pagamento no local. O cliente
+        // ajusta depois se quiser — não vale seis perguntas para confirmar.
+        needsPickup: false,
+        paymentMethod: flow.paymentMethod ?? "Dinheiro (na loja)",
+        reminderEnabled: flow.reminderEnabled ?? true,
+        reminderPreference: flow.reminderPreference ?? "30min",
+        // Sem reidratar o veículo, a confirmação saía com "seu veículo" e o bot
+        // ainda pedia uma placa que o cliente já tinha cadastrada.
+        vehicleModel: flow.vehicleModel ?? oferta.vehicleModel ?? undefined,
+        vehiclePlate: flow.vehiclePlate ?? oferta.vehiclePlate ?? undefined,
+        vehicleRaw: flow.vehicleRaw ?? oferta.vehicleLabel,
+        savedVehicle: flow.savedVehicle ?? oferta.vehicleModel,
+        savedVehiclePlate: flow.savedVehiclePlate ?? oferta.vehiclePlate,
+        vehicleConfirmed: true,
+      };
+      await saveFlow(msg.phone, pronto);
+      await confirmFinal(msg, pronto, ctx, wctx);
+      return;
+    }
+
+    if (escolha.kind === "other-service") {
+      const next: FlowState = { ...flow, repeatOffer: undefined, stage: "ETAPA2_MAIN_MENU" };
+      await saveFlow(msg.phone, next);
+      await sendText({ number: msg.phone, text: flowMsg(wctx).mainMenu(next, msg.pushName) });
+      return;
+    }
+
+    if (escolha.kind === "other-time") {
+      const next: FlowState = {
+        ...flow,
+        repeatOffer: undefined,
+        stage: "ETAPA7_DAY",
+        dbServiceId: oferta.serviceId,
+        serviceLabel: oferta.serviceName,
+        serviceDurationMin: oferta.serviceDurationMin,
+        quoteMin: oferta.servicePrice,
+        quoteMax: oferta.servicePrice,
+        vehicleConfirmed: true,
+      };
+      await saveFlow(msg.phone, next);
+      await sendCalendarWithImageAndList({ number: msg.phone, prompts: wctx.prompts });
+      return;
+    }
+
+    // Não entendeu: não insiste na oferta, cai no menu para não travar.
+    const next: FlowState = { ...flow, repeatOffer: undefined, stage: "ETAPA2_MAIN_MENU" };
     await saveFlow(msg.phone, next);
-    await sendText({
-      number: msg.phone,
-      text: `Olá, *${clientDisplayName(next, msg.pushName)}*! Que bom falar com você novamente.\n\nO novo atendimento será para o mesmo veículo, *${next.savedVehicle ?? vehicleDisplayFromFlow(next)}${next.savedVehiclePlate ? ` · ${next.savedVehiclePlate}` : ""}*?\n\n*1* ✅ Sim, o mesmo veículo\n*2* 🚗 Não, quero informar outro`,
-    });
+    await sendText({ number: msg.phone, text: flowMsg(wctx).mainMenu(next, msg.pushName) });
     return;
+  }
+
+  // Placa pedida depois da reserva (ver `requiredVehicleFields`). Roda antes do
+  // switch porque a resposta é uma placa solta, que nenhuma etapa entenderia.
+  if (flow.awaitingPlateAfterBooking) {
+    const placa = parsePlateFromText(input) ?? normalizeVehiclePlate(input);
+    if (isValidVehiclePlate(placa)) {
+      const next: FlowState = {
+        ...flow,
+        vehiclePlate: placa,
+        savedVehiclePlate: placa,
+        awaitingPlateAfterBooking: false,
+      };
+      await saveFlow(msg.phone, next);
+      if (!msg.testMode?.skipDb) {
+        await prisma.client
+          .update({ where: { phone: normalizePhone(msg.phone) }, data: { vehiclePlate: placa } })
+          .catch((error) => console.error("[WhatsApp Flow] Falha ao salvar a placa:", error));
+      }
+      await sendText({
+        number: msg.phone,
+        text: `✅ Placa *${placa}* anotada.\n\nNossa câmera vai reconhecer seu veículo na chegada e o atendimento começa sozinho. Até lá! 🤍`,
+      });
+      return;
+    }
+
+    if (/^(depois|dps|mais tarde|no dia|deixa|pular|n[ãa]o|nao)$/i.test(lower)) {
+      await saveFlow(msg.phone, { ...flow, awaitingPlateAfterBooking: false });
+      await sendText({
+        number: msg.phone,
+        text: "Sem problema 😊 Anotamos a placa no dia do atendimento.",
+      });
+      return;
+    }
+
+    // Um texto curto e sem sentido de placa ainda é tentativa de placa; qualquer
+    // outra coisa é assunto novo ("quero cancelar", "quanto custa") e não pode
+    // ficar presa nesta pergunta — antes o cliente recebia o mesmo aviso para
+    // sempre, sem nenhuma saída.
+    const pareceTentativaDePlaca = /^[a-z0-9\s-]{5,10}$/i.test(input.trim());
+    if (pareceTentativaDePlaca) {
+      await sendText({
+        number: msg.phone,
+        text: "Não consegui ler a placa. Envie no formato *BRA2E19* ou *ABC1234* — ou responda *depois* para anotarmos no dia.",
+      });
+      return;
+    }
+
+    await saveFlow(msg.phone, { ...flow, awaitingPlateAfterBooking: false });
+    flow.awaitingPlateAfterBooking = false;
   }
 
   if (flow.awaitingReturningVehicleChoice) {
@@ -1951,11 +3020,27 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
       return;
     }
 
-    await sendText({
-      number: msg.phone,
-      text: `Vamos usar *${flow.savedVehicle ?? vehicleDisplayFromFlow(flow)}${flow.savedVehiclePlate ? ` · ${flow.savedVehiclePlate}` : ""}* neste atendimento?\n\n*1* ✅ Sim, o mesmo veículo\n*2* 🚗 Não, informar outro`,
-    });
-    return;
+    // O cliente pode descrever outro carro em vez de responder *2*.
+    const outroVeiculo = parseVehicleMessage(input);
+    if (outroVeiculo.hasData && outroVeiculo.model) {
+      const next: FlowState = {
+        ...storeVehicle({ ...flow, savedVehicle: null, savedVehiclePlate: null }, input),
+        awaitingReturningVehicleChoice: false,
+        vehicleConfirmed: true,
+        stage: "ETAPA2_MAIN_MENU",
+      };
+      await saveFlow(msg.phone, next);
+      await sendText({ number: msg.phone, text: flowMsg(wctx).mainMenu(next, msg.pushName) });
+      return;
+    }
+
+    // Qualquer outra mensagem é um pedido de verdade: agendar, remarcar,
+    // cancelar ou perguntar preço. Repetir a pergunta do veículo transformava
+    // esta etapa em um muro — quem escrevia "quero remarcar" recebia a mesma
+    // pergunta para sempre. O veículo salvo continua valendo (basta descrever
+    // outro para trocar) e a mensagem segue pelo atendimento normal.
+    flow = { ...flow, awaitingReturningVehicleChoice: false, vehicleConfirmed: true };
+    await saveFlow(msg.phone, flow);
   }
 
   // DETECÇÃO DE CANCELAMENTO (cross-cutting) - usando core handler unificado
@@ -1974,7 +3059,7 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
         aiFollowupReturnStage: undefined,
       };
       await saveFlow(msg.phone, next);
-      await sendText({ number: msg.phone, text: menuForStage(next, wctx, msg.pushName) });
+      await sendText({ number: msg.phone, text: await menuForStage(next, wctx, msg.pushName) });
       return;
     }
 
@@ -2039,6 +3124,13 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
     // serviço continuam na etapa pausada, sem obrigar o cliente a escolher 1/2.
     await saveFlow(msg.phone, resumedFlow);
     await processNumberedFlowInternal(msg, resumedFlow);
+    return;
+  }
+
+  // Cancelar e remarcar vêm antes dos comandos globais: "quero cancelar meu
+  // agendamento" casa com o padrão de "meus agendamentos" e era respondido com
+  // a lista da própria reserva, sem nunca cancelar nada.
+  if (await handleAppointmentChange(msg, flow, wctx, input)) {
     return;
   }
 
@@ -2124,7 +3216,7 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
 
     await sendText({
       number: msg.phone,
-      text: `Anotei sua preferência por *${availabilityFlow.dayLabel ?? availabilityFlow.dayDate ?? "esta data"}*. O serviço considerado é *${availabilityFlow.serviceLabel ?? wctx.catalog[selectedService]?.label ?? "o serviço escolhido"}*.\n\n${menuForStage(availabilityFlow, wctx, msg.pushName)}`,
+      text: `Anotei sua preferência por *${availabilityFlow.dayLabel ?? availabilityFlow.dayDate ?? "esta data"}*. O serviço considerado é *${availabilityFlow.serviceLabel ?? wctx.catalog[selectedService]?.label ?? "o serviço escolhido"}*.\n\n${await menuForStage(availabilityFlow, wctx, msg.pushName)}`,
     });
     return;
   }
@@ -2139,9 +3231,18 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
     flow.stage !== "ETAPA2_MAIN_MENU" &&
     flow.stage !== "STALE_RETURN"
   ) {
+    // "oi" e "bom dia" são começo de conversa, não confirmação. Respondê-los com
+    // "Claro 😊" no meio de uma etapa antiga soava fora de contexto — e quando a
+    // etapa não tinha menu próprio o cliente recebia um beco sem saída.
+    const abertura = isConversationOpener(input);
+    const saudacao = abertura
+      ? `${greetingByTime()}${flow.customerName ? `, *${flow.customerName}*` : ""}! 😊`
+      : "Claro 😊";
     await sendText({
       number: msg.phone,
-      text: `Claro 😊 ${menuForStage(flow, wctx, msg.pushName)}`,
+      text: `${saudacao}
+
+${await menuForStage(flow, wctx, msg.pushName)}`,
     });
     return;
   }
@@ -2381,7 +3482,10 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
 
       const catFromText = detectCategoryNum(input);
       const serviceFromText = detectServiceKey(input);
-      const pick = num && num >= 1 && num <= MAIN_MENU_CATEGORIES ? num : catFromText;
+      // O menu mostra as categorias renumeradas sem buracos; a resposta volta
+      // com a posição vista pelo cliente, não com o número da categoria.
+      const catFromNumber = num ? categoryFromMenuNumber(wctx.categories, num) : null;
+      const pick = catFromNumber ?? catFromText;
 
       if (serviceFromText && serviceFromText !== "indeciso") {
         await activateService(msg, { ...flow, serviceRequestContext: input.slice(0, 500) }, serviceFromText, wctx);
@@ -2448,10 +3552,12 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
         return;
       }
       if (!cat || !num || num < 1 || num > cat.keys.length) {
+        // Pode ser um serviço de outra categoria ou uma dúvida antes de decidir.
+        if (await routeFreeText(msg, flow, ctx, wctx, input)) return;
         await sendText({
           number: msg.phone,
           text: cat
-            ? `Qual opção de *${cat.title}* combina com o que você precisa? Pode escrever o nome do serviço ou usar um dos números mostrados.`
+            ? `Qual opção de *${cat.title}* combina com o que você precisa? Pode escrever o nome do serviço ou tocar em uma das opções.`
             : "Não consegui identificar a categoria. Diga em uma frase o que você quer melhorar no veículo.",
         });
         return;
@@ -2567,20 +3673,7 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
             awaitingSavedVehicleChoice: false,
             vehicleCollectStep: hasVehicleInFlow(flow) ? undefined : "details",
           };
-          await saveFlow(msg.phone, next);
-          await sendText({
-            number: msg.phone,
-            text: hasVehicleInFlow(next)
-              ? etapa4VehicleConfirmation(
-                  next.vehicleModel ?? "",
-                  next.vehicleYear ?? "",
-                  next.vehiclePlate ?? "",
-                  next.vehicleColor ?? "",
-                  next.vehicleCondition ?? "",
-                  prompts
-                )
-              : vehicleMissingCopy(next, prompts),
-          });
+          await advanceAfterVehicle(msg, next, wctx);
           return;
         }
 
@@ -2591,6 +3684,20 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
           };
           await saveFlow(msg.phone, next);
           await sendText({ number: msg.phone, text: etapa4Vehicle(false, prompts) });
+          return;
+        }
+
+        // O cliente pode simplesmente descrever outro veículo em vez de responder
+        // 1 ou 2 ("Civic 2021, placa BRA2E19, preto, bom estado"). Antes essa
+        // mensagem era descartada e o mesmo prompt voltava, travando a conversa.
+        // A regra 5 do fluxo oficial manda aproveitar o veículo reconhecido.
+        const informouOutroVeiculo = parseVehicleMessage(input);
+        if (informouOutroVeiculo.hasData && informouOutroVeiculo.model) {
+          const next: FlowState = {
+            ...storeVehicle(beginVehicleCollection(flow, true), input),
+            awaitingSavedVehicleChoice: false,
+          };
+          await advanceAfterVehicle(msg, next, wctx);
           return;
         }
 
@@ -2659,24 +3766,14 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
 
       const collected = await mergeVehicleDetails(flow, input);
       if (!collected.recognized) {
+        // Quem escreve algo que não é veículo normalmente mudou de assunto:
+        // pediu outro serviço ou fez uma pergunta antes de informar o carro.
+        if (await routeFreeText(msg, flow, ctx, wctx, input)) return;
         await sendText({ number: msg.phone, text: vehicleNotUnderstood(prompts) });
         return;
       }
 
-      await saveFlow(msg.phone, collected.next);
-      await sendText({
-        number: msg.phone,
-        text: hasVehicleInFlow(collected.next)
-          ? etapa4VehicleConfirmation(
-              collected.next.vehicleModel ?? "",
-              collected.next.vehicleYear ?? "",
-              collected.next.vehiclePlate ?? "",
-              collected.next.vehicleColor ?? "",
-              collected.next.vehicleCondition ?? "",
-              prompts
-            )
-          : vehicleMissingCopy(collected.next, prompts),
-      });
+      await advanceAfterVehicle(msg, collected.next, wctx);
       return;
     }
 
@@ -2930,11 +4027,37 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
         return;
       }
 
-      const dayParsed = parseDayInput(input, num);
+      // Um número responde a lista mostrada; a lista guarda o id de cada linha,
+      // então digitar "2" vale o mesmo que tocar na segunda opção.
+      const escolha = opcaoEscolhida(flow, input) ?? input.trim();
+
+      // Atalho de horário: o id traz data e hora juntas.
+      const escolhaDireta = escolha.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}:\d{2})$/);
+      if (escolhaDireta) {
+        await takeOfferedSlot(msg, flow, wctx, escolhaDireta[1], escolhaDireta[2].padStart(5, "0"));
+        return;
+      }
+
+      const semanaEscolhida = escolha.match(/^semana:(\d{4}-\d{2}-\d{2})$/);
+      if (semanaEscolhida) {
+        await sendWeekDays(msg, flow, wctx, semanaEscolhida[1]);
+        return;
+      }
+
+      if (/^outro-dia$/i.test(escolha) || /^(outro dia|ver outro dia|outra data|outra semana|ver outras semanas)$/i.test(lower)) {
+        await sendDayPicker(msg, flow, wctx);
+        return;
+      }
+
+      const dayParsed = parseDayInput(escolha, num);
       if (!dayParsed) {
+        // Antes de dizer "não entendi", vale checar se o cliente mudou de
+        // assunto — pedir outro serviço ou fazer uma pergunta no meio da
+        // escolha da data é comum.
+        if (await routeFreeText(msg, flow, ctx, wctx, input)) return;
         await sendText({
           number: msg.phone,
-          text: "Não consegui identificar a data com segurança. Envie algo como *amanhã*, *sexta* ou *15/08* — ou escolha diretamente no calendário acima.",
+          text: "Não consegui identificar a data. Envie algo como *amanhã*, *sexta* ou *15/08* — ou escolha uma das opções da lista acima.",
         });
         return;
       }
@@ -2945,32 +4068,48 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
     }
 
     case "ETAPA7_TIME": {
-      
-      
-
       const slots = flow.availableSlots ?? [];
-
       const durationMin = flow.serviceDurationMin ?? (await getFlowDurationMin(flow, wctx));
-      const chosen = parseTimeSelection(input, slots);
+
+      // Um número responde a lista mostrada; o id da linha é a hora, o período
+      // ou a volta para o calendário.
+      const escolha = opcaoEscolhida(flow, input) ?? input.trim();
+
+      if (/^outro-dia$/i.test(escolha) || /^(outro dia|outra data|mudar o dia|trocar o dia)$/i.test(lower)) {
+        await sendDayPicker(msg, flow, wctx);
+        return;
+      }
+
+      const periodoEscolhido = escolha.match(/^periodo:(manha|tarde|noite)$/);
+      if (periodoEscolhido && slots.length) {
+        await sendTimeList(msg, flow, wctx, slots, {
+          periodo: periodoEscolhido[1] as "manha" | "tarde" | "noite",
+        });
+        return;
+      }
+
+      const chosen = parseTimeSelection(escolha, slots) ?? parseTimeSelection(input, slots);
 
       if (!chosen) {
-        const looksLikeTimeAttempt = /^\d+$/.test(input.trim()) || /\d{1,2}[:h]\d{2}/.test(input.trim());
-        if (looksLikeTimeAttempt) {
+        const tentouHorario = /^\d+$/.test(input.trim()) || /\d{1,2}[:h]\d{2}/.test(input.trim());
+        if (tentouHorario) {
           await sendText({
             number: msg.phone,
-            text: slotUnavailable(
-              flow.dayLabel ?? flow.dayDate ?? "este dia",
-              slots.map((slot, index) => `*${index + 1}* — ${slot}`).join("\n"),
-              prompts
-            ),
+            text: `Esse horário não está livre em *${flow.dayLabel ?? flow.dayDate ?? "esse dia"}*. Escolha um dos disponíveis:`,
           });
+          await sendTimeList(msg, flow, wctx, slots);
           return;
         }
 
+        // Mensagem escrita que não é horário: pode ser outro serviço ou uma
+        // dúvida. A etapa é retomada depois de responder.
+        if (await routeFreeText(msg, flow, ctx, wctx, input)) return;
+
         await sendText({
           number: msg.phone,
-          text: `Qual horário você prefere? Pode escrever, por exemplo, *09:00*, ou usar o número ao lado de uma opção.\n\n${etapa7Time(flow.dayLabel ?? flow.dayDate ?? "o dia", slots, formatDurationLabel(durationMin), prompts)}`,
+          text: "Qual horário fica melhor? Pode escrever a hora, como *09:00*, ou escolher na lista:",
         });
+        await sendTimeList(msg, flow, wctx, slots);
         return;
       }
 
@@ -2987,27 +4126,17 @@ async function processNumberedFlowInternal(msg: IncomingMessage, flow: FlowState
         }
         if (!fresh.includes(chosen)) {
           flow.availableSlots = fresh;
-          await saveFlow(msg.phone, flow);
+          await saveFlow(msg.phone, flow, msg.testMode?.skipDb);
           await sendText({
             number: msg.phone,
-            text: slotUnavailable(
-              flow.dayLabel ?? flow.dayDate ?? "este dia",
-              fresh.map((slot, index) => `*${index + 1}* — ${slot}`).join("\n"),
-              prompts
-            ),
+            text: "Esse horário acabou de ser reservado por outro cliente 😕 Escolha outro:",
           });
+          await sendTimeList(msg, flow, wctx, fresh);
           return;
         }
       }
 
-      flow.startTime = chosen;
-      flow.periodLabel = chosen;
-      flow.stage = "ETAPA9_COUPON";
-      await saveFlow(msg.phone, flow);
-      await sendText({
-        number: msg.phone,
-        text: etapa9Coupon(prompts),
-      });
+      await goToSummaryWithChosenTime(msg, flow, chosen);
       return;
     }
 
@@ -3318,17 +4447,63 @@ async function buildCustomerDoubtAnswer(
   return aiAnswer || analyzedReply?.trim() || controlledDoubtFallback(question, flow, wctx);
 }
 
-function menuForStage(flow: FlowState, wctx: WhatsAppCatalogContext, pushName?: string): string {
+/**
+ * Fechamento com horário concreto.
+ *
+ * Depois de responder uma dúvida, o bot reimprimia o menu — devolvendo trabalho
+ * a um cliente que acabou de demonstrar interesse. Quando já sabemos o serviço,
+ * é melhor terminar com duas datas reais para ele só escolher.
+ */
+async function closingSlotOffer(flow: FlowState): Promise<string | null> {
+  const duracao = flow.serviceDurationMin ?? 60;
+  const agora = new Date();
+  const encontrados: string[] = [];
+  for (let i = 0; i <= 7 && encontrados.length < 2; i++) {
+    const d = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + i);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    let livres: string[] = [];
+    try {
+      livres = await generateAvailableSlots(iso, duracao);
+    } catch {
+      continue;
+    }
+    const agoraMin = agora.getHours() * 60 + agora.getMinutes();
+    const validos = i === 0
+      ? livres.filter((h) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3)) > agoraMin + 60)
+      : livres;
+    if (validos.length) {
+      encontrados.push(`*${encontrados.length + 1}* 📅 ${slotLabel(iso, agora)} às *${validos[0]}*`);
+    }
+  }
+  if (encontrados.length < 1) return null;
+  return [`Posso reservar um destes para você?`, "", ...encontrados, "", "*3* 🔧 Ver outros serviços"].join("\n");
+}
+
+async function menuForStage(
+  flow: FlowState,
+  wctx: WhatsAppCatalogContext,
+  pushName?: string
+): Promise<string> {
   const msgH = flowMsg(wctx);
   switch (flow.stage) {
     case "ETAPA2_MAIN_MENU":
       return msgH.mainMenu(flow, pushName);
     case "ETAPA5_QUOTE":
-      return `*1* Agendar | *2* Outro serviço | *3* Dúvida`;
-    case "ETAPA3_SERVICE_ACTION":
-      return serviceActionMenu(wctx.prompts);
+    case "ETAPA3_SERVICE_ACTION": {
+      // Serviço já escolhido: oferecer horário converte melhor que repetir menu.
+      if (flow.serviceKey || flow.dbServiceId) {
+        const oferta = await closingSlotOffer(flow).catch(() => null);
+        if (oferta) return oferta;
+      }
+      return flow.stage === "ETAPA5_QUOTE"
+        ? `*1* Agendar | *2* Outro serviço | *3* Dúvida`
+        : serviceActionMenu(wctx.prompts);
+    }
     default:
-      return `Digite *menu* para ver opções.`;
+      // "Digite *menu* para ver opções" devolvia o trabalho ao cliente e era o
+      // que ele recebia ao mandar um simples "oi" numa etapa intermediária.
+      // Qualquer etapa sem menu próprio mostra o menu principal de verdade.
+      return msgH.mainMenu(flow, pushName);
   }
 }
 
@@ -3615,12 +4790,9 @@ async function confirmFinal(
     await saveFlow(msg.phone, flow);
     await sendText({
       number: msg.phone,
-      text: slotUnavailable(
-        flow.dayLabel ?? flow.dayDate ?? "este dia",
-        fresh.map((slot, index) => `*${index + 1}* — ${slot}`).join("\n"),
-        wctx.prompts
-      ),
+      text: slotUnavailable(flow.dayLabel ?? flow.dayDate ?? "este dia", "", wctx.prompts),
     });
+    await sendTimeList(msg, flow, wctx, fresh);
     return;
   }
 
@@ -3632,6 +4804,20 @@ async function confirmFinal(
       text: "Ainda não foi possível registrar a reserva. Revise o resumo e confirme novamente, ou digite *9* para atendimento humano.",
     });
     return;
+  }
+
+  // Remarcação: o horário antigo só é liberado depois que o novo existe, para o
+  // cliente nunca ficar sem reserva se a vaga escolhida for tomada no meio.
+  if (flow.rescheduleAppointmentId && !msg.testMode?.skipDb) {
+    try {
+      await cancelAppointmentFromBot({
+        appointmentId: flow.rescheduleAppointmentId,
+        motivo: "Remarcado pelo cliente no WhatsApp",
+      });
+    } catch (error) {
+      console.error("[confirmFinal] Não foi possível liberar o horário antigo:", error);
+    }
+    flow.rescheduleAppointmentId = undefined;
   }
 
   const services = [
@@ -3651,7 +4837,7 @@ async function confirmFinal(
       name,
       vehicle: vehicleDisplayFromFlow(flow),
       services: services || "Serviço premium",
-      day: flow.dayLabel ?? flow.dayDate ?? "—",
+      day: customerDayDisplay(flow) ?? "—",
       time: flow.startTime ?? flow.periodLabel ?? "—",
       payment: flow.paymentMethod ?? "—",
       value: totalValue.toFixed(2).replace(".", ","),
@@ -3676,6 +4862,9 @@ async function confirmFinal(
     vehicleIsSuv: flow.vehicleIsSuv,
     vehicleConfirmed: true,
     awaitingPostConfirmationReturn: true,
+    // A placa deixou de bloquear a venda; é pedida agora, com a reserva já
+    // feita, para o portão conseguir identificar o veículo na chegada.
+    awaitingPlateAfterBooking: !flow.vehiclePlate,
   };
 
   const confirmationDelivery = await sendText({
@@ -3698,6 +4887,19 @@ async function confirmFinal(
     await prisma.whatsAppSession.updateMany({
       where: { phone: normalizePhone(msg.phone) },
       data: { pendingAppointmentId: null },
+    });
+  }
+
+  if (menuFlow.awaitingPlateAfterBooking) {
+    await sendText({
+      number: msg.phone,
+      text: [
+        "🔠 *Só falta a placa*",
+        "",
+        `Com ela nossa câmera reconhece o *${flow.vehicleModel ?? "seu veículo"}* na chegada e já inicia o atendimento — você nem precisa avisar que chegou.`,
+        "",
+        "_Exemplo: BRA2E19._ Se preferir, responda *depois* e anotamos no dia.",
+      ].join("\n"),
     });
   }
 }
@@ -3875,7 +5077,7 @@ export async function startFlow(msg: IncomingMessage) {
       await sendTextWrapper(
         msg,
         savedVehicle
-          ? `Olá, *${returningName}*! Que bom ter você de volta 😊\n\nEste atendimento será para o mesmo veículo, *${savedVehicle}${savedVehiclePlate ? ` · ${savedVehiclePlate}` : ""}*?\n\n*1* ✅ Sim, o mesmo veículo\n*2* 🚗 Não, quero informar outro\n\n_Você também pode responder com suas palavras._`
+          ? `Olá, *${returningName}*! Que bom ter você de volta 😊\n\nEste atendimento será para o mesmo veículo, *${savedVehicle}${savedVehiclePlate ? ` · ${savedVehiclePlate}` : ""}*?\n\n*1* ✅ Mesmo veículo\n*2* 🚗 Outro veículo\n\n_Você também pode responder com suas palavras._`
           : flowMsg(wctx).mainMenu(returningState, msg.pushName),
         { includesWelcome: false }
       );

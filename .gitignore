@@ -50,3 +50,4 @@ __pycache__/
 /public/tmp/exemplo-story-*.jpg
 /public/tmp/story-bg-default.jpg
 /public/tmp/story-bg-sample.jpg
+scripts/tmp/

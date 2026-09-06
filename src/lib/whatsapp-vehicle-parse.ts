@@ -120,6 +120,11 @@ function cleanModelText(text: string): string {
   t = t.replace(/precisa\s+de\s+aten[çcç]ão/g, "");
   t = t.replace(/pouco\s+uso|bem\s+conservado|bem\s+cuidado|carro\s+novo|zero\s+km|seminovo/gi, "");
   t = t.replace(new RegExp(`\\b${stateWord}\\b`, "gi"), "");
+  // As palavras que rotulam o dado não fazem parte do modelo. Sem isto, o
+  // exemplo que o próprio bot sugere ("Civic 2021, placa BRA2E19, preto, bom
+  // estado") virava o modelo "Civic placa".
+  t = t.replace(/\b(?:placas?|modelo|ano|cor|carro|ve[ií]culo|meu|minha|tenho|possuo)\b\s*/gi, "");
+  t = t.replace(/(^|\s)(?:é|eh)(\s|$)/gi, " ");
   t = t.replace(/\b(em|de|da|do|no|na|um|uma)\b\s*/gi, "");
   t = t.replace(/,/g, "");
   t = t.replace(/\s+/g, " ").trim();

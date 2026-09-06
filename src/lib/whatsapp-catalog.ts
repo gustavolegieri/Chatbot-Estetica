@@ -159,14 +159,20 @@ export const CATALOG: Record<string, CatalogItem> = {
   polimento_cotacao: {
     key: "polimento_cotacao",
     label: "Polimento",
-    short: "Polimento técnico para remoção de riscos e imperfeições — valor sob consulta.",
-    pitch: "Agende uma avaliação presencial para cotação personalizada.",
+    short:
+      "Polimento técnico para remoção de riscos, swirls e opacidade. O valor final depende da profundidade dos riscos e é fechado na avaliação.",
+    pitch: "Faixa de investimento informada na hora; o valor exato sai na avaliação da pintura.",
     dbMatch: "Polimento",
-    time: "sob consulta",
-    hatchMin: 0,
-    hatchMax: 0,
-    suvMin: 0,
-    suvMax: 0,
+    time: "3h a 6h",
+    // ATENÇÃO: faixa provisória. Antes este item ia com preço zero e o bot
+    // respondia apenas "sob consulta" — o cliente que pesquisava preço saía da
+    // conversa sem número nenhum, justamente no serviço de ticket mais alto.
+    // Confirme os valores com o dono e ajuste aqui (ou pelo cadastro do
+    // serviço no painel, que sobrescreve estes números).
+    hatchMin: 300,
+    hatchMax: 600,
+    suvMin: 450,
+    suvMax: 850,
   },
   revitalizacao_pintura: {
     key: "revitalizacao_pintura",

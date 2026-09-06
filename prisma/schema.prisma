@@ -81,6 +81,11 @@ model Service {
   upsellForPickup    Boolean           @default(false)
   upsellForSedan     Boolean           @default(false)
   upsellForSuv       Boolean           @default(false)
+  /// Intervalo recomendado entre duas execucoes deste servico, em dias.
+  /// Vazio deixa o motor inferir pelo catalogo (ver resolveRecurrenceDays).
+  recurrenceDays     Int?
+  /// Duracao da garantia do servico, em dias. Habilita o aviso de vencimento.
+  warrantyDays       Int?
   appointments       Appointment[]
   financialRecords   FinancialRecord[]
   upsellService      Service?          @relation("ServiceUpsell", fields: [upsellServiceId], references: [id])
@@ -122,6 +127,10 @@ model Appointment {
   reminder1hSentAt      DateTime?
   reminder30minSentAt   DateTime?
   reminderPreference    String?
+  /// Montagem antes/depois gerada pela camera do portao.
+  beforeAfterUrl        String?
+  /// Ultimo reengajamento disparado tendo este atendimento como ancora.
+  recurrenceNotifiedAt  DateTime?
   client                Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
   coupon                Coupon?           @relation(fields: [couponId], references: [id])
   service               Service           @relation(fields: [serviceId], references: [id])
@@ -213,6 +222,20 @@ model Settings {
   pixQrCodeImage        String?
   testModeEnabled       Boolean        @default(false)
   testModePhone         String?
+
+  /// Envia a montagem antes/depois ao cliente quando o veiculo sai do portao.
+  beforeAfterEnabled    Boolean        @default(true)
+  /// Guarda a montagem como material de Story. Publicacao publica e opt-in.
+  beforeAfterInstagram  Boolean        @default(false)
+  /// Motor de recorrencia: reengajamento por tempo desde o ultimo servico.
+  recurrenceEnabled     Boolean        @default(false)
+  /// Teto diario de mensagens de recorrencia, para nao parecer disparo em massa.
+  recurrenceMaxPerDay   Int            @default(10)
+  /// Silencio minimo entre dois contatos de recorrencia para o mesmo cliente.
+  recurrenceQuietDays   Int            @default(45)
+  /// Janela local (America/Sao_Paulo) em que a recorrencia pode enviar.
+  recurrenceWindowStart String         @default("09:00")
+  recurrenceWindowEnd   String         @default("19:00")
   businessHours         BusinessHour[]
 }
 

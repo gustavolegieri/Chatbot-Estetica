@@ -178,20 +178,35 @@ Vamos continuar com o agendamento?
 ## 14. ESCOLHA DE HORÁRIO — `ETAPA7_TIME`
 
 - Mostra horários disponíveis
-- Se válido: pergunta sobre cupom → `ETAPA9_COUPON`
+- Se válido: assume os padrões e vai **direto ao resumo** → `ETAPA15_SUMMARY_CONFIRM`
 
-## 15. CUPOM — `ETAPA9_COUPON`
+Padrões assumidos neste ponto (todos aparecem no resumo e podem ser trocados lá):
 
-- **Pular**: → `ETAPA9_LOYALTY`
-- **Pedir código**: `"Perfeito 😊 Me envie o código do cupom (ex: AA)."`
+| Campo | Padrão |
+| --- | --- |
+| Coleta (`needsPickup`) | Não — o cliente leva o veículo |
+| Pagamento (`paymentMethod`) | Dinheiro (na loja) |
+| Lembrete (`reminderEnabled`) | Sim, 30 min antes |
+
+> **Mudança aprovada (04/09/2026).** Antes existiam seis telas entre a escolha do
+> horário e a reserva: cupom → fidelidade → logística → pagamento → lembrete →
+> resumo. Escolher o horário é o momento do compromisso, e era ali que o cliente
+> desistia. As etapas não sumiram: viraram opções do resumo, para quem precisa
+> delas.
+
+## 15. CUPOM — `ETAPA9_COUPON` *(opcional, a partir do resumo)*
+
+Alcançada pela opção *4* do resumo.
+
+- **Pular**: volta ao resumo
+- **Código válido**: `"✅ Cupom {CODE} aplicado com sucesso!"`
 - **Inválido**: `"Cupom inválido ou inativo 😔"`
-- **Aplicado**: `"✅ Cupom {CODE} aplicado com sucesso!"` → `ETAPA9_LOYALTY`
 
-## 16. PONTOS DE FIDELIDADE — `ETAPA9_LOYALTY`
+## 16. LOGÍSTICA / PAGAMENTO / LEMBRETE *(opcionais, a partir do resumo)*
 
-- **Usar pontos**: mostra orçamento com desconto
-- **Não usar**: mostra orçamento sem desconto
-→ `ETAPA10_BUDGET`
+- *5* no resumo → `ETAPA10_LOGISTICS` (leva e traz)
+- *3* no resumo → `ETAPA8_PAYMENT` (troca a forma de pagamento)
+- `ETAPA14_REMINDER` continua existindo no caminho longo e devolve ao resumo
 
 ## 17. CONFIRMAÇÃO DE ORÇAMENTO — `ETAPA10_BUDGET`
 
@@ -239,7 +254,10 @@ Vamos continuar com o agendamento?
 ## 23. RESUMO E CONFIRMAÇÃO — `ETAPA15_SUMMARY_CONFIRM` → `ETAPA16_CONFIRMATION`
 
 - Mostra resumo completo do agendamento
+- Opções: *1* confirmar · *2* alterar data/horário · *3* alterar pagamento · *4* cupom · *5* leva e traz
 - Confirmação final → cria o agendamento (`createAppointment`)
+- Se o veículo não tiver placa, ela é pedida **depois** da confirmação
+  (`awaitingPlateAfterBooking`), para não bloquear a venda
 
 ---
 
@@ -268,3 +286,41 @@ A IA não substitui as regras de negócio, preços, agenda ou confirmação fina
 
 `ETAPA7_PERIOD`, `ETAPA7_CUSTOM_DAY`, `ETAPA8_PAYMENT_NO_PIX`, `ETAPA9_REMINDER`,
 `ETAPA11_SERVICE_QUESTION` — mantidas só por compatibilidade com sessões antigas salvas no banco.
+
+---
+
+## Caminho rápido do cliente recorrente (`repeatOffer`)
+
+Quem já tem histórico não entra pelo menu. Ao voltar, recebe uma oferta pronta
+com o último serviço, o veículo salvo, o preço e até três horários livres:
+
+```
+Oi, *Gustavo*! 👋
+
+Da última vez foi *Lavagem Completa* no *Fiesta 2012 · FEG4B58*.
+Quer repetir? Tenho estes horários — R$ 75,00:
+
+*1* 📅 sábado, 05/09 às *09:00*
+*2* 📅 terça, 08/09 às *14:00*
+*3* 📅 quarta, 09/09 às *08:00*
+
+*4* 🔧 Outro serviço  ·  *5* 🕒 Outro horário
+```
+
+- *1–3* → cria a reserva na hora (usa o mesmo `confirmFinal` do fluxo longo)
+- *4* → menu principal
+- *5* → calendário, mantendo o serviço já escolhido
+
+A oferta **não** aparece quando o cliente já tem agendamento futuro, quando o
+serviço saiu do catálogo, quando o último atendimento foi há menos de 2 dias ou
+quando não há horário livre nos próximos 10 dias. Implementação em
+`src/lib/whatsapp-repeat-offer.ts`.
+
+## Dados de veículo exigidos
+
+Não são mais os cinco campos para todo serviço. `requiredVehicleFields` pede:
+
+- **modelo** — sempre (define porte e preço)
+- **cor e estado** — só em serviços que dependem da pintura (polimento,
+  vitrificação, revitalização, descontaminação, proteção, cristalização)
+- **placa** — depois da confirmação, nunca antes (ver seção 23)

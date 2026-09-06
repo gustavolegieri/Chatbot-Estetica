@@ -151,6 +151,90 @@ export async function generateAvailableSlots(
 
 export const getAvailableSlots = generateAvailableSlots;
 
+/** Data local como yyyy-MM-dd, sem passar pelo UTC. */
+function isoLocal(date: Date): string {
+  return format(date, "yyyy-MM-dd");
+}
+
+/**
+ * Horários livres de vários dias de uma vez.
+ *
+ * O seletor de dia precisa saber quantas vagas cada dia das próximas semanas
+ * tem. Chamar `generateAvailableSlots` por dia seriam dezenas de idas ao banco
+ * por mensagem; aqui as configurações, os agendamentos e os bloqueios do
+ * período inteiro vêm em três consultas e o cálculo por dia é feito em memória.
+ */
+export async function generateAvailableSlotsRange(
+  startIso: string,
+  days: number,
+  durationMin: number
+): Promise<Map<string, string[]>> {
+  const resultado = new Map<string, string[]>();
+  const settings = await prisma.settings.findUnique({ where: { id: "default" } });
+  if (!settings || days <= 0) return resultado;
+
+  const inicio = parseIsoDateLocal(startIso);
+  const fim = new Date(inicio);
+  fim.setDate(fim.getDate() + days);
+
+  const [existing, blocked] = await Promise.all([
+    prisma.appointment.findMany({
+      where: {
+        date: { gte: inicio, lt: fim },
+        status: { notIn: ["CANCELLED", "NO_SHOW"] },
+      },
+      select: { date: true, startTime: true, endTime: true },
+    }),
+    prisma.blockedDate.findMany({ where: { date: { gte: inicio, lt: fim } } }),
+  ]);
+
+  const porDia = new Map<string, Array<{ startTime: string; endTime: string }>>();
+  for (const item of existing) {
+    const chave = isoLocal(item.date);
+    const lista = porDia.get(chave) ?? [];
+    lista.push({ startTime: item.startTime, endTime: item.endTime });
+    porDia.set(chave, lista);
+  }
+
+  const bloqueioPorDia = new Map<string, (typeof blocked)[number]>();
+  for (const item of blocked) bloqueioPorDia.set(isoLocal(item.date), item);
+
+  const now = new Date();
+  for (let i = 0; i < days; i++) {
+    const dia = new Date(inicio);
+    dia.setDate(dia.getDate() + i);
+    const iso = isoLocal(dia);
+
+    const bloqueio = bloqueioPorDia.get(iso);
+    // Bloqueio sem janela é o dia inteiro fechado.
+    if (bloqueio && !bloqueio.blockStart && !bloqueio.blockEnd) {
+      resultado.set(iso, []);
+      continue;
+    }
+
+    resultado.set(
+      iso,
+      buildAvailableSlotsForDay({
+        dateStr: iso,
+        durationMin,
+        settings: {
+          businessHoursStart: settings.businessHoursStart,
+          businessHoursEnd: settings.businessHoursEnd,
+          lunchBreakStart: settings.lunchBreakStart,
+          lunchBreakEnd: settings.lunchBreakEnd,
+          slotDurationMin: settings.slotDurationMin,
+          workingDays: settings.workingDays,
+        },
+        existingAppointments: porDia.get(iso) ?? [],
+        now,
+        blockedWindow: bloqueio ?? null,
+      })
+    );
+  }
+
+  return resultado;
+}
+
 export function calculateEndTime(startTime: string, durationMin: number): string {
   const base = parse(startTime, "HH:mm", new Date());
   return format(addMinutes(base, durationMin), "HH:mm");

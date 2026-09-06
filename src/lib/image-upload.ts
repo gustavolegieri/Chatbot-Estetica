@@ -13,6 +13,17 @@ interface UploadResult {
   error?: string;
 }
 
+/** Teto para o upload assinado antes de cair no upload por preset. */
+const SIGNED_UPLOAD_TIMEOUT_MS = 15_000;
+
+/**
+ * Quando a credencial assinada não tem permissão (403) ou está errada, cada
+ * imagem pagava a tentativa perdida antes de cair no preset. Uma janela de
+ * silêncio evita repetir o erro em toda mensagem com calendário ou resumo.
+ */
+const SIGNED_UPLOAD_COOLDOWN_MS = 10 * 60_000;
+let uploadAssinadoIndisponivelAte = 0;
+
 /**
  * Faz upload de um buffer de imagem para o Cloudinary usando unsigned upload preset via API REST
  * @param imageBuffer - Buffer da imagem
@@ -32,6 +43,7 @@ export async function uploadImageToCloudinary(
     : `image-${timestamp}`;
 
   if (
+    Date.now() >= uploadAssinadoIndisponivelAte &&
     cloudName &&
     process.env.CLOUDINARY_API_KEY &&
     process.env.CLOUDINARY_API_SECRET
@@ -43,18 +55,32 @@ export async function uploadImageToCloudinary(
         api_secret: process.env.CLOUDINARY_API_SECRET,
         secure: true,
       });
+      // `upload_stream` não tem timeout próprio: com uma chave sem permissão ou
+      // rede ruim ele fica pendurado por minutos, segurando quem chamou — por
+      // exemplo o processamento do evento de saída do portão. O limite abaixo
+      // garante a queda rápida para o upload por preset logo em seguida.
       const signedResult = await new Promise<{ secure_url: string }>((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error('Tempo limite no upload assinado do Cloudinary')),
+          SIGNED_UPLOAD_TIMEOUT_MS
+        );
+        const settle = (fn: () => void) => {
+          clearTimeout(timer);
+          fn();
+        };
         const stream = cloudinary.uploader.upload_stream(
-          { folder, public_id: publicId, resource_type: 'image', overwrite: false },
+          { folder, public_id: publicId, resource_type: 'image', overwrite: false, timeout: SIGNED_UPLOAD_TIMEOUT_MS },
           (error, result) => {
-            if (error || !result?.secure_url) reject(error || new Error('Cloudinary não retornou uma URL'));
-            else resolve({ secure_url: result.secure_url });
+            if (error || !result?.secure_url) settle(() => reject(error || new Error('Cloudinary não retornou uma URL')));
+            else settle(() => resolve({ secure_url: result.secure_url }));
           }
         );
+        stream.on('error', (error) => settle(() => reject(error)));
         stream.end(imageBuffer);
       });
       return { success: true, url: signedResult.secure_url };
     } catch (error) {
+      uploadAssinadoIndisponivelAte = Date.now() + SIGNED_UPLOAD_COOLDOWN_MS;
       console.warn('[Cloudinary] Upload assinado falhou; tentando preset:', error instanceof Error ? error.message : error);
     }
   }

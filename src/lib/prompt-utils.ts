@@ -78,3 +78,28 @@ export function renderWhatsAppHtml(text: string): string {
     .map((line) => (line === "" ? "<br/>" : `<span>${line}</span><br/>`))
     .join("");
 }
+
+/**
+ * Converte a saída Markdown dos modelos para a formatação do WhatsApp.
+ *
+ * O WhatsApp usa `*negrito*`, e não o `**negrito**` do Markdown. Como os
+ * modelos respondem em Markdown por padrão, sem esta conversão o cliente
+ * recebia literalmente `**Lavagem Completa**`, com os asteriscos à mostra.
+ * Títulos `###` viram negrito e marcadores `-` viram bullet, porque o WhatsApp
+ * não formata nenhum dos dois.
+ *
+ * Vive aqui, e não em `whatsapp-ai`, porque `whatsapp-ai` e
+ * `whatsapp-ai-enhanced` se importam mutuamente — um utilitário neutro evita
+ * que a ordem de avaliação dos módulos deixe a função indefinida em runtime.
+ */
+export function toWhatsAppMarkdown(text: string): string {
+  return text
+    .replace(/\*\*\*([^\n*]+)\*\*\*/g, "*$1*")
+    .replace(/\*\*([^\n*]+)\*\*/g, "*$1*")
+    .replace(/__([^\n_]+)__/g, "*$1*")
+    .replace(/^#{1,6}\s*(.+)$/gm, "*$1*")
+    .replace(/^\s*[-*]\s+(?=\S)/gm, "• ")
+    .replace(/[ \t]+$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}

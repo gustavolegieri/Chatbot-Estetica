@@ -12,7 +12,15 @@ const nextConfig: NextConfig = {
   // Canvas e a pilha de voz/WebSocket devem executar diretamente no Node.
   // Empacotar `ws` no servidor altera o fallback opcional de buffer e pode
   // travar respostas de áudio com `bufferUtil.mask is not a function`.
-  serverExternalPackages: ["@napi-rs/canvas", "msedge-tts", "isomorphic-ws", "ws"],
+  // `@resvg/resvg-js` carrega um binário .node; empacotá-lo quebra a rota do
+  // webhook com "Module parse failed" no arquivo binário.
+  serverExternalPackages: [
+    "@napi-rs/canvas",
+    "@resvg/resvg-js",
+    "msedge-tts",
+    "isomorphic-ws",
+    "ws",
+  ],
 };
 
 

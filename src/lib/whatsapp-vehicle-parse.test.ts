@@ -56,3 +56,18 @@ test("parseVehicleMessage tolerates a typo in estado without changing the model"
   assert.equal(vehicle.model, "Fiesta");
   assert.equal(vehicle.condition, "bom");
 });
+
+test("parseVehicleMessage não deixa a palavra 'placa' dentro do modelo", () => {
+  // O exemplo sugerido pelo próprio bot caía nesse caso: o cliente via
+  // "Civic placa 2021" no orçamento e no resumo.
+  const parsed = parseVehicleMessage("Civic 2021, placa BRA2E19, preto, bom estado");
+  assert.equal(parsed.model, "Civic");
+  assert.equal(parsed.plate, "BRA2E19");
+  assert.equal(parsed.summary, "Civic 2021");
+});
+
+test("parseVehicleMessage entende a frase falada por inteiro", () => {
+  const parsed = parseVehicleMessage("meu carro é um Gol 2015");
+  assert.equal(parsed.model, "Gol");
+  assert.equal(parsed.year, "2015");
+});

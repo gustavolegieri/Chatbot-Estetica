@@ -7,6 +7,7 @@
  */
 
 import type { FlowState, FlowStage } from "./whatsapp-flow-types";
+import { customerDayDisplay } from "./whatsapp-flow-types";
 import { findCouponByCode, canRedeem } from "./coupons";
 import { calculateDistance, calculatePickupFee } from "./maps";
 import { normalizePhone } from "./utils";
@@ -26,6 +27,7 @@ import {
   etapa8ReceiptUpload,
   etapa9Loyalty,
   etapa10Budget,
+  etapa9Coupon,
   etapa10Logistics,
   etapa10LogisticsClientLeads,
   etapa10LogisticsPickupAddress,
@@ -589,37 +591,19 @@ export async function handleCouponStep(
 /**
  * Handler para etapa de lembrete (ETAPA14_REMINDER)
  */
-export async function handleReminderStep(
+/**
+ * Monta o resumo final (texto + cartão). Extraído de `handleReminderStep`
+ * porque o fluxo passou a poder chegar ao resumo direto da escolha do horário,
+ * assumindo padrões, sem passar pelas etapas de cupom, logística, pagamento e
+ * lembrete. Uma única implementação evita dois resumos divergentes.
+ */
+export async function buildSummaryConfirmResponses(
   state: FlowState,
-  message: string,
   responses: FlowResponse[],
   pushName?: string
-): Promise<FlowResult> {
-  const input = message.trim().toLowerCase();
-  const num = parseInt(input, 10);
+): Promise<FlowResponse[]> {
   const prompts = await loadPromptMap();
-  
-  let reminderEnabled = false;
-  let reminderPreference: "30min" | "1hour" | "1day" | "none" = "none";
-  
-  if (num === 1 || /sim|quero/i.test(input)) {
-    reminderEnabled = true;
-    reminderPreference = "30min"; // 30min default
-  } else if (num === 2 || /nao|não|não precisa|não quero/i.test(input)) {
-    reminderEnabled = false;
-    reminderPreference = "none";
-  } else {
-    responses.push({ text: `Escolha uma opção para seguir:\n\n${reminderChoice(prompts)}` });
-    return { responses, nextState: state };
-  }
-  
-  const newState: FlowState = {
-    ...state,
-    reminderEnabled,
-    reminderPreference,
-    stage: "ETAPA15_SUMMARY_CONFIRM",
-  };
-  
+  const reminderEnabled = state.reminderEnabled ?? true;
   // Calculate total value with all discounts
   const totalValue = calculateFlowTotal(state);
   
@@ -629,7 +613,7 @@ export async function handleReminderStep(
   const customerName = resolveValidCustomerName(state.customerName) ?? resolveValidCustomerName(pushName) ?? "Cliente";
   const serviceName = state.serviceLabel ?? "—";
   const vehicle = vehicleDisplayFromFlow(state) || "—";
-  const date = state.dayLabel ?? state.dayDate ?? "—";
+  const date = customerDayDisplay(state) ?? "—";
   const time = state.startTime ?? "—";
   const address = state.pickupAddress ?? "—";
   
@@ -689,6 +673,42 @@ export async function handleReminderStep(
     responses.push({ text: summaryText });
   }
   
+  return responses;
+}
+
+export async function handleReminderStep(
+  state: FlowState,
+  message: string,
+  responses: FlowResponse[],
+  pushName?: string
+): Promise<FlowResult> {
+  const input = message.trim().toLowerCase();
+  const num = parseInt(input, 10);
+  const prompts = await loadPromptMap();
+  
+  let reminderEnabled = false;
+  let reminderPreference: "30min" | "1hour" | "1day" | "none" = "none";
+  
+  if (num === 1 || /sim|quero/i.test(input)) {
+    reminderEnabled = true;
+    reminderPreference = "30min"; // 30min default
+  } else if (num === 2 || /nao|não|não precisa|não quero/i.test(input)) {
+    reminderEnabled = false;
+    reminderPreference = "none";
+  } else {
+    responses.push({ text: `Escolha uma opção para seguir:\n\n${reminderChoice(prompts)}` });
+    return { responses, nextState: state };
+  }
+  
+  const newState: FlowState = {
+    ...state,
+    reminderEnabled,
+    reminderPreference,
+    stage: "ETAPA15_SUMMARY_CONFIRM",
+  };
+  
+  await buildSummaryConfirmResponses(newState, responses, pushName);
+
   return { responses, nextState: newState };
 }
 
@@ -1168,6 +1188,19 @@ ${etapa8Payment(true, prompts)}` });
     return { responses, nextState: newState };
   }
 
+  // Cupom e leva-e-traz deixaram de ser etapas obrigatórias do fluxo; ficam
+  // acessíveis aqui, para quem realmente quer. Assim a maioria fecha em uma
+  // resposta e a minoria que precisa continua atendida.
+  if (/^(4|cupom|tenho cupom|desconto|voucher)$/i.test(input)) {
+    responses.push({ text: `🎟️ ${etapa9Coupon(prompts)}` });
+    return { responses, nextState: { ...state, stage: "ETAPA9_COUPON" } };
+  }
+
+  if (/^(5|leva|leva e traz|buscar|coleta|busca)$/i.test(input)) {
+    responses.push({ text: etapa10Logistics(prompts) });
+    return { responses, nextState: { ...state, stage: "ETAPA10_LOGISTICS" } };
+  }
+
   const isChangeSchedule = /^(2|alterar data|alterar horário|alterar horario|data|horário|horario)$/i.test(input);
   if (isChangeSchedule) {
     const newState: FlowState = {
@@ -1274,7 +1307,10 @@ async function loadPaymentContext() {
   return {
     businessName: s?.businessName ?? "Garagem do Ka",
     hours: "08:00 às 18:00",
-    address: s?.businessAddress ?? "",
+    // `businessAddress` costuma ficar vazio; o endereço real do local mora em
+    // `storeAddress` (usado pelo cálculo de leva-e-traz). Sem este fallback o
+    // bot respondia "Consulte nosso endereço" mesmo tendo o endereço cadastrado.
+    address: s?.businessAddress?.trim() || s?.storeAddress?.trim() || "",
     pixKey: s?.pixKey ?? null,
     pixHolder: s?.pixHolderName ?? null,
     pixBank: s?.pixBank ?? null,

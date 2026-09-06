@@ -5,12 +5,20 @@ const OLLAMA_DEFAULT_MODEL = "qwen2.5:3b-instruct";
 const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const DEFAULT_MODEL = "gpt-oss-120b";
-const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
+// `llama-3.3-70b-versatile` foi descontinuado na Groq e passou a responder 404
+// (model_not_found), derrubando o fallback justamente quando ele era acionado.
+// `openai/gpt-oss-120b` é o mesmo modelo usado no Cerebras, então os prompts do
+// bot se comportam igual nos dois provedores.
+const DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b";
 const AI_TOTAL_TIMEOUT_MS = 5_000;
 const PRIMARY_TIMEOUT_MS = 2_500;
 const DEFAULT_OLLAMA_TIMEOUT_MS = 45_000;
 const cerebrasRuntime = new AsyncLocalStorage<{ enabled: boolean }>();
 let cerebrasUnavailableUntil = 0;
+// Quando o worker local não responde, a próxima mensagem não pode pagar o
+// timeout de novo: o webhook do WhatsApp tem orçamento de segundos.
+let localBridgeUnavailableUntil = 0;
+const LOCAL_BRIDGE_COOLDOWN_MS = 5 * 60 * 1000;
 
 function cerebrasCooldownForStatus(status: number): number {
   if (status === 401 || status === 402) return 10 * 60 * 1000;
@@ -26,11 +34,14 @@ function isOllamaConfigured(): boolean {
   return isEnabled(process.env.OLLAMA_ENABLED);
 }
 
+// A ponte depende de um PC ligado consumindo a fila `localAiJob`. Ela era
+// inferida de `VERCEL === "1"`, então ficava ativa em toda a produção: cada
+// chamada de IA esperava o timeout inteiro por um worker que podia nem existir
+// e devolvia null. Com `isLocalOnly()` verdadeiro por tabela, a nuvem nunca era
+// consultada e todo cliente recebia o mesmo texto de fallback. Agora a ponte só
+// liga quando alguém a liga.
 function isLocalBridgeConfigured(): boolean {
-  if (process.env.LOCAL_AI_BRIDGE_ENABLED?.trim()) {
-    return isEnabled(process.env.LOCAL_AI_BRIDGE_ENABLED);
-  }
-  return process.env.VERCEL === "1";
+  return isEnabled(process.env.LOCAL_AI_BRIDGE_ENABLED);
 }
 
 function isLocalOnly(): boolean {
@@ -125,7 +136,8 @@ async function requestLocalBridge(params: {
     where: { id: job.id, status: { in: ["PENDING", "PROCESSING"] } },
     data: { status: "EXPIRED", error: "Tempo limite da ponte local excedido" },
   });
-  console.error("[Ollama Local] Tempo limite da ponte excedido.");
+  localBridgeUnavailableUntil = Date.now() + LOCAL_BRIDGE_COOLDOWN_MS;
+  console.error("[Ollama Local] Tempo limite da ponte excedido; pausando a ponte por 5 min.");
   return null;
 }
 
@@ -192,9 +204,12 @@ export async function cerebrasChat(params: {
     console.warn("[IA] Ollama local indisponível; tentando fallback externo.");
   }
 
-  if (isLocalBridgeConfigured()) {
+  if (isLocalBridgeConfigured() && Date.now() >= localBridgeUnavailableUntil) {
     const bridgeAnswer = await requestLocalBridge(params);
-    if (bridgeAnswer) return bridgeAnswer;
+    if (bridgeAnswer) {
+      localBridgeUnavailableUntil = 0;
+      return bridgeAnswer;
+    }
     if (isLocalOnly()) return null;
     console.warn("[IA] Ponte da IA local indisponível; tentando fallback externo.");
   }

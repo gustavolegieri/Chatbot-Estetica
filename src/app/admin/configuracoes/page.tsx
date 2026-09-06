@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   WalletCards,
 } from "lucide-react";
+import { parseTestModePhones } from "@/lib/test-mode-phones";
 import { AdminHeader } from "@/components/layout/AdminHeader";
 
 interface Settings {
@@ -69,6 +70,12 @@ export default function ConfiguracoesPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
+  // O campo aceita vários números separados por vírgula; aqui fica só o que já
+  // está completo o bastante para receber mensagem.
+  const testModePhones = useMemo(
+    () => parseTestModePhones(settings?.testModePhone),
+    [settings?.testModePhone]
+  );
 
   useEffect(() => {
     fetch("/api/configuracoes")
@@ -216,7 +223,7 @@ export default function ConfiguracoesPage() {
             <SectionTitle icon={ShieldCheck} eyebrow="Ambiente protegido" title="Modo de teste" description="Restrinja o bot a um número autorizado antes de publicar alterações no canal." />
             <div className="rounded-xl border border-amber-300/15 bg-amber-400/[0.07] px-4 py-3 text-sm leading-6 text-amber-100"><AlertTriangle className="mr-2 inline h-4 w-4 text-amber-300" />Quando ativo, mensagens de outros números são ignoradas pelo bot.</div>
             <label className="mt-4 flex cursor-pointer items-center justify-between rounded-xl border border-white/[0.07] bg-surface-900/55 p-4"><span><span className="block text-sm font-semibold text-slate-100">Ativar modo de teste</span><span className="mt-1 block text-xs text-slate-500">Use apenas enquanto valida o fluxo.</span></span><input type="checkbox" checked={settings.testModeEnabled ?? false} onChange={(event) => setSettings({ ...settings, testModeEnabled: event.target.checked })} className="h-5 w-5 accent-[#d4af37]" /></label>
-            <div className="mt-4"><label className="label">Telefone autorizado</label><input type="text" inputMode="numeric" className="input" placeholder="Ex.: 5511999998888" value={settings.testModePhone ?? ""} onChange={(event) => setSettings({ ...settings, testModePhone: event.target.value.replace(/\D/g, "") || null })} disabled={!settings.testModeEnabled} /><p className="mt-1.5 text-xs text-slate-500">Inclua 55 + DDD, sem +, espaços ou traços.</p>{settings.testModePhone && settings.testModePhone.length >= 12 && <p className="mt-1.5 text-xs font-medium text-emerald-300">Número pronto para envio: +{settings.testModePhone}</p>}</div>
+            <div className="mt-4"><label className="label">Telefones autorizados</label><input type="text" className="input" placeholder="Ex.: 5511999998888, 5511888887777" value={settings.testModePhone ?? ""} onChange={(event) => setSettings({ ...settings, testModePhone: event.target.value.replace(/[^\d,;\s]/g, "") || null })} disabled={!settings.testModeEnabled} /><p className="mt-1.5 text-xs text-slate-500">Inclua 55 + DDD, sem +, espaços ou traços. Para liberar mais de um aparelho, separe por vírgula.</p>{testModePhones.length > 0 && <p className="mt-1.5 text-xs font-medium text-emerald-300">{testModePhones.length === 1 ? "Número liberado: " : `${testModePhones.length} números liberados: `}{testModePhones.map((numero) => `+${numero}`).join(", ")}</p>}</div>
           </section>
 
           <div className="flex flex-col-reverse gap-2 pb-2 sm:flex-row sm:justify-end"><button type="submit" disabled={saving} className="btn-primary"><Save className="mr-2 h-4 w-4" />{saving ? "Salvando..." : "Salvar alterações"}</button></div>

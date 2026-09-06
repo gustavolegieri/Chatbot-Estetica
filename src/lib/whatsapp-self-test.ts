@@ -1,3 +1,5 @@
+import { testModeAllowsPhone } from "./test-mode-phones";
+
 type UnknownRecord = Record<string, unknown>;
 
 export function firstWasenderMessage(data: UnknownRecord): UnknownRecord | null {
@@ -15,16 +17,15 @@ export function isAuthorizedSelfTestPhone(
   configuredPhone?: string | null
 ) {
   if (!enabled) return false;
-  const incoming = phone.replace(/\D/g, "");
-  const allowed = (configuredPhone ?? "").replace(/\D/g, "");
-  return Boolean(allowed && incoming === allowed);
+  return testModeAllowsPhone(phone, enabled, configuredPhone);
 }
 
 export function extractWasenderSendId(result: unknown): string | null {
   if (!result || typeof result !== "object") return null;
   const body = result as UnknownRecord;
   const data = body.data && typeof body.data === "object" ? (body.data as UnknownRecord) : null;
-  const candidate = data?.msgId ?? data?.id ?? body.msgId ?? body.id;
+  // `message_id` é o formato da Zapster; os demais são da Wasender.
+  const candidate = body.message_id ?? data?.msgId ?? data?.id ?? body.msgId ?? body.id;
   return typeof candidate === "string" || typeof candidate === "number"
     ? String(candidate)
     : null;

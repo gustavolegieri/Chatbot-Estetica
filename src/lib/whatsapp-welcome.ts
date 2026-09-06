@@ -6,9 +6,10 @@ import { loadWhatsAppCatalog, buildMainMenu } from "./whatsapp-service-catalog";
 import { etapa1Welcome, etapa2MainMenu, formatHours } from "./whatsapp-flow-messages";
 import { BRAND_DEFAULT } from "./whatsapp-catalog";
 import { resolveValidCustomerName } from "./customer-name";
+import { getRuntimeSettings } from "./settings-runtime";
 
 async function loadWelcomeContext() {
-  const s = await prisma.settings.findUnique({ where: { id: "default" } });
+  const s = await getRuntimeSettings();
   return {
     businessName: s?.businessName ?? BRAND_DEFAULT,
     hours: formatHours(
@@ -42,7 +43,7 @@ export async function sendWelcomeFlow(phone: string, rawName?: string | null) {
         ctx.address ? `📍 ${ctx.address}` : "📍 Consulte nosso endereço por aqui",
         `🕒 ${ctx.hours}`,
         "",
-        etapa2MainMenu(validName, buildMainMenu(wctx.categories, wctx.prompts), wctx.prompts),
+        etapa2MainMenu(validName, buildMainMenu(wctx.categories, wctx.prompts, wctx.catalog), wctx.prompts),
       ].join("\n")
     : etapa1Welcome(ctx, wctx.prompts);
   const nextStage = validName ? "ETAPA2_MAIN_MENU" : "ETAPA1_AWAITING_NAME";

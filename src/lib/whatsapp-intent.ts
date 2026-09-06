@@ -107,6 +107,30 @@ export function isGreetingOrSmallTalk(text: string): boolean {
   );
 }
 
+/**
+ * Abertura de conversa ("oi", "bom dia") — o subconjunto de
+ * `isGreetingOrSmallTalk` que começa um assunto em vez de confirmar o anterior.
+ * "ok", "beleza" e "pera aí" respondem ao bot; "oi" não.
+ */
+export function isConversationOpener(text: string): boolean {
+  const t = text.toLowerCase().trim();
+  return /^(oi+|ol[áa]|hey|opa|e a[íi]|eai|bom dia|boa tarde|boa noite|tudo bem|tudo bom)[!?.…]*$/.test(t);
+}
+
+/** Saudação coerente com a hora de Brasília. */
+export function greetingByTime(now = new Date()): string {
+  const hora = Number(
+    new Intl.DateTimeFormat("pt-BR", {
+      hour: "numeric",
+      hour12: false,
+      timeZone: "America/Sao_Paulo",
+    }).format(now)
+  );
+  if (hora < 12) return "Bom dia";
+  if (hora < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
 export function onlyMenuNumber(text: string, max = MAIN_MENU_CATEGORIES): number | null {
   const t = text.trim();
   if (!/^\d{1,2}$/.test(t)) return null;

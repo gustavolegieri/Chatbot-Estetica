@@ -8,6 +8,7 @@ import { tryHandleAppointmentConfirmation } from "./appointment-confirmation";
 import { applyWelcomeRestartIfNeeded } from "./whatsapp-session-reset";
 import { resolveValidCustomerName } from "./customer-name";
 import { getBusinessHoursStatus, afterHoursMessage } from "./business-hours";
+import { getRuntimeSettings } from "./settings-runtime";
 import { runAppointmentRemindersFromBot } from "./appointment-reminders-runner";
 import { sendText } from "./evolution-api";
 import { FlowState } from "./whatsapp-flow-types";
@@ -24,6 +25,7 @@ import {
   isDeterministicConversationTurn,
 } from "./conversation-intelligence";
 import { handleGateTestCommand } from "./gate-test-flow";
+import { parseTestModePhones, testModeAllowsPhone } from "./test-mode-phones";
 
 interface IncomingMessage {
   phone: string;
@@ -64,7 +66,12 @@ async function getOrCreateSession(phone: string, pushName?: string) {
       metadata: { stage: "ETAPA1_AWAITING_NAME", welcomed: false } as object,
       lastStage: "ETAPA1_AWAITING_NAME",
     },
-    update: {},
+    // O vínculo com o cliente precisa ser preenchido também no update. A sessão
+    // pode ter nascido em outro caminho sem `clientId` — `startFunnel` cria uma
+    // só com o telefone —, e com `update: {}` ela nunca era ligada ao cadastro:
+    // a conversa aparecia solta no painel de atendimento mesmo depois de o
+    // cliente ter nome, veículo e agendamento.
+    update: client?.id ? { clientId: client.id } : {},
     include: { client: true },
   });
 
@@ -81,7 +88,7 @@ async function handleMessageInternal(msg: IncomingMessage) {
   }
 
   // Verificar modo de teste (otimizado com cache)
-  const settings = await prisma.settings.findUnique({ where: { id: "default" } });
+  const settings = await getRuntimeSettings();
   
   console.log("[WhatsApp Bot] Configurações carregadas:", {
     whatsappEnabled: settings?.whatsappEnabled,
@@ -90,20 +97,19 @@ async function handleMessageInternal(msg: IncomingMessage) {
   });
   
   if (settings?.testModeEnabled) {
-    const testPhone = settings.testModePhone?.replace(/\D/g, "");
-    const normalizedPhone = msg.phone.replace(/\D/g, "");
-    
-    if (!testPhone) {
+    const autorizados = parseTestModePhones(settings.testModePhone);
+
+    if (autorizados.length === 0) {
       console.log("[WhatsApp Bot] Modo de teste ativado mas nenhum telefone configurado - ignorando");
       return;
     }
-    
-    if (normalizedPhone !== testPhone) {
+
+    if (!testModeAllowsPhone(msg.phone, true, settings.testModePhone)) {
       console.log("[WhatsApp Bot] Modo de teste - mensagem ignorada de telefone não autorizado:", msg.phone);
       return;
     }
-    
-    console.log("[WhatsApp Bot] Modo de teste - mensagem autorizada de telefone:", msg.phone);
+
+    console.log("[WhatsApp Bot] Modo de teste - telefone autorizado:", msg.phone, `(${autorizados.length} liberado(s))`);
   }
 
   // Filtro extra anti-fuso: se o servidor estiver em outro fuso, ainda assim garantimos que a checagem
@@ -202,11 +208,9 @@ async function handleMessageInternal(msg: IncomingMessage) {
         return;
       }
 
-      const normalizedPhone = msg.phone.replace(/\D/g, "");
       const settingsTestModeAuthorized = Boolean(
         settings?.testModeEnabled &&
-        settings.testModePhone &&
-        normalizedPhone === settings.testModePhone.replace(/\D/g, "")
+          testModeAllowsPhone(msg.phone, true, settings.testModePhone)
       );
       if (settingsTestModeAuthorized && await handleGateTestCommand(msg.phone, inboundText)) {
         return;
@@ -277,6 +281,13 @@ async function handleMessageInternal(msg: IncomingMessage) {
 
 export async function processWhatsAppMessage(msg: IncomingMessage, waitUntil?: (promise: Promise<unknown>) => void) {
   console.log("[WhatsApp Bot] processWhatsAppMessage chamado:", { phone: msg.phone, text: msg.text });
+  // O corte vem antes da fila: o lock do debounce cria uma sessão para o
+  // telefone recebido, então um id de grupo que só fosse recusado dentro de
+  // `handleMessageInternal` já teria deixado uma sessão vazia no banco.
+  if (!isValidPrivateRecipient(msg.phone)) {
+    console.warn("[WhatsApp Bot] Ignorado (não é chat privado):", msg.phone);
+    return;
+  }
   // Important: processar por phone serialmente ajuda a evitar respostas "fora de hora"
   return enqueueWhatsAppMessage(
     {

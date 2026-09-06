@@ -133,7 +133,9 @@ test("first doubt uses voice and availability keeps calendar date until service 
       },
       state
     );
-    assert.equal(state.stage, "ETAPA3_SERVICE_ACTION");
+    // Escolher o serviço já pede o veículo: o menu "quer agendar?" saiu do
+    // caminho porque a escolha do serviço é a própria decisão de agendar.
+    assert.equal(state.stage, "ETAPA4_VEHICLE");
     assert.equal(state.serviceKey, "lavagem_simples");
     assert.equal(state.dayDate, futureDate);
   } finally {

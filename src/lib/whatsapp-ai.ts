@@ -8,6 +8,7 @@ import type { FlowStage, FlowState } from "./whatsapp-flow-types";
 import type { FlowContext } from "./whatsapp-flow-messages";
 import type { WhatsAppCatalogContext } from "./whatsapp-service-catalog";
 import { intelligencePromptContext } from "./conversation-intelligence";
+import { toWhatsAppMarkdown } from "./prompt-utils";
 import {
   analyzeIntentAIV2,
   analyzeIndecisiveClient,
@@ -222,7 +223,7 @@ Responda SOMENTE JSON válido:
   return {
     intent,
     extractedName: parsed.extractedName?.trim() || undefined,
-    reply: parsed.reply?.trim() || undefined,
+    reply: parsed.reply ? toWhatsAppMarkdown(parsed.reply) || undefined : undefined,
     menuNumber:
       typeof parsed.menuNumber === "number" &&
       parsed.menuNumber >= 1 &&
@@ -283,13 +284,10 @@ REGRAS DE OPERAÇÃO:
   });
 
   if (!raw) return null;
-  return (
-    raw
-      .replace(/^["']|["']$/g, "")
-      .trim()
-      .slice(0, 700) || null
-  );
+  return toWhatsAppMarkdown(raw.replace(/^["']|["']$/g, "")).slice(0, 700) || null;
 }
+
+
 
 /** Detecta se mensagem livre parece uma pergunta/dúvida */
 export function looksLikeQuestion(text: string): boolean {

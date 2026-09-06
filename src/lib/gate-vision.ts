@@ -1,7 +1,14 @@
 import { AppointmentStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
-import { sendAppointmentCheckIn, sendAppointmentFinalizing, sendAppointmentTimelapse } from "@/lib/appointment-whatsapp";
+import {
+  sendAppointmentBeforeAfter,
+  sendAppointmentCheckIn,
+  sendAppointmentFinalizing,
+  sendAppointmentTimelapse,
+} from "@/lib/appointment-whatsapp";
+import { buildAppointmentBeforeAfter } from "@/lib/before-after";
+import { parseTestModePhones } from "@/lib/test-mode-phones";
 import { notifyPwaOperationalAlert } from "@/lib/pwa-push";
 import { uploadImageToCloudinary, uploadVideoToCloudinary } from "@/lib/image-upload";
 import { isValidVehiclePlate, normalizeVehiclePlate } from "@/lib/whatsapp-vehicle-parse";
@@ -127,31 +134,34 @@ async function findEntryAppointment(plateInput: string, now = new Date()) {
     include: { client: true, service: true },
     orderBy: { startTime: "asc" },
   });
-  const appointment = selectAppointmentByPlate(appointments, plate, await authorizedTestPhone());
+  const appointment = selectAppointmentByPlate(appointments, plate, await authorizedTestPhones());
   return appointment ? { appointment, match: "plate" as const } : null;
 }
 
-async function authorizedTestPhone() {
+/** Telefones liberados no modo de teste; vazio quando o modo está desligado. */
+async function authorizedTestPhones() {
   const settings = await prisma.settings.findUnique({
     where: { id: "default" },
     select: { testModeEnabled: true, testModePhone: true },
   });
-  return settings?.testModeEnabled && settings.testModePhone
-    ? normalizePhone(settings.testModePhone)
-    : null;
+  if (!settings?.testModeEnabled) return [];
+  return parseTestModePhones(settings.testModePhone).map((numero) => normalizePhone(numero));
 }
 
 export function selectAppointmentByPlate<T extends { client: { vehiclePlate: string | null; phone?: string | null } }>(
   appointments: T[],
   plateInput: string,
-  authorizedPhone?: string | null
+  authorizedPhones?: string | string[] | null
 ) {
   const plate = normalizeVehiclePlate(plateInput);
   if (!isValidVehiclePlate(plate)) return null;
-  const phone = authorizedPhone ? normalizePhone(authorizedPhone) : null;
+  // O modo de teste pode liberar mais de um aparelho; sem nenhum, não filtra.
+  const permitidos = (Array.isArray(authorizedPhones) ? authorizedPhones : [authorizedPhones])
+    .filter((valor): valor is string => Boolean(valor))
+    .map((valor) => normalizePhone(valor));
   return appointments.find((item) =>
     normalizeVehiclePlate(item.client.vehiclePlate || "") === plate &&
-    (!phone || normalizePhone(item.client.phone || "") === phone)
+    (permitidos.length === 0 || permitidos.includes(normalizePhone(item.client.phone || "")))
   ) ?? null;
 }
 
@@ -167,8 +177,26 @@ async function findFinalizingAppointment(plateInput: string, now = new Date()) {
     include: { client: true, service: true },
     orderBy: { startTime: "desc" },
   });
-  const appointment = selectAppointmentByPlate(appointments, plate, await authorizedTestPhone());
+  const appointment = selectAppointmentByPlate(appointments, plate, await authorizedTestPhones());
   return appointment ? { appointment, match: "plate" as const } : null;
+}
+
+/**
+ * Recupera o snapshot da entrada deste mesmo atendimento. Busca pelo
+ * `appointmentId` gravado no log — e não pelo último evento — porque entre a
+ * entrada e a saída pode ter passado outro veículo pelo portão.
+ */
+async function findEntrySnapshotUrl(appointmentId: string): Promise<string | null> {
+  const log = await prisma.auditLog.findFirst({
+    where: {
+      action: "GATE_VISION_ENTER",
+      data: { path: ["appointmentId"], equals: appointmentId },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { data: true },
+  });
+  const url = jsonRecord(log?.data).snapshotUrl;
+  return typeof url === "string" && url ? url : null;
 }
 
 async function latestGateEvent() {
@@ -355,6 +383,16 @@ export async function processGateVisionEvent(input: GateVisionEvent) {
   const timelapseUrl = await uploadTimelapse(input.timelapseDataUrl);
   const whatsappSent = await sendAppointmentFinalizing(appointment, snapshotUrl);
   const timelapseSent = await sendAppointmentTimelapse(appointment, timelapseUrl);
+
+  // A foto da entrada mais a da saída fecham o antes/depois do atendimento.
+  const entrySnapshotUrl = await findEntrySnapshotUrl(appointment.id);
+  const beforeAfter = await buildAppointmentBeforeAfter({
+    appointment,
+    beforeUrl: entrySnapshotUrl,
+    afterUrl: snapshotUrl,
+  });
+  const beforeAfterSent = await sendAppointmentBeforeAfter(appointment, beforeAfter.composedUrl);
+
   await logAudit({
     action: "GATE_VISION_EXIT",
     resource: `gate-event:${input.eventId}`,
@@ -374,6 +412,10 @@ export async function processGateVisionEvent(input: GateVisionEvent) {
       whatsappSent,
       timelapseSent,
       whatsappPhone: appointment.client.phone,
+      beforeAfterUrl: beforeAfter.composedUrl,
+      beforeAfterSent,
+      beforeAfterAssetId: beforeAfter.assetId,
+      beforeAfterSkipped: beforeAfter.skipped ?? null,
     },
   });
   await notifyPwaOperationalAlert({
@@ -457,6 +499,8 @@ export async function getGateVisionReport() {
         snapshotUrl: typeof data.snapshotUrl === "string" ? data.snapshotUrl : null,
         timelapseUrl: typeof data.timelapseUrl === "string" ? data.timelapseUrl : null,
         timelapseSent: data.timelapseSent === true,
+        beforeAfterUrl: typeof data.beforeAfterUrl === "string" ? data.beforeAfterUrl : null,
+        beforeAfterSent: data.beforeAfterSent === true,
         at: item.createdAt,
       };
     }),
