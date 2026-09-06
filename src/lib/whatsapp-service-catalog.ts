@@ -251,6 +251,13 @@ export function mainMenuEntries(
 }
 
 /** Converte o número digitado pelo cliente na categoria que ele viu. */
+/** Número que abre a tabela completa: vem logo depois das categorias. */
+export function catalogMenuNumber(
+  categories: WhatsAppCatalogContext["categories"]
+): number {
+  return mainMenuEntries(categories).length + 1;
+}
+
 export function categoryFromMenuNumber(
   categories: WhatsAppCatalogContext["categories"],
   escolhido: number
@@ -274,6 +281,9 @@ export function buildMainMenu(
     const sufixo = entrada.startingPrice ? ` — a partir de ${precoCurto(entrada.startingPrice)}` : "";
     return `*${entrada.display}* ${entrada.icon} ${entrada.title}${sufixo}`;
   });
+  // Depois das categorias vem a tabela inteira: quem quer comparar preços não
+  // deveria precisar abrir cinco listas para ver cinco serviços.
+  lines.push(`*${lines.length + 1}* 📋 Tabela completa — todos os serviços e preços`);
   // A opção 9 é fixa: atendimento humano, fora da numeração das categorias.
   lines.push(`*9* 👤 Falar com atendente`);
   return lines.join("\n");

@@ -13,6 +13,8 @@ export type FlowStage =
   | "ETAPA4_VEHICLE_CONFIRM"
   /** Proposta em tres degraus: resolve, recomendado, completo. */
   | "ETAPA_PROPOSTA"
+  /** Complementos que cabem na mesma visita. */
+  | "ETAPA_EXTRAS"
   | "ETAPA5_QUOTE"
   | "ETAPA5_FIRST_TIME_BONUS"
   | "ETAPA6_UPSELL"
@@ -163,6 +165,12 @@ export interface FlowState {
   /** Reserva já feita; falta só a placa para o reconhecimento no portão. */
   awaitingPlateAfterBooking?: boolean;
   /** Cancelamento de uma reserva existente, aguardando o sim do cliente. */
+  /** Complementos oferecidos, na ordem mostrada. */
+  extrasOptions?: Array<{ key: string; label: string; price: number; durationMin: number }>;
+  /** Complementos aceitos pelo cliente. */
+  extrasChosen?: Array<{ key: string; label: string; price: number; durationMin: number }>;
+  /** Ja passou pela etapa de complementos. */
+  extrasDone?: boolean;
   /** Ja escolheu um degrau da proposta: nao mostrar de novo. */
   proposalChosen?: boolean;
   /** Degraus mostrados na proposta, na ordem em que o cliente os viu. */

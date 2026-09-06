@@ -113,16 +113,16 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
       
       // Ícone em círculo (regra 1: <g> com transform)
       const dividerSvg = index < mainFields.length - 1 ? `
-        <line x1="${cardPadding}" y1="${y + fieldLineHeight - dividerSpacing}" x2="${width - outerPadding * 2 - cardPadding}" y2="${y + fieldLineHeight - dividerSpacing}" stroke="#FFD700" stroke-width="1" opacity="0.08"/>
+        <line x1="${cardPadding}" y1="${y + fieldLineHeight - dividerSpacing}" x2="${width - outerPadding * 2 - cardPadding}" y2="${y + fieldLineHeight - dividerSpacing}" stroke="#f0c14b" stroke-width="1" opacity="0.08"/>
       ` : '';
       
       fieldsSvg += `
         <g transform="translate(${cardPadding}, ${y})">
-          <circle cx="${iconCircleSize / 2}" cy="${iconCircleSize / 2}" r="${iconCircleSize / 2}" fill="#FFD700" opacity="0.12"/>
+          <circle cx="${iconCircleSize / 2}" cy="${iconCircleSize / 2}" r="${iconCircleSize / 2}" fill="#f0c14b" opacity="0.12"/>
           <g transform="translate(${(iconCircleSize - iconSize) / 2}, ${(iconCircleSize - iconSize) / 2}) scale(${iconScale})">
-            <path d="${field.icon}" fill="#e0c060"/>
+            <path d="${field.icon}" fill="#ffd76a"/>
           </g>
-          <text x="${iconCircleSize + 12}" y="${iconSize - 2}" fill="#e0c060" font-family="${SVG_FONT_FAMILY}" font-size="16" font-weight="500">${escapeXml(field.label)}:</text>
+          <text x="${iconCircleSize + 12}" y="${iconSize - 2}" fill="#ffd76a" font-family="${SVG_FONT_FAMILY}" font-size="16" font-weight="500">${escapeXml(field.label)}:</text>
           <text x="${iconCircleSize + 12}" y="${iconSize + 14}" fill="#ffffff" font-family="${SVG_FONT_FAMILY}" font-size="18">${escapeXml(field.value)}</text>
         </g>
         ${dividerSvg}
@@ -152,13 +152,13 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
         ${getEmbeddedSvgFontCss()}
         <defs>
           <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
-            <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+            <stop offset="0%" style="stop-color:#0e0e12;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#050506;stop-opacity:1" />
           </linearGradient>
           <linearGradient id="divider" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" style="stop-color:#FFD700;stop-opacity:0" />
-            <stop offset="50%" style="stop-color:#FFD700;stop-opacity:0.5" />
-            <stop offset="100%" style="stop-color:#FFD700;stop-opacity:0" />
+            <stop offset="0%" style="stop-color:#f0c14b;stop-opacity:0" />
+            <stop offset="50%" style="stop-color:#f0c14b;stop-opacity:0.5" />
+            <stop offset="100%" style="stop-color:#f0c14b;stop-opacity:0" />
           </linearGradient>
         </defs>
         
@@ -169,7 +169,7 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
         ${logoSvg}
         
         <!-- Título -->
-        <text x="${width / 2}" y="${outerPadding + logoSectionHeight + titleSize - 6}" fill="#FFD700" font-family="${SVG_FONT_FAMILY}" font-size="${titleSize}" font-weight="bold" text-anchor="middle">RESUMO DO AGENDAMENTO</text>
+        <text x="${width / 2}" y="${outerPadding + logoSectionHeight + titleSize - 6}" fill="#f0c14b" font-family="${SVG_FONT_FAMILY}" font-size="${titleSize}" font-weight="bold" text-anchor="middle">RESUMO DO AGENDAMENTO</text>
         
         <!-- Linha divisória com gradiente -->
         <rect x="${outerPadding}" y="${outerPadding + logoSectionHeight + titleSize + titleMargin - 10}" width="${width - outerPadding * 2}" height="1" fill="url(#divider)" />
@@ -179,27 +179,27 @@ export async function generateSummaryCard(data: SummaryCardData): Promise<string
         
         <!-- Cartão/Container -->
         <g transform="translate(${outerPadding}, ${outerPadding + logoSectionHeight + titleSectionHeight})">
-          <rect width="${width - outerPadding * 2}" height="${contentHeight}" fill="#20263f" rx="16" opacity="0.95"/>
-          <rect width="${width - outerPadding * 2}" height="${contentHeight}" fill="none" stroke="#FFD700" stroke-width="1" opacity="0.15" rx="16"/>
+          <rect width="${width - outerPadding * 2}" height="${contentHeight}" fill="#131318" rx="16" opacity="0.95"/>
+          <rect width="${width - outerPadding * 2}" height="${contentHeight}" fill="none" stroke="#f0c14b" stroke-width="1" opacity="0.15" rx="16"/>
           
           <!-- Elementos decorativos nos cantos superiores -->
-          <path d="M 16 0 L 16 8 M 0 16 L 8 16" stroke="#FFD700" stroke-width="2" opacity="0.3" fill="none"/>
-          <path d="M ${width - outerPadding * 2 - 16} 0 L ${width - outerPadding * 2 - 16} 8 M ${width - outerPadding * 2} 16 L ${width - outerPadding * 2 - 8} 16" stroke="#FFD700" stroke-width="2" opacity="0.3" fill="none"/>
+          <path d="M 16 0 L 16 8 M 0 16 L 8 16" stroke="#f0c14b" stroke-width="2" opacity="0.3" fill="none"/>
+          <path d="M ${width - outerPadding * 2 - 16} 0 L ${width - outerPadding * 2 - 16} 8 M ${width - outerPadding * 2} 16 L ${width - outerPadding * 2 - 8} 16" stroke="#f0c14b" stroke-width="2" opacity="0.3" fill="none"/>
           
           <!-- Campos -->
           ${fieldsSvg}
           
           <!-- Fundo diferenciado para o total -->
-          <rect x="${cardPadding}" y="${totalY - 10}" width="${width - outerPadding * 2 - cardPadding * 2}" height="60" fill="#FFD700" opacity="0.08" rx="8"/>
+          <rect x="${cardPadding}" y="${totalY - 10}" width="${width - outerPadding * 2 - cardPadding * 2}" height="60" fill="#f0c14b" opacity="0.08" rx="8"/>
           
           <!-- Total destacado (regra 4: padding lateral para texto alinhado à direita) -->
           <g transform="translate(${cardPadding}, ${totalY})">
-            <circle cx="${iconCircleSize / 2}" cy="${iconCircleSize / 2}" r="${iconCircleSize / 2}" fill="#FFD700" opacity="0.12"/>
+            <circle cx="${iconCircleSize / 2}" cy="${iconCircleSize / 2}" r="${iconCircleSize / 2}" fill="#f0c14b" opacity="0.12"/>
             <g transform="translate(${(iconCircleSize - iconSize) / 2}, ${(iconCircleSize - iconSize) / 2}) scale(${iconScale})">
-              <path d="${ICONS.money}" fill="#e0c060"/>
+              <path d="${ICONS.money}" fill="#ffd76a"/>
             </g>
-            <text x="${iconCircleSize + 12}" y="${iconSize + 8}" fill="#e0c060" font-family="${SVG_FONT_FAMILY}" font-size="20" font-weight="bold">TOTAL:</text>
-            <text x="${width - outerPadding * 2 - cardPadding - 24}" y="${iconSize + 8}" fill="#FFD700" font-family="${SVG_FONT_FAMILY}" font-size="32" font-weight="bold" text-anchor="end">${escapeXml(totalText)}</text>
+            <text x="${iconCircleSize + 12}" y="${iconSize + 8}" fill="#ffd76a" font-family="${SVG_FONT_FAMILY}" font-size="20" font-weight="bold">TOTAL:</text>
+            <text x="${width - outerPadding * 2 - cardPadding - 24}" y="${iconSize + 8}" fill="#f0c14b" font-family="${SVG_FONT_FAMILY}" font-size="32" font-weight="bold" text-anchor="end">${escapeXml(totalText)}</text>
           </g>
         </g>
         

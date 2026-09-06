@@ -1,27 +1,39 @@
 /**
  * Cartões visuais do atendimento no WhatsApp.
  *
- * O resumo do agendamento já chegava como imagem; o resto da conversa era só
- * texto, e as etapas mais importantes — a abertura e a apresentação do serviço —
- * eram justamente as mais longas de ler. Aqui ficam os dois cartões que faltavam,
- * na mesma linguagem visual do resumo (fundo escuro, dourado, logo no topo),
- * para que a conversa inteira pareça a mesma marca.
+ * Cada etapa que pede uma decisão do cliente tem um cartão: a abertura, o
+ * catálogo, o serviço escolhido, a proposta, os complementos, os horários e o
+ * ticket da reserva. Todos saem da mesma moldura — preto, dourado e a logo no
+ * topo — para que a conversa inteira pareça a mesma marca, e não uma colagem de
+ * mensagens de origens diferentes.
  *
- * A régua é a de `summary-card.ts`: altura calculada antes de desenhar, nada de
- * `<svg>` aninhado e texto sempre com escape.
+ * Regras que valem para todos: altura calculada antes de desenhar (nada de
+ * elemento sobrepondo outro), texto sempre com escape, nenhum `<svg>` aninhado
+ * e conversão pelo mesmo `convertSvgToPng` do calendário — é ele que carrega as
+ * fontes do repositório, sem depender de fonte de sistema.
  */
 import { renderLogo } from "./svg-utils";
 import { uploadImageToCloudinary } from "./image-upload";
 import { convertSvgToPng } from "./calendar-converter";
 
-const LARGURA = 600;
-const MARGEM = 24;
-const OURO = "#FFD700";
-// Os nomes sao os das familias reais empacotadas em public/fonts: o resvg
-// resolve a fonte pelo nome, nao pelo @font-face embutido no SVG.
+const LARGURA = 620;
+const MARGEM = 26;
+
+/** Preto do fundo, ouro da marca e os cinzas de apoio. */
+const PRETO = "#050506";
+const PRETO_CLARO = "#0e0e12";
+const CARTAO = "#131318";
+const CARTAO_DESTAQUE = "#1c1a17";
+const BORDA = "#2a2a31";
+const OURO = "#f0c14b";
+const OURO_FORTE = "#ffd76a";
+const TEXTO = "#f5f5f7";
+const TEXTO_FRACO = "#8b8b98";
+
+// Os nomes são os das famílias reais empacotadas em public/fonts: o resvg
+// resolve a fonte pelo nome, não pelo @font-face embutido no SVG.
 const FONTE = "Noto Sans, sans-serif";
 const FONTE_TITULO = "Montserrat, Noto Sans, sans-serif";
-const OURO_SUAVE = "#e0c060";
 
 function escapar(texto: string): string {
   return texto
@@ -50,27 +62,91 @@ function quebrar(texto: string, maxCaracteres: number): string[] {
   return linhas;
 }
 
-const FUNDO = `
+/** "90 min" fica "1h30"; 480 min ou mais viram "1 dia". */
+export function duracaoLegivel(minutos: number): string {
+  if (!Number.isFinite(minutos) || minutos <= 0) return "";
+  if (minutos >= 480) return "1 dia";
+  if (minutos < 60) return `${minutos} min`;
+  const horas = Math.floor(minutos / 60);
+  const resto = minutos % 60;
+  return resto ? `${horas}h${String(resto).padStart(2, "0")}` : `${horas}h`;
+}
+
+const DEFS = `
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    <linearGradient id="fundo" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:${PRETO_CLARO}" />
+      <stop offset="55%" style="stop-color:${PRETO}" />
+      <stop offset="100%" style="stop-color:#08080b" />
     </linearGradient>
-    <linearGradient id="divisor" x1="0%" y1="0%" x2="100%" y2="0%">
+    <linearGradient id="fio" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" style="stop-color:${OURO};stop-opacity:0" />
-      <stop offset="50%" style="stop-color:${OURO};stop-opacity:0.5" />
+      <stop offset="50%" style="stop-color:${OURO};stop-opacity:0.65" />
       <stop offset="100%" style="stop-color:${OURO};stop-opacity:0" />
     </linearGradient>
+    <linearGradient id="barra" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#8a6a1f" />
+      <stop offset="50%" style="stop-color:${OURO_FORTE}" />
+      <stop offset="100%" style="stop-color:#8a6a1f" />
+    </linearGradient>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:${OURO};stop-opacity:0.16" />
+      <stop offset="100%" style="stop-color:${OURO};stop-opacity:0" />
+    </radialGradient>
   </defs>
-  <rect width="100%" height="100%" fill="url(#bg)" />
 `;
+
+/**
+ * Cabeçalho comum: barra dourada, logo com halo, título e subtítulo.
+ * Devolve o SVG e o Y onde o conteúdo do cartão pode começar.
+ */
+async function cabecalho(titulo: string, subtitulo?: string) {
+  const alturaLogo = 62;
+  const yLogo = MARGEM + 10;
+  const logo = await renderLogo((LARGURA - 88) / 2, yLogo, 88, alturaLogo);
+  const yTitulo = yLogo + alturaLogo + 42;
+  const ySub = subtitulo ? yTitulo + 26 : yTitulo;
+  const yFio = ySub + 18;
+
+  const svg = `
+    <rect x="0" y="0" width="${LARGURA}" height="5" fill="url(#barra)"/>
+    <circle cx="${LARGURA / 2}" cy="${yLogo + alturaLogo / 2}" r="92" fill="url(#halo)"/>
+    ${logo}
+    <text x="${LARGURA / 2}" y="${yTitulo}" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="25" font-weight="900" letter-spacing="1.5" text-anchor="middle">${escapar(titulo.toUpperCase())}</text>
+    ${
+      subtitulo
+        ? `<text x="${LARGURA / 2}" y="${ySub + 4}" fill="${TEXTO_FRACO}" font-family="${FONTE}" font-size="15" text-anchor="middle">${escapar(subtitulo)}</text>`
+        : ""
+    }
+    <rect x="${MARGEM}" y="${yFio}" width="${LARGURA - MARGEM * 2}" height="1" fill="url(#fio)"/>
+  `;
+
+  return { svg, conteudoY: yFio + 24 };
+}
+
+/** Rodapé com a assinatura da marca ou a instrução da etapa. */
+function rodape(y: number, texto: string) {
+  return `
+    <rect x="${MARGEM}" y="${y}" width="${LARGURA - MARGEM * 2}" height="1" fill="url(#fio)"/>
+    <text x="${LARGURA / 2}" y="${y + 26}" fill="${TEXTO_FRACO}" font-family="${FONTE}" font-size="13" letter-spacing="0.6" text-anchor="middle">${escapar(texto)}</text>
+  `;
+}
+
+function moldura(altura: number, conteudo: string) {
+  return `
+    <svg width="${LARGURA}" height="${altura}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LARGURA} ${altura}">
+      ${DEFS}
+      <rect width="100%" height="100%" fill="url(#fundo)"/>
+      ${conteudo}
+    </svg>
+  `;
+}
 
 async function publicar(svg: string, prefixo: string, alternativo: string): Promise<string | null> {
   try {
-    const conversao = await convertSvgToPng(svg, { width: 900 });
-    if (!conversao.success || !conversao.pngBuffer) throw new Error(conversao.error ?? "conversao falhou");
-    const png = conversao.pngBuffer;
-    const upload = await uploadImageToCloudinary(png, `${prefixo}-${Date.now()}`, "cards");
+    const conversao = await convertSvgToPng(svg, { width: 930 });
+    if (!conversao.success || !conversao.pngBuffer) throw new Error(conversao.error ?? "conversão falhou");
+    const upload = await uploadImageToCloudinary(conversao.pngBuffer, `${prefixo}-${Date.now()}`, "cards");
     if (upload.success && upload.url) return upload.url;
     console.error(`[Cartões] Upload de ${prefixo} falhou:`, upload.error);
   } catch (erro) {
@@ -81,6 +157,10 @@ async function publicar(svg: string, prefixo: string, alternativo: string): Prom
   return null;
 }
 
+// ─────────────────────────────────────────────────────────────
+// 1 — CAPA DA MARCA
+// ─────────────────────────────────────────────────────────────
+
 export interface WelcomeCardData {
   businessName: string;
   tagline: string;
@@ -89,63 +169,125 @@ export interface WelcomeCardData {
   hours: string;
 }
 
-/** Capa da conversa: marca, o que fazemos e onde estamos. */
 export async function generateWelcomeCard(data: WelcomeCardData): Promise<string | null> {
-  const alturaLogo = 66;
-  const topoConteudo = MARGEM + alturaLogo + 18;
-  const alturaTitulo = 34;
-  const alturaTagline = 22;
-  const linhaDestaque = 34;
-
+  const { svg: topo, conteudoY } = await cabecalho(data.businessName, data.tagline);
   const destaques = data.destaques.slice(0, 5);
-  const alturaCartao = 20 + destaques.length * linhaDestaque + 16;
+  const linha = 40;
+  const alturaLista = destaques.length * linha;
   const enderecoLinhas = quebrar(data.address, 44);
-  // O rodapé cresce com o endereço: com duas linhas fixas, a segunda passava
-  // por cima do horário de funcionamento.
-  const alturaRodape = 30 + enderecoLinhas.length * 24 + 28;
-  const alturaTotal =
-    topoConteudo + alturaTitulo + alturaTagline + 22 + alturaCartao + alturaRodape + MARGEM;
+  const alturaRodape = 40 + enderecoLinhas.length * 22 + 26;
+  const alturaTotal = conteudoY + alturaLista + alturaRodape + MARGEM;
+  const largura = LARGURA - MARGEM * 2;
 
-  const logo = await renderLogo((LARGURA - 90) / 2, MARGEM, 90, alturaLogo);
-
-  const destaquesSvg = destaques
+  const itens = destaques
     .map((item, indice) => {
-      const y = 30 + indice * linhaDestaque;
+      const y = conteudoY + indice * linha;
       return `
-        <circle cx="${MARGEM + 10}" cy="${y - 6}" r="4" fill="${OURO}" opacity="0.7"/>
-        <text x="${MARGEM + 28}" y="${y}" fill="#ffffff" font-family="${FONTE}" font-size="19">${escapar(item)}</text>
+        <rect x="${MARGEM}" y="${y}" width="${largura}" height="32" fill="${CARTAO}" rx="9"/>
+        <rect x="${MARGEM}" y="${y}" width="3" height="32" fill="${OURO}" opacity="0.85" rx="2"/>
+        <text x="${MARGEM + 22}" y="${y + 22}" fill="${TEXTO}" font-family="${FONTE}" font-size="18">${escapar(item)}</text>
       `;
     })
     .join("");
 
-  const yCartao = topoConteudo + alturaTitulo + alturaTagline + 22;
-  const yRodape = yCartao + alturaCartao + 30;
-  const enderecoSvg = enderecoLinhas
+  const yRodape = conteudoY + alturaLista + 16;
+  const endereco = enderecoLinhas
     .map(
-      (linha, indice) =>
-        `<text x="${LARGURA / 2}" y="${yRodape + indice * 24}" fill="${OURO_SUAVE}" font-family="${FONTE}" font-size="16" text-anchor="middle">${escapar(linha)}</text>`
+      (l, i) =>
+        `<text x="${LARGURA / 2}" y="${yRodape + 30 + i * 22}" fill="${OURO}" font-family="${FONTE}" font-size="15" text-anchor="middle">${escapar(l)}</text>`
     )
     .join("");
 
-  const svg = `
-    <svg width="${LARGURA}" height="${alturaTotal}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LARGURA} ${alturaTotal}">
-      ${FUNDO}
-      ${logo}
-      <text x="${LARGURA / 2}" y="${topoConteudo + 26}" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="30" font-weight="900" text-anchor="middle">${escapar(data.businessName.toUpperCase())}</text>
-      <text x="${LARGURA / 2}" y="${topoConteudo + alturaTitulo + 16}" fill="#c8cbe0" font-family="${FONTE}" font-size="17" text-anchor="middle">${escapar(data.tagline)}</text>
-      <rect x="${MARGEM}" y="${yCartao - 14}" width="${LARGURA - MARGEM * 2}" height="1" fill="url(#divisor)" />
-      <g transform="translate(0, ${yCartao})">
-        <rect x="${MARGEM}" y="0" width="${LARGURA - MARGEM * 2}" height="${alturaCartao}" fill="#20263f" rx="16" opacity="0.95"/>
-        <rect x="${MARGEM}" y="0" width="${LARGURA - MARGEM * 2}" height="${alturaCartao}" fill="none" stroke="${OURO}" stroke-width="1" opacity="0.15" rx="16"/>
-        ${destaquesSvg}
-      </g>
-      ${enderecoSvg}
-      <text x="${LARGURA / 2}" y="${yRodape + enderecoLinhas.length * 24 + 6}" fill="#888888" font-family="${FONTE}" font-size="15" text-anchor="middle">${escapar(data.hours)}</text>
-    </svg>
-  `;
-
-  return publicar(svg, "boas-vindas", data.businessName);
+  return publicar(
+    moldura(
+      alturaTotal,
+      `${topo}
+       ${itens}
+       <rect x="${MARGEM}" y="${yRodape}" width="${largura}" height="1" fill="url(#fio)"/>
+       ${endereco}
+       <text x="${LARGURA / 2}" y="${yRodape + 34 + enderecoLinhas.length * 22}" fill="${TEXTO_FRACO}" font-family="${FONTE}" font-size="14" text-anchor="middle">${escapar(data.hours)}</text>`
+    ),
+    "boas-vindas",
+    data.businessName
+  );
 }
+
+// ─────────────────────────────────────────────────────────────
+// 2 — CATÁLOGO COMPLETO
+// ─────────────────────────────────────────────────────────────
+
+export interface CatalogGroup {
+  title: string;
+  items: Array<{ name: string; price: string; duration?: string }>;
+}
+
+/**
+ * Tabela de preços inteira, agrupada por categoria.
+ *
+ * O menu mostra categorias e o submenu mostra os serviços de uma delas: quem
+ * quer só saber "quanto custa cada coisa" precisava abrir cinco listas. Este
+ * cartão responde à pergunta de uma vez e continua valendo como material que o
+ * cliente guarda ou encaminha para alguém.
+ */
+export async function generateCatalogCard(data: {
+  businessName: string;
+  groups: CatalogGroup[];
+  footer: string;
+}): Promise<string | null> {
+  const { svg: topo, conteudoY } = await cabecalho("Tabela de serviços", data.businessName);
+  const linhaItem = 30;
+  const alturaCabecalhoGrupo = 36;
+  const grupos = data.groups.filter((grupo) => grupo.items.length).slice(0, 6);
+
+  const alturaDoGrupo = (grupo: CatalogGroup) =>
+    alturaCabecalhoGrupo + Math.min(grupo.items.length, 6) * linhaItem + 12;
+  const alturaGrupos = grupos.reduce((soma, grupo) => soma + alturaDoGrupo(grupo) + 10, 0);
+  const alturaTotal = conteudoY + alturaGrupos + 52 + MARGEM;
+  const largura = LARGURA - MARGEM * 2;
+
+  let y = conteudoY;
+  const blocos = grupos
+    .map((grupo) => {
+      const itens = grupo.items.slice(0, 6);
+      const altura = alturaDoGrupo(grupo);
+      const topoBloco = y;
+      y += altura + 10;
+
+      const linhas = itens
+        .map((item, indice) => {
+          const iy = alturaCabecalhoGrupo + 22 + indice * linhaItem;
+          const nome = quebrar(item.name, 32)[0] ?? item.name;
+          const tempo = item.duration ? ` · ${item.duration}` : "";
+          return `
+            <circle cx="${MARGEM + 18}" cy="${iy - 5}" r="2.5" fill="${OURO}" opacity="0.7"/>
+            <text x="${MARGEM + 32}" y="${iy}" fill="${TEXTO}" font-family="${FONTE}" font-size="16">${escapar(nome)}</text>
+            <text x="${MARGEM + largura - 20}" y="${iy}" fill="${OURO_FORTE}" font-family="${FONTE}" font-size="16" font-weight="bold" text-anchor="end">${escapar(`${item.price}${tempo}`)}</text>
+          `;
+        })
+        .join("");
+
+      return `
+        <g transform="translate(0, ${topoBloco})">
+          <rect x="${MARGEM}" y="0" width="${largura}" height="${altura}" fill="${CARTAO}" rx="13"/>
+          <rect x="${MARGEM}" y="0" width="${largura}" height="${altura}" fill="none" stroke="${BORDA}" stroke-width="1" rx="13"/>
+          <rect x="${MARGEM}" y="0" width="4" height="${altura}" fill="${OURO}" opacity="0.5" rx="2"/>
+          <text x="${MARGEM + 20}" y="${alturaCabecalhoGrupo - 12}" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="14" font-weight="900" letter-spacing="1.4">${escapar(grupo.title.toUpperCase())}</text>
+          ${linhas}
+        </g>
+      `;
+    })
+    .join("");
+
+  return publicar(
+    moldura(alturaTotal, `${topo}${blocos}${rodape(conteudoY + alturaGrupos, data.footer)}`),
+    "catalogo",
+    data.businessName
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 3 — SERVIÇO ESCOLHIDO
+// ─────────────────────────────────────────────────────────────
 
 export interface ServiceCardData {
   name: string;
@@ -187,74 +329,64 @@ export function serviceCardFromDetail(
   };
 }
 
-/** Vitrine do serviço escolhido: preço, tempo e o que está incluso. */
 export async function generateServiceCard(data: ServiceCardData): Promise<string | null> {
-  const alturaLogo = 52;
-  const topo = MARGEM + alturaLogo + 14;
+  const { svg: topo, conteudoY } = await cabecalho(data.name, data.pitch || undefined);
   const linhaItem = 30;
   // O ✓ marca o item, não a linha: uma frase que quebra em duas continua sendo
   // um item só, e a segunda linha entra recuada, sem marcador próprio.
-  const itens = data.includes.slice(0, 7).flatMap((item) =>
+  const itens = data.includes.slice(0, 8).flatMap((item) =>
     quebrar(item, 44)
       .slice(0, 2)
       .map((texto, indice) => ({ texto, primeira: indice === 0 }))
   );
 
-  const alturaFaixa = 74;
-  const alturaLista = 26 + itens.length * linhaItem + 16;
-  const alturaTitulo = 36;
-  const alturaPitch = data.pitch ? 26 : 0;
-  const alturaTotal = topo + alturaTitulo + alturaPitch + 16 + alturaFaixa + 18 + alturaLista + MARGEM + 12;
-
-  const logo = await renderLogo((LARGURA - 74) / 2, MARGEM, 74, alturaLogo);
+  const alturaFaixa = 84;
+  const alturaLista = 26 + itens.length * linhaItem + 14;
+  const alturaTotal = conteudoY + alturaFaixa + 18 + alturaLista + 52 + MARGEM;
+  const largura = LARGURA - MARGEM * 2;
 
   const itensSvg = itens
     .map((item, indice) => {
-      const y = 34 + indice * linhaItem;
+      const y = 38 + indice * linhaItem;
       const marcador = item.primeira
-        ? `<path d="M ${MARGEM + 8} ${y - 9} l 5 6 l 9 -12" stroke="${OURO}" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
+        ? `<path d="M ${MARGEM + 22} ${y - 9} l 5 6 l 10 -13" stroke="${OURO}" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
         : "";
-      return `
-        ${marcador}
-        <text x="${MARGEM + 32}" y="${y}" fill="#ffffff" font-family="${FONTE}" font-size="18">${escapar(item.texto)}</text>
-      `;
+      return `${marcador}
+        <text x="${MARGEM + 48}" y="${y}" fill="${TEXTO}" font-family="${FONTE}" font-size="17">${escapar(item.texto)}</text>`;
     })
     .join("");
 
-  const yFaixa = topo + alturaTitulo + alturaPitch + 16;
-  const yLista = yFaixa + alturaFaixa + 18;
-  const meio = LARGURA / 2;
+  const yLista = conteudoY + alturaFaixa + 18;
 
-  const svg = `
-    <svg width="${LARGURA}" height="${alturaTotal}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LARGURA} ${alturaTotal}">
-      ${FUNDO}
-      ${logo}
-      <text x="${meio}" y="${topo + 28}" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="27" font-weight="900" text-anchor="middle">${escapar(data.name.toUpperCase())}</text>
-      ${
-        data.pitch
-          ? `<text x="${meio}" y="${topo + alturaTitulo + 16}" fill="#c8cbe0" font-family="${FONTE}" font-size="16" text-anchor="middle">${escapar(quebrar(data.pitch, 58)[0] ?? "")}</text>`
-          : ""
-      }
-      <g transform="translate(0, ${yFaixa})">
-        <rect x="${MARGEM}" y="0" width="${LARGURA - MARGEM * 2}" height="${alturaFaixa}" fill="${OURO}" opacity="0.1" rx="14"/>
-        <text x="${MARGEM + 34}" y="30" fill="${OURO_SUAVE}" font-family="${FONTE}" font-size="15" font-weight="500">INVESTIMENTO</text>
-        <text x="${MARGEM + 34}" y="58" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="27" font-weight="900">${escapar(data.price)}</text>
-        <text x="${LARGURA - MARGEM - 34}" y="30" fill="${OURO_SUAVE}" font-family="${FONTE}" font-size="15" font-weight="500" text-anchor="end">DURAÇÃO</text>
-        <text x="${LARGURA - MARGEM - 34}" y="58" fill="#ffffff" font-family="${FONTE}" font-size="23" font-weight="bold" text-anchor="end">${escapar(data.duration)}</text>
-      </g>
-      <g transform="translate(0, ${yLista})">
-        <rect x="${MARGEM}" y="0" width="${LARGURA - MARGEM * 2}" height="${alturaLista}" fill="#20263f" rx="16" opacity="0.95"/>
-        <rect x="${MARGEM}" y="0" width="${LARGURA - MARGEM * 2}" height="${alturaLista}" fill="none" stroke="${OURO}" stroke-width="1" opacity="0.15" rx="16"/>
-        ${itensSvg}
-      </g>
-    </svg>
-  `;
-
-  return publicar(svg, "servico", data.name);
+  return publicar(
+    moldura(
+      alturaTotal,
+      `${topo}
+       <g transform="translate(0, ${conteudoY})">
+         <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaFaixa}" fill="${CARTAO_DESTAQUE}" rx="14"/>
+         <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaFaixa}" fill="none" stroke="${OURO}" stroke-width="1" opacity="0.35" rx="14"/>
+         <text x="${MARGEM + 30}" y="32" fill="${TEXTO_FRACO}" font-family="${FONTE}" font-size="13" letter-spacing="1.2">INVESTIMENTO</text>
+         <text x="${MARGEM + 30}" y="66" fill="${OURO_FORTE}" font-family="${FONTE_TITULO}" font-size="30" font-weight="900">${escapar(data.price)}</text>
+         <text x="${MARGEM + largura - 30}" y="32" fill="${TEXTO_FRACO}" font-family="${FONTE}" font-size="13" letter-spacing="1.2" text-anchor="end">DURAÇÃO</text>
+         <text x="${MARGEM + largura - 30}" y="66" fill="${TEXTO}" font-family="${FONTE_TITULO}" font-size="26" font-weight="900" text-anchor="end">${escapar(data.duration)}</text>
+       </g>
+       <g transform="translate(0, ${yLista})">
+         <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaLista}" fill="${CARTAO}" rx="14"/>
+         <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaLista}" fill="none" stroke="${BORDA}" stroke-width="1" rx="14"/>
+         ${itensSvg}
+       </g>
+       ${rodape(yLista + alturaLista + 14, "Garagem do Ka · estética automotiva")}`
+    ),
+    "servico",
+    data.name
+  );
 }
 
+// ─────────────────────────────────────────────────────────────
+// 4 — PROPOSTA EM DEGRAUS
+// ─────────────────────────────────────────────────────────────
+
 export interface ProposalOption {
-  /** "Essencial", "Recomendado", "Completo" — o degrau da escada. */
   tier: string;
   name: string;
   price: string;
@@ -263,154 +395,172 @@ export interface ProposalOption {
   recommended?: boolean;
 }
 
-export interface ProposalCardData {
+export async function generateProposalCard(data: {
   vehicle: string;
   problema: string;
   options: ProposalOption[];
-}
-
-/**
- * Proposta em três degraus, no lugar da árvore de menus.
- *
- * O caminho antigo pedia categoria, depois serviço, depois veículo — três
- * respostas antes de o cliente ver qualquer preço. Aqui ele conta o problema em
- * uma frase e recebe a escada inteira em uma imagem: o que resolve o mínimo, o
- * que a equipe recomenda e o que entrega o máximo, cada um com preço e tempo.
- * A escolha vira um toque em botão.
- */
-export async function generateProposalCard(data: ProposalCardData): Promise<string | null> {
-  const alturaLogo = 46;
-  const topo = MARGEM + alturaLogo + 12;
-  const alturaCabecalho = 62;
-  const linhaBullet = 24;
+}): Promise<string | null> {
+  const { svg: topo, conteudoY } = await cabecalho(
+    "Sua proposta",
+    `${data.vehicle}${data.problema ? ` · ${quebrar(data.problema, 34)[0]}` : ""}`
+  );
+  const linhaBullet = 25;
   const opcoes = data.options.slice(0, 3);
-
-  const alturas = opcoes.map((opcao) => 84 + Math.min(opcao.bullets.length, 3) * linhaBullet);
+  const alturas = opcoes.map((opcao) => 96 + Math.min(opcao.bullets.length, 3) * linhaBullet);
   const alturaTotal =
-    topo + alturaCabecalho + alturas.reduce((soma, altura) => soma + altura + 14, 0) + MARGEM + 16;
-
-  const logo = await renderLogo((LARGURA - 66) / 2, MARGEM, 66, alturaLogo);
+    conteudoY + alturas.reduce((soma, altura) => soma + altura + 14, 0) + 52 + MARGEM;
   const largura = LARGURA - MARGEM * 2;
 
-  let y = topo + alturaCabecalho;
+  let y = conteudoY;
   const blocos = opcoes
     .map((opcao, indice) => {
       const altura = alturas[indice];
       const topoBloco = y;
       y += altura + 14;
-
       const destaque = opcao.recommended;
+
       const bullets = opcao.bullets
         .slice(0, 3)
         .map((bullet, i) => {
-          const by = 76 + i * linhaBullet;
-          const texto = quebrar(bullet, 42)[0] ?? bullet;
+          const by = 88 + i * linhaBullet;
           return `
-            <circle cx="${MARGEM + 26}" cy="${by - 5}" r="3" fill="${OURO}" opacity="0.75"/>
-            <text x="${MARGEM + 40}" y="${by}" fill="#c8cbe0" font-family="${FONTE}" font-size="15">${escapar(texto)}</text>
+            <circle cx="${MARGEM + 32}" cy="${by - 5}" r="3" fill="${OURO}" opacity="0.8"/>
+            <text x="${MARGEM + 46}" y="${by}" fill="${TEXTO_FRACO}" font-family="${FONTE}" font-size="15">${escapar(quebrar(bullet, 40)[0] ?? bullet)}</text>
           `;
         })
         .join("");
 
       return `
         <g transform="translate(0, ${topoBloco})">
-          <rect x="${MARGEM}" y="0" width="${largura}" height="${altura}" fill="${destaque ? "#252c4a" : "#20263f"}" rx="16"/>
-          <rect x="${MARGEM}" y="0" width="${largura}" height="${altura}" fill="none" stroke="${OURO}" stroke-width="${destaque ? 2 : 1}" opacity="${destaque ? 0.55 : 0.14}" rx="16"/>
-          <rect x="${MARGEM}" y="14" width="5" height="${altura - 28}" fill="${OURO}" opacity="${destaque ? 0.9 : 0.35}" rx="3"/>
-          <text x="${MARGEM + 26}" y="30" fill="${OURO_SUAVE}" font-family="${FONTE}" font-size="13" font-weight="500">${escapar(`${indice + 1} · ${opcao.tier.toUpperCase()}`)}</text>
-          <text x="${MARGEM + 26}" y="56" fill="#ffffff" font-family="${FONTE_TITULO}" font-size="21" font-weight="900">${escapar(opcao.name)}</text>
-          <text x="${MARGEM + largura - 26}" y="34" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="25" font-weight="900" text-anchor="end">${escapar(opcao.price)}</text>
-          <text x="${MARGEM + largura - 26}" y="56" fill="#8f96b8" font-family="${FONTE}" font-size="15" text-anchor="end">${escapar(opcao.duration)}</text>
-          ${destaque ? `<rect x="${MARGEM + largura - 150}" y="${altura - 34}" width="124" height="24" fill="${OURO}" opacity="0.16" rx="12"/><text x="${MARGEM + largura - 88}" y="${altura - 17}" fill="${OURO}" font-family="${FONTE}" font-size="13" font-weight="bold" text-anchor="middle">RECOMENDADO</text>` : ""}
+          <rect x="${MARGEM}" y="0" width="${largura}" height="${altura}" fill="${destaque ? CARTAO_DESTAQUE : CARTAO}" rx="14"/>
+          <rect x="${MARGEM}" y="0" width="${largura}" height="${altura}" fill="none" stroke="${destaque ? OURO : BORDA}" stroke-width="${destaque ? 2 : 1}" opacity="${destaque ? 0.7 : 1}" rx="14"/>
+          <rect x="${MARGEM}" y="16" width="4" height="${altura - 32}" fill="${OURO}" opacity="${destaque ? 1 : 0.4}" rx="2"/>
+          ${destaque ? `<rect x="${MARGEM + largura - 150}" y="14" width="130" height="24" fill="${OURO}" rx="12"/><text x="${MARGEM + largura - 85}" y="31" fill="#111114" font-family="${FONTE_TITULO}" font-size="12" font-weight="900" letter-spacing="1" text-anchor="middle">RECOMENDADO</text>` : ""}
+          <text x="${MARGEM + 32}" y="34" fill="${TEXTO_FRACO}" font-family="${FONTE}" font-size="12" letter-spacing="1.4">${escapar(`OPÇÃO ${indice + 1} · ${opcao.tier.toUpperCase()}`)}</text>
+          <text x="${MARGEM + 32}" y="62" fill="${TEXTO}" font-family="${FONTE_TITULO}" font-size="20" font-weight="900">${escapar(quebrar(opcao.name, 28)[0] ?? opcao.name)}</text>
+          <text x="${MARGEM + largura - 30}" y="${destaque ? 66 : 62}" fill="${OURO_FORTE}" font-family="${FONTE_TITULO}" font-size="26" font-weight="900" text-anchor="end">${escapar(opcao.price)}</text>
+          <text x="${MARGEM + largura - 30}" y="${destaque ? 86 : 82}" fill="${TEXTO_FRACO}" font-family="${FONTE}" font-size="14" text-anchor="end">${escapar(opcao.duration)}</text>
           ${bullets}
         </g>
       `;
     })
     .join("");
 
-  const svg = `
-    <svg width="${LARGURA}" height="${alturaTotal}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LARGURA} ${alturaTotal}">
-      ${FUNDO}
-      ${logo}
-      <text x="${LARGURA / 2}" y="${topo + 24}" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="22" font-weight="900" text-anchor="middle">SUA PROPOSTA</text>
-      <text x="${LARGURA / 2}" y="${topo + 46}" fill="#8f96b8" font-family="${FONTE}" font-size="15" text-anchor="middle">${escapar(`${data.vehicle} · ${quebrar(data.problema, 40)[0] ?? ""}`)}</text>
-      ${blocos}
-    </svg>
-  `;
-
-  return publicar(svg, "proposta", data.vehicle);
+  return publicar(
+    moldura(alturaTotal, `${topo}${blocos}${rodape(y - 2, "Responda com o número da opção")}`),
+    "proposta",
+    data.vehicle
+  );
 }
 
+// ─────────────────────────────────────────────────────────────
+// 5 — COMPLEMENTOS DA VISITA
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Adicionais que cabem na mesma visita.
+ *
+ * São serviços que ninguém procura sozinho — não se abre uma conversa pedindo
+ * cristalização de faróis —, mas que fazem sentido quando o carro já vai ficar
+ * na oficina. Em um cartão próprio, com preço e o motivo de cada um, a escolha
+ * é informada em vez de empurrada.
+ */
+export async function generateExtrasCard(data: {
+  service: string;
+  extras: Array<{ name: string; price: string; duration?: string; motivo: string }>;
+}): Promise<string | null> {
+  const { svg: topo, conteudoY } = await cabecalho("Aproveite a visita", data.service);
+  const extras = data.extras.slice(0, 5);
+  const alturaItem = 78;
+  const alturaTotal = conteudoY + extras.length * (alturaItem + 12) + 52 + MARGEM;
+  const largura = LARGURA - MARGEM * 2;
+
+  const blocos = extras
+    .map((extra, indice) => {
+      const topoBloco = conteudoY + indice * (alturaItem + 12);
+      return `
+        <g transform="translate(0, ${topoBloco})">
+          <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaItem}" fill="${CARTAO}" rx="14"/>
+          <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaItem}" fill="none" stroke="${BORDA}" stroke-width="1" rx="14"/>
+          <circle cx="${MARGEM + 36}" cy="${alturaItem / 2}" r="19" fill="${OURO}" opacity="0.13"/>
+          <text x="${MARGEM + 36}" y="${alturaItem / 2 + 6}" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="17" font-weight="900" text-anchor="middle">${indice + 1}</text>
+          <text x="${MARGEM + 70}" y="${alturaItem / 2 - 6}" fill="${TEXTO}" font-family="${FONTE_TITULO}" font-size="18" font-weight="900">${escapar(quebrar(extra.name, 26)[0] ?? extra.name)}</text>
+          <text x="${MARGEM + 70}" y="${alturaItem / 2 + 18}" fill="${TEXTO_FRACO}" font-family="${FONTE}" font-size="14">${escapar(quebrar(extra.motivo, 38)[0] ?? "")}</text>
+          <text x="${MARGEM + largura - 26}" y="${alturaItem / 2 - 2}" fill="${OURO_FORTE}" font-family="${FONTE_TITULO}" font-size="21" font-weight="900" text-anchor="end">${escapar(extra.price)}</text>
+          ${extra.duration ? `<text x="${MARGEM + largura - 26}" y="${alturaItem / 2 + 20}" fill="${TEXTO_FRACO}" font-family="${FONTE}" font-size="13" text-anchor="end">+${escapar(extra.duration)}</text>` : ""}
+        </g>
+      `;
+    })
+    .join("");
+
+  return publicar(
+    moldura(
+      alturaTotal,
+      `${topo}${blocos}${rodape(conteudoY + extras.length * (alturaItem + 12) - 2, "Responda os números que quiser — ou pule")}`
+    ),
+    "extras",
+    data.service
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 6 — HORÁRIOS
+// ─────────────────────────────────────────────────────────────
+
 export interface SlotOption {
-  /** "Amanhã", "Terça" — o dia como a pessoa fala. */
   dia: string;
   data: string;
   hora: string;
   nota?: string;
 }
 
-/**
- * Agenda relâmpago: os três primeiros horários livres, grandes.
- *
- * O caminho antigo pedia semana, depois dia, depois período, depois horário —
- * quatro toques para marcar. Quase todo mundo quer "o mais cedo possível", e
- * essa é exatamente a informação que a lista escondia atrás de três telas.
- */
 export async function generateSlotsCard(data: {
   service: string;
   vehicle: string;
   duracao: string;
   slots: SlotOption[];
 }): Promise<string | null> {
-  const alturaLogo = 44;
-  const topo = MARGEM + alturaLogo + 10;
-  const alturaCabecalho = 58;
-  const alturaSlot = 76;
+  const { svg: topo, conteudoY } = await cabecalho(
+    "Horários livres",
+    `${data.service} · ${data.duracao} para o ${data.vehicle}`
+  );
   const slots = data.slots.slice(0, 3);
-  const alturaTotal = topo + alturaCabecalho + slots.length * (alturaSlot + 12) + 46 + MARGEM;
-
-  const logo = await renderLogo((LARGURA - 62) / 2, MARGEM, 62, alturaLogo);
+  const alturaSlot = 84;
+  const alturaTotal = conteudoY + slots.length * (alturaSlot + 12) + 52 + MARGEM;
   const largura = LARGURA - MARGEM * 2;
 
   const blocos = slots
     .map((slot, indice) => {
-      const y = topo + alturaCabecalho + indice * (alturaSlot + 12);
+      const y = conteudoY + indice * (alturaSlot + 12);
       const primeiro = indice === 0;
       return `
         <g transform="translate(0, ${y})">
-          <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaSlot}" fill="${primeiro ? "#252c4a" : "#20263f"}" rx="16"/>
-          <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaSlot}" fill="none" stroke="${OURO}" stroke-width="${primeiro ? 2 : 1}" opacity="${primeiro ? 0.5 : 0.14}" rx="16"/>
-          <circle cx="${MARGEM + 40}" cy="${alturaSlot / 2}" r="20" fill="${OURO}" opacity="0.14"/>
-          <text x="${MARGEM + 40}" y="${alturaSlot / 2 + 7}" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="19" font-weight="900" text-anchor="middle">${indice + 1}</text>
-          <text x="${MARGEM + 76}" y="${alturaSlot / 2 - 4}" fill="#ffffff" font-family="${FONTE_TITULO}" font-size="21" font-weight="900">${escapar(`${slot.dia} · ${slot.hora}`)}</text>
-          <text x="${MARGEM + 76}" y="${alturaSlot / 2 + 20}" fill="#8f96b8" font-family="${FONTE}" font-size="14">${escapar(slot.nota ? `${slot.data} · ${slot.nota}` : slot.data)}</text>
-          ${primeiro ? `<text x="${MARGEM + largura - 24}" y="${alturaSlot / 2 + 6}" fill="${OURO}" font-family="${FONTE}" font-size="13" font-weight="bold" text-anchor="end">MAIS CEDO</text>` : ""}
+          <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaSlot}" fill="${primeiro ? CARTAO_DESTAQUE : CARTAO}" rx="14"/>
+          <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaSlot}" fill="none" stroke="${primeiro ? OURO : BORDA}" stroke-width="${primeiro ? 2 : 1}" opacity="${primeiro ? 0.7 : 1}" rx="14"/>
+          <circle cx="${MARGEM + 44}" cy="${alturaSlot / 2}" r="22" fill="${OURO}" opacity="0.14"/>
+          <text x="${MARGEM + 44}" y="${alturaSlot / 2 + 8}" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="20" font-weight="900" text-anchor="middle">${indice + 1}</text>
+          <text x="${MARGEM + 84}" y="${alturaSlot / 2 - 4}" fill="${TEXTO}" font-family="${FONTE_TITULO}" font-size="22" font-weight="900">${escapar(`${slot.dia} · ${slot.hora}`)}</text>
+          <text x="${MARGEM + 84}" y="${alturaSlot / 2 + 22}" fill="${TEXTO_FRACO}" font-family="${FONTE}" font-size="14">${escapar(slot.nota ? `${slot.data} · ${slot.nota}` : slot.data)}</text>
+          ${primeiro ? `<text x="${MARGEM + largura - 26}" y="${alturaSlot / 2 + 6}" fill="${OURO}" font-family="${FONTE}" font-size="12" font-weight="bold" letter-spacing="1" text-anchor="end">MAIS CEDO</text>` : ""}
         </g>
       `;
     })
     .join("");
 
-  const svg = `
-    <svg width="${LARGURA}" height="${alturaTotal}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LARGURA} ${alturaTotal}">
-      ${FUNDO}
-      ${logo}
-      <text x="${LARGURA / 2}" y="${topo + 22}" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="21" font-weight="900" text-anchor="middle">HORÁRIOS LIVRES</text>
-      <text x="${LARGURA / 2}" y="${topo + 44}" fill="#8f96b8" font-family="${FONTE}" font-size="15" text-anchor="middle">${escapar(`${data.service} · ${data.duracao} reservadas para o ${data.vehicle}`)}</text>
-      ${blocos}
-      <text x="${LARGURA / 2}" y="${alturaTotal - MARGEM - 6}" fill="#888888" font-family="${FONTE}" font-size="14" text-anchor="middle">Prefere outro dia? É só escrever a data.</text>
-    </svg>
-  `;
-
-  return publicar(svg, "horarios", data.service);
+  return publicar(
+    moldura(
+      alturaTotal,
+      `${topo}${blocos}${rodape(conteudoY + slots.length * (alturaSlot + 12) - 2, "Prefere outro dia? É só escrever a data")}`
+    ),
+    "horarios",
+    data.service
+  );
 }
 
-/**
- * Ticket da reserva: o comprovante que o cliente guarda.
- *
- * A confirmação era uma lista de campos em texto. Um ticket com a placa em
- * destaque serve para alguma coisa: é o que a pessoa mostra na chegada e o que
- * a câmera do portão usa para reconhecer o carro.
- */
+// ─────────────────────────────────────────────────────────────
+// 7 — TICKET DA RESERVA
+// ─────────────────────────────────────────────────────────────
+
 export async function generateTicketCard(data: {
   code: string;
   name: string;
@@ -422,51 +572,44 @@ export async function generateTicketCard(data: {
   price: string;
   address: string;
 }): Promise<string | null> {
-  const alturaLogo = 44;
-  const topo = MARGEM + alturaLogo + 10;
-  const alturaCorpo = 300;
-  const enderecoLinhas = quebrar(data.address, 46).slice(0, 2);
-  const alturaTotal = topo + alturaCorpo + enderecoLinhas.length * 20 + 44 + MARGEM;
-  const logo = await renderLogo((LARGURA - 62) / 2, MARGEM, 62, alturaLogo);
+  const { svg: topo, conteudoY } = await cabecalho("Reserva confirmada", data.code);
   const largura = LARGURA - MARGEM * 2;
+  const alturaCorpo = 272;
+  const enderecoLinhas = quebrar(data.address, 46).slice(0, 2);
+  const alturaTotal = conteudoY + alturaCorpo + 36 + enderecoLinhas.length * 22 + MARGEM;
 
-  const linha = (rotulo: string, valor: string, y: number, x: number, ancora: "start" | "end" = "start") => `
-    <text x="${x}" y="${y}" fill="${OURO_SUAVE}" font-family="${FONTE}" font-size="13" font-weight="500" text-anchor="${ancora}">${escapar(rotulo)}</text>
-    <text x="${x}" y="${y + 24}" fill="#ffffff" font-family="${FONTE}" font-size="19" text-anchor="${ancora}">${escapar(valor)}</text>
+  const campo = (rotulo: string, valor: string, y: number, x: number, ancora: "start" | "end") => `
+    <text x="${x}" y="${y}" fill="${TEXTO_FRACO}" font-family="${FONTE}" font-size="12" letter-spacing="1.3" text-anchor="${ancora}">${escapar(rotulo)}</text>
+    <text x="${x}" y="${y + 25}" fill="${TEXTO}" font-family="${FONTE}" font-size="19" text-anchor="${ancora}">${escapar(valor)}</text>
   `;
 
-  const svg = `
-    <svg width="${LARGURA}" height="${alturaTotal}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LARGURA} ${alturaTotal}">
-      ${FUNDO}
-      ${logo}
-      <g transform="translate(0, ${topo})">
-        <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaCorpo}" fill="#20263f" rx="18"/>
-        <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaCorpo}" fill="none" stroke="${OURO}" stroke-width="1" opacity="0.2" rx="18"/>
+  const yRodape = conteudoY + alturaCorpo + 28;
 
-        <text x="${MARGEM + 26}" y="34" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="19" font-weight="900">RESERVA CONFIRMADA</text>
-        <text x="${MARGEM + largura - 26}" y="34" fill="#8f96b8" font-family="${FONTE}" font-size="14" text-anchor="end">${escapar(data.code)}</text>
-
-        <rect x="${MARGEM + 26}" y="52" width="${largura - 52}" height="1" fill="url(#divisor)"/>
-
-        <text x="${MARGEM + 26}" y="88" fill="#ffffff" font-family="${FONTE_TITULO}" font-size="24" font-weight="900">${escapar(data.service)}</text>
-
-        ${linha("QUANDO", `${data.date} · ${data.time}`, 126, MARGEM + 26)}
-        ${linha("VALOR", data.price, 126, MARGEM + largura - 26, "end")}
-        ${linha("CLIENTE", data.name, 190, MARGEM + 26)}
-        ${linha("VEÍCULO", data.vehicle, 190, MARGEM + largura - 26, "end")}
-
-        <rect x="${MARGEM + 26}" y="220" width="${largura - 52}" height="56" fill="${OURO}" opacity="0.12" rx="12"/>
-        <text x="${MARGEM + 46}" y="243" fill="${OURO_SUAVE}" font-family="${FONTE}" font-size="13" font-weight="500">PLACA — a câmera reconhece na chegada</text>
-        <text x="${MARGEM + 46}" y="268" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="24" font-weight="900" letter-spacing="3">${escapar(data.plate || "informe no dia")}</text>
-      </g>
-      ${enderecoLinhas
-        .map(
-          (l, i) =>
-            `<text x="${LARGURA / 2}" y="${topo + alturaCorpo + 28 + i * 20}" fill="#8f96b8" font-family="${FONTE}" font-size="14" text-anchor="middle">${escapar(l)}</text>`
-        )
-        .join("")}
-    </svg>
-  `;
-
-  return publicar(svg, "ticket", data.code);
+  return publicar(
+    moldura(
+      alturaTotal,
+      `${topo}
+       <g transform="translate(0, ${conteudoY})">
+         <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaCorpo}" fill="${CARTAO}" rx="16"/>
+         <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaCorpo}" fill="none" stroke="${OURO}" stroke-width="1" opacity="0.4" rx="16"/>
+         <text x="${MARGEM + 28}" y="44" fill="${TEXTO}" font-family="${FONTE_TITULO}" font-size="23" font-weight="900">${escapar(quebrar(data.service, 28)[0] ?? data.service)}</text>
+         ${campo("QUANDO", `${data.date} · ${data.time}`, 90, MARGEM + 28, "start")}
+         ${campo("VALOR", data.price, 90, MARGEM + largura - 28, "end")}
+         ${campo("CLIENTE", data.name, 156, MARGEM + 28, "start")}
+         ${campo("VEÍCULO", quebrar(data.vehicle, 20)[0] ?? data.vehicle, 156, MARGEM + largura - 28, "end")}
+         <rect x="${MARGEM + 28}" y="192" width="${largura - 56}" height="58" fill="${OURO}" opacity="0.1" rx="12"/>
+         <rect x="${MARGEM + 28}" y="192" width="${largura - 56}" height="58" fill="none" stroke="${OURO}" stroke-width="1" opacity="0.3" rx="12"/>
+         <text x="${MARGEM + 48}" y="215" fill="${TEXTO_FRACO}" font-family="${FONTE}" font-size="12" letter-spacing="1.2">PLACA — a câmera reconhece na chegada</text>
+         <text x="${MARGEM + 48}" y="240" fill="${OURO_FORTE}" font-family="${FONTE_TITULO}" font-size="24" font-weight="900" letter-spacing="4">${escapar(data.plate || "informe no dia")}</text>
+       </g>
+       ${enderecoLinhas
+         .map(
+           (l, i) =>
+             `<text x="${LARGURA / 2}" y="${yRodape + i * 22}" fill="${TEXTO_FRACO}" font-family="${FONTE}" font-size="14" text-anchor="middle">${escapar(l)}</text>`
+         )
+         .join("")}`
+    ),
+    "ticket",
+    data.code
+  );
 }
