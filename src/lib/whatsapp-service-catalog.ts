@@ -260,6 +260,8 @@ export function buildMainMenu(
   catalog?: Record<string, CatalogItem>
 ): string {
   const lines = mainMenuEntries(categories, catalog).map((entrada) => {
+    // O que vem depois do travessão vira a descrição da linha na lista nativa,
+    // então é ali que o preço aparece sem competir com o nome da categoria.
     const sufixo = entrada.startingPrice ? ` — a partir de ${precoCurto(entrada.startingPrice)}` : "";
     return `*${entrada.display}* ${entrada.icon} ${entrada.title}${sufixo}`;
   });

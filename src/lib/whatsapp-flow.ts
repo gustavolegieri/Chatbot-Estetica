@@ -61,6 +61,8 @@ import {
 } from "./whatsapp-appointment-change";
 import { resolveValidCustomerName } from "./customer-name";
 import { getCachedWorkingDays, getRuntimeSettings } from "./settings-runtime";
+import { sendWelcomeCover } from "./whatsapp-welcome";
+import { generateServiceCard, serviceCardFromDetail } from "./whatsapp-cards";
 import { requestHumanHandoff, wantsHumanHandoff } from "./whatsapp-handoff";
 import {
   etapa1Welcome,
@@ -332,7 +334,7 @@ async function sendCalendarWithImageAndList(params: { number: string; prompts?: 
 async function sendTextWrapper(
   msg: IncomingMessage,
   text: string,
-  options?: { voiceReply?: boolean; includesWelcome?: boolean }
+  options?: { voiceReply?: boolean; includesWelcome?: boolean; welcomeCover?: boolean }
 ) {
   await flowDeliveryContext.run(msg.testMode, async () => {
     let outboundText = text;
@@ -344,6 +346,11 @@ async function sendTextWrapper(
         await sendText({ number: msg.phone, text: msg.initialWelcomePrefix, voiceReply: false });
         if (!msg.testMode?.sendTextCallback) await delay(180);
       }
+    }
+    // O simulador do painel não renderiza imagem; lá a capa continua como texto.
+    if (options?.welcomeCover && !msg.testMode) {
+      await sendWelcomeCover(msg.phone, outboundText, "ETAPA1_AWAITING_NAME");
+      return;
     }
     await sendText({ number: msg.phone, text: outboundText, voiceReply: options?.voiceReply });
   });
@@ -1298,6 +1305,30 @@ async function activateService(
     assertDelivery(await entregarDetalhe(msg, detailWithWelcome, media));
     await goToVehicleStep(msg, activeFlow, wctx);
     return;
+  }
+
+  // Sem mídia cadastrada, o próprio detalhe vira cartão: preço, duração e o que
+  // inclui saem do parágrafo e entram na imagem, e o texto fica só com o passo
+  // seguinte. O simulador do painel continua em texto puro.
+  if (!msg.testMode) {
+    const cartao = await generateServiceCard(
+      serviceCardFromDetail(detailText, {
+        name: item.label,
+        price: item.hatchMin > 0 ? `R$ ${item.hatchMin}` : "Sob avaliação",
+        duration: item.time,
+      })
+    );
+    if (cartao) {
+      assertDelivery(
+        await sendMedia({
+          number: msg.phone,
+          mediaUrl: cartao,
+          caption: `*${item.label}* — ${item.hatchMin > 0 ? `R$ ${item.hatchMin}` : "valor sob avaliação"} · ${item.time}`,
+        })
+      );
+      await goToVehicleStep(msg, activeFlow, wctx);
+      return;
+    }
   }
 
   await goToVehicleStep(msg, activeFlow, wctx, detailWithWelcome);
@@ -5112,7 +5143,12 @@ export async function startFlow(msg: IncomingMessage) {
         : understoodSchedule
         ? initialScheduleNameRequest(serviceKey ? wctx.catalog[serviceKey]?.label : null, wctx.prompts)
         : etapa1Welcome(ctx, wctx.prompts),
-      { includesWelcome: !availabilityRequest && !understoodSchedule, voiceReply: false }
+      {
+        includesWelcome: !availabilityRequest && !understoodSchedule,
+        voiceReply: false,
+        // Abertura pura vira cartão da marca com o texto na legenda.
+        welcomeCover: !availabilityRequest && !understoodSchedule,
+      }
     );
     console.log("[WhatsApp Flow] 💾 Salvando estado com welcomed=true");
     const initialState: FlowState = {

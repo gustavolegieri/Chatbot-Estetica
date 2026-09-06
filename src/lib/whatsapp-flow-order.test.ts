@@ -45,7 +45,7 @@ test("simple greeting starts immediately without calling an AI provider", async 
       },
     });
     assert.equal(replies.length, 1);
-    assert.match(replies[0], /como você prefere ser chamado/i);
+    assert.match(replies[0], /como prefere ser chamado/i);
   } finally {
     globalThis.fetch = previousFetch;
     (prisma.settings as any).findUnique = originalSettingsFindUnique;
@@ -102,7 +102,7 @@ test("official scheduling flow keeps one ordered prompt per customer reply", asy
     await startFlow({ phone, text: "Olá", testMode });
     assert.equal(state.stage, "ETAPA1_AWAITING_NAME");
     assert.equal(replies.length, 1);
-    assert.match(replies[0], /como você prefere ser chamado/i);
+    assert.match(replies[0], /como prefere ser chamado/i);
 
     assert.equal((await reply("Gustavo")).length, 1);
     assert.equal(state.stage, "ETAPA2_MAIN_MENU");
@@ -115,7 +115,7 @@ test("official scheduling flow keeps one ordered prompt per customer reply", asy
     const detalhe = await reply("1");
     assert.equal(detalhe.length, 1);
     assert.match(detalhe[0], /Lavagem Simples/i);
-    assert.match(detalhe[0], /ve[íi]culo/i);
+    assert.match(detalhe[0], /me conte do carro|ve[íi]culo/i);
     assert.equal(state.stage, "ETAPA4_VEHICLE");
 
     // Com o veículo reconhecido não há tela de "confirma que é um Fiesta?": o

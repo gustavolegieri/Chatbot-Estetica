@@ -184,7 +184,7 @@ test('accepting an AI recommendation advances directly to vehicle data', async (
     assert.equal(result.nextState.serviceKey, 'higienizacao_tecido');
     assert.equal(result.nextState.serviceRecommendation, null);
     assert.match(text, /Vamos agendar.*Higienização dos Bancos de Tecido/i);
-    assert.match(text, /dados do veículo/i);
+    assert.match(text, /me conte do carro|dados do veículo/i);
     assert.doesNotMatch(text, /Conte brevemente o que você busca/i);
     assert.doesNotMatch(text, /Agendar este serviço/i);
   } finally {
