@@ -1,8 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { cerebrasChat } from "./cerebras-ai";
+import { prisma } from "./prisma";
+import { FLAG_CEREBRAS_INDISPONIVEL } from "./runtime-flags";
 
 test("uses Groq automatically when Cerebras is unavailable", async () => {
+  // O cooldown do provedor agora vive no banco e vale entre invocações. Um 402
+  // real gravado por outra execução faria o teste começar já com o Cerebras
+  // desligado — e o que se quer verificar aqui é justamente a primeira queda.
+  await prisma.runtimeFlag
+    .delete({ where: { key: FLAG_CEREBRAS_INDISPONIVEL } })
+    .catch(() => undefined);
+
   const previousFetch = globalThis.fetch;
   const previousCerebrasKey = process.env.CEREBRAS_API_KEY;
   const previousGroqKey = process.env.GROQ_API_KEY;
