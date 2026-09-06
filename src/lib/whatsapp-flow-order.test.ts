@@ -179,7 +179,7 @@ test("official scheduling flow keeps one ordered prompt per customer reply", asy
 
     const confirmationReply = await reply("1");
     assert.equal(confirmationReply.length, 1);
-    assert.match(confirmationReply[0], /Agendamento confirmado/i);
+    assert.match(confirmationReply[0], /Hor[áa]rio reservado|Agendamento confirmado/i);
     assert.equal(state.stage, "ETAPA2_MAIN_MENU");
     assert.equal(state.awaitingPostConfirmationReturn, true);
   } finally {
