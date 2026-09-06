@@ -62,7 +62,13 @@ import {
 import { resolveValidCustomerName } from "./customer-name";
 import { getCachedWorkingDays, getRuntimeSettings } from "./settings-runtime";
 import { sendWelcomeCover } from "./whatsapp-welcome";
-import { generateServiceCard, serviceCardFromDetail } from "./whatsapp-cards";
+import {
+  generateProposalCard,
+  generateServiceCard,
+  generateSlotsCard,
+  generateTicketCard,
+  serviceCardFromDetail,
+} from "./whatsapp-cards";
 import { humanizarDuracao } from "./whatsapp-service-catalog";
 import { requestHumanHandoff, wantsHumanHandoff } from "./whatsapp-handoff";
 import {
@@ -1950,6 +1956,175 @@ async function handleAppointmentChange(
   return true;
 }
 
+
+/**
+ * Proposta em três degraus, no lugar do orçamento de uma linha só.
+ *
+ * Depois de saber o carro e o serviço, o fluxo antigo mandava um preço e o
+ * calendário. Quem estava em dúvida entre "só lavar" e "resolver de vez" não
+ * tinha como comparar sem voltar ao menu. Aqui a comparação chega pronta: o
+ * serviço escolhido, ele mais o complemento que a equipe recomenda, e a opção
+ * completa. Cada degrau vira um botão.
+ */
+async function montarProposta(
+  flow: FlowState,
+  wctx: WhatsAppCatalogContext
+): Promise<NonNullable<FlowState["proposalOptions"]>> {
+  const baseKey = flow.serviceKey ?? "lavagem_detalhada";
+  const base = wctx.catalog[baseKey];
+  const precoBase = quoteForKey(baseKey, flow, wctx);
+  const duracaoBase = await getFlowDurationMin(flow, wctx);
+
+  const degraus: NonNullable<FlowState["proposalOptions"]> = [
+    {
+      key: baseKey,
+      label: base?.label ?? flow.serviceLabel ?? "Serviço",
+      price: precoBase.min,
+      durationMin: duracaoBase,
+    },
+  ];
+
+  // Combinações que a equipe faz na mesma visita. O cadastro de upsell do
+  // painel tem prioridade; sem ele, o degrau do meio sai daqui, senão a
+  // proposta chegaria com dois caminhos e perderia justamente o recomendado.
+  const PARES_NATURAIS: Record<string, string> = {
+    lavagem_simples: "higienizacao_tecido",
+    lavagem_completa: "higienizacao_tecido",
+    lavagem_detalhada: "higienizacao_tecido_completa",
+    higienizacao_tecido: "lavagem_completa",
+    higienizacao_couro: "lavagem_completa",
+    higienizacao_tecido_completa: "lavagem_detalhada",
+    higienizacao_couro_completa: "lavagem_detalhada",
+    polimento_cotacao: "descontaminacao_pintura",
+    revitalizacao_pintura: "lavagem_detalhada",
+    descontaminacao_pintura: "lavagem_detalhada",
+    cristalizacao_farois: "lavagem_completa",
+    limpeza_motor: "lavagem_detalhada",
+  };
+
+  const complemento = getUpsellForKey(baseKey, wctx);
+  const parKey = PARES_NATURAIS[baseKey];
+  const par = parKey ? wctx.catalog[parKey] : null;
+  if (complemento && precoBase.min > 0) {
+    degraus.push({
+      key: baseKey,
+      label: `${base?.label ?? "Serviço"} + ${complemento.complement}`,
+      price: precoBase.min + complemento.value,
+      durationMin: duracaoBase + complemento.durationMin,
+      upsellKey: complemento.complement,
+      upsellLabel: complemento.complement,
+    });
+  }
+
+  if (!complemento && par && precoBase.min > 0) {
+    const precoPar = quoteForKey(parKey!, flow, wctx);
+    if (precoPar.min > 0) {
+      degraus.push({
+        key: baseKey,
+        label: `${base?.label ?? "Serviço"} + ${par.label}`,
+        price: precoBase.min + precoPar.min,
+        durationMin: duracaoBase + (CATALOG_DURATION_MIN[parKey!] ?? 90),
+        upsellKey: parKey,
+        upsellLabel: par.label,
+      });
+    }
+  }
+
+  // O degrau de cima é o serviço mais completo da casa que ainda não está na
+  // proposta — é ele que responde "e se eu quiser resolver de vez?".
+  const premiumKey = ["polimento_cotacao", "revitalizacao_pintura", "lavagem_detalhada"].find(
+    (chave) => wctx.catalog[chave] && chave !== baseKey
+  );
+  if (premiumKey) {
+    const premium = wctx.catalog[premiumKey];
+    const precoPremium = quoteForKey(premiumKey, flow, wctx);
+    degraus.push({
+      key: premiumKey,
+      label: premium.label,
+      price: precoPremium.min,
+      durationMin: CATALOG_DURATION_MIN[premiumKey] ?? 240,
+    });
+  }
+
+  return degraus.slice(0, 3);
+}
+
+function duracaoLegivel(minutos: number): string {
+  if (minutos >= 480) return "1 dia";
+  if (minutos < 60) return `${minutos} min`;
+  const horas = Math.floor(minutos / 60);
+  const resto = minutos % 60;
+  return resto ? `${horas}h${String(resto).padStart(2, "0")}` : `${horas}h`;
+}
+
+function precoLegivel(valor: number): string {
+  if (!valor || valor <= 0) return "sob avaliação";
+  return `R$ ${valor}`;
+}
+
+async function enviarProposta(
+  msg: IncomingMessage,
+  flow: FlowState,
+  wctx: WhatsAppCatalogContext
+): Promise<boolean> {
+  const degraus = await montarProposta(flow, wctx);
+  if (degraus.length < 2) return false;
+
+  const veiculo = vehicleDisplayFromFlow(flow) || "seu veículo";
+  const cartao = msg.testMode
+    ? null
+    : await generateProposalCard({
+        vehicle: veiculo,
+        problema: flow.serviceRequestContext?.slice(0, 60) ?? flow.serviceLabel ?? "",
+        options: degraus.map((degrau, indice) => ({
+          tier: indice === 0 ? "Resolve" : indice === 1 ? "Recomendado" : "Completo",
+          name: degrau.label,
+          price: precoLegivel(degrau.price),
+          duration: duracaoLegivel(degrau.durationMin),
+          recommended: indice === 1,
+          bullets: bulletsDoServico(degrau.key, wctx),
+        })),
+      });
+
+  const linhas = degraus.map(
+    (degrau, indice) =>
+      `*${indice + 1}* ${degrau.label} — ${precoLegivel(degrau.price)} · ${duracaoLegivel(degrau.durationMin)}`
+  );
+
+  const proximo: FlowState = { ...flow, stage: "ETAPA_PROPOSTA", proposalOptions: degraus };
+  await saveFlow(msg.phone, proximo, msg.testMode?.skipDb);
+  msg.testMode?.onFlowStateChange?.(proximo);
+
+  if (cartao) {
+    await sendMedia({
+      number: msg.phone,
+      mediaUrl: cartao,
+      caption: `Montei ${degraus.length} caminhos para o *${veiculo}* 👇\n\nTodos podem ser feitos na mesma visita — a diferença é até onde a gente vai.`,
+    });
+    await sendText({ number: msg.phone, text: `Qual eu reservo?\n\n${linhas.join("\n")}` });
+    return true;
+  }
+
+  await sendText({
+    number: msg.phone,
+    text: `Montei ${degraus.length} caminhos para o *${veiculo}*:\n\n${linhas.join("\n")}\n\n_Responda com o número — ou pergunte o que quiser antes._`,
+  });
+  return true;
+}
+
+/** Três frases curtas do que o serviço entrega, tiradas do detalhe oficial. */
+function bulletsDoServico(key: string, wctx: WhatsAppCatalogContext): string[] {
+  const detalhe = flowMsg(wctx).detail(key, false);
+  const itens = detalhe
+    .split("\n")
+    .map((linha) => linha.trim())
+    .filter((linha) => linha.startsWith("•"))
+    .map((linha) => linha.replace(/^•\s*/, ""));
+  if (itens.length) return itens.slice(0, 3);
+  const item = wctx.catalog[key];
+  return item?.short ? [item.short] : [];
+}
+
 /**
  * Abre a escolha de data: imagem do calendário e, logo abaixo, a lista.
  *
@@ -2023,13 +2198,38 @@ async function sendDayPicker(
     .filter((linha) => linha !== null && linha !== undefined)
     .join("\n");
 
-  const entregaCalendario = await sendCalendarWithImageAndList({
-    number: msg.phone,
-    prompts: wctx.prompts,
-    caption: legenda,
-  });
+  // O calendário do mês inteiro pedia uma leitura de 30 dias para uma escolha
+  // que quase sempre é "o quanto antes". No lugar dele vai o cartão com os três
+  // primeiros horários que cabem o serviço inteiro; a lista logo abaixo continua
+  // com as semanas, para quem quer outro dia.
+  const cartaoHorarios =
+    msg.testMode || atalhos.length === 0
+      ? null
+      : await generateSlotsCard({
+          service: flow.serviceLabel ?? "Atendimento",
+          vehicle: flow.vehicleModel ?? "seu veículo",
+          duracao: formatDurationLabel(durationMin),
+          slots: atalhos.map((atalho) => {
+            const [iso, hora] = atalho.id.split(" ");
+            const data = parse(iso, "yyyy-MM-dd", new Date());
+            return {
+              dia: nomeDoDia(data, hoje),
+              data: format(data, "dd/MM"),
+              hora,
+              nota: atalho.description?.replace(/^Primeiro horário livre · /, ""),
+            };
+          }),
+        });
+
+  const entregaCalendario = cartaoHorarios
+    ? await sendMedia({ number: msg.phone, mediaUrl: cartaoHorarios, caption: legenda })
+    : await sendCalendarWithImageAndList({
+        number: msg.phone,
+        prompts: wctx.prompts,
+        caption: legenda,
+      });
   if ((entregaCalendario as any)?.error || (entregaCalendario as any)?.blocked) {
-    throw new Error("Não foi possível entregar o calendário imediatamente");
+    throw new Error("Não foi possível entregar os horários imediatamente");
   }
 
   const entrega = await sendList({
@@ -2775,6 +2975,10 @@ async function sendQuote(msg: IncomingMessage, flow: FlowState, wctx: WhatsAppCa
         /\n*_Agora escolha o melhor dia no calend[aá]rio abaixo\._/i,
         ""
       );
+      // Antes do calendario vem a proposta: o cliente compara os tres caminhos
+      // e o horario so aparece depois que ele decide o que quer fazer.
+      if (!flow.proposalChosen && (await enviarProposta(msg, flow, wctx))) return;
+
       const ofertou = await sendDayPicker(msg, flow, wctx, textoDoCalendario);
       if (!ofertou) {
         // Agenda cheia no mês: resta o calendário com a resposta livre por data.
@@ -3825,6 +4029,62 @@ ${await menuForStage(flow, wctx, msg.pushName)}`,
       return;
     }
 
+
+    case "ETAPA_PROPOSTA": {
+      const degraus = flow.proposalOptions ?? [];
+      const escolhido = num && num >= 1 && num <= degraus.length ? degraus[num - 1] : null;
+
+      if (!escolhido) {
+        // Pergunta antes de decidir é o normal aqui: quem está comparando três
+        // preços quer entender a diferença. A dúvida vai para o mesmo caminho
+        // de sempre e a proposta continua de pé.
+        if (await routeFreeText(msg, flow, ctx, wctx, input)) return;
+        await sendText({
+          number: msg.phone,
+          text: `Responda com o número do caminho que prefere:\n\n${degraus
+            .map((degrau, indice) => `*${indice + 1}* ${degrau.label} — ${precoLegivel(degrau.price)}`)
+            .join("\n")}`,
+        });
+        return;
+      }
+
+      const item = wctx.catalog[escolhido.key];
+      const proximo: FlowState = {
+        ...flow,
+        proposalChosen: true,
+        proposalOptions: undefined,
+        serviceKey: escolhido.key,
+        // Com complemento, o rotulo combinado fica so na proposta: o resumo ja
+        // soma servico + upsell, e usar o combinado aqui repetia o complemento.
+        serviceLabel: escolhido.upsellLabel
+          ? wctx.catalog[escolhido.key]?.label ?? escolhido.label
+          : escolhido.label,
+        dbServiceId: wctx.dbServiceIdByKey[escolhido.key] ?? flow.dbServiceId,
+        serviceDurationMin: escolhido.durationMin,
+        estimatedTime: duracaoLegivel(escolhido.durationMin),
+        quoteMin: escolhido.price,
+        quoteMax: escolhido.price,
+        upsellAccepted: Boolean(escolhido.upsellKey),
+        upsellLabel: escolhido.upsellLabel,
+        stage: "ETAPA7_DAY",
+      };
+      await saveFlow(msg.phone, proximo, msg.testMode?.skipDb);
+      msg.testMode?.onFlowStateChange?.(proximo);
+
+      const ofereceu = await sendDayPicker(
+        msg,
+        proximo,
+        wctx,
+        `Fechado: *${escolhido.label}* — ${precoLegivel(escolhido.price)} · ${duracaoLegivel(escolhido.durationMin)}${item ? "" : ""}`
+      );
+      if (!ofereceu) {
+        await sendText({
+          number: msg.phone,
+          text: "Não encontrei vaga nas próximas semanas para esse serviço. Responda *9* que a equipe encaixa você.",
+        });
+      }
+      return;
+    }
 
     case "ETAPA5_QUOTE": {
       if (wantsOtherServices(input, num)) {
@@ -4915,10 +5175,25 @@ async function confirmFinal(
     awaitingPlateAfterBooking: !flow.vehiclePlate,
   };
 
-  const confirmationDelivery = await sendText({
-    number: msg.phone,
-    text: confirmBody,
-  });
+  // A confirmação vira o ticket da reserva: é o que o cliente guarda, mostra na
+  // chegada e usa para conferir a placa que a câmera do portão vai ler.
+  const ticket = msg.testMode
+    ? null
+    : await generateTicketCard({
+        code: `#KA-${result.appointment.id.slice(-4).toUpperCase()}`,
+        name,
+        vehicle: vehicleDisplayFromFlow(flow),
+        plate: flow.vehiclePlate ?? "",
+        service: services || flow.serviceLabel || "Atendimento",
+        date: customerDayDisplay(flow) ?? "—",
+        time: flow.startTime ?? flow.periodLabel ?? "—",
+        price: `R$ ${totalValue.toFixed(2).replace(".", ",")}`,
+        address: ctx.address || "nosso endereço",
+      });
+
+  const confirmationDelivery = ticket
+    ? await sendMedia({ number: msg.phone, mediaUrl: ticket, caption: confirmBody })
+    : await sendText({ number: msg.phone, text: confirmBody });
   if (
     (confirmationDelivery as any)?.error ||
     (confirmationDelivery as any)?.blocked ||

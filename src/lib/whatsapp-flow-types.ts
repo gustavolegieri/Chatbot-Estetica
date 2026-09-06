@@ -11,6 +11,8 @@ export type FlowStage =
   | "ETAPA3_PACKAGE_ACTION"
   | "ETAPA4_VEHICLE"
   | "ETAPA4_VEHICLE_CONFIRM"
+  /** Proposta em tres degraus: resolve, recomendado, completo. */
+  | "ETAPA_PROPOSTA"
   | "ETAPA5_QUOTE"
   | "ETAPA5_FIRST_TIME_BONUS"
   | "ETAPA6_UPSELL"
@@ -161,6 +163,17 @@ export interface FlowState {
   /** Reserva já feita; falta só a placa para o reconhecimento no portão. */
   awaitingPlateAfterBooking?: boolean;
   /** Cancelamento de uma reserva existente, aguardando o sim do cliente. */
+  /** Ja escolheu um degrau da proposta: nao mostrar de novo. */
+  proposalChosen?: boolean;
+  /** Degraus mostrados na proposta, na ordem em que o cliente os viu. */
+  proposalOptions?: Array<{
+    key: string;
+    label: string;
+    price: number;
+    durationMin: number;
+    upsellKey?: string;
+    upsellLabel?: string;
+  }>;
   awaitingCancelConfirmation?: boolean;
   cancelAppointmentId?: string;
   /** Reserva que será substituída quando o novo horário for confirmado. */

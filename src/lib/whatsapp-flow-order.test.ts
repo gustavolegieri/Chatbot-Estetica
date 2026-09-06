@@ -118,17 +118,23 @@ test("official scheduling flow keeps one ordered prompt per customer reply", asy
     assert.match(detalhe[0], /me conte do carro|ve[íi]culo/i);
     assert.equal(state.stage, "ETAPA4_VEHICLE");
 
-    // Com o veículo reconhecido não há tela de "confirma que é um Fiesta?": o
-    // orçamento vira a legenda do calendário e a lista de datas vem logo abaixo.
-    // São duas mensagens porque legenda de imagem não aceita menu — é a única
-    // etapa do fluxo em que isso acontece.
-    const orcamento = await reply("Fiesta 2012, FEG4B58, branco, estado bom");
-    assert.equal(orcamento.length, 2);
-    assert.match(orcamento[0], /^\[MÍDIA: image\|/);
-    assert.match(orcamento[0], /Lavagem Simples/);
-    assert.match(orcamento[1], /Quando fica melhor/i);
+    // Com o veículo reconhecido não há tela de "confirma que é um Fiesta?": vem
+    // a proposta em três degraus, com preço e duração de cada caminho. No
+    // simulador ela é texto; no WhatsApp, o cartão com a comparação.
+    const proposta = await reply("Fiesta 2012, FEG4B58, branco, estado bom");
+    assert.equal(proposta.length, 1);
+    assert.match(proposta[0], /Lavagem Simples/);
+    assert.match(proposta[0], /caminhos/i);
     assert.equal(state.vehicleModel, "Fiesta");
     assert.equal(state.vehiclePlate, "FEG4B58");
+    assert.equal(state.stage, "ETAPA_PROPOSTA");
+    assert.ok((state.proposalOptions?.length ?? 0) >= 2, "a proposta deve ter ao menos dois degraus");
+
+    // Escolher o degrau é a decisão de agendar: os horários vêm em seguida.
+    const horarios = await reply("1");
+    assert.equal(horarios.length, 2);
+    assert.match(horarios[0], /^\[MÍDIA: image\|/);
+    assert.match(horarios[1], /Quando fica melhor/i);
     assert.equal(state.stage, "ETAPA7_DAY");
 
     // A lista abre por atalhos de horário e segue por semana; um atalho fecha
@@ -179,7 +185,7 @@ test("official scheduling flow keeps one ordered prompt per customer reply", asy
 
     const confirmationReply = await reply("1");
     assert.equal(confirmationReply.length, 1);
-    assert.match(confirmationReply[0], /Hor[áa]rio reservado|Agendamento confirmado/i);
+    assert.match(confirmationReply[0], /Reservado|Hor[áa]rio reservado|Agendamento confirmado/i);
     assert.equal(state.stage, "ETAPA2_MAIN_MENU");
     assert.equal(state.awaitingPostConfirmationReturn, true);
   } finally {

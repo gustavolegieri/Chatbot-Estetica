@@ -178,7 +178,7 @@ export const BOT_PROMPT_DEFAULTS: PromptDef[] = [
     label: "Confirmação final (legado)",
     category: "fluxo",
     hint: "{name}, {vehicle}, {services}, {day}, {time}, {payment}, {value}, {address}, {pixBlock}",
-    content: "✅ *Horário reservado, {name}!*\n\n🚗 {vehicle}\n🛠️ {services}\n📅 {day} às {time}\n💰 R$ {value} · {payment}\n\n📍 {address}\n{pixBlock}\n\n*No dia:* chegue no horário e deixe o carro conosco — te aviso quando estiver pronto.\n\n_Aviso 30 min antes. Precisa mudar? Escreva *remarcar* ou *cancelar* por aqui._",
+    content: "Reservado, *{name}* 🤝\n\nÉ só chegar no horário — a câmera lê a placa e o atendimento começa sozinho, sem fila.\n{pixBlock}\n📍 {address}\n\n_Aviso 30 min antes. Precisa mudar? Escreva *remarcar* ou *cancelar* por aqui._",
   },
   {
     key: "stale_return",

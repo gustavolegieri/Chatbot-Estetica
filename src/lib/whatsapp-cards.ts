@@ -252,3 +252,221 @@ export async function generateServiceCard(data: ServiceCardData): Promise<string
 
   return publicar(svg, "servico", data.name);
 }
+
+export interface ProposalOption {
+  /** "Essencial", "Recomendado", "Completo" — o degrau da escada. */
+  tier: string;
+  name: string;
+  price: string;
+  duration: string;
+  bullets: string[];
+  recommended?: boolean;
+}
+
+export interface ProposalCardData {
+  vehicle: string;
+  problema: string;
+  options: ProposalOption[];
+}
+
+/**
+ * Proposta em três degraus, no lugar da árvore de menus.
+ *
+ * O caminho antigo pedia categoria, depois serviço, depois veículo — três
+ * respostas antes de o cliente ver qualquer preço. Aqui ele conta o problema em
+ * uma frase e recebe a escada inteira em uma imagem: o que resolve o mínimo, o
+ * que a equipe recomenda e o que entrega o máximo, cada um com preço e tempo.
+ * A escolha vira um toque em botão.
+ */
+export async function generateProposalCard(data: ProposalCardData): Promise<string | null> {
+  const alturaLogo = 46;
+  const topo = MARGEM + alturaLogo + 12;
+  const alturaCabecalho = 62;
+  const linhaBullet = 24;
+  const opcoes = data.options.slice(0, 3);
+
+  const alturas = opcoes.map((opcao) => 84 + Math.min(opcao.bullets.length, 3) * linhaBullet);
+  const alturaTotal =
+    topo + alturaCabecalho + alturas.reduce((soma, altura) => soma + altura + 14, 0) + MARGEM + 16;
+
+  const logo = await renderLogo((LARGURA - 66) / 2, MARGEM, 66, alturaLogo);
+  const largura = LARGURA - MARGEM * 2;
+
+  let y = topo + alturaCabecalho;
+  const blocos = opcoes
+    .map((opcao, indice) => {
+      const altura = alturas[indice];
+      const topoBloco = y;
+      y += altura + 14;
+
+      const destaque = opcao.recommended;
+      const bullets = opcao.bullets
+        .slice(0, 3)
+        .map((bullet, i) => {
+          const by = 76 + i * linhaBullet;
+          const texto = quebrar(bullet, 42)[0] ?? bullet;
+          return `
+            <circle cx="${MARGEM + 26}" cy="${by - 5}" r="3" fill="${OURO}" opacity="0.75"/>
+            <text x="${MARGEM + 40}" y="${by}" fill="#c8cbe0" font-family="${FONTE}" font-size="15">${escapar(texto)}</text>
+          `;
+        })
+        .join("");
+
+      return `
+        <g transform="translate(0, ${topoBloco})">
+          <rect x="${MARGEM}" y="0" width="${largura}" height="${altura}" fill="${destaque ? "#252c4a" : "#20263f"}" rx="16"/>
+          <rect x="${MARGEM}" y="0" width="${largura}" height="${altura}" fill="none" stroke="${OURO}" stroke-width="${destaque ? 2 : 1}" opacity="${destaque ? 0.55 : 0.14}" rx="16"/>
+          <rect x="${MARGEM}" y="14" width="5" height="${altura - 28}" fill="${OURO}" opacity="${destaque ? 0.9 : 0.35}" rx="3"/>
+          <text x="${MARGEM + 26}" y="30" fill="${OURO_SUAVE}" font-family="${FONTE}" font-size="13" font-weight="500">${escapar(`${indice + 1} · ${opcao.tier.toUpperCase()}`)}</text>
+          <text x="${MARGEM + 26}" y="56" fill="#ffffff" font-family="${FONTE_TITULO}" font-size="21" font-weight="900">${escapar(opcao.name)}</text>
+          <text x="${MARGEM + largura - 26}" y="34" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="25" font-weight="900" text-anchor="end">${escapar(opcao.price)}</text>
+          <text x="${MARGEM + largura - 26}" y="56" fill="#8f96b8" font-family="${FONTE}" font-size="15" text-anchor="end">${escapar(opcao.duration)}</text>
+          ${destaque ? `<rect x="${MARGEM + largura - 150}" y="${altura - 34}" width="124" height="24" fill="${OURO}" opacity="0.16" rx="12"/><text x="${MARGEM + largura - 88}" y="${altura - 17}" fill="${OURO}" font-family="${FONTE}" font-size="13" font-weight="bold" text-anchor="middle">RECOMENDADO</text>` : ""}
+          ${bullets}
+        </g>
+      `;
+    })
+    .join("");
+
+  const svg = `
+    <svg width="${LARGURA}" height="${alturaTotal}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LARGURA} ${alturaTotal}">
+      ${FUNDO}
+      ${logo}
+      <text x="${LARGURA / 2}" y="${topo + 24}" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="22" font-weight="900" text-anchor="middle">SUA PROPOSTA</text>
+      <text x="${LARGURA / 2}" y="${topo + 46}" fill="#8f96b8" font-family="${FONTE}" font-size="15" text-anchor="middle">${escapar(`${data.vehicle} · ${quebrar(data.problema, 40)[0] ?? ""}`)}</text>
+      ${blocos}
+    </svg>
+  `;
+
+  return publicar(svg, "proposta", data.vehicle);
+}
+
+export interface SlotOption {
+  /** "Amanhã", "Terça" — o dia como a pessoa fala. */
+  dia: string;
+  data: string;
+  hora: string;
+  nota?: string;
+}
+
+/**
+ * Agenda relâmpago: os três primeiros horários livres, grandes.
+ *
+ * O caminho antigo pedia semana, depois dia, depois período, depois horário —
+ * quatro toques para marcar. Quase todo mundo quer "o mais cedo possível", e
+ * essa é exatamente a informação que a lista escondia atrás de três telas.
+ */
+export async function generateSlotsCard(data: {
+  service: string;
+  vehicle: string;
+  duracao: string;
+  slots: SlotOption[];
+}): Promise<string | null> {
+  const alturaLogo = 44;
+  const topo = MARGEM + alturaLogo + 10;
+  const alturaCabecalho = 58;
+  const alturaSlot = 76;
+  const slots = data.slots.slice(0, 3);
+  const alturaTotal = topo + alturaCabecalho + slots.length * (alturaSlot + 12) + 46 + MARGEM;
+
+  const logo = await renderLogo((LARGURA - 62) / 2, MARGEM, 62, alturaLogo);
+  const largura = LARGURA - MARGEM * 2;
+
+  const blocos = slots
+    .map((slot, indice) => {
+      const y = topo + alturaCabecalho + indice * (alturaSlot + 12);
+      const primeiro = indice === 0;
+      return `
+        <g transform="translate(0, ${y})">
+          <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaSlot}" fill="${primeiro ? "#252c4a" : "#20263f"}" rx="16"/>
+          <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaSlot}" fill="none" stroke="${OURO}" stroke-width="${primeiro ? 2 : 1}" opacity="${primeiro ? 0.5 : 0.14}" rx="16"/>
+          <circle cx="${MARGEM + 40}" cy="${alturaSlot / 2}" r="20" fill="${OURO}" opacity="0.14"/>
+          <text x="${MARGEM + 40}" y="${alturaSlot / 2 + 7}" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="19" font-weight="900" text-anchor="middle">${indice + 1}</text>
+          <text x="${MARGEM + 76}" y="${alturaSlot / 2 - 4}" fill="#ffffff" font-family="${FONTE_TITULO}" font-size="21" font-weight="900">${escapar(`${slot.dia} · ${slot.hora}`)}</text>
+          <text x="${MARGEM + 76}" y="${alturaSlot / 2 + 20}" fill="#8f96b8" font-family="${FONTE}" font-size="14">${escapar(slot.nota ? `${slot.data} · ${slot.nota}` : slot.data)}</text>
+          ${primeiro ? `<text x="${MARGEM + largura - 24}" y="${alturaSlot / 2 + 6}" fill="${OURO}" font-family="${FONTE}" font-size="13" font-weight="bold" text-anchor="end">MAIS CEDO</text>` : ""}
+        </g>
+      `;
+    })
+    .join("");
+
+  const svg = `
+    <svg width="${LARGURA}" height="${alturaTotal}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LARGURA} ${alturaTotal}">
+      ${FUNDO}
+      ${logo}
+      <text x="${LARGURA / 2}" y="${topo + 22}" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="21" font-weight="900" text-anchor="middle">HORÁRIOS LIVRES</text>
+      <text x="${LARGURA / 2}" y="${topo + 44}" fill="#8f96b8" font-family="${FONTE}" font-size="15" text-anchor="middle">${escapar(`${data.service} · ${data.duracao} reservadas para o ${data.vehicle}`)}</text>
+      ${blocos}
+      <text x="${LARGURA / 2}" y="${alturaTotal - MARGEM - 6}" fill="#888888" font-family="${FONTE}" font-size="14" text-anchor="middle">Prefere outro dia? É só escrever a data.</text>
+    </svg>
+  `;
+
+  return publicar(svg, "horarios", data.service);
+}
+
+/**
+ * Ticket da reserva: o comprovante que o cliente guarda.
+ *
+ * A confirmação era uma lista de campos em texto. Um ticket com a placa em
+ * destaque serve para alguma coisa: é o que a pessoa mostra na chegada e o que
+ * a câmera do portão usa para reconhecer o carro.
+ */
+export async function generateTicketCard(data: {
+  code: string;
+  name: string;
+  vehicle: string;
+  plate: string;
+  service: string;
+  date: string;
+  time: string;
+  price: string;
+  address: string;
+}): Promise<string | null> {
+  const alturaLogo = 44;
+  const topo = MARGEM + alturaLogo + 10;
+  const alturaCorpo = 300;
+  const enderecoLinhas = quebrar(data.address, 46).slice(0, 2);
+  const alturaTotal = topo + alturaCorpo + enderecoLinhas.length * 20 + 44 + MARGEM;
+  const logo = await renderLogo((LARGURA - 62) / 2, MARGEM, 62, alturaLogo);
+  const largura = LARGURA - MARGEM * 2;
+
+  const linha = (rotulo: string, valor: string, y: number, x: number, ancora: "start" | "end" = "start") => `
+    <text x="${x}" y="${y}" fill="${OURO_SUAVE}" font-family="${FONTE}" font-size="13" font-weight="500" text-anchor="${ancora}">${escapar(rotulo)}</text>
+    <text x="${x}" y="${y + 24}" fill="#ffffff" font-family="${FONTE}" font-size="19" text-anchor="${ancora}">${escapar(valor)}</text>
+  `;
+
+  const svg = `
+    <svg width="${LARGURA}" height="${alturaTotal}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LARGURA} ${alturaTotal}">
+      ${FUNDO}
+      ${logo}
+      <g transform="translate(0, ${topo})">
+        <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaCorpo}" fill="#20263f" rx="18"/>
+        <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaCorpo}" fill="none" stroke="${OURO}" stroke-width="1" opacity="0.2" rx="18"/>
+
+        <text x="${MARGEM + 26}" y="34" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="19" font-weight="900">RESERVA CONFIRMADA</text>
+        <text x="${MARGEM + largura - 26}" y="34" fill="#8f96b8" font-family="${FONTE}" font-size="14" text-anchor="end">${escapar(data.code)}</text>
+
+        <rect x="${MARGEM + 26}" y="52" width="${largura - 52}" height="1" fill="url(#divisor)"/>
+
+        <text x="${MARGEM + 26}" y="88" fill="#ffffff" font-family="${FONTE_TITULO}" font-size="24" font-weight="900">${escapar(data.service)}</text>
+
+        ${linha("QUANDO", `${data.date} · ${data.time}`, 126, MARGEM + 26)}
+        ${linha("VALOR", data.price, 126, MARGEM + largura - 26, "end")}
+        ${linha("CLIENTE", data.name, 190, MARGEM + 26)}
+        ${linha("VEÍCULO", data.vehicle, 190, MARGEM + largura - 26, "end")}
+
+        <rect x="${MARGEM + 26}" y="220" width="${largura - 52}" height="56" fill="${OURO}" opacity="0.12" rx="12"/>
+        <text x="${MARGEM + 46}" y="243" fill="${OURO_SUAVE}" font-family="${FONTE}" font-size="13" font-weight="500">PLACA — a câmera reconhece na chegada</text>
+        <text x="${MARGEM + 46}" y="268" fill="${OURO}" font-family="${FONTE_TITULO}" font-size="24" font-weight="900" letter-spacing="3">${escapar(data.plate || "informe no dia")}</text>
+      </g>
+      ${enderecoLinhas
+        .map(
+          (l, i) =>
+            `<text x="${LARGURA / 2}" y="${topo + alturaCorpo + 28 + i * 20}" fill="#8f96b8" font-family="${FONTE}" font-size="14" text-anchor="middle">${escapar(l)}</text>`
+        )
+        .join("")}
+    </svg>
+  `;
+
+  return publicar(svg, "ticket", data.code);
+}
