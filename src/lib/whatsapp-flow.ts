@@ -65,6 +65,7 @@ import { resolveValidCustomerName } from "./customer-name";
 import { getCachedWorkingDays, getRuntimeSettings } from "./settings-runtime";
 import { sendWelcomeCover } from "./whatsapp-welcome";
 import {
+  generateAgendaCard,
   generateCatalogCard,
   generateExtrasCard,
   generateProposalCard,
@@ -74,6 +75,7 @@ import {
   serviceCardFromDetail,
 } from "./whatsapp-cards";
 import { eventoNaAgenda, proximaManutencao, rotaNoMapa } from "./whatsapp-links";
+import { preverODia } from "./previsao-tempo";
 import { naoEntendi, pareceRabisco, reserva as copyReserva } from "./whatsapp-copy";
 import { humanizarDuracao } from "./whatsapp-service-catalog";
 import { requestHumanHandoff, wantsHumanHandoff } from "./whatsapp-handoff";
@@ -2345,11 +2347,22 @@ async function sendDayPicker(
 
   const hoje = new Date();
 
-  // Atalhos: o primeiro horário de cada um dos próximos dias com vaga.
-  const atalhos = agenda.slice(0, ATALHOS_DE_HORARIO).map((dia) => ({
-    id: `${dia.iso} ${dia.slots[0]}`,
-    label: `${nomeDoDia(dia.data, hoje)} ${format(dia.data, "dd/MM")} · ${dia.slots[0]}`,
-    description: `Primeiro horário livre · ${dia.slots.length} no dia`,
+  // Antes a lista abria com "o primeiro horário livre" de cada um dos três
+  // próximos dias — e como a agenda abre às 08:00, os três diziam 08:00. Quem
+  // queria ver a semana inteira, ou uma tarde, tinha de navegar por dentro.
+  // Agora todos os dias com vaga aparecem de uma vez, com quantos horários
+  // cada um tem e a faixa que cobrem.
+  const atalho = agenda[0];
+  const linhaAtalho = {
+    id: `${atalho.iso} ${atalho.slots[0]}`,
+    label: `⚡ Mais cedo: ${nomeDoDia(atalho.data, hoje)} ${atalho.slots[0]}`,
+    description: `${format(atalho.data, "dd/MM")} · reserva na hora`,
+  };
+
+  const linhasDia = agenda.map((dia) => ({
+    id: dia.iso,
+    label: `${nomeDoDia(dia.data, hoje)} ${format(dia.data, "dd/MM")}`,
+    description: `${dia.slots.length} ${dia.slots.length === 1 ? "horário" : "horários"} · ${dia.slots[0]} às ${dia.slots[dia.slots.length - 1]}`,
   }));
 
   // Semanas, com a contagem real de vagas de cada uma.
@@ -2377,7 +2390,11 @@ async function sendDayPicker(
     };
   });
 
-  const linhas = [...atalhos, ...linhasSemana].slice(0, MAX_LIST_ROWS);
+  // O atalho vem primeiro porque é o pedido mais comum; os dias no meio; as
+  // semanas no fim, para quem quer marcar mais para frente.
+  const dias = linhasDia.slice(0, MAX_LIST_ROWS - 1 - Math.min(linhasSemana.length, 2));
+  const linhas = [linhaAtalho, ...dias, ...linhasSemana.slice(1, 3)].slice(0, MAX_LIST_ROWS);
+
   await registrarOpcoes(
     msg,
     flow,
@@ -2394,27 +2411,22 @@ async function sendDayPicker(
     .filter((linha) => linha !== null && linha !== undefined)
     .join("\n");
 
-  // O calendário do mês inteiro pedia uma leitura de 30 dias para uma escolha
-  // que quase sempre é "o quanto antes". No lugar dele vai o cartão com os três
-  // primeiros horários que cabem o serviço inteiro; a lista logo abaixo continua
-  // com as semanas, para quem quer outro dia.
+  // O cartão passa a mostrar a agenda dos próximos dias — quantos horários cada
+  // um tem e a faixa que cobrem —, em vez de três linhas repetindo 08:00.
   const cartaoHorarios =
-    msg.testMode || atalhos.length === 0
+    msg.testMode || agenda.length === 0
       ? null
-      : await generateSlotsCard({
+      : await generateAgendaCard({
           service: flow.serviceLabel ?? "Atendimento",
           vehicle: flow.vehicleModel ?? "seu veículo",
           duracao: formatDurationLabel(durationMin),
-          slots: atalhos.map((atalho) => {
-            const [iso, hora] = atalho.id.split(" ");
-            const data = parse(iso, "yyyy-MM-dd", new Date());
-            return {
-              dia: nomeDoDia(data, hoje),
-              data: format(data, "dd/MM"),
-              hora,
-              nota: atalho.description?.replace(/^Primeiro horário livre · /, ""),
-            };
-          }),
+          dias: agenda.slice(0, 7).map((dia) => ({
+            dia: nomeDoDia(dia.data, hoje),
+            data: format(dia.data, "dd/MM"),
+            vagas: dia.slots.length,
+            primeiro: dia.slots[0],
+            ultimo: dia.slots[dia.slots.length - 1],
+          })),
         });
 
   const entregaCalendario = cartaoHorarios
@@ -2588,6 +2600,13 @@ function periodoDoHorario(slot: string): PeriodoDoDia {
   return "noite";
 }
 
+/** "Tarde" para o cliente ler, no lugar da chave interna. */
+function periodoLegivel(slot: string): string {
+  const chave = periodoDoHorario(slot);
+  const periodo = PERIODOS.find((p) => p.chave === chave);
+  return periodo ? `${periodo.emoji} ${periodo.nome}` : "";
+}
+
 /**
  * Mostra os horários de um dia.
  *
@@ -2602,7 +2621,7 @@ async function sendTimeList(
   flow: FlowState,
   wctx: WhatsAppCatalogContext,
   todos: string[],
-  opcoes?: { periodo?: PeriodoDoDia; introducao?: string }
+  opcoes?: { periodo?: PeriodoDoDia; introducao?: string; porPeriodo?: boolean }
 ) {
   const durationMin = flow.serviceDurationMin ?? (await getFlowDurationMin(flow, wctx));
   const diaLegivel = flow.dayLabel ?? flow.dayDate ?? "o dia";
@@ -2612,8 +2631,63 @@ async function sendTimeList(
     ? todos.filter((slot) => periodoDoHorario(slot) === opcoes.periodo)
     : todos;
 
-  // Dia cheio demais para uma lista só: primeiro o período, depois o horário.
+  // O dia inteiro na tela, não só os períodos.
+  //
+  // A lista aguenta 12 linhas e um dia costuma ter 16 horários, então a
+  // seleção é espalhada de ponta a ponta — manhã, tarde e noite representadas
+  // — em vez de mostrar os primeiros e esconder o resto atrás de "tarde". A
+  // última linha abre a lista completa por período para quem quer o horário
+  // exato, e escrever a hora continua funcionando em qualquer momento.
   if (!opcoes?.periodo && doPeriodo.length > cabeNaLista) {
+    const espalhados: string[] = [];
+    const passo = (doPeriodo.length - 1) / (cabeNaLista - 2);
+    for (let i = 0; i < cabeNaLista - 1; i++) {
+      const slot = doPeriodo[Math.min(doPeriodo.length - 1, Math.round(i * passo))];
+      if (slot && !espalhados.includes(slot)) espalhados.push(slot);
+    }
+
+    const linhasHorario = espalhados.map((slot) => ({
+      id: slot,
+      label: `🕒 ${slot}`,
+      description: `${periodoLegivel(slot)} · termina às ${calculateEndTime(slot, durationMin)}`,
+    }));
+    linhasHorario.push({
+      id: "todos-horarios",
+      label: "⏰ Ver todos os horários",
+      description: `${doPeriodo.length} no dia, por período`,
+    });
+
+    await registrarOpcoes(
+      msg,
+      flow,
+      linhasHorario.map(({ id, label }) => ({ id, label })),
+      "ETAPA7_TIME"
+    );
+
+    await sendList({
+      number: msg.phone,
+      title: `Horários — ${diaLegivel}`,
+      description: [
+        opcoes?.introducao?.trim(),
+        `São *${doPeriodo.length}* horários livres. O atendimento leva *${formatDurationLabel(durationMin)}*.`,
+        "",
+        `_Se quiser um horário exato, é só escrever — por exemplo *${doPeriodo[Math.floor(doPeriodo.length / 2)]}*._`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      buttonText: "Escolher horário",
+      sections: [
+        {
+          title: "Horários do dia",
+          rows: linhasHorario.map((l) => ({ id: l.id, title: l.label, description: l.description })),
+        },
+      ],
+    });
+    return;
+  }
+
+  // Pedido explícito de ver tudo: aí sim a lista abre por período.
+  if (!opcoes?.periodo && opcoes?.porPeriodo) {
     const linhas = PERIODOS.map((periodo) => {
       const horarios = todos.filter((slot) => periodoDoHorario(slot) === periodo.chave);
       if (horarios.length === 0) return null;
@@ -4658,6 +4732,13 @@ ${await menuForStage(flow, wctx, msg.pushName)}`,
         return;
       }
 
+      // "Ver todos os horários": a lista abre por período, e cada período mostra
+      // o dia inteiro daquela faixa.
+      if (/^todos-horarios$/i.test(escolha) || /^(todos|ver todos|todos os hor[áa]rios)$/i.test(lower)) {
+        await sendTimeList(msg, flow, wctx, slots, { porPeriodo: true });
+        return;
+      }
+
       const periodoEscolhido = escolha.match(/^periodo:(manha|tarde|noite)$/);
       if (periodoEscolhido && slots.length) {
         await sendTimeList(msg, flow, wctx, slots, {
@@ -5484,10 +5565,16 @@ async function confirmFinal(
     flow.serviceKey ? RETORNO_EM_DIAS[flow.serviceKey] : null
   );
 
+  // Lavagem e chuva brigam: avisar antes vira escolha informada, e não
+  // reclamação depois. A previsão é um extra — se a API não responder, a
+  // confirmação sai igual.
+  const previsao = flow.dayDate && !msg.testMode ? await preverODia(flow.dayDate) : null;
+
   const extras = [
     linkRota ? `🗺️ *Como chegar:* ${linkRota}` : null,
     linkAgenda ? `🗓️ *Salvar na agenda:* ${linkAgenda}` : null,
     retorno ? `🔁 Recomendo repetir por volta de *${retorno}* — eu te lembro.` : null,
+    previsao?.aviso ?? null,
   ].filter(Boolean);
   const corpoDaConfirmacao = extras.length
     ? [confirmBody, ...extras].join("\n\n")

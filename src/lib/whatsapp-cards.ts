@@ -648,3 +648,58 @@ export async function generateTicketCard(data: {
     data.code
   );
 }
+
+/**
+ * Agenda dos próximos dias: quantos horários cada um tem e a faixa que cobrem.
+ *
+ * O cartão anterior mostrava "o primeiro horário livre" de três dias — e, como
+ * a agenda abre às 08:00, os três diziam 08:00. Isso escondia justamente a
+ * informação que faz escolher: onde sobra espaço e onde já está apertado. Aqui
+ * a barra à direita mostra a ocupação de cada dia de relance.
+ */
+export async function generateAgendaCard(data: {
+  service: string;
+  vehicle: string;
+  duracao: string;
+  dias: Array<{ dia: string; data: string; vagas: number; primeiro: string; ultimo: string }>;
+}): Promise<string | null> {
+  const { svg: topo, conteudoY } = await cabecalho(
+    "Agenda aberta",
+    `${data.service} · ${data.duracao} para o ${data.vehicle}`
+  );
+  const dias = data.dias.slice(0, 7);
+  const alturaLinha = 56;
+  const alturaTotal = conteudoY + dias.length * (alturaLinha + 8) + 52 + MARGEM;
+  const largura = LARGURA - MARGEM * 2;
+  const maiorVaga = Math.max(...dias.map((d) => d.vagas), 1);
+
+  const linhas = dias
+    .map((dia, indice) => {
+      const y = conteudoY + indice * (alturaLinha + 8);
+      const primeiro = indice === 0;
+      // A barra é proporcional ao dia mais livre da lista: comparar dias entre
+      // si é o que responde "qual me atende melhor?".
+      const larguraBarra = Math.max(18, Math.round((dia.vagas / maiorVaga) * 132));
+      return `
+        <g transform="translate(0, ${y})">
+          <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaLinha}" fill="${primeiro ? CARTAO_DESTAQUE : CARTAO}" rx="12"/>
+          <rect x="${MARGEM}" y="0" width="${largura}" height="${alturaLinha}" fill="none" stroke="${primeiro ? OURO : BORDA}" stroke-width="${primeiro ? 2 : 1}" opacity="${primeiro ? 0.65 : 1}" rx="12"/>
+          <text x="${MARGEM + 22}" y="${alturaLinha / 2 - 3}" fill="${TEXTO}" font-family="${FONTE_TITULO}" font-size="18" font-weight="900">${escapar(dia.dia)}</text>
+          <text x="${MARGEM + 22}" y="${alturaLinha / 2 + 18}" fill="${TEXTO_FRACO}" font-family="${FONTE}" font-size="13">${escapar(`${dia.data} · ${dia.primeiro} às ${dia.ultimo}`)}</text>
+          <rect x="${MARGEM + largura - 176}" y="${alturaLinha / 2 - 7}" width="${larguraBarra}" height="10" fill="${OURO}" opacity="${primeiro ? 0.9 : 0.45}" rx="5"/>
+          <text x="${MARGEM + largura - 22}" y="${alturaLinha / 2 + 3}" fill="${primeiro ? OURO_FORTE : TEXTO}" font-family="${FONTE_TITULO}" font-size="16" font-weight="900" text-anchor="end">${dia.vagas}</text>
+          <text x="${MARGEM + largura - 22}" y="${alturaLinha / 2 + 20}" fill="${TEXTO_FRACO}" font-family="${FONTE}" font-size="11" text-anchor="end">horários</text>
+        </g>
+      `;
+    })
+    .join("");
+
+  return publicar(
+    moldura(
+      alturaTotal,
+      `${topo}${linhas}${rodape(conteudoY + dias.length * (alturaLinha + 8) - 4, "Toque no dia na lista abaixo — ou escreva a data")}`
+    ),
+    "agenda",
+    data.service
+  );
+}
