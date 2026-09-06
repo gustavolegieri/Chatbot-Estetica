@@ -2444,7 +2444,7 @@ async function sendDayPicker(
     number: msg.phone,
     title: "Quando fica melhor?",
     description: [
-      "Toque em um horário para reservar direto, ou escolha a semana para ver todos os dias.",
+      "Toque no dia para ver os horários — ou no atalho para fechar no mais cedo.",
       "",
       `_Se preferir, escreva a data — por exemplo *${format(addDays(hoje, 7), "dd/MM")}* ou *sexta*._`,
     ].join("\n"),
