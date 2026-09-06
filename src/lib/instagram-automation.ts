@@ -145,7 +145,7 @@ async function brandFooter() {
     prisma.brand.findUnique({ where: { id: "default" } }),
     ensureInstagramAutomation(),
   ]);
-  const businessName = brand?.displayName || settings?.businessName || "Estética Automotiva";
+  const businessName = brand?.displayName || settings?.businessName || "Garagem do Ka";
   const cta = auto.ctaText || "Agende pelo WhatsApp";
   const phone = settings?.businessPhone ? `${cta} · ${settings.businessPhone}` : cta;
   const logoDataUrl = await urlToDataUrl(brand?.logoPath);

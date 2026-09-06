@@ -178,7 +178,7 @@ async function brandInfo() {
   ]);
   return {
     settings,
-    businessName: brand?.displayName || settings?.businessName || "Estética Automotiva",
+    businessName: brand?.displayName || settings?.businessName || "Garagem do Ka",
     accent: brand?.themeColor || "#D4AF37",
   };
 }

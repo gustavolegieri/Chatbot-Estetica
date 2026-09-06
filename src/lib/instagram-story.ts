@@ -443,7 +443,7 @@ export async function generateAndHostStoryImage(slot: StorySlot) {
     }),
   ]);
 
-  const businessName = brand?.displayName || settings?.businessName || "Estética Automotiva";
+  const businessName = brand?.displayName || settings?.businessName || "Garagem do Ka";
   const serviceName = service?.name ?? "Polimento técnico";
   const price = service ? formatCurrency(Number(service.price)) : "R$ 289";
   const support = service?.whatsappShort || service?.description || "Acabamento premium";

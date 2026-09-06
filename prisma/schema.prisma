@@ -188,7 +188,7 @@ model FinancialRecord {
 
 model Settings {
   id                    String         @id @default("default")
-  businessName          String         @default("Estética Automotiva")
+  businessName          String         @default("Garagem do Ka")
   businessPhone         String?
   businessAddress       String?
   businessHoursStart    String         @default("08:00")
