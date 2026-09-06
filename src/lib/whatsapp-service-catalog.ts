@@ -181,6 +181,15 @@ export function categoryStartingPrice(
   return valores.length ? Math.min(...valores) : null;
 }
 
+/** "90 min" fica "1h30"; o resto passa como está. */
+export function humanizarDuracao(tempo: string): string {
+  const minutos = Number(tempo.match(/^(\d+)\s*min/i)?.[1]);
+  if (!Number.isFinite(minutos) || minutos < 60) return tempo;
+  const horas = Math.floor(minutos / 60);
+  const resto = minutos % 60;
+  return resto ? `${horas}h${String(resto).padStart(2, "0")}` : `${horas}h`;
+}
+
 function precoCurto(valor: number): string {
   return Number.isInteger(valor)
     ? `R$ ${valor}`
@@ -276,14 +285,29 @@ export function subMenuForCategoryCtx(
 ): string {
   const cat = ctx.categories[categoryNum];
   if (!cat) return "";
+  // Preço e tempo entram depois do travessão: viram a descrição da linha na
+  // lista nativa e o cliente decide sem precisar abrir cada serviço.
   const lines = cat.keys
     .filter((k) => k !== "indeciso")
     .map((key, i) => {
       const item = ctx.catalog[key];
-      return item ? `*${i + 1}* — ${item.label}` : null;
+      if (!item) return null;
+      const detalhes = [
+        item.hatchMin > 0 ? precoCurto(item.hatchMin) : "sob avaliação",
+        humanizarDuracao(item.time),
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      return `*${i + 1}* — ${item.label} — ${detalhes}`;
     })
     .filter(Boolean);
-  return [`*${cat.title}* — qual opção?`, ``, ...lines, ``, `*0* — Voltar ao menu principal`].join("\n");
+  return [
+    `*${cat.title}*`,
+    ``,
+    ...lines,
+    ``,
+    `*0* — Voltar ao menu principal`,
+  ].join("\n");
 }
 
 export function getUpsellForKey(

@@ -63,6 +63,7 @@ import { resolveValidCustomerName } from "./customer-name";
 import { getCachedWorkingDays, getRuntimeSettings } from "./settings-runtime";
 import { sendWelcomeCover } from "./whatsapp-welcome";
 import { generateServiceCard, serviceCardFromDetail } from "./whatsapp-cards";
+import { humanizarDuracao } from "./whatsapp-service-catalog";
 import { requestHumanHandoff, wantsHumanHandoff } from "./whatsapp-handoff";
 import {
   etapa1Welcome,
@@ -331,6 +332,21 @@ async function sendCalendarWithImageAndList(params: { number: string; prompts?: 
 /**
  * Wrapper para sendText que suporta modo de teste
  */
+/**
+ * Apresentação da marca: cartão com o texto na legenda.
+ *
+ * É a primeira coisa que o cliente vê, e antes era um parágrafo de oito linhas
+ * com endereço e horário no meio. O simulador do painel não renderiza imagem,
+ * então lá continua o texto.
+ */
+async function enviarAberturaDaMarca(msg: IncomingMessage, texto: string) {
+  if (msg.testMode) {
+    await sendText({ number: msg.phone, text: texto, voiceReply: false });
+    return;
+  }
+  await sendWelcomeCover(msg.phone, texto, "ETAPA1_AWAITING_NAME");
+}
+
 async function sendTextWrapper(
   msg: IncomingMessage,
   text: string,
@@ -343,7 +359,7 @@ async function sendTextWrapper(
       if (!options?.includesWelcome) {
         // A apresentação nunca deve chegar colada ao menu, serviço ou dúvida.
         // Mantemos uma mensagem curta e independente antes de continuar.
-        await sendText({ number: msg.phone, text: msg.initialWelcomePrefix, voiceReply: false });
+        await enviarAberturaDaMarca(msg, msg.initialWelcomePrefix);
         if (!msg.testMode?.sendTextCallback) await delay(180);
       }
     }
@@ -1315,7 +1331,7 @@ async function activateService(
       serviceCardFromDetail(detailText, {
         name: item.label,
         price: item.hatchMin > 0 ? `R$ ${item.hatchMin}` : "Sob avaliação",
-        duration: item.time,
+        duration: humanizarDuracao(item.time),
       })
     );
     if (cartao) {
@@ -1323,7 +1339,7 @@ async function activateService(
         await sendMedia({
           number: msg.phone,
           mediaUrl: cartao,
-          caption: `*${item.label}* — ${item.hatchMin > 0 ? `R$ ${item.hatchMin}` : "valor sob avaliação"} · ${item.time}`,
+          caption: `*${item.label}* — ${item.hatchMin > 0 ? `R$ ${item.hatchMin}` : "valor sob avaliação"} · ${humanizarDuracao(item.time)}`,
         })
       );
       await goToVehicleStep(msg, activeFlow, wctx);
@@ -4943,15 +4959,15 @@ export async function startFlow(msg: IncomingMessage) {
     const wctx = await loadWhatsAppCatalog();
     const normalizedDigits = normalizePhone(msg.phone);
     const abWelcomeVariant: "A" | "B" = Number(normalizedDigits.slice(-1) || "0") % 2 === 0 ? "A" : "B";
+    // Endereço, horário e o que fazemos vivem no cartão da marca, que é como
+    // esta apresentação chega ao cliente. O texto fica com o que a imagem não
+    // diz: quem está falando e o que essa conversa resolve.
     msg.initialWelcomePrefix = [
-      `Olá! Você está falando com a *${ctx.businessName}* 🚗`,
+      `Olá! Aqui é a assistente da *${ctx.businessName}* 🚗`,
       "",
       abWelcomeVariant === "A"
-        ? "Sou a assistente virtual da equipe. Posso esclarecer dúvidas, recomendar o cuidado ideal e organizar seu agendamento."
-        : "Vou cuidar do seu atendimento do começo ao fim: entendo o que seu veículo precisa, indico o serviço e encontro um bom horário para você.",
-      "",
-      ctx.address ? `📍 ${ctx.address}` : "📍 Consulte nosso endereço por aqui",
-      `🕒 ${ctx.hours}`,
+        ? "Cuido do seu atendimento do início ao fim: indico o serviço certo, mostro o preço e reservo o horário."
+        : "Vou entender o que seu carro precisa, mostrar o preço e reservar o melhor horário para você.",
     ].join("\n");
     msg.initialWelcomeConsumed = false;
     const input = msg.text.trim();

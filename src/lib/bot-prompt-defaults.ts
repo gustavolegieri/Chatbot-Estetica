@@ -178,7 +178,7 @@ export const BOT_PROMPT_DEFAULTS: PromptDef[] = [
     label: "Confirmação final (legado)",
     category: "fluxo",
     hint: "{name}, {vehicle}, {services}, {day}, {time}, {payment}, {value}, {address}, {pixBlock}",
-    content: "✅ *Agendamento confirmado*\n\nOlá, *{name}*. Sua reserva foi registrada.\n\n*Dados do atendimento*\n👤 Cliente: {name}\n🚗 Veículo: {vehicle}\n🛠️ Serviço(s): {services}\n📅 Data: {day}\n🕒 Horário: {time}\n💳 Pagamento: {payment}\n💰 Valor estimado: R$ {value}\n\n📍 *Local:* {address}\n{pixBlock}\n\n_Enviaremos um lembrete antes do atendimento. Caso precise ajustar algo, responda por aqui._",
+    content: "✅ *Horário reservado, {name}!*\n\n🚗 {vehicle}\n🛠️ {services}\n📅 {day} às {time}\n💰 R$ {value} · {payment}\n\n📍 {address}\n{pixBlock}\n\n*No dia:* chegue no horário e deixe o carro conosco — te aviso quando estiver pronto.\n\n_Aviso 30 min antes. Precisa mudar? Escreva *remarcar* ou *cancelar* por aqui._",
   },
   {
     key: "stale_return",
@@ -225,14 +225,14 @@ export const BOT_PROMPT_DEFAULTS: PromptDef[] = [
     label: "Aviso 30min antes",
     category: "automacao",
     hint: "{name}, {service}, {time}",
-    content: "🚗 *Seu atendimento está próximo*\n\nOlá, *{name}*. O serviço *{service}* está reservado para *{time}*.\n\nSe houver qualquer imprevisto, responda por aqui para que a equipe possa ajudar.",
+    content: "🚗 *Falta pouco, {name}!*\n\nSeu atendimento de *{service}* começa às *{time}*.\n\n📍 {address}\n\n_Se precisar de mais tempo, é só avisar por aqui._",
   },
   {
     key: "appointment_cancelled",
     label: "Cancelamento automático",
     category: "automacao",
     hint: "{name}, {dateLabel}, {time}, {service}, {reason}",
-    content: "Olá, *{name}*.\n\nSeu agendamento foi cancelado:\n\n🛠️ {service}\n📅 {dateLabel}, às {time}\n\n{reason}\n\nPara escolher um novo horário, responda *menu*.",
+    content: "Tudo certo, *{name}* — seu horário foi cancelado, sem custo.\n\n🛠️ {service}\n📅 {date} às {time}\n\nQuando quiser voltar, é só me chamar. 🚗",
   },
   {
     key: "appointment_thankyou",
