@@ -5386,11 +5386,13 @@ async function confirmFinal(
     flow.rescheduleAppointmentId = undefined;
   }
 
+  // Os complementos aceitos entram no nome do atendimento: sem eles o resumo
+  // cobrava um total que os serviços listados não explicavam.
   const services = [
-
     flow.serviceLabel,
     flow.upsellAccepted ? flow.upsellLabel : null,
     flow.packageKey,
+    ...(flow.extrasChosen ?? []).map((extra) => extra.label),
   ]
     .filter(Boolean)
     .join(" + ");

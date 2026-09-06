@@ -611,7 +611,12 @@ export async function buildSummaryConfirmResponses(
   const reminderText = reminderEnabled ? "Sim" : "Não";
   const pickupText = state.needsPickup ? "Sim" : "Não";
   const customerName = resolveValidCustomerName(state.customerName) ?? resolveValidCustomerName(pushName) ?? "Cliente";
-  const serviceName = state.serviceLabel ?? "—";
+  // Complementos aceitos entram no nome do atendimento: sem eles o resumo
+  // mostrava um total que os serviços listados não explicavam.
+  const serviceName =
+    [state.serviceLabel, ...(state.extrasChosen ?? []).map((extra) => extra.label)]
+      .filter(Boolean)
+      .join(" + ") || "—";
   const vehicle = vehicleDisplayFromFlow(state) || "—";
   const date = customerDayDisplay(state) ?? "—";
   const time = state.startTime ?? "—";
