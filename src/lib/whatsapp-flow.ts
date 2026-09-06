@@ -1235,9 +1235,10 @@ function quoteForKey(key: string, flow: FlowState, wctx: WhatsAppCatalogContext)
     max = Math.round(max * 1.12);
   }
   if (min <= 0 && key === "polimento_cotacao") {
-    return { min: 0, max: 0, time: item.time, label: item.label };
+    return { min: 0, max: 0, time: humanizarDuracao(item.time), label: item.label };
   }
-  return { min, max, time: item.time, label: item.label };
+  // "90 min" na mensagem do orcamento vira "1h30", igual ao resto do fluxo.
+  return { min, max, time: humanizarDuracao(item.time), label: item.label };
 }
 
 async function activateService(
