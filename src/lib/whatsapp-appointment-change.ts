@@ -107,6 +107,25 @@ export async function cancelAppointmentFromBot(params: {
     }),
   ]);
 
+  // Trilha de auditoria: quem pediu, quando e por quê. Sem ela, um horário que
+  // some da agenda vira discussão — o painel mostra o estado, não a história.
+  await prisma.auditLog
+    .create({
+      data: {
+        action: "appointment.cancelled",
+        resource: `appointment:${params.appointmentId}`,
+        data: {
+          motivo: params.motivo,
+          responsavel: `whatsapp:${atualizado.client.phone}`,
+          servico: atualizado.service.name,
+          data: atualizado.date.toISOString(),
+          horario: atualizado.startTime,
+          canceladoEm: new Date().toISOString(),
+        },
+      },
+    })
+    .catch((error) => console.error("[Agendamento] Falha ao registrar auditoria:", error));
+
   try {
     const { notifyCancelledAppointment } = await import("./notifications");
     await notifyCancelledAppointment(atualizado, params.motivo);

@@ -74,6 +74,7 @@ import {
   serviceCardFromDetail,
 } from "./whatsapp-cards";
 import { eventoNaAgenda, proximaManutencao, rotaNoMapa } from "./whatsapp-links";
+import { reserva as copyReserva } from "./whatsapp-copy";
 import { humanizarDuracao } from "./whatsapp-service-catalog";
 import { requestHumanHandoff, wantsHumanHandoff } from "./whatsapp-handoff";
 import {
@@ -1846,11 +1847,9 @@ async function handleAppointmentChange(
       await saveFlow(msg.phone, next);
       await sendText({
         number: msg.phone,
-        text: [
-          `Pronto. Seu horário de *${format(new Date(cancelado.date), "dd/MM")} às ${cancelado.startTime}* foi cancelado, sem custo.`,
-          "",
-          "Quando quiser remarcar, é só me chamar — envie *menu* para ver os serviços.",
-        ].join("\n"),
+          text: copyReserva.cancelada(
+            `${format(new Date(cancelado.date), "dd/MM")} às ${cancelado.startTime}`
+          ),
       });
       return true;
     }
@@ -1864,7 +1863,7 @@ async function handleAppointmentChange(
       await saveFlow(msg.phone, next);
       await sendText({
         number: msg.phone,
-        text: "Combinado, seu horário continua confirmado 😊 Te espero no dia!",
+        text: copyReserva.mantida,
       });
       return true;
     }
@@ -1896,16 +1895,7 @@ async function handleAppointmentChange(
     await saveFlow(msg.phone, next);
     await sendText({
       number: msg.phone,
-      text: [
-        `Você tem *${agendamento.service.name}* marcado para ${quando}.`,
-        "",
-        "Confirma o cancelamento?",
-        "",
-        "*1* ✅ Sim, cancelar",
-        "*2* 📅 Manter o horário",
-        "",
-        "_Se preferir apenas trocar o dia, responda *remarcar*._",
-      ].join("\n"),
+      text: copyReserva.confirmarCancelamento(agendamento.service.name, quando),
     });
     return true;
   }
@@ -1950,7 +1940,7 @@ async function handleAppointmentChange(
     msg,
     next,
     wctx,
-    `Vamos remarcar seu atendimento de *${agendamento.service.name}*, marcado para ${quando}.\n\nO horário atual fica reservado até você confirmar o novo.`
+    copyReserva.remarcando(agendamento.service.name, quando)
   );
   if (!ofereceu) {
     await sendText({
