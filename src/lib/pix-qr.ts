@@ -50,24 +50,55 @@ export async function generatePixQrCode(
   }
 }
 
+/**
+ * Campo do BR Code: identificador, tamanho com dois dígitos e valor.
+ *
+ * O tamanho é o que fazia o código anterior falhar: ele vinha fixo no
+ * template (`0136` para a chave, `540` para o valor), então qualquer chave que
+ * não tivesse 36 caracteres — e-mail, telefone, CPF, chave aleatória com outro
+ * formato — ou qualquer valor com número de dígitos diferente produzia um
+ * código que o app do banco recusa.
+ */
+function campo(id: string, valor: string): string {
+  return `${id}${String(valor.length).padStart(2, "0")}${valor}`;
+}
+
+/** Tira acento e símbolo: o BR Code aceita só ASCII imprimível. */
+function apenasAscii(texto: string, limite: number): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^ -~]/g, "")
+    .trim()
+    .slice(0, limite);
+}
+
+/**
+ * PIX Copia e Cola no formato EMV do Banco Central.
+ *
+ * A ordem dos campos é a da especificação e o CRC16 fecha o código — os dois
+ * são verificados pelo app do banco antes de mostrar o pagamento.
+ */
 export function generatePixPayload(data: PixQrCodeData): string {
-  // Gera payload PIX Copia e Cola (formato padrão do Banco Central)
-  // Implementação simplificada para desenvolvimento
+  const chave = data.key.trim();
+  const conta = campo("00", "BR.GOV.BCB.PIX") + campo("01", chave);
+  const valor = data.amount > 0 ? data.amount.toFixed(2) : null;
 
-  const key = data.key;
-  const amount = Math.floor(data.amount * 100).toString().padStart(11, '0');
-  const merchantName = data.merchantName.substring(0, 25).padEnd(25, ' ');
-  const merchantCity = data.merchantCity.substring(0, 15).padEnd(15, ' ');
+  const partes = [
+    campo("00", "01"),
+    campo("26", conta),
+    campo("52", "0000"),
+    campo("53", "986"),
+    valor ? campo("54", valor) : "",
+    campo("58", "BR"),
+    campo("59", apenasAscii(data.merchantName, 25) || "GARAGEM DO KA"),
+    campo("60", apenasAscii(data.merchantCity, 15) || "JUNDIAI"),
+    campo("62", campo("05", "***")),
+  ];
 
-  // Payload simplificado para QR Code PIX
-  // Em produção, usar biblioteca oficial do Banco Central
-  const payload = `00020126580014BR.GOV.BCB.PIX0136${key}520400005303986540${amount}5802BR59${merchantName}6009${merchantCity}62070503***6304`;
-
-  // Calcular CRC16-CCITT para o payload (simplificado)
-  const crc = calculateCRC16(payload.substring(0, payload.length - 4));
-  const crcHex = crc.toString(16).toUpperCase().padStart(4, '0');
-
-  return payload.substring(0, payload.length - 4) + crcHex;
+  const semCrc = `${partes.join("")}6304`;
+  const crc = calculateCRC16(semCrc).toString(16).toUpperCase().padStart(4, "0");
+  return `${semCrc}${crc}`;
 }
 
 // Função simplificada para cálculo de CRC16-CCITT

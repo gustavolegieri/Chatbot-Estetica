@@ -76,6 +76,7 @@ import {
 } from "./whatsapp-cards";
 import { eventoNaAgenda, proximaManutencao, rotaNoMapa } from "./whatsapp-links";
 import { preverODia } from "./previsao-tempo";
+import { generatePixPayload, generatePixQrCode } from "./pix-qr";
 import { naoEntendi, pareceRabisco, reserva as copyReserva } from "./whatsapp-copy";
 import { humanizarDuracao } from "./whatsapp-service-catalog";
 import { requestHumanHandoff, wantsHumanHandoff } from "./whatsapp-handoff";
@@ -5600,6 +5601,31 @@ async function confirmFinal(
       where: { phone: normalizePhone(msg.phone) },
       data: { pendingAppointmentId: null },
     });
+  }
+
+  // PIX escolhido: o QR e o copia-e-cola vão logo depois da confirmação. O
+  // cliente paga sem sair da conversa e sem digitar chave nenhuma.
+  if (includePix && ctx.pixKey && !msg.testMode) {
+    try {
+      const dadosPix = {
+        amount: totalValue,
+        description: services || flow.serviceLabel || "Atendimento",
+        merchantName: ctx.pixHolder || ctx.businessName,
+        merchantCity: ctx.pixMerchantCity || "Jundiai",
+        key: ctx.pixKey,
+      };
+      const qr = await generatePixQrCode(dadosPix);
+      await sendMedia({
+        number: msg.phone,
+        mediaUrl: qr,
+        caption: `💠 *PIX de R$ ${totalValue.toFixed(2).replace(".", ",")}*
+
+Aponte a câmera do banco para o código — ou use o copia e cola abaixo.`,
+      });
+      await sendText({ number: msg.phone, text: generatePixPayload(dadosPix) });
+    } catch (erro) {
+      console.error("[PIX] Não foi possível montar o código; a reserva segue confirmada:", erro);
+    }
   }
 
   if (menuFlow.awaitingPlateAfterBooking) {
