@@ -12,6 +12,8 @@
  * e conversão pelo mesmo `convertSvgToPng` do calendário — é ele que carrega as
  * fontes do repositório, sem depender de fonte de sistema.
  */
+import { createHash } from "node:crypto";
+import { prisma } from "./prisma";
 import { renderLogo } from "./svg-utils";
 import { uploadImageToCloudinary } from "./image-upload";
 import { convertSvgToPng } from "./calendar-converter";
@@ -142,12 +144,45 @@ function moldura(altura: number, conteudo: string) {
   `;
 }
 
+/** Cache do processo, para duas mensagens seguidas na mesma instância. */
+const cacheEmMemoria = new Map<string, string>();
+
+/**
+ * Publica o cartão, reaproveitando o que já foi renderizado.
+ *
+ * A capa da marca e a tabela de serviços têm o mesmo SVG em todo atendimento, e
+ * os dois passos caros são justamente os finais: converter para PNG e subir. O
+ * endereço é o conteúdo — mesmo SVG, mesma URL —, então o cache não precisa de
+ * invalidação: mudou o preço, muda o SVG, muda o hash.
+ */
 async function publicar(svg: string, prefixo: string, alternativo: string): Promise<string | null> {
+  const hash = createHash("sha256").update(svg).digest("hex");
+
+  const daMemoria = cacheEmMemoria.get(hash);
+  if (daMemoria) return daMemoria;
+
+  try {
+    const salvo = await prisma.cardCache.findUnique({ where: { hash }, select: { url: true } });
+    if (salvo?.url) {
+      cacheEmMemoria.set(hash, salvo.url);
+      return salvo.url;
+    }
+  } catch (erro) {
+    // Cache indisponível não pode derrubar o atendimento: segue e renderiza.
+    console.warn("[Cartões] Cache indisponível, renderizando de novo:", erro);
+  }
+
   try {
     const conversao = await convertSvgToPng(svg, { width: 930 });
     if (!conversao.success || !conversao.pngBuffer) throw new Error(conversao.error ?? "conversão falhou");
     const upload = await uploadImageToCloudinary(conversao.pngBuffer, `${prefixo}-${Date.now()}`, "cards");
-    if (upload.success && upload.url) return upload.url;
+    if (upload.success && upload.url) {
+      cacheEmMemoria.set(hash, upload.url);
+      await prisma.cardCache
+        .create({ data: { hash, url: upload.url, kind: prefixo } })
+        .catch(() => undefined); // corrida entre instâncias: a primeira grava
+      return upload.url;
+    }
     console.error(`[Cartões] Upload de ${prefixo} falhou:`, upload.error);
   } catch (erro) {
     console.error(`[Cartões] Não foi possível gerar ${prefixo}:`, erro);

@@ -681,3 +681,16 @@ model InstagramStoryPost {
   @@index([slot, publishedAt])
   @@index([publishedAt])
 }
+
+/// Cartao ja renderizado, endereçado pelo conteudo.
+/// O SVG de boas-vindas e o da tabela de servicos sao identicos a cada
+/// atendimento: sem este cache, toda conversa pagava de novo a conversao para
+/// PNG e o upload, os dois passos mais lentos da resposta.
+model CardCache {
+  hash      String   @id
+  url       String
+  kind      String
+  createdAt DateTime @default(now())
+
+  @@index([kind])
+}

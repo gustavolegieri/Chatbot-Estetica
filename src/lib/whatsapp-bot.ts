@@ -193,17 +193,20 @@ async function handleMessageInternal(msg: IncomingMessage) {
         return;
       }
 
-      // Bloqueio administrativo de números: evita respostas automáticas do bot
-      const blocked = await prisma.blockedPhone.findUnique({
-        where: { phone: normalizePhone(msg.phone) },
-        select: { id: true },
-      });
+      // As duas travas são independentes e cada ida ao Postgres custa uma volta
+      // de rede inteira: em série elas somavam ~1s antes da primeira resposta.
+      const [blocked, botPausado] = await Promise.all([
+        prisma.blockedPhone.findUnique({
+          where: { phone: normalizePhone(msg.phone) },
+          select: { id: true },
+        }),
+        isBotPausedForPhone(msg.phone),
+      ]);
       if (blocked) {
         console.log("[WhatsApp Bot] Número bloqueado:", msg.phone);
         return;
       }
-
-      if (await isBotPausedForPhone(msg.phone)) {
+      if (botPausado) {
         console.log("[WhatsApp Bot] Bot pausado para este número:", msg.phone);
         return;
       }
