@@ -694,3 +694,14 @@ model CardCache {
 
   @@index([kind])
 }
+
+/// Marcador curto compartilhado entre as instancias serverless.
+/// Uma trava em memoria nao vale nada quando cada mensagem cai em um processo
+/// novo: o cooldown de um provedor de IA sem credito, por exemplo, precisa
+/// sobreviver a invocacao que o descobriu.
+model RuntimeFlag {
+  key       String   @id
+  value     String
+  expiresAt DateTime?
+  updatedAt DateTime @updatedAt
+}

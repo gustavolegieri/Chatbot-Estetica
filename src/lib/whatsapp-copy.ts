@@ -101,3 +101,23 @@ export const posAtendimento = {
       "_Para trocar a data, escreva *remarcar*. Para desmarcar, *cancelar*._",
     ].join("\n"),
 };
+
+/**
+ * Texto sem intenção reconhecível: teclado no bolso, dedo errado, teste.
+ *
+ * A marca é a ausência de estrutura de palavra — poucas vogais, nenhum espaço,
+ * nada de dígito. Serve para responder na hora, sem gastar uma chamada de IA
+ * para devolver "não entendi" de um jeito mais bonito.
+ */
+export function pareceRabisco(texto: string): boolean {
+  const limpo = texto.trim().toLowerCase();
+  if (limpo.length < 4 || limpo.length > 20) return false;
+  if (/\s/.test(limpo)) return false;
+  if (/\d/.test(limpo)) return false;
+  if (!/^[a-záàâãéêíóôõúç]+$/i.test(limpo)) return false;
+
+  const vogais = (limpo.match(/[aeiouáàâãéêíóôõú]/g) ?? []).length;
+  const proporcao = vogais / limpo.length;
+  // Português fica entre 40% e 50% de vogais; abaixo de 30% não é palavra.
+  return proporcao < 0.3;
+}

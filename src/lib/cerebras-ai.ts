@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { FLAG_CEREBRAS_INDISPONIVEL, flagAtiva, ligarFlag } from "./runtime-flags";
 
 const OLLAMA_DEFAULT_URL = "http://127.0.0.1:11434";
 const OLLAMA_DEFAULT_MODEL = "qwen2.5:3b-instruct";
@@ -253,6 +254,11 @@ export async function cerebrasChat(params: {
         if (provider.name === "Cerebras") {
           const cooldown = cerebrasCooldownForStatus(res.status);
           if (cooldown > 0) cerebrasUnavailableUntil = Date.now() + cooldown;
+          // O cooldown precisa atravessar a invocação: sem isso, cada mensagem
+          // em uma instância nova paga de novo a resposta 402.
+          if (cooldown > 0) {
+            void ligarFlag(FLAG_CEREBRAS_INDISPONIVEL, String(res.status), cooldown);
+          }
         }
         console.error(`[${provider.name}] API error:`, res.status, error.slice(0, 300));
         return null;
@@ -269,7 +275,9 @@ export async function cerebrasChat(params: {
     }
   };
 
-  if (cerebrasKey && Date.now() >= cerebrasUnavailableUntil) {
+  const cerebrasEmCooldown =
+    Date.now() < cerebrasUnavailableUntil || (await flagAtiva(FLAG_CEREBRAS_INDISPONIVEL));
+  if (cerebrasKey && !cerebrasEmCooldown) {
     const primary = await requestProvider({
       name: "Cerebras",
       url: CEREBRAS_URL,

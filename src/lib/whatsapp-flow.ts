@@ -74,7 +74,7 @@ import {
   serviceCardFromDetail,
 } from "./whatsapp-cards";
 import { eventoNaAgenda, proximaManutencao, rotaNoMapa } from "./whatsapp-links";
-import { reserva as copyReserva } from "./whatsapp-copy";
+import { naoEntendi, pareceRabisco, reserva as copyReserva } from "./whatsapp-copy";
 import { humanizarDuracao } from "./whatsapp-service-catalog";
 import { requestHumanHandoff, wantsHumanHandoff } from "./whatsapp-handoff";
 import {
@@ -3944,6 +3944,18 @@ ${await menuForStage(flow, wctx, msg.pushName)}`,
           });
           return;
         }
+
+        // Rabisco curto e sem vogal repetida não é pergunta: é teclado no bolso
+        // ou dedo errado. Consultar a IA custava segundos para devolver um texto
+        // genérico; o menu de volta responde na hora e mostra a saída.
+        if (pareceRabisco(input)) {
+          await sendText({
+            number: msg.phone,
+            text: naoEntendi.opcaoInvalida(msgH.mainMenu(flow, msg.pushName)),
+          });
+          return;
+        }
+
         const clarification = await buildFriendlyFallback(input, flow.stage, flow.serviceLabel);
         await sendText({
           number: msg.phone,
